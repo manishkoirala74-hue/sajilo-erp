@@ -931,7 +931,7 @@ function GeneralLedgerDetailReport({ initialFromDate, initialToDate }) {
 
   const accPicker = (
     <div className="flex flex-col gap-1 min-w-[200px]">
-      <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Select Account</Label>
+      <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Select Account</label>
       <select
         value={filters.accountId}
         onChange={e => setFilters(p => ({ ...p, accountId: e.target.value }))}
