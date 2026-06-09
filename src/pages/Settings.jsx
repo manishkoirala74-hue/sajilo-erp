@@ -3,7 +3,7 @@ import { useAuth } from '@/lib/AuthContext';
 import { sajilo } from '@/api/sajiloClient';
 import {
   Save, Building2, Users, Settings2, FileText, Mail,
-  ChevronRight, Globe, Bell, Hash, Palette, Shield, Database, TrendingDown, FileSpreadsheet, BookOpen, Calendar
+  ChevronRight, Globe, Bell, Hash, Palette, Shield, Database, TrendingDown, FileSpreadsheet, BookOpen, Calendar, HardDrive
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,6 +17,7 @@ import DepreciationSettings from '@/components/settings/DepreciationSettings';
 import QuotationSettings from '@/components/settings/QuotationSettings';
 import OpeningBalances from '@/components/settings/OpeningBalances.jsx';
 import ItemImportExport from '@/components/settings/ItemImportExport';
+import DataUtilities from '@/components/settings/DataUtilities';
 
 import GLAccountSettings from '@/components/settings/GLAccountSettings';
 import PayrollGLSettings from '@/components/settings/PayrollGLSettings';
@@ -34,6 +35,7 @@ const SECTIONS = [
   { id: 'vouchers', label: 'Voucher & Invoice Setup', icon: FileText },
   { id: 'quotation', label: 'Quotation Design', icon: FileText },
   { id: 'import_export', label: 'Import / Export', icon: FileSpreadsheet },
+  { id: 'data_utilities', label: 'Data Utilities', icon: HardDrive, adminOnly: true },
   { id: 'gl_accounts', label: 'GL Account Mapping', icon: BookOpen },
   { id: 'email', label: 'Email Notifications', icon: Mail },
 ];
@@ -370,6 +372,11 @@ export default function Settings() {
         {/* ── IMPORT / EXPORT ── */}
         {activeSection === 'import_export' && (
           <ItemImportExport />
+        )}
+
+        {/* ── DATA UTILITIES ── */}
+        {activeSection === 'data_utilities' && (
+          <DataUtilities />
         )}
 
         {/* ── GL ACCOUNT MAPPING ── */}

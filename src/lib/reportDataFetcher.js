@@ -10,173 +10,46 @@ export async function fetchReportData(reportId, fromDate, toDate) {
   switch (reportId) {
 
     case 'trial_balance': {
-      const [accounts, journals, lines] = await Promise.all([
-        sajilo.entities.ChartOfAccount.filter({ is_active: true }, 'account_code', 2000),
-        sajilo.entities.GeneralLedgerJournal.filter({ status: 'Posted' }, 'entry_date', 10000),
-        sajilo.entities.GeneralLedgerLine.list('', 50000)
-      ]);
-
-      const journalMap = {};
-      journals.forEach(j => { 
-        journalMap[j.id] = j.entry_date ? j.entry_date.split('T')[0] : ''; 
+      const p_company_id = sajilo.getCompanyId();
+      const { data, error } = await supabase.rpc('get_trial_balance_rpc', {
+        p_company_id,
+        p_from_date: fromDate,
+        p_to_date: toDate
       });
-      
-      const accountTotals = {};
-      lines.forEach(l => {
-        const date = journalMap[l.journal_id];
-        if (!date) return;
-        
-        if (!accountTotals[l.account_id]) {
-          accountTotals[l.account_id] = { ob_dr: 0, ob_cr: 0, cur_dr: 0, cur_cr: 0 };
-        }
-        
-        if (date < fromDate) {
-          accountTotals[l.account_id].ob_dr += (l.debit_amount || 0);
-          accountTotals[l.account_id].ob_cr += (l.credit_amount || 0);
-        } else if (date >= fromDate && date <= toDate) {
-          accountTotals[l.account_id].cur_dr += (l.debit_amount || 0);
-          accountTotals[l.account_id].cur_cr += (l.credit_amount || 0);
-        }
-      });
-
-      return accounts
-        .filter(a => a.ledger_type === 'Sub Ledger' && a.account_code && a.account_code !== '—')
-        .map(a => {
-          const t = accountTotals[a.id] || { ob_dr: 0, ob_cr: 0, cur_dr: 0, cur_cr: 0 };
-          const isDebitNormal = ['Asset','COGS','Expense','OPEX','Cost of Goods Sold','Other Expense'].includes(a.account_type);
-          
-          let ob_dr = 0, ob_cr = 0;
-          if (isDebitNormal) {
-            ob_dr = Number(a.opening_balance || 0);
-          } else {
-            ob_cr = Number(a.opening_balance || 0);
-          }
-          ob_dr += Number(t.ob_dr || 0);
-          ob_cr += Number(t.ob_cr || 0);
-          
-          let net_ob_dr = 0, net_ob_cr = 0;
-          const net_ob = ob_dr - ob_cr;
-          if (isDebitNormal) {
-            if (net_ob >= 0) net_ob_dr = net_ob; else net_ob_cr = -net_ob;
-          } else {
-            if (net_ob <= 0) net_ob_cr = -net_ob; else net_ob_dr = net_ob;
-          }
-          
-          const cur_dr = t.cur_dr;
-          const cur_cr = t.cur_cr;
-          
-          const total_dr = net_ob_dr + cur_dr;
-          const total_cr = net_ob_cr + cur_cr;
-          
-          let net_cb_dr = 0, net_cb_cr = 0;
-          const net_cb = total_dr - total_cr;
-          if (isDebitNormal) {
-            if (net_cb >= 0) net_cb_dr = net_cb; else net_cb_cr = -net_cb;
-          } else {
-            if (net_cb <= 0) net_cb_cr = -net_cb; else net_cb_dr = net_cb;
-          }
-
-          return {
-            id:           a.id,
-            account_code: a.account_code,
-            account_name: a.account_name,
-            account_type: a.account_type,
-            ledger_type:  a.ledger_type,
-            parent_account_id: a.parent_account_id,
-            opening_debit:  net_ob_dr,
-            opening_credit: net_ob_cr,
-            current_debit:  cur_dr,
-            current_credit: cur_cr,
-            closing_debit:  net_cb_dr,
-            closing_credit: net_cb_cr,
-            _isControlAccount: a._isControlAccount,
-          };
-        })
-        .filter(a => 
-          Math.abs(a.opening_debit) > 0.001 || 
-          Math.abs(a.opening_credit) > 0.001 || 
-          Math.abs(a.current_debit) > 0.001 || 
-          Math.abs(a.current_credit) > 0.001 || 
-          Math.abs(a.closing_debit) > 0.001 || 
-          Math.abs(a.closing_credit) > 0.001
-        );
+      if (error) throw error;
+      return (data || []).map(a => ({
+        ...a,
+        _isControlAccount: false
+      }));
     }
 
     case 'profit_loss': {
-      // Fetch all active accounts to build the tree
-      const allAccounts = await sajilo.entities.ChartOfAccount.filter({ is_active: true }, 'account_code', 2000);
-      const accounts = allAccounts.filter(a => ['Revenue', 'Other Income', 'Expense', 'COGS', 'OPEX', 'Cost of Goods Sold', 'Other Expense'].includes(a.account_type));
-
-      const accTypeMap = {};
-      allAccounts.forEach(a => accTypeMap[a.id] = a.account_type);
-
-      // Fetch posted journals within date range (safely applying company filter)
-      const journals = await sajilo.entities.GeneralLedgerJournal.filter({ status: 'Posted' }, 'entry_date', 5000);
-      const validJIds = journals.filter(j => inRange(j.entry_date, fromDate, toDate)).map(j => j.id);
-
-      let lines = [];
-      if (validJIds.length > 0) {
-        // Chunk requests to avoid URL length limits
-        const chunk = 100;
-        for (let i = 0; i < validJIds.length; i += chunk) {
-          const { data } = await supabase.from('GeneralLedgerLine').select('*').in('journal_id', validJIds.slice(i, i + chunk));
-          if (data) lines = lines.concat(data);
-        }
-      }
-
-      // Compute balances dynamically
-      const balances = {};
-      lines.forEach(l => {
-        if (!balances[l.account_id]) balances[l.account_id] = 0;
-        const delta = (l.debit_amount || 0) - (l.credit_amount || 0);
-        const actualType = l.account_type || accTypeMap[l.account_id] || '';
-        const isDebitNormal = ['Asset', 'COGS', 'Expense', 'OPEX', 'Cost of Goods Sold', 'Other Expense'].includes(actualType);
-        balances[l.account_id] += (isDebitNormal ? delta : -delta);
+      const p_company_id = sajilo.getCompanyId();
+      const { data, error } = await supabase.rpc('get_profit_loss_rpc', {
+        p_company_id,
+        p_from_date: fromDate,
+        p_to_date: toDate
       });
-
-      // Map balances to the tree nodes
-      const reportAccounts = accounts.map(a => ({
-        id: a.id,
-        parent_account_id: a.parent_account_id,
-        account_code: a.account_code,
-        account_name: a.account_name,
-        account_type: a.account_type,
-        account_subtype: a.account_subtype,
-        ledger_type: a.ledger_type,
-        balance: balances[a.id] || 0
-      }));
-
-      return { accounts: reportAccounts };
+      if (error) throw error;
+      return { accounts: data || [] };
     }
 
     case 'balance_sheet': {
-      // Balance sheet sums EVERYTHING up to toDate
-      const allAccountsForTypeMap = await sajilo.entities.ChartOfAccount.filter({ is_active: true }, 'account_code', 2000);
-      const accTypeMap = {};
-      allAccountsForTypeMap.forEach(a => accTypeMap[a.id] = a.account_type);
-
-      const journals = await sajilo.entities.GeneralLedgerJournal.filter({ status: 'Posted' }, 'entry_date', 5000);
-      const validJIds = journals.filter(j => !toDate || (new Date(j.entry_date) <= new Date(toDate))).map(j => j.id);
-
-      let lines = [];
-      if (validJIds.length > 0) {
-        const chunk = 100;
-        for (let i = 0; i < validJIds.length; i += chunk) {
-          const { data } = await supabase.from('GeneralLedgerLine').select('*').in('journal_id', validJIds.slice(i, i + chunk));
-          if (data) lines = lines.concat(data);
-        }
-      }
-
-      const accMap = {};
-      lines.forEach(l => {
-        if (!accMap[l.account_id]) accMap[l.account_id] = { id: l.account_id, code: l.account_code, name: l.account_name, type: l.account_type, balance: 0 };
-        const delta = (l.debit_amount || 0) - (l.credit_amount || 0);
-        const actualType = l.account_type || accTypeMap[l.account_id] || '';
-        const isDebitNormal = ['Asset', 'COGS', 'Expense', 'OPEX', 'Cost of Goods Sold', 'Other Expense'].includes(actualType);
-        accMap[l.account_id].balance += (isDebitNormal ? delta : -delta);
+      // Re-use trial balance RPC for balance sheet up to toDate
+      const p_company_id = sajilo.getCompanyId();
+      const { data, error } = await supabase.rpc('get_trial_balance_rpc', {
+        p_company_id,
+        p_from_date: '1900-01-01', // Get everything up to toDate
+        p_to_date: toDate || new Date().toISOString().slice(0,10)
       });
+      if (error) throw error;
+      
+      const allAccounts = (data || []).map(a => {
+        const isDebitNormal = ['Asset','COGS','Expense','OPEX','Cost of Goods Sold','Other Expense'].includes(a.account_type);
+        const bal = isDebitNormal ? (a.closing_debit - a.closing_credit) : (a.closing_credit - a.closing_debit);
+        return { code: a.account_code, name: a.account_name, type: a.account_type, balance: bal };
+      }).filter(a => Math.abs(a.balance) > 0.01);
 
-      const allAccounts = Object.values(accMap).filter(a => Math.abs(a.balance) > 0.01);
       const toRow = a => ({ account_code: a.code, account_name: a.name, balance: a.balance });
 
       const assets      = allAccounts.filter(a => a.type === 'Asset').map(toRow);
@@ -277,10 +150,12 @@ export async function fetchReportData(reportId, fromDate, toDate) {
     }
 
     case 'ar_aging': {
-      const invoices = await sajilo.entities.SalesInvoice.list('-invoice_date', 2000);
+      const p_company_id = sajilo.getCompanyId();
+      let query = supabase.from('SalesInvoice').select('*').eq('status', 'Posted').neq('payment_status', 'Paid');
+      if (p_company_id) query = query.eq('company_id', p_company_id);
+      const { data: invoices } = await query;
       const today = new Date().toISOString().slice(0, 10);
-      return invoices
-        .filter(i => i.status === 'Posted' && i.payment_status !== 'Paid')
+      return (invoices || [])
         .map(i => {
           const due = i.due_date || i.invoice_date;
           const days = due < today ? Math.floor((new Date(today) - new Date(due)) / 86400000) : 0;
@@ -312,28 +187,30 @@ export async function fetchReportData(reportId, fromDate, toDate) {
     }
 
     case 'ap_aging': {
-      const bills = await sajilo.entities.PurchaseInvoice.list('-bill_date', 2000);
+      const p_company_id = sajilo.getCompanyId();
+      let query = supabase.from('PurchaseInvoice').select('*').eq('status', 'Posted').neq('payment_status', 'Paid');
+      if (p_company_id) query = query.eq('company_id', p_company_id);
+      const { data: bills } = await query;
       const today = new Date().toISOString().slice(0, 10);
       return (bills || [])
-        .filter(i => i.status === 'Posted' && i.payment_status !== 'Paid')
         .map(i => {
-          const due = i.due_date || i.bill_date;
+          const due = i.due_date || i.invoice_date;
           const days = due < today ? Math.floor((new Date(today) - new Date(due)) / 86400000) : 0;
           const bucket = days === 0 ? 'Current' : days <= 30 ? '1–30 days' : days <= 60 ? '31–60 days' : '60+ days';
-          return { invoice_number: i.bill_number, invoice_date: i.bill_date, customer_name: i.vendor_name, due_date: i.due_date, grand_total: i.grand_total, days_overdue: days, bucket, payment_status: i.payment_status };
+          return { invoice_number: i.invoice_number, invoice_date: i.invoice_date, customer_name: i.vendor_name, due_date: i.due_date, grand_total: i.grand_total, days_overdue: days, bucket, payment_status: i.payment_status };
         })
         .sort((a, b) => b.days_overdue - a.days_overdue);
     }
 
     case 'unpaid_bills': {
-      const bills = await sajilo.entities.PurchaseInvoice.list('-bill_date', 2000);
+      const bills = await sajilo.entities.PurchaseInvoice.list('-invoice_date', 2000);
       return (bills || [])
         .filter(i => i.status === 'Posted' && i.payment_status !== 'Paid')
-        .map(i => ({ invoice_number: i.bill_number, invoice_date: i.bill_date, customer_name: i.vendor_name, grand_total: i.grand_total, payment_status: i.payment_status }));
+        .map(i => ({ invoice_number: i.invoice_number, invoice_date: i.invoice_date, customer_name: i.vendor_name, grand_total: i.grand_total, payment_status: i.payment_status }));
     }
 
     case 'vendor_balance': {
-      const bills = await sajilo.entities.PurchaseInvoice.list('-bill_date', 2000);
+      const bills = await sajilo.entities.PurchaseInvoice.list('-invoice_date', 2000);
       const map = {};
       (bills || []).filter(i => i.status === 'Posted').forEach(i => {
         if (!map[i.vendor_name]) map[i.vendor_name] = { vendor: i.vendor_name, total_billed: 0 };
@@ -353,45 +230,20 @@ export async function fetchReportData(reportId, fromDate, toDate) {
     }
 
     case 'vat_purchases': {
-      const bills = await sajilo.entities.PurchaseInvoice.list('-bill_date', 2000);
-      return (bills || []).filter(i => i.status === 'Posted' && (i.vat_amount || 0) > 0 && inRange(i.bill_date, fromDate, toDate))
-        .map(i => ({ ...i, invoice_number: i.bill_number, invoice_date: i.bill_date, customer_name: i.vendor_name, goods_subtotal: i.subtotal }));
+      const bills = await sajilo.entities.PurchaseInvoice.list('-invoice_date', 2000);
+      return (bills || []).filter(i => i.status === 'Posted' && (i.vat_amount || 0) > 0 && inRange(i.invoice_date, fromDate, toDate))
+        .map(i => ({ ...i, invoice_number: i.invoice_number, invoice_date: i.invoice_date, customer_name: i.vendor_name, goods_subtotal: i.subtotal }));
     }
 
     case 'gl_summary': {
-      const allAccounts = await sajilo.entities.ChartOfAccount.filter({ is_active: true }, 'account_code', 2000);
-      const accTypeMap = {};
-      allAccounts.forEach(a => accTypeMap[a.id] = a.account_type);
-
-      const journals = await sajilo.entities.GeneralLedgerJournal.filter({ status: 'Posted' }, 'entry_date', 10000);
-      const validJIds = journals.map(j => j.id);
-
-      let lines = [];
-      if (validJIds.length > 0) {
-        const chunk = 100;
-        for (let i = 0; i < validJIds.length; i += chunk) {
-          const { data } = await supabase.from('GeneralLedgerLine').select('*').in('journal_id', validJIds.slice(i, i + chunk));
-          if (data) lines = lines.concat(data);
-        }
-      }
-
-      const journalMap = {};
-      journals.forEach(j => { journalMap[j.id] = j.entry_date ? j.entry_date.split('T')[0] : ''; });
-      
-      const accountTotals = {};
-      lines.forEach(l => {
-        const date = journalMap[l.journal_id];
-        if (!date || !inRange(date, fromDate, toDate)) return;
-        if (!accountTotals[l.account_id]) accountTotals[l.account_id] = { dr: 0, cr: 0 };
-        accountTotals[l.account_id].dr += (l.debit_amount || 0);
-        accountTotals[l.account_id].cr += (l.credit_amount || 0);
+      const p_company_id = sajilo.getCompanyId();
+      const { data, error } = await supabase.rpc('get_gl_summary_rpc', {
+        p_company_id,
+        p_from_date: fromDate,
+        p_to_date: toDate
       });
-
-      return allAccounts.map(a => ({
-        ...a,
-        debit: accountTotals[a.id]?.dr || 0,
-        credit: accountTotals[a.id]?.cr || 0
-      })).filter(a => a.debit > 0 || a.credit > 0);
+      if (error) throw error;
+      return data || [];
     }
 
     case 'journal_report': {
@@ -440,14 +292,14 @@ export async function fetchReportData(reportId, fromDate, toDate) {
     }
 
     case 'purchase_summary': {
-      const bills = await sajilo.entities.PurchaseInvoice.list('-bill_date', 2000);
-      return (bills || []).filter(i => i.status === 'Posted' && inRange(i.bill_date, fromDate, toDate));
+      const bills = await sajilo.entities.PurchaseInvoice.list('-invoice_date', 2000);
+      return (bills || []).filter(i => i.status === 'Posted' && inRange(i.invoice_date, fromDate, toDate));
     }
 
     case 'purchase_by_vendor': {
-      const bills = await sajilo.entities.PurchaseInvoice.list('-bill_date', 2000);
+      const bills = await sajilo.entities.PurchaseInvoice.list('-invoice_date', 2000);
       const map = {};
-      (bills || []).filter(i => i.status === 'Posted' && inRange(i.bill_date, fromDate, toDate)).forEach(i => {
+      (bills || []).filter(i => i.status === 'Posted' && inRange(i.invoice_date, fromDate, toDate)).forEach(i => {
         if (!map[i.vendor_name]) map[i.vendor_name] = { vendor: i.vendor_name, count: 0, total: 0 };
         map[i.vendor_name].count++;
         map[i.vendor_name].total += i.grand_total || 0;
@@ -456,9 +308,9 @@ export async function fetchReportData(reportId, fromDate, toDate) {
     }
 
     case 'purchase_by_item': {
-      const bills = await sajilo.entities.PurchaseInvoice.list('-bill_date', 2000);
+      const bills = await sajilo.entities.PurchaseInvoice.list('-invoice_date', 2000);
       const map = {};
-      (bills || []).filter(i => i.status === 'Posted' && inRange(i.bill_date, fromDate, toDate)).forEach(inv => {
+      (bills || []).filter(i => i.status === 'Posted' && inRange(i.invoice_date, fromDate, toDate)).forEach(inv => {
         (inv.line_items || []).forEach(l => {
           const key = l.item_id || l.item_name;
           if (!map[key]) map[key] = { item_code: l.item_code, item_name: l.item_name, qty_bought: 0, cost: 0 };
@@ -470,10 +322,13 @@ export async function fetchReportData(reportId, fromDate, toDate) {
     }
 
     case 'ar_aging_summary': {
-      const invoices = await sajilo.entities.SalesInvoice.list('-invoice_date', 2000);
+      const p_company_id = sajilo.getCompanyId();
+      let query = supabase.from('SalesInvoice').select('due_date, invoice_date, customer_name, grand_total').eq('status', 'Posted').neq('payment_status', 'Paid');
+      if (p_company_id) query = query.eq('company_id', p_company_id);
+      const { data: invoices } = await query;
       const today = new Date().toISOString().slice(0, 10);
       const map = {};
-      invoices.filter(i => i.status === 'Posted' && i.payment_status !== 'Paid').forEach(i => {
+      (invoices || []).forEach(i => {
         const due = i.due_date || i.invoice_date;
         const days = due < today ? Math.floor((new Date(today) - new Date(due)) / 86400000) : 0;
         const cust = i.customer_name || 'Unknown';
@@ -489,11 +344,14 @@ export async function fetchReportData(reportId, fromDate, toDate) {
     }
 
     case 'ap_aging_summary': {
-      const bills = await sajilo.entities.PurchaseInvoice.list('-bill_date', 2000);
+      const p_company_id = sajilo.getCompanyId();
+      let query = supabase.from('PurchaseInvoice').select('due_date, invoice_date, vendor_name, grand_total').eq('status', 'Posted').neq('payment_status', 'Paid');
+      if (p_company_id) query = query.eq('company_id', p_company_id);
+      const { data: bills } = await query;
       const today = new Date().toISOString().slice(0, 10);
       const map = {};
-      (bills || []).filter(i => i.status === 'Posted' && i.payment_status !== 'Paid').forEach(i => {
-        const due = i.due_date || i.bill_date;
+      (bills || []).forEach(i => {
+        const due = i.due_date || i.invoice_date;
         const days = due < today ? Math.floor((new Date(today) - new Date(due)) / 86400000) : 0;
         const vendor = i.vendor_name || 'Unknown';
         if (!map[vendor]) map[vendor] = { vendor, current: 0, '30d': 0, '60d': 0, '60d+': 0, total: 0 };
