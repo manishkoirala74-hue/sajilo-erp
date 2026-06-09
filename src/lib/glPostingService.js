@@ -37,8 +37,17 @@ async function validateNoGroupPosting(lines, preloadedAccounts = null) {
 }
 
 async function createJournal({ date, description, module, sourceId, sourceType, lines, preloadedAccounts = null }) {
-  const totalDebit  = r2(lines.reduce((s, l) => s + (l.debit_amount  || 0), 0));
-  const totalCredit = r2(lines.reduce((s, l) => s + (l.credit_amount || 0), 0));
+  // Normalize negative amounts by swapping debit and credit (to support reversal logic safely without DB errors)
+  const normalizedLines = lines.map(l => {
+    let dr = r2(l.debit_amount || 0);
+    let cr = r2(l.credit_amount || 0);
+    if (dr < 0) { cr += Math.abs(dr); dr = 0; }
+    if (cr < 0) { dr += Math.abs(cr); cr = 0; }
+    return { ...l, debit_amount: dr, credit_amount: cr };
+  });
+
+  const totalDebit  = r2(normalizedLines.reduce((s, l) => s + l.debit_amount, 0));
+  const totalCredit = r2(normalizedLines.reduce((s, l) => s + l.credit_amount, 0));
 
   if (totalDebit === 0 && totalCredit === 0) return null; // nothing to post
 
@@ -58,7 +67,7 @@ async function createJournal({ date, description, module, sourceId, sourceType, 
   });
 
   await sajilo.entities.GeneralLedgerLine.bulkCreate(
-    lines.map(l => ({
+    normalizedLines.map(l => ({
       journal_id: journal.id,
       account_id: l.account_id,
       account_code: l.account_code || '',
@@ -73,12 +82,12 @@ async function createJournal({ date, description, module, sourceId, sourceType, 
   // Update running balance on each ChartOfAccount record
   // Net effect per account: Debit increases Debit-normal accounts, Credit increases Credit-normal accounts
   const accountDeltas = {};
-  for (const l of lines) {
-    if (!l.account_id) continue;
+  normalizedLines.forEach(l => {
+    if (!l.account_id) return;
     if (!accountDeltas[l.account_id]) accountDeltas[l.account_id] = 0;
-    // net change = debit - credit (positive = net debit movement)
+    // net change = debit - credit
     accountDeltas[l.account_id] += r2((l.debit_amount || 0) - (l.credit_amount || 0));
-  }
+  });
   // Fetch affected accounts and update balances
   const accountIds = Object.keys(accountDeltas);
   if (accountIds.length > 0) {

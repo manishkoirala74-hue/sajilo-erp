@@ -1,4 +1,4 @@
-import { sajilo } from '@/api/sajiloClient';
+import { sajilo, supabase } from '@/api/sajiloClient';
 
 // Helper to check if a date string falls within range
 function inRange(dateStr, from, to) {

@@ -7,7 +7,7 @@ if (!supabaseUrl || !supabaseKey) {
   console.warn("Supabase URL or Key is missing. Check your .env.local file.");
 }
 
-const supabase = createClient(supabaseUrl || 'https://placeholder.supabase.co', supabaseKey || 'placeholder');
+export const supabase = createClient(supabaseUrl || 'https://placeholder.supabase.co', supabaseKey || 'placeholder');
 
 let activeCompanyId = null;
 const globalTables = ['User', 'Company', 'UserCompany'];
