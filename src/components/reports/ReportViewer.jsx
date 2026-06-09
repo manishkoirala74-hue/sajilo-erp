@@ -848,7 +848,146 @@ function SimpleReport({ title, reportId, initialData, initialFromDate, initialTo
     </div>
   );
 }
+// ── Detail General Ledger (with Account Picker) ───────────────────────────────
+function GeneralLedgerDetailReport({ initialFromDate, initialToDate }) {
+  const [filters,   setFilters]   = useState({ ...DEFAULT_FILTERS, fromDate: initialFromDate, toDate: initialToDate, accountId: '' });
+  const [accounts,  setAccounts]  = useState([]);
+  const [lines,     setLines]     = useState([]);
+  const [summary,   setSummary]   = useState({ ob: 0, cb: 0, obIsDr: true, cbIsDr: true });
+  const [loading,   setLoading]   = useState(false);
+  const [hasLoaded, setHasLoaded] = useState(false);
 
+  useEffect(() => {
+    sajilo.entities.ChartOfAccount.filter({ is_active: true, ledger_type: 'Sub Ledger' }, 'account_name', 1000).then(res => {
+      setAccounts(res);
+      if (res.length > 0 && !filters.accountId) {
+        setFilters(p => ({ ...p, accountId: res[0].id }));
+      }
+    });
+  }, []);
+
+  const load = useCallback(async () => {
+    if (!filters.accountId) return;
+    setHasLoaded(true);
+    setLoading(true);
+    try {
+      const [allLines, journals] = await Promise.all([
+        sajilo.entities.GeneralLedgerLine.filter({ account_id: filters.accountId }, '', 10000),
+        sajilo.entities.GeneralLedgerJournal.filter({ status: 'Posted' }, 'entry_date', 10000)
+      ]);
+      const journalMap = {};
+      journals.forEach(j => { journalMap[j.id] = j; });
+      
+      const acc = accounts.find(a => a.id === filters.accountId);
+      const isDebitNormal = acc ? ['Asset','COGS','Expense','OPEX','Cost of Goods Sold','Other Expense'].includes(acc.account_type) : true;
+      
+      let obBase = Number(acc?.opening_balance || 0);
+      let obDr = isDebitNormal ? obBase : 0;
+      let obCr = isDebitNormal ? 0 : obBase;
+
+      const validLines = [];
+      for (const l of allLines) {
+        const j = journalMap[l.journal_id];
+        if (!j || !j.entry_date) continue;
+        const date = j.entry_date.split('T')[0];
+        
+        if (date < filters.fromDate) {
+          obDr += (l.debit_amount || 0);
+          obCr += (l.credit_amount || 0);
+        } else if (date >= filters.fromDate && date <= filters.toDate) {
+          validLines.push({
+            ...l,
+            date,
+            voucher_no: j.voucher_no || '',
+            description: l.description || j.memo || ''
+          });
+        }
+      }
+      
+      validLines.sort((a,b) => a.date.localeCompare(b.date));
+
+      let netOb = isDebitNormal ? (obDr - obCr) : (obCr - obDr);
+      const obIsDr = isDebitNormal ? netOb >= 0 : netOb < 0;
+      netOb = Math.abs(netOb);
+
+      let runningBal = isDebitNormal ? (obDr - obCr) : (obCr - obDr);
+
+      const rows = validLines.map(l => {
+        const dr = l.debit_amount || 0;
+        const cr = l.credit_amount || 0;
+        runningBal += isDebitNormal ? (dr - cr) : (cr - dr);
+        return { ...l, dr, cr, bal: Math.abs(runningBal), balIsDr: isDebitNormal ? runningBal >= 0 : runningBal < 0 };
+      });
+
+      const cbIsDr = isDebitNormal ? runningBal >= 0 : runningBal < 0;
+
+      setSummary({ ob: netOb, obIsDr, cb: Math.abs(runningBal), cbIsDr });
+      setLines(rows);
+    } catch (e) {
+      console.error(e);
+    }
+    setLoading(false);
+  }, [filters.accountId, filters.fromDate, filters.toDate, accounts]);
+
+  const accPicker = (
+    <div className="flex flex-col gap-1 min-w-[200px]">
+      <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Select Account</Label>
+      <select
+        value={filters.accountId}
+        onChange={e => setFilters(p => ({ ...p, accountId: e.target.value }))}
+        className="h-8 rounded-md border border-input bg-white px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+      >
+        {accounts.map(a => <option key={a.id} value={a.id}>{a.account_name} ({a.account_code})</option>)}
+      </select>
+    </div>
+  );
+
+  const acc = accounts.find(a => a.id === filters.accountId);
+  const title = `Detail General Ledger: ${acc ? acc.account_name : '...'}`;
+
+  const tableRows = [
+    // OB Row
+    ['', '', 'Opening Balance', '', '', fmtNPR(summary.ob) + (summary.obIsDr ? ' Dr' : ' Cr')],
+    ...lines.map(l => [
+      l.date,
+      l.voucher_no,
+      l.description,
+      fmtNPR(l.dr),
+      fmtNPR(l.cr),
+      fmtNPR(l.bal) + (l.balIsDr ? ' Dr' : ' Cr')
+    ])
+  ];
+
+  const handleExport = () => downloadCSV('general_ledger_detail.csv',
+    ['Date', 'Voucher #', 'Description', 'Debit', 'Credit', 'Balance'],
+    tableRows
+  );
+
+  return (
+    <div className="space-y-4">
+      <div className="report-no-print">
+        <ReportFilterBar filters={filters} onChange={setFilters} onApply={load} showApplyButton extraOptions={accPicker} />
+      </div>
+      {!hasLoaded ? (
+        <div className="py-16 text-center space-y-3">
+          <div className="text-4xl">📊</div>
+          <p className="text-sm font-semibold text-foreground">Select an account and click <span className="text-primary">Apply</span>.</p>
+        </div>
+      ) : loading ? (
+        <div className="py-10 text-center text-muted-foreground text-sm">Loading ledger…</div>
+      ) : (
+        <ReportTable title={title} fromDate={filters.fromDate} toDate={filters.toDate}
+          headers={['Date', 'Voucher #', 'Description', 'Debit (NPR)', 'Credit (NPR)', 'Balance (NPR)']}
+          rows={tableRows}
+          footer={['', '', 'Closing Balance', fmtNPR(lines.reduce((s,l)=>s+l.dr,0)), fmtNPR(lines.reduce((s,l)=>s+l.cr,0)), fmtNPR(summary.cb) + (summary.cbIsDr ? ' Dr' : ' Cr')]}
+          onExport={handleExport}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── Print Portal ──────────────────────────────────────────────────────────────
 // ── Print Portal ──────────────────────────────────────────────────────────────
 // Injects a clean print-only DOM node so window.print() renders ONLY the report
 function usePrintPortal() {
@@ -897,6 +1036,9 @@ export default function ReportViewer({ reportId, data, fromDate, toDate, columnS
 
   const renderContent = () => {
     switch (reportId) {
+      case 'ledger_detail':
+        return <GeneralLedgerDetailReport initialFromDate={fromDate} initialToDate={toDate} />;
+
       case 'debtor_statement':
         return <PartnerStatement title="Customer Statement" mode="ar" initialFromDate={fromDate} initialToDate={toDate} />;
 
@@ -923,6 +1065,92 @@ export default function ReportViewer({ reportId, data, fromDate, toDate, columnS
 
       case 'vendor_balance':
         return <PartnerReport title="Supplier Payable Summary" mode="ap" initialFromDate={fromDate} initialToDate={toDate} />;
+
+      case 'gl_summary':
+        return <SimpleReport title="General Ledger Summary" reportId={reportId} initialData={data} initialFromDate={fromDate} initialToDate={toDate}
+          renderFn={(rows, fd, td) => (
+            <ReportTable title="General Ledger Summary" fromDate={fd} toDate={td}
+              headers={['Account Code', 'Account Name', 'Debit (NPR)', 'Credit (NPR)']}
+              rows={rows.map(r => [r.account_code, r.account_name, fmtNPR(r.debit), fmtNPR(r.credit)])}
+              footer={['', 'TOTAL', fmtNPR(rows.reduce((s,r)=>s+r.debit,0)), fmtNPR(rows.reduce((s,r)=>s+r.credit,0))]}
+              onExport={() => downloadCSV('gl_summary.csv', ['Code','Account Name','Debit','Credit'], rows.map(r=>[r.account_code, r.account_name, r.debit?.toFixed(2), r.credit?.toFixed(2)]))}
+            />
+          )} />;
+
+      case 'journal_report':
+        return <SimpleReport title="Journal Report" reportId={reportId} initialData={data} initialFromDate={fromDate} initialToDate={toDate}
+          renderFn={(rows, fd, td) => (
+            <ReportTable title="Journal Report" fromDate={fd} toDate={td}
+              headers={['Date', 'Voucher #', 'Memo', 'Lines', 'Total Amount (NPR)']}
+              rows={rows.map(r => [r.entry_date?.split('T')[0], r.voucher_no, r.memo, r.lines?.length || 0, fmtNPR(r.total_amount)])}
+              onExport={() => downloadCSV('journal_report.csv', ['Date','Voucher #','Memo','Lines','Total Amount'], rows.map(r=>[r.entry_date?.split('T')[0], r.voucher_no, r.memo, r.lines?.length || 0, r.total_amount?.toFixed(2)]))}
+            />
+          )} />;
+
+      case 'txn_list':
+        return <SimpleReport title="Transaction List" reportId={reportId} initialData={data} initialFromDate={fromDate} initialToDate={toDate}
+          renderFn={(rows, fd, td) => (
+            <ReportTable title="Transaction List" fromDate={fd} toDate={td}
+              headers={['Date', 'Voucher #', 'Account', 'Description', 'Debit (NPR)', 'Credit (NPR)']}
+              rows={rows.map(r => [r.entry_date, r.voucher_no, r.account_name, r.description || r.journal_memo, fmtNPR(r.debit_amount), fmtNPR(r.credit_amount)])}
+              footer={['', '', '', 'TOTAL', fmtNPR(rows.reduce((s,r)=>s+(r.debit_amount||0),0)), fmtNPR(rows.reduce((s,r)=>s+(r.credit_amount||0),0))]}
+              onExport={() => downloadCSV('txn_list.csv', ['Date','Voucher','Account','Description','Debit','Credit'], rows.map(r=>[r.entry_date, r.voucher_no, r.account_name, r.description || r.journal_memo, r.debit_amount?.toFixed(2), r.credit_amount?.toFixed(2)]))}
+            />
+          )} />;
+
+      case 'purchase_summary':
+        return <SimpleReport title="Purchase Summary" reportId={reportId} initialData={data} initialFromDate={fromDate} initialToDate={toDate}
+          renderFn={(rows, fd, td) => (
+            <ReportTable title="Purchase Summary" fromDate={fd} toDate={td}
+              headers={['Bill #','Date','Supplier','Status','Subtotal (NPR)','VAT (NPR)','Grand Total (NPR)']}
+              rows={rows.map(r => [r.bill_number, r.bill_date, r.vendor_name, r.status, fmtNPR(r.subtotal), fmtNPR(r.vat_amount), fmtNPR(r.grand_total)])}
+              footer={['','','','TOTAL','', fmtNPR(rows.reduce((s,r)=>s+(r.vat_amount||0),0)), fmtNPR(rows.reduce((s,r)=>s+(r.grand_total||0),0))]}
+              onExport={() => downloadCSV('purchase_summary.csv',['Bill #','Date','Supplier','Status','Subtotal','VAT','Grand Total'],rows.map(r=>[r.bill_number,r.bill_date,r.vendor_name,r.status,r.subtotal?.toFixed(2),r.vat_amount?.toFixed(2),r.grand_total?.toFixed(2)]))}
+            />
+          )} />;
+
+      case 'purchase_by_vendor':
+        return <SimpleReport title="Purchase by Supplier" reportId={reportId} initialData={data} initialFromDate={fromDate} initialToDate={toDate}
+          renderFn={(rows, fd, td) => (
+            <ReportTable title="Purchase by Supplier" fromDate={fd} toDate={td}
+              headers={['Supplier','Bill Count','Total Purchased (NPR)']}
+              rows={rows.map(r => [r.vendor, r.count, fmtNPR(r.total)])}
+              footer={['TOTAL','', fmtNPR(rows.reduce((s,r)=>s+(r.total||0),0))]}
+              onExport={() => downloadCSV('purchase_by_vendor.csv',['Supplier','Bill Count','Total Purchased'],rows.map(r=>[r.vendor,r.count,r.total?.toFixed(2)]))}
+            />
+          )} />;
+
+      case 'purchase_by_item':
+        return <SimpleReport title="Purchase by Item" reportId={reportId} initialData={data} initialFromDate={fromDate} initialToDate={toDate}
+          renderFn={(rows, fd, td) => (
+            <ReportTable title="Purchase by Item" fromDate={fd} toDate={td}
+              headers={['Item Code','Item Name','Qty Bought','Cost (NPR)']}
+              rows={rows.map(r => [r.item_code||'—', r.item_name, r.qty_bought, fmtNPR(r.cost)])}
+              onExport={() => downloadCSV('purchase_by_item.csv',['Code','Item','Qty','Cost'],rows.map(r=>[r.item_code,r.item_name,r.qty_bought,r.cost?.toFixed(2)]))}
+            />
+          )} />;
+
+      case 'ar_aging_summary':
+        return <SimpleReport title="Customer Ageing Summary" reportId={reportId} initialData={data} initialFromDate={fromDate} initialToDate={toDate}
+          renderFn={(rows, fd, td) => (
+            <ReportTable title="Customer Ageing Summary" fromDate={fd} toDate={td}
+              headers={['Customer', 'Current', '1-30 Days', '31-60 Days', '60+ Days', 'Total (NPR)']}
+              rows={rows.map(r => [r.customer, fmtNPR(r.current), fmtNPR(r['30d']), fmtNPR(r['60d']), fmtNPR(r['60d+']), fmtNPR(r.total)])}
+              footer={['TOTAL', fmtNPR(rows.reduce((s,r)=>s+r.current,0)), fmtNPR(rows.reduce((s,r)=>s+r['30d'],0)), fmtNPR(rows.reduce((s,r)=>s+r['60d'],0)), fmtNPR(rows.reduce((s,r)=>s+r['60d+'],0)), fmtNPR(rows.reduce((s,r)=>s+r.total,0))]}
+              onExport={() => downloadCSV('ar_aging_summary.csv',['Customer', 'Current', '1-30 Days', '31-60 Days', '60+ Days', 'Total'],rows.map(r=>[r.customer, r.current?.toFixed(2), r['30d']?.toFixed(2), r['60d']?.toFixed(2), r['60d+']?.toFixed(2), r.total?.toFixed(2)]))}
+            />
+          )} />;
+
+      case 'ap_aging_summary':
+        return <SimpleReport title="Supplier Ageing Summary" reportId={reportId} initialData={data} initialFromDate={fromDate} initialToDate={toDate}
+          renderFn={(rows, fd, td) => (
+            <ReportTable title="Supplier Ageing Summary" fromDate={fd} toDate={td}
+              headers={['Supplier', 'Current', '1-30 Days', '31-60 Days', '60+ Days', 'Total (NPR)']}
+              rows={rows.map(r => [r.vendor, fmtNPR(r.current), fmtNPR(r['30d']), fmtNPR(r['60d']), fmtNPR(r['60d+']), fmtNPR(r.total)])}
+              footer={['TOTAL', fmtNPR(rows.reduce((s,r)=>s+r.current,0)), fmtNPR(rows.reduce((s,r)=>s+r['30d'],0)), fmtNPR(rows.reduce((s,r)=>s+r['60d'],0)), fmtNPR(rows.reduce((s,r)=>s+r['60d+'],0)), fmtNPR(rows.reduce((s,r)=>s+r.total,0))]}
+              onExport={() => downloadCSV('ap_aging_summary.csv',['Supplier', 'Current', '1-30 Days', '31-60 Days', '60+ Days', 'Total'],rows.map(r=>[r.vendor, r.current?.toFixed(2), r['30d']?.toFixed(2), r['60d']?.toFixed(2), r['60d+']?.toFixed(2), r.total?.toFixed(2)]))}
+            />
+          )} />;
 
       // Simple table reports — each gets its own filter bar via SimpleReport
       case 'sales_summary':

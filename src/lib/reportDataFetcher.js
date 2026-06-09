@@ -299,6 +299,127 @@ export async function fetchReportData(reportId, fromDate, toDate) {
         .map(i => ({ ...i, invoice_number: i.bill_number, invoice_date: i.bill_date, customer_name: i.vendor_name, goods_subtotal: i.subtotal }));
     }
 
+    case 'gl_summary': {
+      const [accounts, journals, lines] = await Promise.all([
+        sajilo.entities.ChartOfAccount.filter({ is_active: true }, 'account_code', 2000),
+        sajilo.entities.GeneralLedgerJournal.filter({ status: 'Posted' }, 'entry_date', 10000),
+        sajilo.entities.GeneralLedgerLine.list('', 50000)
+      ]);
+      const journalMap = {};
+      journals.forEach(j => { journalMap[j.id] = j.entry_date ? j.entry_date.split('T')[0] : ''; });
+      
+      const accountTotals = {};
+      lines.forEach(l => {
+        const date = journalMap[l.journal_id];
+        if (!date || !inRange(date, fromDate, toDate)) return;
+        if (!accountTotals[l.account_id]) accountTotals[l.account_id] = { dr: 0, cr: 0 };
+        accountTotals[l.account_id].dr += (l.debit_amount || 0);
+        accountTotals[l.account_id].cr += (l.credit_amount || 0);
+      });
+
+      return accounts.map(a => ({
+        ...a,
+        debit: accountTotals[a.id]?.dr || 0,
+        credit: accountTotals[a.id]?.cr || 0
+      })).filter(a => a.debit > 0 || a.credit > 0);
+    }
+
+    case 'journal_report': {
+      const [journals, lines] = await Promise.all([
+        sajilo.entities.GeneralLedgerJournal.filter({ status: 'Posted' }, 'entry_date', 5000),
+        sajilo.entities.GeneralLedgerLine.list('', 20000)
+      ]);
+      const filteredJournals = journals.filter(j => inRange(j.entry_date?.split('T')[0], fromDate, toDate));
+      const jIds = new Set(filteredJournals.map(j => j.id));
+      const jMap = {};
+      filteredJournals.forEach(j => { jMap[j.id] = { ...j, lines: [] }; });
+      lines.forEach(l => {
+        if (jIds.has(l.journal_id)) jMap[l.journal_id].lines.push(l);
+      });
+      return Object.values(jMap).sort((a,b) => a.entry_date.localeCompare(b.entry_date));
+    }
+
+    case 'txn_list': {
+      const [journals, lines] = await Promise.all([
+        sajilo.entities.GeneralLedgerJournal.filter({ status: 'Posted' }, 'entry_date', 5000),
+        sajilo.entities.GeneralLedgerLine.list('', 20000)
+      ]);
+      const jMap = {};
+      journals.forEach(j => { jMap[j.id] = j; });
+      return lines.map(l => {
+        const j = jMap[l.journal_id];
+        return { ...l, entry_date: j?.entry_date?.split('T')[0] || '', journal_memo: j?.memo || '', voucher_no: j?.voucher_no || '' };
+      }).filter(l => inRange(l.entry_date, fromDate, toDate));
+    }
+
+    case 'purchase_summary': {
+      const bills = await sajilo.entities.PurchaseInvoice.list('-bill_date', 2000);
+      return (bills || []).filter(i => i.status === 'Posted' && inRange(i.bill_date, fromDate, toDate));
+    }
+
+    case 'purchase_by_vendor': {
+      const bills = await sajilo.entities.PurchaseInvoice.list('-bill_date', 2000);
+      const map = {};
+      (bills || []).filter(i => i.status === 'Posted' && inRange(i.bill_date, fromDate, toDate)).forEach(i => {
+        if (!map[i.vendor_name]) map[i.vendor_name] = { vendor: i.vendor_name, count: 0, total: 0 };
+        map[i.vendor_name].count++;
+        map[i.vendor_name].total += i.grand_total || 0;
+      });
+      return Object.values(map).sort((a, b) => b.total - a.total);
+    }
+
+    case 'purchase_by_item': {
+      const bills = await sajilo.entities.PurchaseInvoice.list('-bill_date', 2000);
+      const map = {};
+      (bills || []).filter(i => i.status === 'Posted' && inRange(i.bill_date, fromDate, toDate)).forEach(inv => {
+        (inv.line_items || []).forEach(l => {
+          const key = l.item_id || l.item_name;
+          if (!map[key]) map[key] = { item_code: l.item_code, item_name: l.item_name, qty_bought: 0, cost: 0 };
+          map[key].qty_bought += l.quantity || 0;
+          map[key].cost += l.line_total || 0;
+        });
+      });
+      return Object.values(map).sort((a, b) => b.cost - a.cost);
+    }
+
+    case 'ar_aging_summary': {
+      const invoices = await sajilo.entities.SalesInvoice.list('-invoice_date', 2000);
+      const today = new Date().toISOString().slice(0, 10);
+      const map = {};
+      invoices.filter(i => i.status === 'Posted' && i.payment_status !== 'Paid').forEach(i => {
+        const due = i.due_date || i.invoice_date;
+        const days = due < today ? Math.floor((new Date(today) - new Date(due)) / 86400000) : 0;
+        const cust = i.customer_name || 'Unknown';
+        if (!map[cust]) map[cust] = { customer: cust, current: 0, '30d': 0, '60d': 0, '60d+': 0, total: 0 };
+        const amt = i.grand_total || 0;
+        map[cust].total += amt;
+        if (days === 0) map[cust].current += amt;
+        else if (days <= 30) map[cust]['30d'] += amt;
+        else if (days <= 60) map[cust]['60d'] += amt;
+        else map[cust]['60d+'] += amt;
+      });
+      return Object.values(map).sort((a, b) => b.total - a.total);
+    }
+
+    case 'ap_aging_summary': {
+      const bills = await sajilo.entities.PurchaseInvoice.list('-bill_date', 2000);
+      const today = new Date().toISOString().slice(0, 10);
+      const map = {};
+      (bills || []).filter(i => i.status === 'Posted' && i.payment_status !== 'Paid').forEach(i => {
+        const due = i.due_date || i.bill_date;
+        const days = due < today ? Math.floor((new Date(today) - new Date(due)) / 86400000) : 0;
+        const vendor = i.vendor_name || 'Unknown';
+        if (!map[vendor]) map[vendor] = { vendor, current: 0, '30d': 0, '60d': 0, '60d+': 0, total: 0 };
+        const amt = i.grand_total || 0;
+        map[vendor].total += amt;
+        if (days === 0) map[vendor].current += amt;
+        else if (days <= 30) map[vendor]['30d'] += amt;
+        else if (days <= 60) map[vendor]['60d'] += amt;
+        else map[vendor]['60d+'] += amt;
+      });
+      return Object.values(map).sort((a, b) => b.total - a.total);
+    }
+
     default:
       return [];
   }
