@@ -66,10 +66,12 @@ export default function FinancialVouchers() {
   const ledgerAccounts = allAccounts.filter(a => a.ledger_type === 'Sub Ledger');
 
   const handleEntry = (idx, field, val) => {
-    const entries = [...form.entries];
-    entries[idx] = { ...entries[idx], [field]: (field === 'debit' || field === 'credit') ? parseFloat(val) || 0 : val };
-    const total = entries.reduce((s, e) => s + (e.debit || 0), 0);
-    setForm({ ...form, entries, total_amount: total });
+    setForm(prev => {
+      const entries = [...prev.entries];
+      entries[idx] = { ...entries[idx], [field]: (field === 'debit' || field === 'credit') ? parseFloat(val) || 0 : val };
+      const total = entries.reduce((s, e) => s + (e.debit || 0), 0);
+      return { ...prev, entries, total_amount: total };
+    });
   };
 
   const addEntry = () => setForm({ ...form, entries: [...form.entries, { account_id: '', account_code: '', account_name: '', account_type: 'Asset', debit: 0, credit: 0, narration: '' }] });
