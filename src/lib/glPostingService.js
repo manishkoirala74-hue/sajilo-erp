@@ -227,11 +227,17 @@ export async function postSalesInvoice(invoice, itemsMap, settings, isReversal =
   const sign = isReversal ? -1 : 1;
   const lines = [];
 
-  const arId   = s.gl_accounts_receivable_id;
-  const arName = s.gl_accounts_receivable_name || 'Accounts Receivable';
-  if (!arId) { warnMissingAccount('Accounts Receivable'); return null; }
-
-  lines.push({ account_id: arId, account_name: arName, debit_amount: r2(sign * invoice.grand_total), credit_amount: 0 });
+  if (['Cash', 'Bank'].includes(invoice.payment_mode)) {
+    const cbId = invoice.cash_bank_account_id;
+    const cbName = invoice.cash_bank_account_name || invoice.payment_mode;
+    if (!cbId) { warnMissingAccount(`${invoice.payment_mode} Account`); return null; }
+    lines.push({ account_id: cbId, account_name: cbName, debit_amount: r2(sign * invoice.grand_total), credit_amount: 0 });
+  } else {
+    const arId   = s.gl_accounts_receivable_id;
+    const arName = s.gl_accounts_receivable_name || 'Accounts Receivable';
+    if (!arId) { warnMissingAccount('Accounts Receivable'); return null; }
+    lines.push({ account_id: arId, account_name: arName, debit_amount: r2(sign * invoice.grand_total), credit_amount: 0 });
+  }
 
   const siLineItemsWithCost = [];
   for (const line of (invoice.line_items || [])) {
@@ -340,9 +346,12 @@ export async function postPurchaseInvoice(invoice, itemsMap, settings, isReversa
   const sign = isReversal ? -1 : 1;
   const lines = [];
 
-  const apId   = s.gl_accounts_payable_id;
-  const apName = s.gl_accounts_payable_name || 'Accounts Payable';
-  if (!apId) { warnMissingAccount('Accounts Payable'); return null; }
+  let apId, apName;
+  if (!['Cash', 'Bank'].includes(invoice.payment_mode)) {
+    apId   = s.gl_accounts_payable_id;
+    apName = s.gl_accounts_payable_name || 'Accounts Payable';
+    if (!apId) { warnMissingAccount('Accounts Payable'); return null; }
+  }
 
   for (const line of (invoice.line_items || [])) {
     const item = itemsMap[line.item_id];
@@ -357,7 +366,14 @@ export async function postPurchaseInvoice(invoice, itemsMap, settings, isReversa
     lines.push({ account_id: s.gl_vat_payable_id, account_name: s.gl_vat_payable_name || 'VAT Payable', debit_amount: r2(sign * invoice.vat_amount), credit_amount: 0, description: 'Input VAT' });
   }
 
-  lines.push({ account_id: apId, account_name: apName, debit_amount: 0, credit_amount: r2(sign * invoice.grand_total) });
+  if (['Cash', 'Bank'].includes(invoice.payment_mode)) {
+    const cbId = invoice.cash_bank_account_id;
+    const cbName = invoice.cash_bank_account_name || invoice.payment_mode;
+    if (!cbId) { warnMissingAccount(`${invoice.payment_mode} Account`); return null; }
+    lines.push({ account_id: cbId, account_name: cbName, debit_amount: 0, credit_amount: r2(sign * invoice.grand_total) });
+  } else {
+    lines.push({ account_id: apId, account_name: apName, debit_amount: 0, credit_amount: r2(sign * invoice.grand_total) });
+  }
 
   // Commit GL journal first — WAC runs after so GL remains atomic even if cost update fails
   const journalId = await createJournal({

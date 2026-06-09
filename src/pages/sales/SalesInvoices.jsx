@@ -20,6 +20,7 @@ const emptySI = {
   invoice_number: '', customer_id: '', customer_name: '', sales_order_id: '',
   invoice_date: format(new Date(), 'yyyy-MM-dd'),
   due_date: format(new Date(Date.now() + 30 * 86400000), 'yyyy-MM-dd'),
+  payment_mode: 'Credit', cash_bank_account_id: '', cash_bank_account_name: '',
   status: 'Draft', payment_status: 'Unpaid',
   goods_subtotal: 0, sundry_charges_total: 0, total_tax_amount: 0, grand_total: 0,
   notes: '', line_items: []
@@ -29,6 +30,7 @@ export default function SalesInvoices() {
   const [invoices, setInvoices] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [salesOrders, setSalesOrders] = useState([]);
+  const [accounts, setAccounts] = useState([]);
   const [settings, setSettings] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -57,12 +59,14 @@ export default function SalesInvoices() {
       sajilo.entities.BusinessPartner.filter({ is_active: true }),
       sajilo.entities.SalesOrder.filter({ fulfillment_status: 'Confirmed' }),
       sajilo.entities.CompanySettings.list(),
-    ]).then(([inv, cs, sos, sett]) => {
+      sajilo.entities.ChartOfAccount.filter({ is_active: true }, 'account_code', 500)
+    ]).then(([inv, cs, sos, sett, accs]) => {
       setInvoices(inv);
       // Sales module: show customers + suppliers flagged as treat_as_customer
       setCustomers(cs.filter(c => c.is_customer || c.treat_as_customer));
       setSalesOrders(sos);
       setSettings(sett.length > 0 ? sett[0] : {});
+      setAccounts(accs);
       setLoading(false);
     });
   };
@@ -128,7 +132,8 @@ export default function SalesInvoices() {
   };
 
   const handleSave = async (postStatus = 'Draft') => {
-    if (!form.customer_name) { toast.error('Select a customer'); return; }
+    if (form.payment_mode === 'Credit' && !form.customer_name) { toast.error('Select a customer'); return; }
+    if (['Cash', 'Bank'].includes(form.payment_mode) && !form.cash_bank_account_id) { toast.error('Select a Cash/Bank ledger account'); return; }
     if (!form.invoice_number) { toast.error('Invoice number is required'); return; }
 
     const isManual = settings?.invoice_numbering_method === 'Manual';
@@ -154,7 +159,12 @@ export default function SalesInvoices() {
 
     setSaving(true);
     try {
-  const data = { ...form, status: postStatus };
+      const isCashOrBank = ['Cash', 'Bank'].includes(form.payment_mode);
+      const data = { 
+        ...form, 
+        status: postStatus,
+        payment_status: isCashOrBank ? 'Paid' : form.payment_status 
+      };
       const created = await sajilo.entities.SalesInvoice.create(data);
 
       if (postStatus === 'Posted') {
@@ -338,6 +348,22 @@ export default function SalesInvoices() {
 
           <div className="grid grid-cols-2 gap-4 mt-4">
             <div className="col-span-2">
+              <Label>Payment Mode</Label>
+              <div className="flex gap-2 mt-1">
+                {['Credit', 'Cash', 'Bank'].map(mode => (
+                  <Button 
+                    key={mode} 
+                    type="button"
+                    variant={form.payment_mode === mode ? 'default' : 'outline'}
+                    onClick={() => setForm(f => ({ ...f, payment_mode: mode, cash_bank_account_id: '', cash_bank_account_name: '', customer_id: '', customer_name: '' }))}
+                    className="flex-1"
+                  >
+                    {mode}
+                  </Button>
+                ))}
+              </div>
+            </div>
+            <div className="col-span-2">
               <Label>Invoice Number *</Label>
               <div className="flex gap-2 mt-1">
                 <Input
@@ -357,18 +383,47 @@ export default function SalesInvoices() {
                 </p>
               )}
             </div>
-            <div>
-              <Label>Customer *</Label>
-              <Select value={form.customer_id} onValueChange={v => {
-                const c = customers.find(x => x.id === v);
-                setForm(f => ({ ...f, customer_id: v, customer_name: c?.name || '' }));
-              }}>
-                <SelectTrigger className="mt-1"><SelectValue placeholder="Select customer" /></SelectTrigger>
-                <SelectContent>
-                  {customers.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
+            
+            {form.payment_mode === 'Credit' ? (
+              <div>
+                <Label>Customer *</Label>
+                <Select value={form.customer_id} onValueChange={v => {
+                  const c = customers.find(x => x.id === v);
+                  setForm(f => ({ ...f, customer_id: v, customer_name: c?.name || '' }));
+                }}>
+                  <SelectTrigger className="mt-1"><SelectValue placeholder="Select customer" /></SelectTrigger>
+                  <SelectContent>
+                    {customers.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : (
+              <>
+                <div>
+                  <Label>{form.payment_mode} Account (Ledger) *</Label>
+                  <Select value={form.cash_bank_account_id} onValueChange={v => {
+                    const acc = accounts.find(x => x.id === v);
+                    setForm(f => ({ ...f, cash_bank_account_id: v, cash_bank_account_name: acc?.account_name || '' }));
+                  }}>
+                    <SelectTrigger className="mt-1"><SelectValue placeholder={`Select ${form.payment_mode} account`} /></SelectTrigger>
+                    <SelectContent>
+                      {accounts
+                        .filter(a => a.ledger_type === 'Sub Ledger' && (form.payment_mode === 'Cash' ? a.account_name.toLowerCase().includes('cash') : (a.parent_account_name?.toLowerCase().includes('bank') || a.account_name.toLowerCase().includes('bank'))))
+                        .map(a => <SelectItem key={a.id} value={a.id}>{a.account_name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Customer Name (Optional)</Label>
+                  <Input 
+                    value={form.customer_name} 
+                    onChange={e => setForm(f => ({ ...f, customer_name: e.target.value }))} 
+                    placeholder="Walk-in Customer" 
+                    className="mt-1" 
+                  />
+                </div>
+              </>
+            )}
             <div>
               <Label>Fetch from Sales Order</Label>
               <Select onValueChange={fetchFromSO}>

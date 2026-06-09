@@ -21,6 +21,7 @@ const emptyPI = {
   po_reference_number: '', vendor_id: '', vendor_name: '',
   invoice_date: format(new Date(), 'yyyy-MM-dd'),
   due_date: format(new Date(Date.now() + 30 * 86400000), 'yyyy-MM-dd'),
+  payment_mode: 'Credit', cash_bank_account_id: '', cash_bank_account_name: '',
   status: 'Draft', payment_status: 'Unpaid',
   subtotal: 0, vat_amount: 0, landed_cost_total: 0, grand_total: 0,
   notes: '', line_items: []
@@ -30,6 +31,7 @@ export default function PurchaseInvoices() {
   const [invoices, setInvoices] = useState([]);
   const [vendors, setVendors] = useState([]);
   const [approvedPOs, setApprovedPOs] = useState([]);
+  const [accounts, setAccounts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [viewDetail, setViewDetail] = useState(null);
@@ -47,11 +49,13 @@ export default function PurchaseInvoices() {
       sajilo.entities.PurchaseInvoice.list('-created_date'),
       sajilo.entities.BusinessPartner.filter({ is_active: true }),
       sajilo.entities.PurchaseOrder.filter({ status: 'Approved' }),
-    ]).then(([inv, vs, pos]) => {
+      sajilo.entities.ChartOfAccount.filter({ is_active: true }, 'account_code', 500)
+    ]).then(([inv, vs, pos, accs]) => {
       setInvoices(inv);
       // Purchase module: show vendors + customers flagged as treated_as_vendor
       setVendors(vs.filter(v => v.is_vendor || v.treated_as_vendor));
       setApprovedPOs(pos);
+      setAccounts(accs);
       setLoading(false);
     });
   };
@@ -107,10 +111,16 @@ export default function PurchaseInvoices() {
   };
 
   const handleSave = async (postStatus = 'Draft') => {
-    if (!form.vendor_name) { toast.error('Select a vendor'); return; }
+    if (form.payment_mode === 'Credit' && !form.vendor_name) { toast.error('Select a vendor'); return; }
+    if (['Cash', 'Bank'].includes(form.payment_mode) && !form.cash_bank_account_id) { toast.error('Select a Cash/Bank ledger account'); return; }
     setSaving(true);
     try {
-  const data = { ...form, status: postStatus };
+      const isCashOrBank = ['Cash', 'Bank'].includes(form.payment_mode);
+      const data = { 
+        ...form, 
+        status: postStatus,
+        payment_status: isCashOrBank ? 'Paid' : form.payment_status 
+      };
       const created = await sajilo.entities.PurchaseInvoice.create(data);
 
       // Update stock if posting
@@ -262,18 +272,63 @@ export default function PurchaseInvoices() {
             <DialogTitle>New Purchase Invoice — {form.invoice_number}</DialogTitle>
           </DialogHeader>
           <div className="grid grid-cols-2 gap-4 mt-4">
-            <div>
-              <Label>Vendor *</Label>
-              <Select value={form.vendor_id} onValueChange={v => {
-                const vendor = vendors.find(vn => vn.id === v);
-                setForm(f => ({ ...f, vendor_id: v, vendor_name: vendor?.name || '' }));
-              }}>
-                <SelectTrigger className="mt-1"><SelectValue placeholder="Select vendor" /></SelectTrigger>
-                <SelectContent>
-                  {vendors.map(v => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
+            <div className="col-span-2">
+              <Label>Payment Mode</Label>
+              <div className="flex gap-2 mt-1">
+                {['Credit', 'Cash', 'Bank'].map(mode => (
+                  <Button 
+                    key={mode} 
+                    type="button"
+                    variant={form.payment_mode === mode ? 'default' : 'outline'}
+                    onClick={() => setForm(f => ({ ...f, payment_mode: mode, cash_bank_account_id: '', cash_bank_account_name: '', vendor_id: '', vendor_name: '' }))}
+                    className="flex-1"
+                  >
+                    {mode}
+                  </Button>
+                ))}
+              </div>
             </div>
+            
+            {form.payment_mode === 'Credit' ? (
+              <div>
+                <Label>Vendor *</Label>
+                <Select value={form.vendor_id} onValueChange={v => {
+                  const vendor = vendors.find(vn => vn.id === v);
+                  setForm(f => ({ ...f, vendor_id: v, vendor_name: vendor?.name || '' }));
+                }}>
+                  <SelectTrigger className="mt-1"><SelectValue placeholder="Select vendor" /></SelectTrigger>
+                  <SelectContent>
+                    {vendors.map(v => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : (
+              <>
+                <div>
+                  <Label>{form.payment_mode} Account (Ledger) *</Label>
+                  <Select value={form.cash_bank_account_id} onValueChange={v => {
+                    const acc = accounts.find(x => x.id === v);
+                    setForm(f => ({ ...f, cash_bank_account_id: v, cash_bank_account_name: acc?.account_name || '' }));
+                  }}>
+                    <SelectTrigger className="mt-1"><SelectValue placeholder={`Select ${form.payment_mode} account`} /></SelectTrigger>
+                    <SelectContent>
+                      {accounts
+                        .filter(a => a.ledger_type === 'Sub Ledger' && (form.payment_mode === 'Cash' ? a.account_name.toLowerCase().includes('cash') : (a.parent_account_name?.toLowerCase().includes('bank') || a.account_name.toLowerCase().includes('bank'))))
+                        .map(a => <SelectItem key={a.id} value={a.id}>{a.account_name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Vendor Name (Optional)</Label>
+                  <Input 
+                    value={form.vendor_name} 
+                    onChange={e => setForm(f => ({ ...f, vendor_name: e.target.value }))} 
+                    placeholder="Walk-in Vendor" 
+                    className="mt-1" 
+                  />
+                </div>
+              </>
+            )}
             <div>
               <Label>Fetch from Approved PO</Label>
               <Select onValueChange={fetchFromPO}>
