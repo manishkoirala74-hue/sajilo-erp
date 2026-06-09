@@ -74,7 +74,7 @@ function DatePickerWithToggle({ value, onChange, label }) {
   );
 }
 
-const ACCOUNT_TYPES = ['Asset', 'Liability', 'Equity', 'Revenue', 'COGS', 'OPEX'];
+const ACCOUNT_TYPES = ['Asset', 'Liability', 'Equity', 'Revenue', 'Expense', 'COGS', 'OPEX'];
 
 const suggestNormalBalance = (type) =>
   ['Asset', 'COGS', 'OPEX', 'Cost of Goods Sold', 'Expense'].includes(type) ? 'Debit' : 'Credit';
