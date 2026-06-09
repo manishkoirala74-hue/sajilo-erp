@@ -39,24 +39,30 @@ function BulkActionBar({ selectedIds, onClear, accounts, categories, onBulkUpdat
   const cogsAccounts = subAccounts.filter(a => ['Cost of Goods Sold', 'COGS', 'Expense', 'Asset'].includes(a.account_type));
 
   const apply = async () => {
-    if (!bulkAction || !bulkValue) return;
+    if (!bulkAction) return;
+    if (bulkAction !== 'reset_wac' && !bulkValue) return;
     setApplying(true);
 
-    let updateData = {};
-    if (bulkAction === 'sales_account') {
-      const acc = accounts.find(a => a.id === bulkValue);
-      updateData = { sales_account_id: bulkValue, sales_account_name: acc?.account_name || '' };
-    } else if (bulkAction === 'purchase_account') {
-      const acc = accounts.find(a => a.id === bulkValue);
-      updateData = { purchase_account_id: bulkValue, purchase_account_name: acc?.account_name || '' };
-    } else if (bulkAction === 'category') {
-      const cat = categories.find(c => c.id === bulkValue);
-      updateData = { category_id: bulkValue, category_name: cat?.category_name || '' };
-    } else if (bulkAction === 'activate') {
-      updateData = { is_active: bulkValue === 'true' };
+    if (bulkAction === 'reset_wac') {
+      if (onResetWac) await onResetWac(selectedIds);
+    } else {
+      let updateData = {};
+      if (bulkAction === 'sales_account') {
+        const acc = accounts.find(a => a.id === bulkValue);
+        updateData = { sales_account_id: bulkValue, sales_account_name: acc?.account_name || '' };
+      } else if (bulkAction === 'purchase_account') {
+        const acc = accounts.find(a => a.id === bulkValue);
+        updateData = { purchase_account_id: bulkValue, purchase_account_name: acc?.account_name || '' };
+      } else if (bulkAction === 'category') {
+        const cat = categories.find(c => c.id === bulkValue);
+        updateData = { category_id: bulkValue, category_name: cat?.category_name || '' };
+      } else if (bulkAction === 'activate') {
+        updateData = { is_active: bulkValue === 'true' };
+      }
+
+      await onBulkUpdate(selectedIds, updateData);
     }
 
-    await onBulkUpdate(selectedIds, updateData);
     setApplying(false);
     setBulkAction('');
     setBulkValue('');
@@ -85,6 +91,7 @@ function BulkActionBar({ selectedIds, onClear, accounts, categories, onBulkUpdat
             <SelectItem value="purchase_account">Set Purchase Account</SelectItem>
             <SelectItem value="category">Set Category</SelectItem>
             <SelectItem value="activate">Set Active / Inactive</SelectItem>
+            <SelectItem value="reset_wac">Reset WAC to Purchase Price</SelectItem>
             <SelectItem value="delete">Delete Items</SelectItem>
           </SelectContent>
         </Select>
@@ -128,7 +135,7 @@ function BulkActionBar({ selectedIds, onClear, accounts, categories, onBulkUpdat
         )}
 
         {bulkAction !== 'delete' && (
-          <Button size="sm" onClick={apply} disabled={!bulkAction || !bulkValue || applying} className="h-8">
+          <Button size="sm" onClick={apply} disabled={!bulkAction || (bulkAction !== 'reset_wac' && !bulkValue) || applying} className="h-8">
             {applying ? 'Applying…' : 'Apply'}
           </Button>
         )}
@@ -268,6 +275,17 @@ export default function Items() {
   const handleBulkUpdate = async (ids, data) => {
     await Promise.all(ids.map(id => sajilo.entities.Item.update(id, data)));
     toast.success(`Updated ${ids.length} item(s)`);
+    setSelectedIds([]);
+    fetchItems();
+  };
+
+  const handleResetWac = async (ids) => {
+    const itemsToUpdate = items.filter(i => ids.includes(i.id));
+    await Promise.all(itemsToUpdate.map(item => sajilo.entities.Item.update(item.id, {
+      weighted_average_cost: item.purchase_price || 0,
+      current_unit_cost: item.purchase_price || 0,
+    })));
+    toast.success(`Reset WAC to Purchase Price for ${ids.length} item(s)`);
     setSelectedIds([]);
     fetchItems();
   };
@@ -471,6 +489,7 @@ export default function Items() {
           categories={categories}
           onBulkUpdate={handleBulkUpdate}
           onBulkDelete={handleBulkDelete}
+          onResetWac={handleResetWac}
         />
       )}
 

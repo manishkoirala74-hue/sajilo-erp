@@ -309,11 +309,9 @@ async function recalculateWAC(invoiceLines, itemsMap) {
     const incomingPrice = r2(line.unit_price ?? 0);
     if (incomingQty <= 0) continue;
 
-    // Bootstrap total_asset_value from legacy field if not yet set
+    // Bootstrap old value mathematically from WAC (ignoring total_asset_value which is not decremented on sales)
     const oldQty   = r2(item.quantity_on_hand || 0);
-    const oldValue = r2(item.total_asset_value > 0
-      ? item.total_asset_value
-      : oldQty * (item.current_unit_cost || item.weighted_average_cost || 0));
+    const oldValue = r2(oldQty * (item.current_unit_cost || item.weighted_average_cost || 0));
 
     const newTotalQty   = r2(oldQty + incomingQty);
     const newTotalValue = r2(oldValue + (incomingQty * incomingPrice));
@@ -321,7 +319,6 @@ async function recalculateWAC(invoiceLines, itemsMap) {
 
     await sajilo.entities.Item.update(item.id, {
       quantity_on_hand:      newTotalQty,
-      total_asset_value:     newTotalValue,
       current_unit_cost:     newUnitCost,
       weighted_average_cost: newUnitCost, // Keep legacy field in sync
     });
