@@ -17,7 +17,8 @@ export default function DataUtilities() {
       toast.error('Please select both start and end dates for the recalculation period.');
       return;
     }
-    if (!user?.company_id) {
+    const companyId = sajilo.getCompanyId();
+    if (!companyId) {
       toast.error('Company ID not found. Please log out and log back in.');
       return;
     }
@@ -26,7 +27,7 @@ export default function DataUtilities() {
     const toastId = toast.loading('Recalculating inventory cost timeline. This may take a while...');
     try {
       const { error } = await sajilo.client.rpc('rebuild_inventory_wac_timeline', {
-        p_company_id: user.company_id,
+        p_company_id: companyId,
         p_start_date: startDate,
         p_end_date: endDate
       });
