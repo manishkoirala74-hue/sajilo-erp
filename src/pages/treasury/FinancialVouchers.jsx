@@ -329,7 +329,7 @@ export default function FinancialVouchers() {
                   Row 1 (payment source) is restricted to <strong>Cash & Cash Equivalents</strong> accounts only.
                 </p>
               )}
-              <div className="border rounded-lg overflow-hidden">
+              <div className="border rounded-lg">
                 <table className="w-full text-sm">
                   <thead className="bg-muted/50">
                     <tr>
