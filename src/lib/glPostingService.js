@@ -169,8 +169,11 @@ export async function postPOSSale(sale, itemsMap, settings, isReversal = false) 
     const salesAccName = item?.sales_account_name || s.gl_default_sales_account_name || 'Sales Revenue';
     if (!salesAccId) { warnMissingAccount('Sales Revenue'); continue; }
 
-    // Lock cost_at_sale at the current authoritative unit cost
-    const costAtSale = r2(item?.current_unit_cost || item?.weighted_average_cost || 0);
+    // On reversal, we MUST use the exact cost_at_sale that was recorded on the line to balance the GL perfectly.
+    // On normal post, we lock in the current unit cost.
+    const costAtSale = isReversal 
+      ? r2(line.cost_at_sale || 0)
+      : r2(item?.current_unit_cost || item?.weighted_average_cost || 0);
 
     lines.push({ account_id: salesAccId, account_name: salesAccName, debit_amount: 0, credit_amount: r2(sign * line.line_total), description: `Sale: ${line.item_name}` });
 
@@ -246,8 +249,11 @@ export async function postSalesInvoice(invoice, itemsMap, settings, isReversal =
     const salesAccName = item?.sales_account_name || s.gl_default_sales_account_name || 'Sales Revenue';
     if (!salesAccId) { warnMissingAccount('Sales Revenue'); continue; }
 
-    // Lock cost_at_sale at the current authoritative unit cost
-    const costAtSale = r2(item?.current_unit_cost || item?.weighted_average_cost || 0);
+    // On reversal, we MUST use the exact cost_at_sale that was recorded on the line to balance the GL perfectly.
+    // On normal post, we lock in the current unit cost.
+    const costAtSale = isReversal 
+      ? r2(line.cost_at_sale || 0)
+      : r2(item?.current_unit_cost || item?.weighted_average_cost || 0);
 
     lines.push({ account_id: salesAccId, account_name: salesAccName, debit_amount: 0, credit_amount: r2(sign * line.line_total), description: `Sale: ${line.item_name}` });
 
