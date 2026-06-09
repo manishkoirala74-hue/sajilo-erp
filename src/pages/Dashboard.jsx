@@ -57,9 +57,9 @@ export default function Dashboard() {
     });
   }, []);
 
-  const totalSales = salesInvoices.reduce((s, inv) => s + (inv.grand_total || 0), 0);
-  const totalPurchases = purchaseInvoices.reduce((s, inv) => s + (inv.grand_total || 0), 0);
-  const unpaidSales = salesInvoices.filter(i => i.payment_status === 'Unpaid').length;
+  const totalSales = salesInvoices.filter(i => i.status === 'Posted').reduce((s, inv) => s + (inv.grand_total || 0), 0);
+  const totalPurchases = purchaseInvoices.filter(i => i.status === 'Posted').reduce((s, inv) => s + (inv.grand_total || 0), 0);
+  const unpaidSales = salesInvoices.filter(i => i.payment_status === 'Unpaid' && i.status === 'Posted').length;
   const lowStockItems = items.filter(i => i.quantity_on_hand <= i.reorder_level && i.reorder_level > 0);
   const pendingApprovals = purchaseOrders.filter(po => po.status === 'Pending Approval');
   const recentSales = salesInvoices.slice(0, 5);
