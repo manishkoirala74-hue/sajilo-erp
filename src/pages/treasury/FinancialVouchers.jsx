@@ -82,16 +82,69 @@ export default function FinancialVouchers() {
     return `${prefix}-${new Date().getFullYear()}-${String(vouchers.length + 1).padStart(3, '0')}`;
   };
 
+  // ── Post new GL journal ───────────────────────────────────────────────────
+  async function postGLLines(voucher) {
+    const lines = (voucher.entries || [])
+      .filter(e => e.account_id)
+      .map(e => ({
+        account_id: e.account_id,
+        account_code: e.account_code || '',
+        account_name: e.account_name || '',
+        account_type: e.account_type || '',
+        debit_amount: e.debit || 0,
+        credit_amount: e.credit || 0,
+        description: voucher.narration || e.narration || `Financial Voucher ${voucher.voucher_number}`,
+      }));
+
+    if (lines.length === 0) return;
+
+    const today = voucher.voucher_date || new Date().toISOString().split('T')[0];
+    const totalDebit = lines.reduce((s, l) => s + (l.debit_amount || 0), 0);
+    const totalCredit = lines.reduce((s, l) => s + (l.credit_amount || 0), 0);
+
+    const journal = await sajilo.entities.GeneralLedgerJournal.create({
+      entry_date: today,
+      description: voucher.narration || `Financial Voucher ${voucher.voucher_number}`,
+      reference_module: 'Treasury',
+      source_document_id: voucher.id,
+      source_document_type: 'FinancialVoucher',
+      status: 'Posted',
+      total_debit: totalDebit,
+      total_credit: totalCredit,
+      is_balanced: Math.abs(totalDebit - totalCredit) < 0.01,
+    });
+
+    await sajilo.entities.GeneralLedgerLine.bulkCreate(
+      lines.map(l => ({ ...l, journal_id: journal.id }))
+    );
+
+    for (const l of lines) {
+      if (!l.account_id) continue;
+      const results = await sajilo.entities.ChartOfAccount.filter({ id: l.account_id }, 'account_code', 1);
+      const acc = results[0];
+      if (!acc) continue;
+      const delta = (l.debit_amount || 0) - (l.credit_amount || 0);
+      const debitNormal = ['Asset', 'COGS', 'Expense', 'OPEX', 'Cost of Goods Sold', 'Other Expense'].includes(acc.account_type);
+      const balanceChange = debitNormal ? delta : -delta;
+      await sajilo.entities.ChartOfAccount.update(acc.id, { current_balance: Math.round(((acc.current_balance || 0) + balanceChange) * 100) / 100 });
+    }
+  }
+
   const save = async (status) => {
     setSaving(true);
     try {
-  const payload = { ...form, status, voucher_number: genNumber() };
-      await sajilo.entities.FinancialVoucher.create(payload);
+      const payload = { ...form, status, voucher_number: genNumber() };
+      const savedVoucher = await sajilo.entities.FinancialVoucher.create(payload);
+      
+      if (status === 'Posted') {
+        await postGLLines(savedVoucher);
+      }
+
       toast.success(`Voucher ${status}`);
       setOpen(false);
       setForm(emptyVoucher);
       fetchData();
-        } catch (err) {
+    } catch (err) {
       toast.error(err.message || 'Error occurred while saving');
     } finally {
       setSaving(false);
