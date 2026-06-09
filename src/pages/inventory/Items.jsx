@@ -28,7 +28,7 @@ const emptyItem = {
 };
 
 // ── Bulk Action Panel ──────────────────────────────────────────────
-function BulkActionBar({ selectedIds, onClear, accounts, categories, onBulkUpdate, onBulkDelete }) {
+function BulkActionBar({ selectedIds, onClear, accounts, categories, onBulkUpdate, onBulkDelete, onResetWac }) {
   const [bulkAction, setBulkAction] = useState('');
   const [bulkValue, setBulkValue] = useState('');
   const [applying, setApplying] = useState(false);
