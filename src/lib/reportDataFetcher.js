@@ -103,13 +103,36 @@ export async function fetchReportData(reportId, fromDate, toDate) {
     }
 
     case 'profit_loss': {
-      const accounts = await sajilo.entities.ChartOfAccount.filter({ is_active: true }, 'account_code', 1000);
-      // STRICT: only persisted Sub Ledger rows with a valid account_code
-      const sub = accounts.filter(a => a.ledger_type === 'Sub Ledger' && a.account_code && a.account_code !== '—');
-      const toRow = a => ({ account_code: a.account_code, account_name: a.account_name, balance: Math.abs(a.current_balance || 0) });
-      const revenue_accounts = sub.filter(a => ['Revenue','Other Income'].includes(a.account_type)).map(toRow);
-      const cogs_accounts    = sub.filter(a => ['COGS','Cost of Goods Sold'].includes(a.account_type)).map(toRow);
-      const opex_accounts    = sub.filter(a => ['OPEX','Expense','Other Expense'].includes(a.account_type)).map(toRow);
+      // Fetch posted journals within date range
+      const jRes = await supabase.from('GeneralLedgerJournal').select('id, entry_date').eq('status', 'Posted');
+      const journals = jRes.data || [];
+      const validJIds = journals.filter(j => inRange(j.entry_date, fromDate, toDate)).map(j => j.id);
+
+      let lines = [];
+      if (validJIds.length > 0) {
+        // Chunk requests to avoid URL length limits
+        const chunk = 100;
+        for (let i = 0; i < validJIds.length; i += chunk) {
+          const { data } = await supabase.from('GeneralLedgerLine').select('*').in('journal_id', validJIds.slice(i, i + chunk));
+          if (data) lines = lines.concat(data);
+        }
+      }
+
+      const accMap = {};
+      lines.forEach(l => {
+        if (!accMap[l.account_id]) accMap[l.account_id] = { id: l.account_id, code: l.account_code, name: l.account_name, type: l.account_type, balance: 0 };
+        const delta = (l.debit_amount || 0) - (l.credit_amount || 0);
+        const isDebitNormal = ['Asset', 'COGS', 'Expense', 'OPEX', 'Cost of Goods Sold', 'Other Expense'].includes(l.account_type);
+        accMap[l.account_id].balance += (isDebitNormal ? delta : -delta);
+      });
+
+      const allAccounts = Object.values(accMap).filter(a => a.balance !== 0);
+      const toRow = a => ({ account_code: a.code, account_name: a.name, balance: a.balance });
+
+      const revenue_accounts = allAccounts.filter(a => ['Revenue','Other Income'].includes(a.type)).map(toRow);
+      const cogs_accounts    = allAccounts.filter(a => ['COGS','Cost of Goods Sold'].includes(a.type)).map(toRow);
+      const opex_accounts    = allAccounts.filter(a => ['OPEX','Expense','Other Expense'].includes(a.type)).map(toRow);
+
       const revenue = revenue_accounts.reduce((s, a) => s + a.balance, 0);
       const cogs    = cogs_accounts.reduce((s, a) => s + a.balance, 0);
       const opex    = opex_accounts.reduce((s, a) => s + a.balance, 0);
@@ -117,13 +140,35 @@ export async function fetchReportData(reportId, fromDate, toDate) {
     }
 
     case 'balance_sheet': {
-      const accounts = await sajilo.entities.ChartOfAccount.filter({ is_active: true }, 'account_code', 1000);
-      // STRICT: only persisted Sub Ledger rows with a valid account_code and non-zero balance
-      const sub = accounts.filter(a => a.ledger_type === 'Sub Ledger' && a.account_code && a.account_code !== '—' && (a.current_balance || 0) !== 0);
-      const toRow = a => ({ account_code: a.account_code, account_name: a.account_name, balance: a.current_balance || 0 });
-      const assets      = sub.filter(a => a.account_type === 'Asset').map(toRow);
-      const liabilities = sub.filter(a => a.account_type === 'Liability').map(toRow);
-      const equity      = sub.filter(a => a.account_type === 'Equity').map(toRow);
+      // Balance sheet sums EVERYTHING up to toDate
+      const jRes = await supabase.from('GeneralLedgerJournal').select('id, entry_date').eq('status', 'Posted');
+      const journals = jRes.data || [];
+      const validJIds = journals.filter(j => !toDate || (new Date(j.entry_date) <= new Date(toDate))).map(j => j.id);
+
+      let lines = [];
+      if (validJIds.length > 0) {
+        const chunk = 100;
+        for (let i = 0; i < validJIds.length; i += chunk) {
+          const { data } = await supabase.from('GeneralLedgerLine').select('*').in('journal_id', validJIds.slice(i, i + chunk));
+          if (data) lines = lines.concat(data);
+        }
+      }
+
+      const accMap = {};
+      lines.forEach(l => {
+        if (!accMap[l.account_id]) accMap[l.account_id] = { id: l.account_id, code: l.account_code, name: l.account_name, type: l.account_type, balance: 0 };
+        const delta = (l.debit_amount || 0) - (l.credit_amount || 0);
+        const isDebitNormal = ['Asset', 'COGS', 'Expense', 'OPEX', 'Cost of Goods Sold', 'Other Expense'].includes(l.account_type);
+        accMap[l.account_id].balance += (isDebitNormal ? delta : -delta);
+      });
+
+      const allAccounts = Object.values(accMap).filter(a => Math.abs(a.balance) > 0.01);
+      const toRow = a => ({ account_code: a.code, account_name: a.name, balance: a.balance });
+
+      const assets      = allAccounts.filter(a => a.type === 'Asset').map(toRow);
+      const liabilities = allAccounts.filter(a => a.type === 'Liability').map(toRow);
+      const equity      = allAccounts.filter(a => a.type === 'Equity').map(toRow);
+
       return {
         assets, liabilities, equity,
         total_assets:      assets.reduce((s, a) => s + a.balance, 0),
