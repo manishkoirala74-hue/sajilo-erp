@@ -1,0 +1,65 @@
+{
+  "name": "OpeningBalanceLog",
+  "type": "object",
+  "properties": {
+    "account_id": {
+      "type": "string"
+    },
+    "account_code": {
+      "type": "string"
+    },
+    "account_name": {
+      "type": "string"
+    },
+    "account_group": {
+      "type": "string"
+    },
+    "opening_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "previous_balance": {
+      "type": "number",
+      "default": 0
+    },
+    "new_balance": {
+      "type": "number",
+      "default": 0
+    },
+    "balance_type": {
+      "type": "string",
+      "enum": [
+        "Debit",
+        "Credit"
+      ]
+    },
+    "changed_by": {
+      "type": "string"
+    },
+    "change_reason": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "account_id",
+    "account_code",
+    "account_name"
+  ],
+  "rls": {
+    "create": false,
+    "read": {
+      "user_condition": {
+        "$or": [
+          {
+            "role": "admin"
+          },
+          {
+            "role": "accountant"
+          }
+        ]
+      }
+    },
+    "update": false,
+    "delete": false
+  }
+}

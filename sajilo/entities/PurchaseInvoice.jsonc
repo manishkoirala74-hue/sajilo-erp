@@ -1,0 +1,172 @@
+{
+  "name": "PurchaseInvoice",
+  "type": "object",
+  "properties": {
+    "invoice_number": {
+      "type": "string",
+      "description": "Internal reference e.g. PI-2026-001"
+    },
+    "vendor_invoice_no": {
+      "type": "string",
+      "description": "Supplier's invoice number"
+    },
+    "po_reference_id": {
+      "type": "string",
+      "description": "FK to PurchaseOrder (nullable)"
+    },
+    "po_reference_number": {
+      "type": "string"
+    },
+    "vendor_id": {
+      "type": "string",
+      "description": "FK to BusinessPartner"
+    },
+    "vendor_name": {
+      "type": "string"
+    },
+    "invoice_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "due_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "Draft",
+        "Posted",
+        "Paid",
+        "Cancelled"
+      ],
+      "default": "Draft"
+    },
+    "payment_status": {
+      "type": "string",
+      "enum": [
+        "Unpaid",
+        "Partial",
+        "Paid"
+      ],
+      "default": "Unpaid"
+    },
+    "subtotal": {
+      "type": "number",
+      "default": 0
+    },
+    "vat_amount": {
+      "type": "number",
+      "default": 0
+    },
+    "landed_cost_total": {
+      "type": "number",
+      "default": 0
+    },
+    "grand_total": {
+      "type": "number",
+      "default": 0
+    },
+    "notes": {
+      "type": "string"
+    },
+    "line_items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "item_id": {
+            "type": "string"
+          },
+          "item_name": {
+            "type": "string"
+          },
+          "item_code": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "number"
+          },
+          "received_qty": {
+            "type": "number",
+            "description": "Actual quantity physically received. Defaults to quantity if not set. This is the qty used in WAC recalculation."
+          },
+          "unit_price": {
+            "type": "number"
+          },
+          "vat_applicable": {
+            "type": "boolean"
+          },
+          "line_total": {
+            "type": "number"
+          },
+          "wac_unit_cost_snapshot": {
+            "type": "number",
+            "description": "The item's current_unit_cost AFTER this receipt was processed. Immutable audit trail of historical WAC states."
+          }
+        }
+      }
+    }
+  },
+  "required": [
+    "vendor_name"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "$or": [
+          {
+            "role": "admin"
+          },
+          {
+            "role": "warehouse"
+          }
+        ]
+      }
+    },
+    "read": {
+      "$or": [
+        {
+          "created_by": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "warehouse"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "accountant"
+          }
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "created_by": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "warehouse"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

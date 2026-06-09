@@ -1,0 +1,130 @@
+{
+  "name": "PurchaseReturn",
+  "type": "object",
+  "properties": {
+    "return_number": {
+      "type": "string"
+    },
+    "purchase_invoice_id": {
+      "type": "string"
+    },
+    "purchase_invoice_number": {
+      "type": "string"
+    },
+    "vendor_id": {
+      "type": "string"
+    },
+    "vendor_name": {
+      "type": "string"
+    },
+    "return_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "reason": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "Draft",
+        "Posted",
+        "Cancelled"
+      ],
+      "default": "Draft"
+    },
+    "subtotal": {
+      "type": "number",
+      "default": 0
+    },
+    "vat_amount": {
+      "type": "number",
+      "default": 0
+    },
+    "grand_total": {
+      "type": "number",
+      "default": 0
+    },
+    "notes": {
+      "type": "string"
+    },
+    "line_items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "item_id": {
+            "type": "string"
+          },
+          "item_name": {
+            "type": "string"
+          },
+          "item_code": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "number"
+          },
+          "unit_price": {
+            "type": "number"
+          },
+          "vat_applicable": {
+            "type": "boolean"
+          },
+          "line_total": {
+            "type": "number"
+          }
+        }
+      }
+    }
+  },
+  "required": [
+    "vendor_name"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "$or": [
+          {
+            "role": "admin"
+          },
+          {
+            "role": "warehouse"
+          }
+        ]
+      }
+    },
+    "read": {
+      "user_condition": {
+        "$or": [
+          {
+            "role": "admin"
+          },
+          {
+            "role": "warehouse"
+          },
+          {
+            "role": "accountant"
+          }
+        ]
+      }
+    },
+    "update": {
+      "user_condition": {
+        "$or": [
+          {
+            "role": "admin"
+          },
+          {
+            "role": "warehouse"
+          }
+        ]
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

@@ -1,0 +1,109 @@
+{
+  "name": "AssetComplianceSchedule",
+  "type": "object",
+  "properties": {
+    "asset_id": {
+      "type": "string"
+    },
+    "asset_name": {
+      "type": "string"
+    },
+    "event_type": {
+      "type": "string"
+    },
+    "event_name": {
+      "type": "string"
+    },
+    "frequency_months": {
+      "type": "integer",
+      "default": 12
+    },
+    "last_completed_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "next_due_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "reminder_lead_days": {
+      "type": "integer",
+      "default": 30
+    },
+    "assigned_user": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "Safe",
+        "Upcoming",
+        "Overdue"
+      ],
+      "default": "Safe"
+    },
+    "completion_notes": {
+      "type": "string"
+    },
+    "document_urls": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Uploaded compliance documents (certificates, receipts, etc.)"
+    }
+  },
+  "required": [
+    "asset_name",
+    "event_name"
+  ],
+  "rls": {
+    "create": {
+      "$or": [
+        {
+          "created_by": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "read": {
+      "$or": [
+        {
+          "assigned_user": "{{user.email}}"
+        },
+        {
+          "created_by": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "assigned_user": "{{user.email}}"
+        },
+        {
+          "created_by": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

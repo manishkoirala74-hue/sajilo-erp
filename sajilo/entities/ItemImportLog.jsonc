@@ -1,0 +1,82 @@
+{
+  "name": "ItemImportLog",
+  "type": "object",
+  "properties": {
+    "file_name": {
+      "type": "string"
+    },
+    "imported_by": {
+      "type": "string"
+    },
+    "import_date": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "total_rows": {
+      "type": "integer",
+      "default": 0
+    },
+    "items_created": {
+      "type": "integer",
+      "default": 0
+    },
+    "items_updated": {
+      "type": "integer",
+      "default": 0
+    },
+    "items_skipped": {
+      "type": "integer",
+      "default": 0
+    },
+    "items_failed": {
+      "type": "integer",
+      "default": 0
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "Success",
+        "Partial",
+        "Failed"
+      ],
+      "default": "Success"
+    },
+    "errors": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "List of validation/import error messages"
+    },
+    "notes": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "file_name",
+    "imported_by"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "warehouse"
+          }
+        }
+      ]
+    },
+    "update": false,
+    "delete": false
+  }
+}

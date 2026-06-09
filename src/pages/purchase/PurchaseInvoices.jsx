@@ -1,0 +1,361 @@
+import { useState, useEffect } from 'react';
+import { sajilo } from '@/api/sajiloClient';
+import { Plus, Eye, CheckCircle2, XCircle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import PageHeader from '@/components/shared/PageHeader';
+import StatusBadge from '@/components/shared/StatusBadge';
+import DataTable from '@/components/shared/DataTable';
+import LineItemsEditor from '@/components/invoices/LineItemsEditor';
+import { toast } from 'sonner';
+import { format } from 'date-fns';
+import DateInput from '@/components/shared/DateInput';
+import { postPurchaseInvoice, loadItemsMap, loadSettings } from '@/lib/glPostingService';
+import { useSajiloSync } from '@/hooks/useSajiloSync';
+
+const emptyPI = {
+  invoice_number: '', vendor_invoice_no: '', po_reference_id: '',
+  po_reference_number: '', vendor_id: '', vendor_name: '',
+  invoice_date: format(new Date(), 'yyyy-MM-dd'),
+  due_date: format(new Date(Date.now() + 30 * 86400000), 'yyyy-MM-dd'),
+  status: 'Draft', payment_status: 'Unpaid',
+  subtotal: 0, vat_amount: 0, landed_cost_total: 0, grand_total: 0,
+  notes: '', line_items: []
+};
+
+export default function PurchaseInvoices() {
+  const [invoices, setInvoices] = useState([]);
+  const [vendors, setVendors] = useState([]);
+  const [approvedPOs, setApprovedPOs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [viewDetail, setViewDetail] = useState(null);
+  const [form, setForm] = useState(emptyPI);
+  const [saving, setSaving] = useState(false);
+  const [filterStatus, setFilterStatus] = useState('all');
+
+  // Cancel dialog state
+  const [cancelTarget, setCancelTarget] = useState(null);
+  const [cancelReason, setCancelReason] = useState('');
+  const [cancelling, setCancelling] = useState(false);
+
+  const loadData = () => {
+    Promise.all([
+      sajilo.entities.PurchaseInvoice.list('-created_date'),
+      sajilo.entities.BusinessPartner.filter({ is_active: true }),
+      sajilo.entities.PurchaseOrder.filter({ status: 'Approved' }),
+    ]).then(([inv, vs, pos]) => {
+      setInvoices(inv);
+      // Purchase module: show vendors + customers flagged as treated_as_vendor
+      setVendors(vs.filter(v => v.is_vendor || v.treated_as_vendor));
+      setApprovedPOs(pos);
+      setLoading(false);
+    });
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  useSajiloSync(['BusinessPartner', 'PurchaseOrder'], loadData);
+
+  const fetchInvoices = async () => {
+    const data = await sajilo.entities.PurchaseInvoice.list('-created_date');
+    setInvoices(data);
+  };
+
+  const generateInvoiceNumber = () => {
+    const year = new Date().getFullYear();
+    const seq = String(invoices.length + 1).padStart(3, '0');
+    return `PI-${year}-${seq}`;
+  };
+
+  const openNew = () => {
+    setForm({ ...emptyPI, invoice_number: generateInvoiceNumber() });
+    setShowForm(true);
+  };
+
+  const fetchFromPO = (poId) => {
+    const po = approvedPOs.find(p => p.id === poId);
+    if (po) {
+      setForm(f => ({
+        ...f,
+        po_reference_id: po.id,
+        po_reference_number: po.po_number,
+        vendor_id: po.vendor_id,
+        vendor_name: po.vendor_name,
+        line_items: po.line_items || [],
+        subtotal: po.subtotal,
+        vat_amount: po.vat_amount,
+        grand_total: po.total_amount,
+      }));
+      toast.success('Data fetched from PO');
+    }
+  };
+
+  const handleLineChange = (lines) => {
+    const subtotal = lines.reduce((s, l) => s + (l.line_total || 0), 0);
+    const vatAmount = lines.reduce((s, l) => l.vat_applicable ? s + (l.line_total || 0) * 0.13 : s, 0);
+    setForm(f => ({
+      ...f, line_items: lines, subtotal,
+      vat_amount: vatAmount,
+      grand_total: subtotal + vatAmount + (f.landed_cost_total || 0)
+    }));
+  };
+
+  const handleSave = async (postStatus = 'Draft') => {
+    if (!form.vendor_name) { toast.error('Select a vendor'); return; }
+    setSaving(true);
+    try {
+  const data = { ...form, status: postStatus };
+      const created = await sajilo.entities.PurchaseInvoice.create(data);
+
+      // Update stock if posting
+      if (postStatus === 'Posted') {
+        for (const line of form.line_items) {
+          if (line.item_id) {
+            const items = await sajilo.entities.Item.filter({ id: line.item_id });
+            if (items.length > 0) {
+              const item = items[0];
+              const oldQty = item.quantity_on_hand || 0;
+              const oldWAC = item.weighted_average_cost || 0;
+              const newQty = line.quantity || 0;
+              const newCost = line.unit_price || 0;
+              const newWAC = ((oldQty * oldWAC) + (newQty * newCost)) / (oldQty + newQty);
+              await sajilo.entities.Item.update(item.id, {
+                quantity_on_hand: oldQty + newQty,
+                weighted_average_cost: Math.round(newWAC * 100) / 100,
+              });
+            }
+          }
+        }
+        // GL Posting
+        const [itemsMap, glSettings] = await Promise.all([loadItemsMap(form.line_items.map(l => l.item_id)), loadSettings()]);
+        await postPurchaseInvoice({ ...data, id: created.id }, itemsMap, glSettings);
+        toast.success('Invoice posted — stock, WAC & GL updated');
+      } else {
+        toast.success('Invoice saved as draft');
+      }
+
+        } catch (err) {
+      toast.error(err.message || 'Error occurred while saving');
+    } finally {
+      setSaving(false);
+    }
+    setShowForm(false);
+    fetchInvoices();
+  };
+
+  // ── CANCEL (reverses all transactions, stock restored) ──
+  const handleConfirmCancel = async () => {
+    if (!cancelReason.trim()) { toast.error('Please provide a cancellation reason'); return; }
+    setCancelling(true);
+    const inv = cancelTarget;
+
+    // Reverse stock if it was Posted
+    if (inv.status === 'Posted') {
+      for (const line of (inv.line_items || [])) {
+        if (line.item_id) {
+          const items = await sajilo.entities.Item.filter({ id: line.item_id });
+          if (items.length > 0) {
+            const item = items[0];
+            const restoredQty = (item.quantity_on_hand || 0) - (line.quantity || 0);
+            await sajilo.entities.Item.update(item.id, { quantity_on_hand: Math.max(0, restoredQty) });
+          }
+        }
+      }
+    }
+
+    await sajilo.entities.PurchaseInvoice.update(inv.id, {
+      status: 'Cancelled',
+      payment_status: 'Unpaid',
+      notes: (inv.notes ? inv.notes + '\n' : '') + `Cancelled: ${cancelReason}`,
+    });
+
+    // GL Reversal
+    if (inv.status === 'Posted') {
+      const [itemsMap, glSettings] = await Promise.all([loadItemsMap((inv.line_items || []).map(l => l.item_id)), loadSettings()]);
+      await postPurchaseInvoice(inv, itemsMap, glSettings, true);
+    }
+    toast.success('Purchase Invoice cancelled — all transactions reversed & GL updated');
+    setCancelling(false);
+    setCancelTarget(null);
+    setCancelReason('');
+    fetchInvoices();
+  };
+
+  const filtered = filterStatus === 'all' ? invoices : invoices.filter(i =>
+    filterStatus === 'payment' ? i.payment_status === 'Unpaid' : i.status === filterStatus
+  );
+
+  const columns = [
+    { key: 'invoice_number', label: 'Invoice #', render: (val, row) => (
+      <span className={`font-mono font-semibold ${row.status === 'Cancelled' ? 'line-through text-muted-foreground' : 'text-primary'}`}>{val}</span>
+    )},
+    { key: 'vendor_name', label: 'Vendor', render: (val, row) => (
+      <span className={row.status === 'Cancelled' ? 'text-muted-foreground' : ''}>{val}</span>
+    )},
+    { key: 'vendor_invoice_no', label: "Vendor's Ref" },
+    { key: 'invoice_date', label: 'Date', isDate: true },
+    { key: 'grand_total', label: 'Total', render: (val, row) => (
+      <span className={`font-semibold ${row.status === 'Cancelled' ? 'line-through text-muted-foreground' : ''}`}>NPR {Number(val).toLocaleString()}</span>
+    )},
+    { key: 'status', label: 'Status', render: (val) => <StatusBadge status={val} /> },
+    { key: 'payment_status', label: 'Payment', render: (val, row) => (
+      row.status === 'Cancelled' ? <span className="text-xs text-muted-foreground">—</span> : <StatusBadge status={val} />
+    )},
+    {
+      key: 'actions', label: '',
+      render: (_, row) => (
+        <div className="flex items-center gap-1">
+          <Button variant="ghost" size="icon" title="View" onClick={() => setViewDetail(row)}>
+            <Eye className="w-4 h-4" />
+          </Button>
+          {(row.status === 'Draft' || row.status === 'Posted') && (
+            <Button variant="ghost" size="icon" className="text-destructive" title="Cancel Invoice (reverse transactions)" onClick={() => { setCancelTarget(row); setCancelReason(''); }}>
+              <XCircle className="w-4 h-4" />
+            </Button>
+          )}
+        </div>
+      )
+    }
+  ];
+
+  return (
+    <div>
+      <PageHeader
+        title="Purchase Invoices"
+        subtitle="Record supplier bills and manage accounts payable"
+        action={openNew}
+        actionLabel="New Invoice"
+        actionIcon={Plus}
+      />
+
+      <div className="flex gap-2 mb-4 flex-wrap">
+        {[
+          { key: 'all', label: 'All' },
+          { key: 'Draft', label: 'Draft' },
+          { key: 'Posted', label: 'Posted' },
+          { key: 'payment', label: 'Unpaid' },
+          { key: 'Cancelled', label: 'Cancelled' },
+        ].map(f => (
+          <button
+            key={f.key}
+            onClick={() => setFilterStatus(f.key)}
+            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+              filterStatus === f.key ? 'bg-primary text-white' : 'bg-white border border-border text-muted-foreground hover:bg-muted'
+            }`}
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
+
+      <DataTable columns={columns} data={filtered} searchKey="vendor_name" loading={loading} />
+
+      <Dialog open={showForm} onOpenChange={setShowForm}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>New Purchase Invoice — {form.invoice_number}</DialogTitle>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-4 mt-4">
+            <div>
+              <Label>Vendor *</Label>
+              <Select value={form.vendor_id} onValueChange={v => {
+                const vendor = vendors.find(vn => vn.id === v);
+                setForm(f => ({ ...f, vendor_id: v, vendor_name: vendor?.name || '' }));
+              }}>
+                <SelectTrigger className="mt-1"><SelectValue placeholder="Select vendor" /></SelectTrigger>
+                <SelectContent>
+                  {vendors.map(v => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Fetch from Approved PO</Label>
+              <Select onValueChange={fetchFromPO}>
+                <SelectTrigger className="mt-1 border-dashed border-primary/50 text-primary">
+                  <SelectValue placeholder="📋 Fetch from PO..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {approvedPOs.map(po => (
+                    <SelectItem key={po.id} value={po.id}>{po.po_number} — {po.vendor_name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Vendor's Invoice No.</Label>
+              <Input value={form.vendor_invoice_no} onChange={e => setForm(f => ({...f, vendor_invoice_no: e.target.value}))} placeholder="Supplier reference" className="mt-1" />
+            </div>
+            <div>
+              <DateInput label="Invoice Date" value={form.invoice_date} onChange={v => setForm(f => ({...f, invoice_date: v}))} className="mt-1" />
+            </div>
+            <div>
+              <DateInput label="Due Date" value={form.due_date} onChange={v => setForm(f => ({...f, due_date: v}))} className="mt-1" />
+            </div>
+            <div>
+              <Label>Landed Cost (NPR)</Label>
+              <Input type="number" value={form.landed_cost_total} onChange={e => {
+                const lc = Number(e.target.value);
+                setForm(f => ({ ...f, landed_cost_total: lc, grand_total: f.subtotal + f.vat_amount + lc }));
+              }} className="mt-1" />
+            </div>
+          </div>
+
+          <div className="mt-6">
+            <Label className="text-base font-semibold mb-3 block">Line Items</Label>
+            <LineItemsEditor value={form.line_items} onChange={handleLineChange} />
+          </div>
+
+          <div className="flex justify-end gap-3 mt-4 pt-4 border-t border-border">
+            <Button variant="outline" onClick={() => setShowForm(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => handleSave('Draft')} disabled={saving}>Save Draft</Button>
+            <Button onClick={() => handleSave('Posted')} disabled={saving}>
+              {saving ? 'Posting...' : 'Post Invoice (Update Stock)'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── CANCEL DIALOG ── */}
+      <Dialog open={!!cancelTarget} onOpenChange={() => setCancelTarget(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <XCircle className="w-5 h-5" /> Cancel Purchase Invoice {cancelTarget?.invoice_number}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
+              <p className="font-semibold">This action will:</p>
+              <ul className="list-disc list-inside mt-1 space-y-0.5">
+                {cancelTarget?.status === 'Posted' && <li>Reverse all stock additions (deduct inventory)</li>}
+                <li>Mark the invoice as Cancelled (number is skipped — not reused)</li>
+                <li>This action cannot be undone</li>
+              </ul>
+            </div>
+            <div>
+              <Label>Cancellation Reason *</Label>
+              <Input
+                value={cancelReason}
+                onChange={e => setCancelReason(e.target.value)}
+                placeholder="Enter reason for cancellation..."
+                className="mt-1"
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 mt-4">
+            <Button variant="outline" onClick={() => setCancelTarget(null)}>Back</Button>
+            <Button variant="destructive" disabled={cancelling || !cancelReason.trim()} onClick={handleConfirmCancel}>
+              {cancelling ? 'Cancelling...' : 'Confirm Cancellation'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}

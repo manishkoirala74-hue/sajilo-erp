@@ -1,0 +1,23 @@
+{
+  "name": "UserCompany",
+  "type": "object",
+  "properties": {
+    "user_id": {
+      "type": "string",
+      "description": "Reference to User ID (UUID)"
+    },
+    "company_id": {
+      "type": "string",
+      "description": "Reference to Company ID (UUID)"
+    },
+    "is_default": {
+      "type": "boolean",
+      "default": false,
+      "description": "Is this the default company for the user?"
+    }
+  },
+  "required": [
+    "user_id",
+    "company_id"
+  ]
+}

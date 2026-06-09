@@ -1,0 +1,62 @@
+{
+  "name": "FixedAssetDeleteLog",
+  "type": "object",
+  "properties": {
+    "asset_id": {
+      "type": "string"
+    },
+    "asset_code": {
+      "type": "string"
+    },
+    "asset_name": {
+      "type": "string"
+    },
+    "category": {
+      "type": "string"
+    },
+    "gross_purchase_value": {
+      "type": "number",
+      "default": 0
+    },
+    "net_book_value": {
+      "type": "number",
+      "default": 0
+    },
+    "status_before_delete": {
+      "type": "string"
+    },
+    "deleted_by": {
+      "type": "string"
+    },
+    "deleted_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "reason": {
+      "type": "string"
+    },
+    "asset_snapshot": {
+      "type": "object",
+      "description": "Full JSON snapshot of the FixedAsset record at time of soft-delete"
+    }
+  },
+  "required": [
+    "asset_id",
+    "asset_name",
+    "deleted_by"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": false,
+    "delete": false
+  }
+}

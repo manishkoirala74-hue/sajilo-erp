@@ -1,0 +1,119 @@
+{
+  "name": "GeneralLedgerJournal",
+  "type": "object",
+  "properties": {
+    "entry_date": {
+      "type": "string",
+      "format": "date",
+      "description": "The date of the journal entry"
+    },
+    "description": {
+      "type": "string",
+      "description": "A description of the journal entry"
+    },
+    "reference_module": {
+      "type": "string",
+      "enum": [
+        "Manufacturing",
+        "Payroll",
+        "Assets",
+        "General",
+        "Sales",
+        "Purchase",
+        "Stock"
+      ],
+      "default": "General",
+      "description": "The module that originated this journal entry"
+    },
+    "source_document_id": {
+      "type": "string",
+      "description": "ID of the source document"
+    },
+    "source_document_type": {
+      "type": "string",
+      "description": "Type of the source document e.g. PurchaseInvoice, PayrollRun, FixedAsset"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "Draft",
+        "Posted",
+        "Reversed"
+      ],
+      "default": "Draft"
+    },
+    "total_debit": {
+      "type": "number",
+      "default": 0
+    },
+    "total_credit": {
+      "type": "number",
+      "default": 0
+    },
+    "is_balanced": {
+      "type": "boolean",
+      "default": false,
+      "description": "True when SUM(debit) = SUM(credit)"
+    },
+    "posted_by": {
+      "type": "string"
+    },
+    "notes": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "entry_date",
+    "description",
+    "reference_module"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "$or": [
+          {
+            "role": "admin"
+          },
+          {
+            "role": "accountant"
+          }
+        ]
+      }
+    },
+    "read": {
+      "user_condition": {
+        "$or": [
+          {
+            "role": "admin"
+          },
+          {
+            "role": "accountant"
+          },
+          {
+            "role": "warehouse"
+          }
+        ]
+      }
+    },
+    "update": {
+      "user_condition": {
+        "$or": [
+          {
+            "role": "admin"
+          },
+          {
+            "role": "accountant"
+          },
+          {
+            "role": "warehouse"
+          }
+        ]
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

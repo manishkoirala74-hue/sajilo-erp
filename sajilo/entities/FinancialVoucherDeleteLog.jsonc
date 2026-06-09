@@ -1,0 +1,66 @@
+{
+  "name": "FinancialVoucherDeleteLog",
+  "type": "object",
+  "properties": {
+    "voucher_id": {
+      "type": "string"
+    },
+    "voucher_number": {
+      "type": "string"
+    },
+    "voucher_type": {
+      "type": "string"
+    },
+    "voucher_date": {
+      "type": "string"
+    },
+    "total_amount": {
+      "type": "number",
+      "default": 0
+    },
+    "contact_name": {
+      "type": "string"
+    },
+    "action_type": {
+      "type": "string",
+      "enum": [
+        "Delete",
+        "Reverse"
+      ],
+      "default": "Delete"
+    },
+    "reversal_voucher_number": {
+      "type": "string",
+      "description": "Voucher number of the reversal entry (if action_type=Reverse)"
+    },
+    "performed_by": {
+      "type": "string"
+    },
+    "reason": {
+      "type": "string"
+    },
+    "voucher_snapshot": {
+      "type": "object",
+      "description": "Full JSON snapshot at time of action"
+    }
+  },
+  "required": [
+    "voucher_number",
+    "performed_by",
+    "action_type"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": false,
+    "delete": false
+  }
+}

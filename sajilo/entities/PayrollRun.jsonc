@@ -1,0 +1,132 @@
+{
+  "name": "PayrollRun",
+  "type": "object",
+  "properties": {
+    "run_reference": {
+      "type": "string"
+    },
+    "period_month": {
+      "type": "integer"
+    },
+    "period_year": {
+      "type": "integer"
+    },
+    "period_label": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "Draft",
+        "Processing",
+        "Posted",
+        "Cancelled"
+      ],
+      "default": "Draft"
+    },
+    "total_gross": {
+      "type": "number",
+      "default": 0
+    },
+    "total_pf": {
+      "type": "number",
+      "default": 0
+    },
+    "total_tds": {
+      "type": "number",
+      "default": 0
+    },
+    "total_net": {
+      "type": "number",
+      "default": 0
+    },
+    "employee_count": {
+      "type": "integer",
+      "default": 0
+    },
+    "payslips": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "employee_id": {
+            "type": "string"
+          },
+          "employee_name": {
+            "type": "string"
+          },
+          "employee_code": {
+            "type": "string"
+          },
+          "department": {
+            "type": "string"
+          },
+          "base_salary": {
+            "type": "number"
+          },
+          "allowances": {
+            "type": "number"
+          },
+          "gross_pay": {
+            "type": "number"
+          },
+          "pf_amount": {
+            "type": "number"
+          },
+          "tds_amount": {
+            "type": "number"
+          },
+          "net_payable": {
+            "type": "number"
+          }
+        }
+      }
+    }
+  },
+  "required": [
+    "period_label"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "$or": [
+          {
+            "role": "admin"
+          },
+          {
+            "role": "hr_manager"
+          }
+        ]
+      }
+    },
+    "read": {
+      "user_condition": {
+        "$or": [
+          {
+            "role": "admin"
+          },
+          {
+            "role": "hr_manager"
+          }
+        ]
+      }
+    },
+    "update": {
+      "user_condition": {
+        "$or": [
+          {
+            "role": "admin"
+          },
+          {
+            "role": "hr_manager"
+          }
+        ]
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

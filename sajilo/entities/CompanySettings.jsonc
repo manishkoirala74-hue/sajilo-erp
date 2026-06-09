@@ -1,0 +1,454 @@
+{
+  "name": "CompanySettings",
+  "type": "object",
+  "properties": {
+    "company_name": {
+      "type": "string"
+    },
+    "company_logo_url": {
+      "type": "string"
+    },
+    "address": {
+      "type": "string"
+    },
+    "phone": {
+      "type": "string"
+    },
+    "email": {
+      "type": "string"
+    },
+    "tax_id": {
+      "type": "string"
+    },
+    "currency": {
+      "type": "string",
+      "default": "NPR"
+    },
+    "fiscal_year_start": {
+      "type": "string",
+      "default": "2026-04-01"
+    },
+    "vat_rate": {
+      "type": "number",
+      "default": 13
+    },
+    "tax_charge_type": {
+      "type": "string",
+      "enum": [
+        "Exclusive",
+        "Inclusive"
+      ],
+      "default": "Exclusive"
+    },
+    "default_payment_term_days": {
+      "type": "integer",
+      "default": 30
+    },
+    "enable_purchase_orders": {
+      "type": "boolean",
+      "default": true
+    },
+    "enable_approvals": {
+      "type": "boolean",
+      "default": true
+    },
+    "approval_limit_amount": {
+      "type": "number",
+      "default": 50000
+    },
+    "enable_landed_costs": {
+      "type": "boolean",
+      "default": false
+    },
+    "date_format": {
+      "type": "string",
+      "enum": [
+        "AD",
+        "BS"
+      ],
+      "default": "AD"
+    },
+    "item_image_max_size_mb": {
+      "type": "number",
+      "default": 2
+    },
+    "item_image_max_count": {
+      "type": "integer",
+      "default": 3
+    },
+    "invoice_prefix_sales": {
+      "type": "string",
+      "default": "SI"
+    },
+    "invoice_prefix_purchase": {
+      "type": "string",
+      "default": "PI"
+    },
+    "invoice_prefix_sales_order": {
+      "type": "string",
+      "default": "SO"
+    },
+    "invoice_prefix_purchase_order": {
+      "type": "string",
+      "default": "PO"
+    },
+    "invoice_suffix": {
+      "type": "string",
+      "default": ""
+    },
+    "invoice_next_number": {
+      "type": "integer",
+      "default": 1
+    },
+    "invoice_numbering_method": {
+      "type": "string",
+      "enum": [
+        "Auto",
+        "Manual"
+      ],
+      "default": "Auto"
+    },
+    "invoice_duplicate_handling": {
+      "type": "string",
+      "enum": [
+        "Block",
+        "Warn"
+      ],
+      "default": "Block"
+    },
+    "overdue_reminder_days": {
+      "type": "integer",
+      "default": 7
+    },
+    "send_invoice_reminder_on_due": {
+      "type": "boolean",
+      "default": true
+    },
+    "self_reminder_days_before_due": {
+      "type": "integer",
+      "default": 3
+    },
+    "email_smtp_host": {
+      "type": "string"
+    },
+    "email_smtp_port": {
+      "type": "integer",
+      "default": 587
+    },
+    "email_smtp_user": {
+      "type": "string"
+    },
+    "email_smtp_password": {
+      "type": "string"
+    },
+    "email_from_name": {
+      "type": "string"
+    },
+    "email_debtor_template": {
+      "type": "string",
+      "default": "Dear {customer_name},\n\nThis is a reminder that invoice {invoice_number} for NPR {amount} is due on {due_date}.\n\nPlease make the payment at your earliest convenience.\n\nRegards,\n{company_name}"
+    },
+    "opening_balance_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "enable_pos_module": {
+      "type": "boolean",
+      "default": true
+    },
+    "enable_manufacturing_module": {
+      "type": "boolean",
+      "default": true
+    },
+    "enable_hr_module": {
+      "type": "boolean",
+      "default": true
+    },
+    "enable_assets_module": {
+      "type": "boolean",
+      "default": true
+    },
+    "enable_services_module": {
+      "type": "boolean",
+      "default": true
+    },
+    "dep_default_method": {
+      "type": "string",
+      "enum": [
+        "Straight-Line",
+        "Written-Down Value",
+        "Units of Production"
+      ],
+      "default": "Straight-Line"
+    },
+    "dep_default_rate_percent": {
+      "type": "number",
+      "default": 20
+    },
+    "dep_use_rate_override": {
+      "type": "boolean",
+      "default": false
+    },
+    "dep_posting_mode": {
+      "type": "string",
+      "enum": [
+        "Direct",
+        "Accumulated"
+      ],
+      "default": "Accumulated"
+    },
+    "dep_factory_expense_account_id": {
+      "type": "string"
+    },
+    "dep_factory_expense_account_name": {
+      "type": "string"
+    },
+    "dep_admin_expense_account_id": {
+      "type": "string"
+    },
+    "dep_admin_expense_account_name": {
+      "type": "string"
+    },
+    "dep_accumulated_machinery_account_id": {
+      "type": "string"
+    },
+    "dep_accumulated_machinery_account_name": {
+      "type": "string"
+    },
+    "dep_accumulated_office_account_id": {
+      "type": "string"
+    },
+    "dep_accumulated_office_account_name": {
+      "type": "string"
+    },
+    "dep_accumulated_vehicle_account_id": {
+      "type": "string"
+    },
+    "dep_accumulated_vehicle_account_name": {
+      "type": "string"
+    },
+    "asset_categories": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [
+        "IT Equipment",
+        "Vehicles",
+        "Furniture",
+        "Machinery",
+        "Buildings",
+        "Other"
+      ]
+    },
+    "compliance_event_types": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [
+        "Insurance",
+        "Government Tax",
+        "Preventative Maintenance",
+        "Safety Inspection",
+        "License Renewal"
+      ]
+    },
+    "password_expiry_days": {
+      "type": "integer",
+      "default": 0
+    },
+    "quotation_prefix": {
+      "type": "string",
+      "default": "QT"
+    },
+    "quotation_suffix": {
+      "type": "string",
+      "default": ""
+    },
+    "quotation_next_number": {
+      "type": "integer",
+      "default": 1
+    },
+    "quotation_validity_days": {
+      "type": "integer",
+      "default": 30
+    },
+    "quotation_template": {
+      "type": "string",
+      "enum": [
+        "modern",
+        "classic",
+        "minimal"
+      ],
+      "default": "modern"
+    },
+    "quotation_accent_color": {
+      "type": "string",
+      "default": "#6366f1"
+    },
+    "quotation_font": {
+      "type": "string",
+      "default": "inter"
+    },
+    "quotation_show_logo": {
+      "type": "boolean",
+      "default": true
+    },
+    "quotation_show_vat": {
+      "type": "boolean",
+      "default": true
+    },
+    "quotation_show_item_codes": {
+      "type": "boolean",
+      "default": true
+    },
+    "quotation_show_unit_price": {
+      "type": "boolean",
+      "default": true
+    },
+    "quotation_default_notes": {
+      "type": "string",
+      "default": ""
+    },
+    "quotation_default_terms": {
+      "type": "string",
+      "default": ""
+    },
+    "quotation_salutation": {
+      "type": "string",
+      "default": ""
+    },
+    "quotation_paper_size": {
+      "type": "string",
+      "default": "A4"
+    },
+    "quotation_orientation": {
+      "type": "string",
+      "default": "portrait"
+    },
+    "gl_cash_account_id": {
+      "type": "string",
+      "description": "Default Cash-in-Hand GL account for POS Cash payments"
+    },
+    "gl_cash_account_name": {
+      "type": "string"
+    },
+    "gl_bank_account_id": {
+      "type": "string",
+      "description": "Default Bank GL account for Card/Digital Wallet payments"
+    },
+    "gl_bank_account_name": {
+      "type": "string"
+    },
+    "gl_accounts_receivable_id": {
+      "type": "string",
+      "description": "Accounts Receivable GL account (Credit sales)"
+    },
+    "gl_accounts_receivable_name": {
+      "type": "string"
+    },
+    "gl_accounts_payable_id": {
+      "type": "string",
+      "description": "Accounts Payable GL account (Purchase invoices)"
+    },
+    "gl_accounts_payable_name": {
+      "type": "string"
+    },
+    "gl_vat_payable_id": {
+      "type": "string",
+      "description": "VAT Payable GL account"
+    },
+    "gl_vat_payable_name": {
+      "type": "string"
+    },
+    "gl_sales_return_account_id": {
+      "type": "string"
+    },
+    "gl_sales_return_account_name": {
+      "type": "string"
+    },
+    "gl_purchase_return_account_id": {
+      "type": "string"
+    },
+    "gl_purchase_return_account_name": {
+      "type": "string"
+    },
+    "gl_default_sales_account_id": {
+      "type": "string"
+    },
+    "gl_default_sales_account_name": {
+      "type": "string"
+    },
+    "gl_default_cogs_account_id": {
+      "type": "string"
+    },
+    "gl_default_cogs_account_name": {
+      "type": "string"
+    },
+    "gl_default_inventory_account_id": {
+      "type": "string"
+    },
+    "gl_default_inventory_account_name": {
+      "type": "string"
+    },
+    "gl_stock_variance_account_id": {
+      "type": "string"
+    },
+    "gl_stock_variance_account_name": {
+      "type": "string"
+    },
+    "gl_opening_equity_account_id": {
+      "type": "string"
+    },
+    "gl_opening_equity_account_name": {
+      "type": "string"
+    },
+    "gl_customer_ledger_group_id": {
+      "type": "string",
+      "description": "Parent Group Ledger account for auto-generating Customer sub-ledgers (e.g. Trade Debtors group)"
+    },
+    "gl_customer_ledger_group_name": {
+      "type": "string"
+    },
+    "gl_supplier_ledger_group_id": {
+      "type": "string",
+      "description": "Parent Group Ledger account for auto-generating Supplier sub-ledgers (e.g. Trade Creditors group)"
+    },
+    "gl_supplier_ledger_group_name": {
+      "type": "string"
+    },
+    "gl_dual_ledger_group_id": {
+      "type": "string",
+      "description": "Parent Group Ledger for partners flagged as both Customer and Vendor (dual-relationship ledger)"
+    },
+    "gl_dual_ledger_group_name": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "company_name"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

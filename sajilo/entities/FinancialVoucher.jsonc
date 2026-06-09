@@ -1,0 +1,127 @@
+{
+  "name": "FinancialVoucher",
+  "type": "object",
+  "properties": {
+    "voucher_number": {
+      "type": "string"
+    },
+    "voucher_type": {
+      "type": "string",
+      "enum": [
+        "Receipt",
+        "Payment",
+        "Journal",
+        "Contra"
+      ],
+      "default": "Receipt"
+    },
+    "voucher_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "contact_id": {
+      "type": "string"
+    },
+    "contact_name": {
+      "type": "string"
+    },
+    "total_amount": {
+      "type": "number",
+      "default": 0
+    },
+    "payment_mode": {
+      "type": "string",
+      "enum": [
+        "Cash",
+        "Bank Transfer",
+        "Cheque",
+        "Digital Wallet"
+      ],
+      "default": "Cash"
+    },
+    "reference_no": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "Draft",
+        "Posted",
+        "Cancelled"
+      ],
+      "default": "Draft"
+    },
+    "narration": {
+      "type": "string"
+    },
+    "entries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "account_name": {
+            "type": "string"
+          },
+          "account_type": {
+            "type": "string"
+          },
+          "debit": {
+            "type": "number"
+          },
+          "credit": {
+            "type": "number"
+          },
+          "narration": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "required": [
+    "voucher_type"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "$or": [
+          {
+            "role": "admin"
+          },
+          {
+            "role": "accountant"
+          }
+        ]
+      }
+    },
+    "read": {
+      "user_condition": {
+        "$or": [
+          {
+            "role": "admin"
+          },
+          {
+            "role": "accountant"
+          }
+        ]
+      }
+    },
+    "update": {
+      "user_condition": {
+        "$or": [
+          {
+            "role": "admin"
+          },
+          {
+            "role": "accountant"
+          }
+        ]
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

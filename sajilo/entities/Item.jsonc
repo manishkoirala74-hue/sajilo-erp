@@ -1,0 +1,175 @@
+{
+  "name": "Item",
+  "type": "object",
+  "properties": {
+    "item_code": {
+      "type": "string",
+      "description": "Unique SKU/item code"
+    },
+    "item_name": {
+      "type": "string"
+    },
+    "category_id": {
+      "type": "string",
+      "description": "FK to ItemCategory"
+    },
+    "category_name": {
+      "type": "string"
+    },
+    "item_type": {
+      "type": "string",
+      "enum": [
+        "Product",
+        "Service",
+        "Raw Material",
+        "Semi-Finished Good",
+        "Finished Good"
+      ],
+      "default": "Product"
+    },
+    "costing_method": {
+      "type": "string",
+      "enum": [
+        "WAC",
+        "FIFO"
+      ],
+      "default": "WAC",
+      "description": "Costing method: WAC = Weighted Average Cost, FIFO = First In First Out"
+    },
+    "unit_of_measure": {
+      "type": "string",
+      "default": "PCS"
+    },
+    "purchase_uom": {
+      "type": "string",
+      "description": "UOM used when purchasing (may differ from stock UOM)"
+    },
+    "sales_uom": {
+      "type": "string",
+      "description": "UOM used when selling (may differ from stock UOM)"
+    },
+    "selling_price": {
+      "type": "number",
+      "default": 0
+    },
+    "purchase_price": {
+      "type": "number",
+      "default": 0
+    },
+    "weighted_average_cost": {
+      "type": "number",
+      "default": 0,
+      "description": "Legacy alias \u2014 kept in sync with current_unit_cost for backward compatibility"
+    },
+    "current_unit_cost": {
+      "type": "number",
+      "default": 0,
+      "description": "Authoritative WAC = total_asset_value / quantity_on_hand. Recomputed on every purchase posting."
+    },
+    "total_asset_value": {
+      "type": "number",
+      "default": 0,
+      "description": "Running total inventory asset value = cumulative sum of (received_qty \u00d7 unit_cost). WAC numerator."
+    },
+    "quantity_on_hand": {
+      "type": "number",
+      "default": 0
+    },
+    "quantity_reserved": {
+      "type": "number",
+      "default": 0
+    },
+    "reorder_level": {
+      "type": "number",
+      "default": 0
+    },
+    "purchase_account_id": {
+      "type": "string",
+      "description": "FK to ChartOfAccount \u2014 Cost of Goods Sold or Purchase account"
+    },
+    "purchase_account_name": {
+      "type": "string"
+    },
+    "sales_account_id": {
+      "type": "string",
+      "description": "FK to ChartOfAccount \u2014 Revenue / Sales account"
+    },
+    "sales_account_name": {
+      "type": "string"
+    },
+    "inventory_account_id": {
+      "type": "string",
+      "description": "FK to ChartOfAccount \u2014 Inventory Asset account"
+    },
+    "inventory_account_name": {
+      "type": "string"
+    },
+    "discount_scheme_id": {
+      "type": "string",
+      "description": "FK to DiscountScheme applied to this item"
+    },
+    "discount_scheme_name": {
+      "type": "string"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true
+    },
+    "is_vat_applicable": {
+      "type": "boolean",
+      "default": false
+    },
+    "description": {
+      "type": "string"
+    },
+    "image_url": {
+      "type": "string"
+    },
+    "barcode": {
+      "type": "string"
+    },
+    "hs_code": {
+      "type": "string",
+      "description": "Harmonized System (HS) code for customs and trade classification"
+    }
+  },
+  "required": [
+    "item_name"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "$or": [
+          {
+            "role": "admin"
+          },
+          {
+            "role": "warehouse"
+          }
+        ]
+      }
+    },
+    "read": {
+      "user_condition": {
+        "$exists": true
+      }
+    },
+    "update": {
+      "user_condition": {
+        "$or": [
+          {
+            "role": "admin"
+          },
+          {
+            "role": "warehouse"
+          }
+        ]
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

@@ -1,0 +1,126 @@
+{
+  "name": "ServiceContract",
+  "type": "object",
+  "properties": {
+    "contract_reference": {
+      "type": "string"
+    },
+    "customer_id": {
+      "type": "string"
+    },
+    "customer_name": {
+      "type": "string"
+    },
+    "service_name": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "start_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "expiry_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "billing_frequency": {
+      "type": "string",
+      "enum": [
+        "Monthly",
+        "Quarterly",
+        "Half-Yearly",
+        "Annually"
+      ],
+      "default": "Monthly"
+    },
+    "billing_amount": {
+      "type": "number",
+      "default": 0
+    },
+    "next_billing_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "Draft",
+        "Active",
+        "Suspended",
+        "Expiring Soon",
+        "Expired",
+        "Cancelled"
+      ],
+      "default": "Draft"
+    },
+    "billing_type": {
+      "type": "string",
+      "enum": [
+        "Bill in Arrears",
+        "Bill in Advance"
+      ],
+      "default": "Bill in Arrears"
+    },
+    "assigned_sales_rep": {
+      "type": "string"
+    },
+    "notes": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "customer_name",
+    "service_name"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "$or": [
+          {
+            "role": "admin"
+          },
+          {
+            "role": "sales_rep"
+          }
+        ]
+      }
+    },
+    "read": {
+      "$or": [
+        {
+          "assigned_sales_rep": "{{user.full_name}}"
+        },
+        {
+          "created_by": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "assigned_sales_rep": "{{user.full_name}}"
+        },
+        {
+          "created_by": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

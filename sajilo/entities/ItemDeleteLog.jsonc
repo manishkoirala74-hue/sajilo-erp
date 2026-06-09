@@ -1,0 +1,60 @@
+{
+  "name": "ItemDeleteLog",
+  "type": "object",
+  "properties": {
+    "item_id": {
+      "type": "string"
+    },
+    "item_code": {
+      "type": "string"
+    },
+    "item_name": {
+      "type": "string"
+    },
+    "item_type": {
+      "type": "string"
+    },
+    "category_name": {
+      "type": "string"
+    },
+    "selling_price": {
+      "type": "number",
+      "default": 0
+    },
+    "quantity_on_hand": {
+      "type": "number",
+      "default": 0
+    },
+    "hs_code": {
+      "type": "string"
+    },
+    "deleted_by": {
+      "type": "string"
+    },
+    "deleted_count": {
+      "type": "integer",
+      "default": 1
+    },
+    "notes": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "item_name",
+    "deleted_by"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": false,
+    "delete": false
+  }
+}

@@ -1,0 +1,141 @@
+{
+  "name": "BusinessPartner",
+  "type": "object",
+  "properties": {
+    "partner_code": {
+      "type": "string",
+      "description": "Auto-generated unique code e.g. BP-001"
+    },
+    "name": {
+      "type": "string",
+      "description": "Full name of individual or company"
+    },
+    "partner_type": {
+      "type": "string",
+      "enum": [
+        "Individual",
+        "Company"
+      ],
+      "default": "Company"
+    },
+    "tax_id_number": {
+      "type": "string",
+      "description": "VAT/PAN number"
+    },
+    "is_customer": {
+      "type": "boolean",
+      "default": false
+    },
+    "is_vendor": {
+      "type": "boolean",
+      "default": false
+    },
+    "treat_as_customer": {
+      "type": "boolean",
+      "default": false,
+      "description": "Supplier flagged to also appear in Sales/POS customer dropdowns; triggers twin AR ledger creation"
+    },
+    "treated_as_vendor": {
+      "type": "boolean",
+      "default": false,
+      "description": "Customer flagged to also appear in Purchase vendor dropdowns; triggers twin AP ledger creation"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true
+    },
+    "credit_limit_amount": {
+      "type": "number",
+      "default": 0
+    },
+    "default_payment_term_days": {
+      "type": "integer",
+      "default": 30
+    },
+    "email": {
+      "type": "string"
+    },
+    "phone": {
+      "type": "string"
+    },
+    "address": {
+      "type": "string"
+    },
+    "city": {
+      "type": "string"
+    },
+    "country": {
+      "type": "string",
+      "default": "Nepal"
+    },
+    "profile_image_url": {
+      "type": "string"
+    },
+    "notes": {
+      "type": "string"
+    },
+    "receivable_account_id": {
+      "type": "string",
+      "description": "FK to ChartOfAccount \u2014 auto-generated AR sub-ledger"
+    },
+    "receivable_account_name": {
+      "type": "string"
+    },
+    "receivable_account_code": {
+      "type": "string",
+      "description": "Account code of the auto-generated AR sub-ledger"
+    },
+    "payable_account_id": {
+      "type": "string",
+      "description": "FK to ChartOfAccount \u2014 auto-generated AP sub-ledger"
+    },
+    "payable_account_name": {
+      "type": "string"
+    },
+    "payable_account_code": {
+      "type": "string",
+      "description": "Account code of the auto-generated AP sub-ledger"
+    },
+    "opening_balance": {
+      "type": "number",
+      "default": 0
+    },
+    "opening_balance_type": {
+      "type": "string",
+      "enum": [
+        "Dr",
+        "Cr"
+      ],
+      "default": "Dr"
+    },
+    "opening_balance_date": {
+      "type": "string",
+      "format": "date"
+    }
+  },
+  "required": [
+    "name"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": {
+      "user_condition": {
+        "$exists": true
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

@@ -1,0 +1,71 @@
+{
+  "name": "PartnerDeleteLog",
+  "type": "object",
+  "properties": {
+    "partner_id": {
+      "type": "string"
+    },
+    "partner_name": {
+      "type": "string"
+    },
+    "partner_type": {
+      "type": "string",
+      "enum": [
+        "Customer",
+        "Supplier"
+      ],
+      "description": "Whether this was a Customer or Supplier deletion"
+    },
+    "partner_code": {
+      "type": "string"
+    },
+    "tax_id_number": {
+      "type": "string"
+    },
+    "email": {
+      "type": "string"
+    },
+    "phone": {
+      "type": "string"
+    },
+    "deleted_by": {
+      "type": "string",
+      "description": "Email of user who performed the deletion"
+    },
+    "action_type": {
+      "type": "string",
+      "enum": [
+        "Single Delete",
+        "Bulk Delete"
+      ],
+      "default": "Single Delete"
+    },
+    "log_payload": {
+      "type": "string",
+      "description": "Full audit trail payload string as per system log format"
+    },
+    "partner_snapshot": {
+      "type": "object",
+      "description": "Full JSON snapshot of the BusinessPartner record at time of deletion"
+    }
+  },
+  "required": [
+    "partner_name",
+    "deleted_by",
+    "partner_type"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": false,
+    "delete": false
+  }
+}

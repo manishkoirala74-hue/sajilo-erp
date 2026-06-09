@@ -1,0 +1,79 @@
+{
+  "name": "ItemCategory",
+  "type": "object",
+  "properties": {
+    "category_name": {
+      "type": "string"
+    },
+    "category_code": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "parent_category_id": {
+      "type": "string",
+      "description": "FK to parent category for sub-categories"
+    },
+    "purchase_account_id": {
+      "type": "string",
+      "description": "Default purchase/COGS account for items in this category"
+    },
+    "purchase_account_name": {
+      "type": "string"
+    },
+    "sales_account_id": {
+      "type": "string",
+      "description": "Default sales/revenue account for items in this category"
+    },
+    "sales_account_name": {
+      "type": "string"
+    },
+    "discount_scheme_id": {
+      "type": "string",
+      "description": "Default discount scheme applied to this category"
+    },
+    "discount_scheme_name": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "category_name"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "$or": [
+          {
+            "role": "admin"
+          },
+          {
+            "role": "warehouse"
+          }
+        ]
+      }
+    },
+    "read": {
+      "user_condition": {
+        "$exists": true
+      }
+    },
+    "update": {
+      "user_condition": {
+        "$or": [
+          {
+            "role": "admin"
+          },
+          {
+            "role": "warehouse"
+          }
+        ]
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

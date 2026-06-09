@@ -1,0 +1,108 @@
+{
+  "name": "ChartOfAccount",
+  "type": "object",
+  "properties": {
+    "account_code": {
+      "type": "string",
+      "description": "Unique IFRS-compliant account code e.g. 1000, 1100, 1110"
+    },
+    "account_name": {
+      "type": "string"
+    },
+    "account_type": {
+      "type": "string",
+      "enum": [
+        "Asset",
+        "Liability",
+        "Equity",
+        "Revenue",
+        "COGS",
+        "OPEX",
+        "Cost of Goods Sold",
+        "Other Income",
+        "Other Expense",
+        "Expense"
+      ],
+      "description": "IFRS-aligned account classification"
+    },
+    "account_subtype": {
+      "type": "string",
+      "description": "e.g. Current Asset, Non-Current Asset, Current Liability, etc."
+    },
+    "ifrs_reference": {
+      "type": "string",
+      "description": "Relevant IFRS standard e.g. IAS 7, IFRS 15"
+    },
+    "ledger_type": {
+      "type": "string",
+      "enum": [
+        "Group Ledger",
+        "Sub Ledger"
+      ],
+      "default": "Sub Ledger"
+    },
+    "parent_account_id": {
+      "type": "string",
+      "description": "FK to parent Group Ledger account"
+    },
+    "parent_account_name": {
+      "type": "string"
+    },
+    "normal_balance": {
+      "type": "string",
+      "enum": [
+        "Debit",
+        "Credit"
+      ],
+      "description": "Normal balance side per accounting convention"
+    },
+    "current_balance": {
+      "type": "number",
+      "default": 0,
+      "description": "Running balance maintained by journal postings"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true
+    },
+    "is_system_account": {
+      "type": "boolean",
+      "default": false,
+      "description": "System accounts cannot be deleted"
+    },
+    "description": {
+      "type": "string"
+    },
+    "notes": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "account_code",
+    "account_name",
+    "account_type",
+    "ledger_type"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

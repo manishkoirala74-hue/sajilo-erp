@@ -1,0 +1,173 @@
+{
+  "name": "SalesInvoice",
+  "type": "object",
+  "properties": {
+    "invoice_number": {
+      "type": "string",
+      "description": "Auto-generated e.g. SI-2026-001"
+    },
+    "customer_id": {
+      "type": "string",
+      "description": "FK to BusinessPartner"
+    },
+    "customer_name": {
+      "type": "string"
+    },
+    "sales_order_id": {
+      "type": "string",
+      "description": "FK to SalesOrder (nullable)"
+    },
+    "invoice_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "due_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "Draft",
+        "Posted",
+        "Cancelled",
+        "Rejected"
+      ],
+      "default": "Draft"
+    },
+    "payment_status": {
+      "type": "string",
+      "enum": [
+        "Unpaid",
+        "Partial",
+        "Paid"
+      ],
+      "default": "Unpaid"
+    },
+    "goods_subtotal": {
+      "type": "number",
+      "default": 0
+    },
+    "sundry_charges_total": {
+      "type": "number",
+      "default": 0
+    },
+    "total_tax_amount": {
+      "type": "number",
+      "default": 0
+    },
+    "grand_total": {
+      "type": "number",
+      "default": 0
+    },
+    "notes": {
+      "type": "string"
+    },
+    "cancellation_reason": {
+      "type": "string",
+      "description": "Reason for cancellation \u2014 all transactions are reversed"
+    },
+    "cancelled_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "rejection_reason": {
+      "type": "string",
+      "description": "Reason for rejecting the invoice number (no transactions)"
+    },
+    "rejected_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "line_items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "item_id": {
+            "type": "string"
+          },
+          "item_name": {
+            "type": "string"
+          },
+          "item_code": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "number"
+          },
+          "unit_price": {
+            "type": "number"
+          },
+          "vat_applicable": {
+            "type": "boolean"
+          },
+          "line_total": {
+            "type": "number"
+          },
+          "cost_at_sale": {
+            "type": "number",
+            "default": 0,
+            "description": "Unit cost locked at moment of sale posting = item.current_unit_cost at T(sale). Immutable after posting. Used for historical gross margin reporting."
+          }
+        }
+      }
+    }
+  },
+  "required": [
+    "customer_name"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "$or": [
+          {
+            "role": "admin"
+          },
+          {
+            "role": "sales_rep"
+          }
+        ]
+      }
+    },
+    "read": {
+      "$or": [
+        {
+          "created_by": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "$or": [
+              {
+                "role": "admin"
+              },
+              {
+                "role": "sales_rep"
+              },
+              {
+                "role": "accountant"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "created_by": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

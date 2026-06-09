@@ -1,0 +1,87 @@
+{
+  "name": "UnitOfMeasure",
+  "type": "object",
+  "properties": {
+    "uom_code": {
+      "type": "string",
+      "description": "Short code e.g. PCS, DZN, KG"
+    },
+    "uom_name": {
+      "type": "string",
+      "description": "Full name e.g. Pieces, Dozen, Kilogram"
+    },
+    "uom_type": {
+      "type": "string",
+      "enum": [
+        "Quantity",
+        "Weight",
+        "Volume",
+        "Length",
+        "Time",
+        "Other"
+      ],
+      "default": "Quantity"
+    },
+    "is_base_unit": {
+      "type": "boolean",
+      "default": false,
+      "description": "The base unit in a conversion group (e.g. PCS is base for DZN)"
+    },
+    "base_unit_code": {
+      "type": "string",
+      "description": "The base UOM code this unit converts to"
+    },
+    "conversion_factor": {
+      "type": "number",
+      "default": 1,
+      "description": "How many base units = 1 of this unit. e.g. 1 DZN = 12 PCS, so factor = 12"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true
+    },
+    "description": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "uom_code",
+    "uom_name"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "$or": [
+          {
+            "role": "admin"
+          },
+          {
+            "role": "warehouse"
+          }
+        ]
+      }
+    },
+    "read": {
+      "user_condition": {
+        "$exists": true
+      }
+    },
+    "update": {
+      "user_condition": {
+        "$or": [
+          {
+            "role": "admin"
+          },
+          {
+            "role": "warehouse"
+          }
+        ]
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

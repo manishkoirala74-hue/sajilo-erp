@@ -1,0 +1,144 @@
+{
+  "name": "FixedAsset",
+  "type": "object",
+  "properties": {
+    "asset_code": {
+      "type": "string"
+    },
+    "asset_name": {
+      "type": "string"
+    },
+    "category": {
+      "type": "string"
+    },
+    "purchase_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "gross_purchase_value": {
+      "type": "number",
+      "default": 0
+    },
+    "salvage_value": {
+      "type": "number",
+      "default": 0
+    },
+    "useful_life_months": {
+      "type": "integer",
+      "default": 60
+    },
+    "depreciation_method": {
+      "type": "string",
+      "enum": [
+        "Straight-Line",
+        "Written-Down Value"
+      ],
+      "default": "Straight-Line"
+    },
+    "accumulated_depreciation": {
+      "type": "number",
+      "default": 0
+    },
+    "net_book_value": {
+      "type": "number",
+      "default": 0
+    },
+    "parent_asset_id": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "Active",
+        "In Repair",
+        "Disposed",
+        "Sold",
+        "Deleted"
+      ],
+      "default": "Active"
+    },
+    "location": {
+      "type": "string"
+    },
+    "assigned_to": {
+      "type": "string"
+    },
+    "notes": {
+      "type": "string"
+    },
+    "document_urls": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Uploaded supporting documents (invoices, warranties, etc.)"
+    },
+    "asset_ledger_id": {
+      "type": "string",
+      "description": "FK to ChartOfAccount \u2014 Non-Current Asset account tracking historical cost of this asset"
+    },
+    "asset_ledger_name": {
+      "type": "string"
+    },
+    "accumulated_dep_ledger_id": {
+      "type": "string",
+      "description": "FK to ChartOfAccount \u2014 Contra-Asset / Accumulated Depreciation account for this asset"
+    },
+    "accumulated_dep_ledger_name": {
+      "type": "string"
+    },
+    "dep_expense_ledger_id": {
+      "type": "string",
+      "description": "FK to ChartOfAccount \u2014 OPEX or FOH depreciation expense account for this asset"
+    },
+    "dep_expense_ledger_name": {
+      "type": "string"
+    },
+    "gl_posted": {
+      "type": "boolean",
+      "default": false,
+      "description": "True once the asset purchase journal (DR Asset Cost / CR AP or Cash) has been posted"
+    },
+    "payment_method_type": {
+      "type": "string",
+      "enum": [
+        "cash_bank",
+        "party_ledger"
+      ],
+      "default": "cash_bank",
+      "description": "How the asset purchase was funded: via Cash/Bank or posted to a Supplier party ledger"
+    },
+    "payment_account_id": {
+      "type": "string",
+      "description": "FK to ChartOfAccount \u2014 the specific Cash/Bank GL account or Supplier AP sub-ledger credited on purchase"
+    },
+    "payment_account_name": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "asset_name"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

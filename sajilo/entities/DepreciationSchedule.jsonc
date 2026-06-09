@@ -1,0 +1,62 @@
+{
+  "name": "DepreciationSchedule",
+  "type": "object",
+  "properties": {
+    "asset_id": {
+      "type": "string"
+    },
+    "asset_name": {
+      "type": "string"
+    },
+    "asset_code": {
+      "type": "string"
+    },
+    "schedule_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "calculated_depreciation_amount": {
+      "type": "number",
+      "default": 0
+    },
+    "is_posted": {
+      "type": "boolean",
+      "default": false
+    },
+    "posted_by": {
+      "type": "string"
+    },
+    "posted_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "period_label": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "asset_id"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

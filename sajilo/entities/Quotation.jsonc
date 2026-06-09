@@ -1,0 +1,167 @@
+{
+  "name": "Quotation",
+  "type": "object",
+  "properties": {
+    "quotation_number": {
+      "type": "string",
+      "description": "e.g. QT-2026-001"
+    },
+    "customer_id": {
+      "type": "string"
+    },
+    "customer_name": {
+      "type": "string"
+    },
+    "customer_email": {
+      "type": "string"
+    },
+    "customer_phone": {
+      "type": "string"
+    },
+    "customer_address": {
+      "type": "string"
+    },
+    "quotation_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "valid_until": {
+      "type": "string",
+      "format": "date"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "Draft",
+        "Sent",
+        "Accepted",
+        "Rejected",
+        "Expired",
+        "Converted"
+      ],
+      "default": "Draft"
+    },
+    "goods_subtotal": {
+      "type": "number",
+      "default": 0
+    },
+    "discount_amount": {
+      "type": "number",
+      "default": 0
+    },
+    "total_tax_amount": {
+      "type": "number",
+      "default": 0
+    },
+    "grand_total": {
+      "type": "number",
+      "default": 0
+    },
+    "notes": {
+      "type": "string",
+      "description": "Customer-visible notes on the quotation"
+    },
+    "internal_notes": {
+      "type": "string",
+      "description": "Internal notes (not printed)"
+    },
+    "terms_and_conditions": {
+      "type": "string"
+    },
+    "converted_to_order_id": {
+      "type": "string"
+    },
+    "converted_to_invoice_id": {
+      "type": "string"
+    },
+    "line_items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "item_id": {
+            "type": "string"
+          },
+          "item_name": {
+            "type": "string"
+          },
+          "item_code": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "number"
+          },
+          "unit_price": {
+            "type": "number"
+          },
+          "discount_percent": {
+            "type": "number"
+          },
+          "vat_applicable": {
+            "type": "boolean"
+          },
+          "line_total": {
+            "type": "number"
+          }
+        }
+      }
+    }
+  },
+  "required": [
+    "customer_name",
+    "quotation_date"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "$or": [
+          {
+            "role": "admin"
+          },
+          {
+            "role": "sales_rep"
+          }
+        ]
+      }
+    },
+    "read": {
+      "$or": [
+        {
+          "created_by": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "$or": [
+              {
+                "role": "admin"
+              },
+              {
+                "role": "sales_rep"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "created_by": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

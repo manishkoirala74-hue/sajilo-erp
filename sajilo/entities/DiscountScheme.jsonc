@@ -1,0 +1,111 @@
+{
+  "name": "DiscountScheme",
+  "type": "object",
+  "properties": {
+    "scheme_name": {
+      "type": "string"
+    },
+    "discount_type": {
+      "type": "string",
+      "enum": [
+        "Percentage",
+        "Fixed Amount"
+      ],
+      "default": "Percentage"
+    },
+    "discount_value": {
+      "type": "number",
+      "default": 0,
+      "description": "% or fixed NPR amount"
+    },
+    "applies_to": {
+      "type": "string",
+      "enum": [
+        "All Items",
+        "Specific Item",
+        "Item Category"
+      ],
+      "default": "All Items"
+    },
+    "item_id": {
+      "type": "string",
+      "description": "FK to Item (if applies_to = Specific Item)"
+    },
+    "item_name": {
+      "type": "string"
+    },
+    "category_id": {
+      "type": "string",
+      "description": "FK to ItemCategory (if applies_to = Item Category)"
+    },
+    "category_name": {
+      "type": "string"
+    },
+    "valid_from": {
+      "type": "string",
+      "format": "date"
+    },
+    "valid_until": {
+      "type": "string",
+      "format": "date"
+    },
+    "minimum_quantity": {
+      "type": "number",
+      "default": 0,
+      "description": "Minimum qty to qualify for discount"
+    },
+    "minimum_amount": {
+      "type": "number",
+      "default": 0,
+      "description": "Minimum order amount to qualify"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true
+    },
+    "notes": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "scheme_name",
+    "discount_type",
+    "discount_value"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "manager"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "sales_rep"
+          }
+        }
+      ]
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

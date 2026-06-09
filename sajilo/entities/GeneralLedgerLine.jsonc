@@ -1,0 +1,64 @@
+{
+  "name": "GeneralLedgerLine",
+  "type": "object",
+  "properties": {
+    "journal_id": {
+      "type": "string",
+      "description": "FK to GeneralLedgerJournal"
+    },
+    "account_id": {
+      "type": "string",
+      "description": "FK to ChartOfAccount"
+    },
+    "account_code": {
+      "type": "string",
+      "description": "Account code (denormalized for performance)"
+    },
+    "account_name": {
+      "type": "string",
+      "description": "Account name (denormalized for performance)"
+    },
+    "account_type": {
+      "type": "string",
+      "description": "Account type (denormalized)"
+    },
+    "debit_amount": {
+      "type": "number",
+      "default": 0
+    },
+    "credit_amount": {
+      "type": "number",
+      "default": 0
+    },
+    "description": {
+      "type": "string",
+      "description": "Line-level narration"
+    }
+  },
+  "required": [
+    "journal_id",
+    "account_id",
+    "debit_amount",
+    "credit_amount"
+  ],
+  "rls": {
+    "create": false,
+    "read": {
+      "user_condition": {
+        "$or": [
+          {
+            "role": "admin"
+          },
+          {
+            "role": "accountant"
+          },
+          {
+            "role": "warehouse"
+          }
+        ]
+      }
+    },
+    "update": false,
+    "delete": false
+  }
+}

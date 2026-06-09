@@ -1,0 +1,130 @@
+{
+  "name": "Employee",
+  "type": "object",
+  "properties": {
+    "employee_code": {
+      "type": "string"
+    },
+    "full_name": {
+      "type": "string"
+    },
+    "date_of_birth": {
+      "type": "string",
+      "format": "date"
+    },
+    "national_id_number": {
+      "type": "string"
+    },
+    "department": {
+      "type": "string"
+    },
+    "designation": {
+      "type": "string"
+    },
+    "employment_status": {
+      "type": "string",
+      "enum": [
+        "Candidate",
+        "Probation",
+        "Permanent",
+        "Notice Period",
+        "Retired",
+        "Terminated"
+      ],
+      "default": "Probation"
+    },
+    "joining_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "exit_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "email": {
+      "type": "string"
+    },
+    "phone": {
+      "type": "string"
+    },
+    "address": {
+      "type": "string"
+    },
+    "bank_name": {
+      "type": "string"
+    },
+    "bank_account_number": {
+      "type": "string"
+    },
+    "base_salary": {
+      "type": "number",
+      "default": 0
+    },
+    "house_rent_allowance": {
+      "type": "number",
+      "default": 0
+    },
+    "transport_allowance": {
+      "type": "number",
+      "default": 0
+    },
+    "pf_deduction_percentage": {
+      "type": "number",
+      "default": 10
+    },
+    "tds_tax_percentage": {
+      "type": "number",
+      "default": 1
+    },
+    "annual_leave_balance": {
+      "type": "number",
+      "default": 0
+    },
+    "sick_leave_balance": {
+      "type": "number",
+      "default": 0
+    },
+    "profile_image_url": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "full_name"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": {
+      "$or": [
+        {
+          "email": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "email": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

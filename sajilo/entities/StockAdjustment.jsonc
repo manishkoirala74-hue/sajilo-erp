@@ -1,0 +1,127 @@
+{
+  "name": "StockAdjustment",
+  "type": "object",
+  "properties": {
+    "adjustment_number": {
+      "type": "string"
+    },
+    "adjustment_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "adjustment_type": {
+      "type": "string",
+      "enum": [
+        "Increase",
+        "Decrease"
+      ],
+      "default": "Increase"
+    },
+    "reason": {
+      "type": "string",
+      "enum": [
+        "Physical Count Variance",
+        "Damage/Wastage",
+        "Opening Stock",
+        "Expiry",
+        "Theft/Loss",
+        "Other"
+      ],
+      "default": "Physical Count Variance"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "Draft",
+        "Posted",
+        "Cancelled"
+      ],
+      "default": "Draft"
+    },
+    "total_cost_impact": {
+      "type": "number",
+      "default": 0
+    },
+    "notes": {
+      "type": "string"
+    },
+    "line_items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "item_id": {
+            "type": "string"
+          },
+          "item_name": {
+            "type": "string"
+          },
+          "item_code": {
+            "type": "string"
+          },
+          "current_qty": {
+            "type": "number"
+          },
+          "adjusted_qty": {
+            "type": "number"
+          },
+          "difference_qty": {
+            "type": "number"
+          },
+          "cost_per_unit": {
+            "type": "number"
+          },
+          "cost_impact": {
+            "type": "number"
+          }
+        }
+      }
+    }
+  },
+  "required": [
+    "adjustment_type"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "$or": [
+          {
+            "role": "admin"
+          },
+          {
+            "role": "warehouse"
+          }
+        ]
+      }
+    },
+    "read": {
+      "user_condition": {
+        "$or": [
+          {
+            "role": "admin"
+          },
+          {
+            "role": "warehouse"
+          }
+        ]
+      }
+    },
+    "update": {
+      "user_condition": {
+        "$or": [
+          {
+            "role": "admin"
+          },
+          {
+            "role": "warehouse"
+          }
+        ]
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

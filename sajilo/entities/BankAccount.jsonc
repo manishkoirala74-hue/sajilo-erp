@@ -1,0 +1,126 @@
+{
+  "name": "BankAccount",
+  "type": "object",
+  "properties": {
+    "account_name": {
+      "type": "string",
+      "description": "Descriptive ledger name e.g. 'Nepal Bank - Current Account'"
+    },
+    "account_type": {
+      "type": "string",
+      "enum": [
+        "Cash",
+        "Bank"
+      ],
+      "default": "Bank"
+    },
+    "account_holder_name": {
+      "type": "string",
+      "description": "Name of the account holder / company"
+    },
+    "bank_name": {
+      "type": "string",
+      "description": "e.g. Nepal Bank Limited, Himalayan Bank"
+    },
+    "branch_name": {
+      "type": "string"
+    },
+    "account_number": {
+      "type": "string",
+      "description": "Bank account number"
+    },
+    "account_category": {
+      "type": "string",
+      "enum": [
+        "Current",
+        "Savings",
+        "Overdraft",
+        "Fixed Deposit",
+        "Cash in Hand"
+      ],
+      "default": "Current"
+    },
+    "currency": {
+      "type": "string",
+      "default": "NPR"
+    },
+    "opening_balance": {
+      "type": "number",
+      "default": 0
+    },
+    "current_balance": {
+      "type": "number",
+      "default": 0
+    },
+    "gl_account_id": {
+      "type": "string",
+      "description": "FK to auto-created ChartOfAccount sub-ledger"
+    },
+    "gl_account_name": {
+      "type": "string",
+      "description": "Auto-created GL account name"
+    },
+    "ledger_group_id": {
+      "type": "string",
+      "description": "FK to parent Group Ledger (Cash & Cash Equivalents group)"
+    },
+    "ledger_group_name": {
+      "type": "string",
+      "description": "Parent group ledger name"
+    },
+    "ifsc_code": {
+      "type": "string",
+      "description": "IFSC / routing code"
+    },
+    "swift_code": {
+      "type": "string"
+    },
+    "contact_person": {
+      "type": "string",
+      "description": "Bank relationship manager / contact person"
+    },
+    "contact_phone": {
+      "type": "string"
+    },
+    "notes": {
+      "type": "string"
+    },
+    "document_urls": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Uploaded supporting documents"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true
+    }
+  },
+  "required": [
+    "account_name",
+    "account_type"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

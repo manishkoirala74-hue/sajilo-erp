@@ -1,0 +1,153 @@
+{
+  "name": "POSSale",
+  "type": "object",
+  "properties": {
+    "sale_number": {
+      "type": "string"
+    },
+    "sale_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "customer_name": {
+      "type": "string",
+      "default": "Walk-in Customer"
+    },
+    "customer_id": {
+      "type": "string"
+    },
+    "payment_method": {
+      "type": "string",
+      "enum": [
+        "Cash",
+        "Card",
+        "Digital Wallet",
+        "Credit"
+      ],
+      "default": "Cash"
+    },
+    "subtotal": {
+      "type": "number",
+      "default": 0
+    },
+    "discount_amount": {
+      "type": "number",
+      "default": 0
+    },
+    "vat_amount": {
+      "type": "number",
+      "default": 0
+    },
+    "grand_total": {
+      "type": "number",
+      "default": 0
+    },
+    "amount_tendered": {
+      "type": "number",
+      "default": 0
+    },
+    "change_amount": {
+      "type": "number",
+      "default": 0
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "Completed",
+        "Voided"
+      ],
+      "default": "Completed"
+    },
+    "notes": {
+      "type": "string"
+    },
+    "line_items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "item_id": {
+            "type": "string"
+          },
+          "item_name": {
+            "type": "string"
+          },
+          "item_code": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "number"
+          },
+          "unit_price": {
+            "type": "number"
+          },
+          "discount_percent": {
+            "type": "number"
+          },
+          "vat_applicable": {
+            "type": "boolean"
+          },
+          "line_total": {
+            "type": "number"
+          },
+          "cost_at_sale": {
+            "type": "number",
+            "default": 0,
+            "description": "Unit cost locked at moment of sale posting = item.current_unit_cost at T(sale). Immutable after posting. Used for historical gross margin reporting."
+          }
+        }
+      }
+    }
+  },
+  "required": [],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "$or": [
+          {
+            "role": "admin"
+          },
+          {
+            "role": "sales_rep"
+          }
+        ]
+      }
+    },
+    "read": {
+      "$or": [
+        {
+          "created_by": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "$or": [
+              {
+                "role": "admin"
+              },
+              {
+                "role": "accountant"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "created_by": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

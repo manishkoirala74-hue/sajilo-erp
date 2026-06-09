@@ -1,0 +1,147 @@
+{
+  "name": "ManufacturingOrder",
+  "type": "object",
+  "properties": {
+    "mo_number": {
+      "type": "string"
+    },
+    "product_name": {
+      "type": "string"
+    },
+    "product_item_id": {
+      "type": "string"
+    },
+    "bom_description": {
+      "type": "string"
+    },
+    "planned_quantity": {
+      "type": "number",
+      "default": 1
+    },
+    "actual_yield_quantity": {
+      "type": "number",
+      "default": 0
+    },
+    "expected_yield_percent": {
+      "type": "number",
+      "default": 100
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "Draft",
+        "Confirmed",
+        "In Progress",
+        "Completed",
+        "Cancelled"
+      ],
+      "default": "Draft"
+    },
+    "start_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "completion_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "total_material_cost": {
+      "type": "number",
+      "default": 0
+    },
+    "total_overhead_cost": {
+      "type": "number",
+      "default": 0
+    },
+    "final_unit_cost": {
+      "type": "number",
+      "default": 0
+    },
+    "batch_number": {
+      "type": "string"
+    },
+    "notes": {
+      "type": "string"
+    },
+    "bom_components": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "component_type": {
+            "type": "string",
+            "enum": [
+              "Material",
+              "Labor Overhead",
+              "Machine Overhead"
+            ]
+          },
+          "item_id": {
+            "type": "string"
+          },
+          "item_name": {
+            "type": "string"
+          },
+          "quantity_required": {
+            "type": "number"
+          },
+          "unit_cost": {
+            "type": "number"
+          },
+          "line_cost": {
+            "type": "number"
+          }
+        }
+      }
+    }
+  },
+  "required": [
+    "product_name"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "$or": [
+          {
+            "role": "admin"
+          },
+          {
+            "role": "production_manager"
+          }
+        ]
+      }
+    },
+    "read": {
+      "user_condition": {
+        "$or": [
+          {
+            "role": "admin"
+          },
+          {
+            "role": "production_manager"
+          },
+          {
+            "role": "warehouse"
+          }
+        ]
+      }
+    },
+    "update": {
+      "user_condition": {
+        "$or": [
+          {
+            "role": "admin"
+          },
+          {
+            "role": "production_manager"
+          }
+        ]
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}
