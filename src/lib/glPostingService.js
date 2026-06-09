@@ -365,37 +365,6 @@ export async function postStockAdjustment(adj, itemsMap, settings) {
   return journalId;
 }
 
-// ΓöÇΓöÇΓöÇ Resolve "Difference in Trial Balance" ledger ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
-// Looks up the account by exact name (case-insensitive) from ChartOfAccounts.
-// Returns { id, name } or null if not found.
-export async function resolveDifferenceInTrialBalance() {
-  const accounts = await sajilo.entities.ChartOfAccount.filter({ is_active: true }, 'account_code', 2000);
-  const hit = accounts.find(a =>
-    (a.account_name || '').toLowerCase().includes('difference in trial balance')
-  );
-  if (!hit) {
-    toast.warning(
-      'GL Posting skipped: "Difference in Trial Balance" account not found in Chart of Accounts. ' +
-      'Please create it first.',
-      { duration: 8000 }
-    );
-    return null;
-  }
-  return { id: hit.id, name: hit.account_name };
-}
-
-function resolvePaymentAccount(paymentMethod, s) {
-  if (!paymentMethod || paymentMethod === 'Cash') {
-    return { id: s.gl_cash_account_id, name: s.gl_cash_account_name || 'Cash' };
-  }
-  return { id: s.gl_bank_account_id, name: s.gl_bank_account_name || 'Bank' };
-}
-
-function warnMissingAccount(name) {
-  toast.warning(`GL Posting skipped: "${name}" account not configured in Settings ΓåÆ GL Accounts.`, { duration: 6000 });
-}
-
-
 
 async function createJournal({ date, description, module, sourceId, sourceType, lines }) {
   let company_id = null;
