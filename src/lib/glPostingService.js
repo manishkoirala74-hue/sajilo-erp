@@ -6,7 +6,7 @@
  * strict Group Ledger validation, and race-condition-free inventory costing.
  */
 
-import { supabase } from '@/api/sajiloClient';
+import { supabase, sajilo } from '@/api/sajiloClient';
 import { toast } from 'sonner';
 
 function r2(n) { return Math.round((n || 0) * 100) / 100; }
@@ -390,7 +390,7 @@ async function createJournal({ date, description, module, sourceId, sourceType, 
     })),
     p_lock_cogs: false
   };
-  const { data, error } = await sajilo.client.rpc('rpc_post_gl_transaction', payload);
+  const { data, error } = await supabase.rpc('rpc_post_gl_transaction', payload);
   if (error) { toast.error('GL Error: ' + error.message); throw error; }
   return data;
 }
