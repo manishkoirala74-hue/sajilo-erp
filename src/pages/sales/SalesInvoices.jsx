@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { sajilo } from '@/api/sajiloClient';
-import { Plus, Eye, CheckCircle2, XCircle, Ban, AlertTriangle } from 'lucide-react';
+import { Plus, Eye, CheckCircle2, XCircle, Ban, AlertTriangle, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -100,6 +100,13 @@ export default function SalesInvoices() {
     setShowForm(true);
   };
 
+  const openEdit = (row) => {
+    setForm({ ...emptySI, ...row });
+    setDupWarning(false);
+    setPendingPostStatus(null);
+    setShowForm(true);
+  };
+
   const fetchFromSO = (soId) => {
     const so = salesOrders.find(s => s.id === soId);
     if (so) {
@@ -127,31 +134,29 @@ export default function SalesInvoices() {
     }));
   };
 
-  const checkDuplicate = (invoiceNumber) => {
-    return invoices.some(inv => inv.invoice_number === invoiceNumber);
+  const checkDuplicate = (invoiceNumber, excludeId = null) => {
+    return invoices.some(inv => inv.invoice_number === invoiceNumber && inv.id !== excludeId);
   };
 
   const handleSave = async (postStatus = 'Draft') => {
     if (form.payment_mode === 'Credit' && !form.customer_name) { toast.error('Select a customer'); return; }
     if (['Cash', 'Bank'].includes(form.payment_mode) && !form.cash_bank_account_id) { toast.error('Select a Cash/Bank ledger account'); return; }
     if (!form.invoice_number) { toast.error('Invoice number is required'); return; }
+    if (!form.grand_total || form.grand_total <= 0) { toast.error('Total amount cannot be empty or zero'); return; }
 
     const isManual = settings?.invoice_numbering_method === 'Manual';
 
-    // Duplicate check for manual numbering
-    if (isManual && checkDuplicate(form.invoice_number)) {
+    if (isManual && checkDuplicate(form.invoice_number, form.id)) {
       const handling = settings?.invoice_duplicate_handling || 'Block';
       if (handling === 'Block') {
         toast.error(`Invoice number "${form.invoice_number}" already exists. Duplicate numbers are not allowed.`);
         return;
       } else {
-        // Warn mode — show confirm dialog
         if (!dupWarning) {
           setDupWarning(true);
           setPendingPostStatus(postStatus);
           return;
         }
-        // User confirmed via the warning dialog — proceed
         setDupWarning(false);
         setPendingPostStatus(null);
       }
@@ -175,28 +180,65 @@ export default function SalesInvoices() {
       delete payload.cash_bank_account_id;
       delete payload.cash_bank_account_name;
 
-      const created = await sajilo.entities.SalesInvoice.create(payload);
-
-      if (postStatus === 'Posted') {
-        for (const line of form.line_items) {
-          if (line.item_id) {
-            const items = await sajilo.entities.Item.filter({ id: line.item_id });
-            if (items.length > 0) {
-              const item = items[0];
-              const newQty = Math.max(0, (item.quantity_on_hand || 0) - (line.quantity || 0));
-              await sajilo.entities.Item.update(item.id, { quantity_on_hand: newQty });
+      if (form.id) {
+        const oldInv = invoices.find(i => i.id === form.id);
+        if (oldInv && oldInv.status === 'Posted') {
+          for (const line of (oldInv.line_items || [])) {
+            if (line.item_id) {
+              const items = await sajilo.entities.Item.filter({ id: line.item_id });
+              if (items.length > 0) {
+                const item = items[0];
+                const restoredQty = (item.quantity_on_hand || 0) + (line.quantity || 0);
+                await sajilo.entities.Item.update(item.id, { quantity_on_hand: restoredQty });
+              }
             }
           }
+          const [itemsMap, glSettings] = await Promise.all([loadItemsMap((oldInv.line_items || []).map(l => l.item_id)), loadSettings()]);
+          await postSalesInvoice(oldInv, itemsMap, glSettings, true);
         }
-        // GL Posting
-        const [itemsMap, glSettings] = await Promise.all([loadItemsMap(form.line_items.map(l => l.item_id)), loadSettings()]);
-        await postSalesInvoice({ ...data, id: created.id }, itemsMap, glSettings);
-        toast.success('Invoice posted — stock deducted & GL updated');
+
+        await sajilo.entities.SalesInvoice.update(form.id, payload);
+
+        if (postStatus === 'Posted') {
+          for (const line of form.line_items) {
+            if (line.item_id) {
+              const items = await sajilo.entities.Item.filter({ id: line.item_id });
+              if (items.length > 0) {
+                const item = items[0];
+                const newQty = Math.max(0, (item.quantity_on_hand || 0) - (line.quantity || 0));
+                await sajilo.entities.Item.update(item.id, { quantity_on_hand: newQty });
+              }
+            }
+          }
+          const [itemsMap, glSettings] = await Promise.all([loadItemsMap(form.line_items.map(l => l.item_id)), loadSettings()]);
+          await postSalesInvoice(data, itemsMap, glSettings);
+          toast.success('Invoice updated and posted — stock deducted & GL updated');
+        } else {
+          toast.success('Invoice updated as draft');
+        }
       } else {
-        toast.success('Invoice saved as draft');
+        const created = await sajilo.entities.SalesInvoice.create(payload);
+
+        if (postStatus === 'Posted') {
+          for (const line of form.line_items) {
+            if (line.item_id) {
+              const items = await sajilo.entities.Item.filter({ id: line.item_id });
+              if (items.length > 0) {
+                const item = items[0];
+                const newQty = Math.max(0, (item.quantity_on_hand || 0) - (line.quantity || 0));
+                await sajilo.entities.Item.update(item.id, { quantity_on_hand: newQty });
+              }
+            }
+          }
+          const [itemsMap, glSettings] = await Promise.all([loadItemsMap(form.line_items.map(l => l.item_id)), loadSettings()]);
+          await postSalesInvoice({ ...data, id: created.id }, itemsMap, glSettings);
+          toast.success('Invoice posted — stock deducted & GL updated');
+        } else {
+          toast.success('Invoice saved as draft');
+        }
       }
 
-        } catch (err) {
+    } catch (err) {
       toast.error(err.message || 'Error occurred while saving');
     } finally {
       setSaving(false);
@@ -300,6 +342,11 @@ export default function SalesInvoices() {
             </Button>
           )}
           {(row.status === 'Draft' || row.status === 'Posted') && (
+            <Button variant="ghost" size="icon" className="text-primary" title="Edit Invoice" onClick={() => openEdit(row)}>
+              <Pencil className="w-4 h-4" />
+            </Button>
+          )}
+          {(row.status === 'Draft' || row.status === 'Posted') && (
             <Button variant="ghost" size="icon" className="text-destructive" title="Cancel Invoice (reverse transactions)" onClick={() => { setCancelTarget(row); setCancelReason(''); }}>
               <XCircle className="w-4 h-4" />
             </Button>
@@ -353,7 +400,7 @@ export default function SalesInvoices() {
       <Dialog open={showForm} onOpenChange={setShowForm}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>New Sales Invoice</DialogTitle>
+            <DialogTitle>{form.id ? 'Edit Sales Invoice' : 'New Sales Invoice'}</DialogTitle>
           </DialogHeader>
 
           <div className="grid grid-cols-2 gap-4 mt-4">

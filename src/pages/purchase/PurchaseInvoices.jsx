@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { sajilo } from '@/api/sajiloClient';
-import { Plus, Eye, CheckCircle2, XCircle } from 'lucide-react';
+import { Plus, Eye, CheckCircle2, XCircle, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -82,6 +82,11 @@ export default function PurchaseInvoices() {
     setShowForm(true);
   };
 
+  const openEdit = (row) => {
+    setForm({ ...emptyPI, ...row });
+    setShowForm(true);
+  };
+
   const fetchFromPO = (poId) => {
     const po = approvedPOs.find(p => p.id === poId);
     if (po) {
@@ -113,6 +118,7 @@ export default function PurchaseInvoices() {
   const handleSave = async (postStatus = 'Draft') => {
     if (form.payment_mode === 'Credit' && !form.vendor_name) { toast.error('Select a vendor'); return; }
     if (['Cash', 'Bank'].includes(form.payment_mode) && !form.cash_bank_account_id) { toast.error('Select a Cash/Bank ledger account'); return; }
+    if (!form.grand_total || form.grand_total <= 0) { toast.error('Total amount cannot be empty or zero'); return; }
     setSaving(true);
     try {
       const isCashOrBank = ['Cash', 'Bank'].includes(form.payment_mode);
@@ -131,17 +137,45 @@ export default function PurchaseInvoices() {
       delete payload.cash_bank_account_id;
       delete payload.cash_bank_account_name;
 
-      const created = await sajilo.entities.PurchaseInvoice.create(payload);
+      if (form.id) {
+        const oldInv = invoices.find(i => i.id === form.id);
+        if (oldInv && oldInv.status === 'Posted') {
+          for (const line of (oldInv.line_items || [])) {
+            if (line.item_id) {
+              const items = await sajilo.entities.Item.filter({ id: line.item_id });
+              if (items.length > 0) {
+                const item = items[0];
+                const restoredQty = (item.quantity_on_hand || 0) - (line.quantity || 0);
+                await sajilo.entities.Item.update(item.id, { quantity_on_hand: Math.max(0, restoredQty) });
+              }
+            }
+          }
+          const [itemsMap, glSettings] = await Promise.all([loadItemsMap((oldInv.line_items || []).map(l => l.item_id)), loadSettings()]);
+          await postPurchaseInvoice(oldInv, itemsMap, glSettings, true);
+        }
 
-      if (postStatus === 'Posted') {
-        const [itemsMap, glSettings] = await Promise.all([loadItemsMap(form.line_items.map(l => l.item_id)), loadSettings()]);
-        await postPurchaseInvoice({ ...data, id: created.id }, itemsMap, glSettings);
-        toast.success('Invoice posted — stock, WAC & GL updated');
+        await sajilo.entities.PurchaseInvoice.update(form.id, payload);
+
+        if (postStatus === 'Posted') {
+          const [itemsMap, glSettings] = await Promise.all([loadItemsMap(form.line_items.map(l => l.item_id)), loadSettings()]);
+          await postPurchaseInvoice(data, itemsMap, glSettings);
+          toast.success('Invoice updated and posted — stock, WAC & GL updated');
+        } else {
+          toast.success('Invoice updated as draft');
+        }
       } else {
-        toast.success('Invoice saved as draft');
+        const created = await sajilo.entities.PurchaseInvoice.create(payload);
+
+        if (postStatus === 'Posted') {
+          const [itemsMap, glSettings] = await Promise.all([loadItemsMap(form.line_items.map(l => l.item_id)), loadSettings()]);
+          await postPurchaseInvoice({ ...data, id: created.id }, itemsMap, glSettings);
+          toast.success('Invoice posted — stock, WAC & GL updated');
+        } else {
+          toast.success('Invoice saved as draft');
+        }
       }
 
-        } catch (err) {
+    } catch (err) {
       toast.error(err.message || 'Error occurred while saving');
     } finally {
       setSaving(false);
@@ -216,6 +250,11 @@ export default function PurchaseInvoices() {
             <Eye className="w-4 h-4" />
           </Button>
           {(row.status === 'Draft' || row.status === 'Posted') && (
+            <Button variant="ghost" size="icon" className="text-primary" title="Edit Invoice" onClick={() => openEdit(row)}>
+              <Pencil className="w-4 h-4" />
+            </Button>
+          )}
+          {(row.status === 'Draft' || row.status === 'Posted') && (
             <Button variant="ghost" size="icon" className="text-destructive" title="Cancel Invoice (reverse transactions)" onClick={() => { setCancelTarget(row); setCancelReason(''); }}>
               <XCircle className="w-4 h-4" />
             </Button>
@@ -260,7 +299,7 @@ export default function PurchaseInvoices() {
       <Dialog open={showForm} onOpenChange={setShowForm}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>New Purchase Invoice — {form.invoice_number}</DialogTitle>
+            <DialogTitle>{form.id ? 'Edit Purchase Invoice' : 'New Purchase Invoice'} — {form.invoice_number}</DialogTitle>
           </DialogHeader>
           <div className="grid grid-cols-2 gap-4 mt-4">
             <div className="col-span-2">
