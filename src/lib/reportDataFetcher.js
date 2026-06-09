@@ -107,9 +107,11 @@ export async function fetchReportData(reportId, fromDate, toDate) {
       const allAccounts = await sajilo.entities.ChartOfAccount.filter({ is_active: true }, 'account_code', 2000);
       const accounts = allAccounts.filter(a => ['Revenue', 'Other Income', 'Expense', 'COGS', 'OPEX', 'Cost of Goods Sold', 'Other Expense'].includes(a.account_type));
 
-      // Fetch posted journals within date range
-      const jRes = await supabase.from('GeneralLedgerJournal').select('id, entry_date').eq('status', 'Posted');
-      const journals = jRes.data || [];
+      const accTypeMap = {};
+      allAccounts.forEach(a => accTypeMap[a.id] = a.account_type);
+
+      // Fetch posted journals within date range (safely applying company filter)
+      const journals = await sajilo.entities.GeneralLedgerJournal.filter({ status: 'Posted' }, 'entry_date', 5000);
       const validJIds = journals.filter(j => inRange(j.entry_date, fromDate, toDate)).map(j => j.id);
 
       let lines = [];
@@ -127,7 +129,8 @@ export async function fetchReportData(reportId, fromDate, toDate) {
       lines.forEach(l => {
         if (!balances[l.account_id]) balances[l.account_id] = 0;
         const delta = (l.debit_amount || 0) - (l.credit_amount || 0);
-        const isDebitNormal = ['Asset', 'COGS', 'Expense', 'OPEX', 'Cost of Goods Sold', 'Other Expense'].includes(l.account_type);
+        const actualType = l.account_type || accTypeMap[l.account_id] || '';
+        const isDebitNormal = ['Asset', 'COGS', 'Expense', 'OPEX', 'Cost of Goods Sold', 'Other Expense'].includes(actualType);
         balances[l.account_id] += (isDebitNormal ? delta : -delta);
       });
 
@@ -148,8 +151,11 @@ export async function fetchReportData(reportId, fromDate, toDate) {
 
     case 'balance_sheet': {
       // Balance sheet sums EVERYTHING up to toDate
-      const jRes = await supabase.from('GeneralLedgerJournal').select('id, entry_date').eq('status', 'Posted');
-      const journals = jRes.data || [];
+      const allAccountsForTypeMap = await sajilo.entities.ChartOfAccount.filter({ is_active: true }, 'account_code', 2000);
+      const accTypeMap = {};
+      allAccountsForTypeMap.forEach(a => accTypeMap[a.id] = a.account_type);
+
+      const journals = await sajilo.entities.GeneralLedgerJournal.filter({ status: 'Posted' }, 'entry_date', 5000);
       const validJIds = journals.filter(j => !toDate || (new Date(j.entry_date) <= new Date(toDate))).map(j => j.id);
 
       let lines = [];
@@ -165,7 +171,8 @@ export async function fetchReportData(reportId, fromDate, toDate) {
       lines.forEach(l => {
         if (!accMap[l.account_id]) accMap[l.account_id] = { id: l.account_id, code: l.account_code, name: l.account_name, type: l.account_type, balance: 0 };
         const delta = (l.debit_amount || 0) - (l.credit_amount || 0);
-        const isDebitNormal = ['Asset', 'COGS', 'Expense', 'OPEX', 'Cost of Goods Sold', 'Other Expense'].includes(l.account_type);
+        const actualType = l.account_type || accTypeMap[l.account_id] || '';
+        const isDebitNormal = ['Asset', 'COGS', 'Expense', 'OPEX', 'Cost of Goods Sold', 'Other Expense'].includes(actualType);
         accMap[l.account_id].balance += (isDebitNormal ? delta : -delta);
       });
 
@@ -352,11 +359,22 @@ export async function fetchReportData(reportId, fromDate, toDate) {
     }
 
     case 'gl_summary': {
-      const [accounts, journals, lines] = await Promise.all([
-        sajilo.entities.ChartOfAccount.filter({ is_active: true }, 'account_code', 2000),
-        sajilo.entities.GeneralLedgerJournal.filter({ status: 'Posted' }, 'entry_date', 10000),
-        sajilo.entities.GeneralLedgerLine.list('', 50000)
-      ]);
+      const allAccounts = await sajilo.entities.ChartOfAccount.filter({ is_active: true }, 'account_code', 2000);
+      const accTypeMap = {};
+      allAccounts.forEach(a => accTypeMap[a.id] = a.account_type);
+
+      const journals = await sajilo.entities.GeneralLedgerJournal.filter({ status: 'Posted' }, 'entry_date', 10000);
+      const validJIds = journals.map(j => j.id);
+
+      let lines = [];
+      if (validJIds.length > 0) {
+        const chunk = 100;
+        for (let i = 0; i < validJIds.length; i += chunk) {
+          const { data } = await supabase.from('GeneralLedgerLine').select('*').in('journal_id', validJIds.slice(i, i + chunk));
+          if (data) lines = lines.concat(data);
+        }
+      }
+
       const journalMap = {};
       journals.forEach(j => { journalMap[j.id] = j.entry_date ? j.entry_date.split('T')[0] : ''; });
       
@@ -369,7 +387,7 @@ export async function fetchReportData(reportId, fromDate, toDate) {
         accountTotals[l.account_id].cr += (l.credit_amount || 0);
       });
 
-      return accounts.map(a => ({
+      return allAccounts.map(a => ({
         ...a,
         debit: accountTotals[a.id]?.dr || 0,
         credit: accountTotals[a.id]?.cr || 0
@@ -377,31 +395,48 @@ export async function fetchReportData(reportId, fromDate, toDate) {
     }
 
     case 'journal_report': {
-      const [journals, lines] = await Promise.all([
-        sajilo.entities.GeneralLedgerJournal.filter({ status: 'Posted' }, 'entry_date', 5000),
-        sajilo.entities.GeneralLedgerLine.list('', 20000)
-      ]);
+      const journals = await sajilo.entities.GeneralLedgerJournal.filter({ status: 'Posted' }, 'entry_date', 5000);
       const filteredJournals = journals.filter(j => inRange(j.entry_date?.split('T')[0], fromDate, toDate));
       const jIds = new Set(filteredJournals.map(j => j.id));
+      
+      let lines = [];
+      if (filteredJournals.length > 0) {
+        const chunk = 100;
+        const validJIds = Array.from(jIds);
+        for (let i = 0; i < validJIds.length; i += chunk) {
+          const { data } = await supabase.from('GeneralLedgerLine').select('*').in('journal_id', validJIds.slice(i, i + chunk));
+          if (data) lines = lines.concat(data);
+        }
+      }
+
       const jMap = {};
       filteredJournals.forEach(j => { jMap[j.id] = { ...j, lines: [] }; });
       lines.forEach(l => {
-        if (jIds.has(l.journal_id)) jMap[l.journal_id].lines.push(l);
+        if (jMap[l.journal_id]) jMap[l.journal_id].lines.push(l);
       });
       return Object.values(jMap).sort((a,b) => a.entry_date.localeCompare(b.entry_date));
     }
 
     case 'txn_list': {
-      const [journals, lines] = await Promise.all([
-        sajilo.entities.GeneralLedgerJournal.filter({ status: 'Posted' }, 'entry_date', 5000),
-        sajilo.entities.GeneralLedgerLine.list('', 20000)
-      ]);
+      const journals = await sajilo.entities.GeneralLedgerJournal.filter({ status: 'Posted' }, 'entry_date', 5000);
+      const filteredJournals = journals.filter(j => inRange(j.entry_date?.split('T')[0], fromDate, toDate));
       const jMap = {};
-      journals.forEach(j => { jMap[j.id] = j; });
+      filteredJournals.forEach(j => { jMap[j.id] = j; });
+
+      let lines = [];
+      if (filteredJournals.length > 0) {
+        const chunk = 100;
+        const validJIds = Object.keys(jMap);
+        for (let i = 0; i < validJIds.length; i += chunk) {
+          const { data } = await supabase.from('GeneralLedgerLine').select('*').in('journal_id', validJIds.slice(i, i + chunk));
+          if (data) lines = lines.concat(data);
+        }
+      }
+
       return lines.map(l => {
         const j = jMap[l.journal_id];
         return { ...l, entry_date: j?.entry_date?.split('T')[0] || '', journal_memo: j?.memo || '', voucher_no: j?.voucher_no || '' };
-      }).filter(l => inRange(l.entry_date, fromDate, toDate));
+      });
     }
 
     case 'purchase_summary': {
