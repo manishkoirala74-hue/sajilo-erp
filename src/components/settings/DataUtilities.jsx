@@ -56,14 +56,14 @@ export default function DataUtilities() {
             </p>
             
             <div className="flex items-center gap-4 mb-4">
-              <div className="w-40">
+              <div className="w-52">
                 <DateInput 
                   label="Period Start Date" 
                   value={startDate} 
                   onChange={setStartDate} 
                 />
               </div>
-              <div className="w-40">
+              <div className="w-52">
                 <DateInput 
                   label="Period End Date" 
                   value={endDate} 

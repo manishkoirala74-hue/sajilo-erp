@@ -70,7 +70,7 @@ export default function DateInput({ value, onChange, label, className, disabled 
             value={value || ''}
             onChange={handleADChange}
             disabled={disabled}
-            className="flex-1"
+            className="flex-1 min-w-0"
           />
         ) : (
           <Input
@@ -81,7 +81,7 @@ export default function DateInput({ value, onChange, label, className, disabled 
             placeholder="YYYY-MM-DD (BS)"
             maxLength={10}
             className={cn(
-              'flex-1 font-mono',
+              'flex-1 font-mono min-w-0',
               bsText.length === 10 && (() => { const p = bsText.split('-').map(Number); return !isValidBSDate(p[0],p[1],p[2]); })() && 'border-destructive focus-visible:ring-destructive'
             )}
           />

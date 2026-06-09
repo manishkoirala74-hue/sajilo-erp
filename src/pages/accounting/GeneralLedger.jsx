@@ -107,8 +107,8 @@ export default function GeneralLedger() {
             <SelectItem value="Reversed">Reversed</SelectItem>
           </SelectContent>
         </Select>
-        <DateInput value={dateFrom} onChange={setDateFrom} className="w-44" />
-        <DateInput value={dateTo} onChange={setDateTo} className="w-44" />
+        <DateInput value={dateFrom} onChange={setDateFrom} className="w-52" />
+        <DateInput value={dateTo} onChange={setDateTo} className="w-52" />
         <Button variant="outline" size="icon" onClick={fetchData}><RefreshCw className="w-4 h-4" /></Button>
         <Button onClick={() => setShowModal(true)}>
           <Plus className="w-4 h-4 mr-1.5" /> New Journal Entry
