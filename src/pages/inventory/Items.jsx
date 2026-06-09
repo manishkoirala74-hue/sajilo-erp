@@ -248,14 +248,15 @@ export default function Items() {
     if (!form.item_name) { toast.error('Item name is required'); return; }
     setSaving(true);
     try {
-  if (editing) {
-        await sajilo.entities.Item.update(editing.id, form);
+      const { image_urls, ...payload } = form;
+      if (editing) {
+        await sajilo.entities.Item.update(editing.id, payload);
         toast.success('Item updated');
       } else {
-        await sajilo.entities.Item.create(form);
+        await sajilo.entities.Item.create(payload);
         toast.success('Item created');
       }
-        } catch (err) {
+    } catch (err) {
       toast.error(err.message || 'Error occurred while saving');
     } finally {
       setSaving(false);
