@@ -165,7 +165,17 @@ export default function SalesInvoices() {
         status: postStatus,
         payment_status: isCashOrBank ? 'Paid' : form.payment_status 
       };
-      const created = await sajilo.entities.SalesInvoice.create(data);
+
+      if (isCashOrBank) {
+        data.notes = (data.notes ? data.notes + '\n' : '') + `Payment Mode: ${form.payment_mode} (${form.cash_bank_account_name})`;
+      }
+
+      const payload = { ...data };
+      delete payload.payment_mode;
+      delete payload.cash_bank_account_id;
+      delete payload.cash_bank_account_name;
+
+      const created = await sajilo.entities.SalesInvoice.create(payload);
 
       if (postStatus === 'Posted') {
         for (const line of form.line_items) {
