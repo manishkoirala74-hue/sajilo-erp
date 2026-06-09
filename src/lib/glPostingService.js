@@ -386,16 +386,19 @@ export async function postPurchaseInvoice(invoice, itemsMap, settings, isReversa
   });
 
   // WAC recalculation trigger — runs only on WAC items after GL is committed
-  const snapshots = await recalculateWAC(invoice.line_items || [], itemsMap);
+  // Skip during reversals because cancellation manual stock adjustment handles restoration
+  if (!isReversal) {
+    const snapshots = await recalculateWAC(invoice.line_items || [], itemsMap);
 
-  // Write wac_unit_cost_snapshot back onto the invoice line_items for audit trail
-  if (invoice.id && Object.keys(snapshots).length > 0) {
-    const updatedLines = (invoice.line_items || []).map(l => ({
-      ...l,
-      received_qty: l.received_qty ?? l.quantity,
-      wac_unit_cost_snapshot: snapshots[l.item_id] ?? l.wac_unit_cost_snapshot ?? null,
-    }));
-    await sajilo.entities.PurchaseInvoice.update(invoice.id, { line_items: updatedLines });
+    // Write wac_unit_cost_snapshot back onto the invoice line_items for audit trail
+    if (invoice.id && Object.keys(snapshots).length > 0) {
+      const updatedLines = (invoice.line_items || []).map(l => ({
+        ...l,
+        received_qty: l.received_qty ?? l.quantity,
+        wac_unit_cost_snapshot: snapshots[l.item_id] ?? l.wac_unit_cost_snapshot ?? null,
+      }));
+      await sajilo.entities.PurchaseInvoice.update(invoice.id, { line_items: updatedLines });
+    }
   }
 
   return journalId;

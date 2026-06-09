@@ -133,26 +133,7 @@ export default function PurchaseInvoices() {
 
       const created = await sajilo.entities.PurchaseInvoice.create(payload);
 
-      // Update stock if posting
       if (postStatus === 'Posted') {
-        for (const line of form.line_items) {
-          if (line.item_id) {
-            const items = await sajilo.entities.Item.filter({ id: line.item_id });
-            if (items.length > 0) {
-              const item = items[0];
-              const oldQty = item.quantity_on_hand || 0;
-              const oldWAC = item.weighted_average_cost || 0;
-              const newQty = line.quantity || 0;
-              const newCost = line.unit_price || 0;
-              const newWAC = ((oldQty * oldWAC) + (newQty * newCost)) / (oldQty + newQty);
-              await sajilo.entities.Item.update(item.id, {
-                quantity_on_hand: oldQty + newQty,
-                weighted_average_cost: Math.round(newWAC * 100) / 100,
-              });
-            }
-          }
-        }
-        // GL Posting
         const [itemsMap, glSettings] = await Promise.all([loadItemsMap(form.line_items.map(l => l.item_id)), loadSettings()]);
         await postPurchaseInvoice({ ...data, id: created.id }, itemsMap, glSettings);
         toast.success('Invoice posted — stock, WAC & GL updated');
@@ -383,6 +364,56 @@ export default function PurchaseInvoices() {
               {saving ? 'Posting...' : 'Post Invoice (Update Stock)'}
             </Button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── VIEW DETAIL ── */}
+      <Dialog open={!!viewDetail} onOpenChange={() => setViewDetail(null)}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              Purchase Invoice {viewDetail?.invoice_number}
+              <StatusBadge status={viewDetail?.status} />
+            </DialogTitle>
+          </DialogHeader>
+          {viewDetail && (
+            <div className="space-y-4 mt-2">
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div><span className="text-muted-foreground">Vendor:</span> <span className="font-medium">{viewDetail.vendor_name}</span></div>
+                <div><span className="text-muted-foreground">Date:</span> <span className="font-medium">{viewDetail.invoice_date}</span></div>
+                <div><span className="text-muted-foreground">Due Date:</span> <span className="font-medium">{viewDetail.due_date}</span></div>
+                <div><span className="text-muted-foreground">Payment:</span> <StatusBadge status={viewDetail.payment_status} /></div>
+                <div><span className="text-muted-foreground">Subtotal:</span> <span className="font-medium">NPR {Number(viewDetail.subtotal).toLocaleString()}</span></div>
+                <div><span className="text-muted-foreground">VAT:</span> <span className="font-medium">NPR {Number(viewDetail.vat_amount).toLocaleString()}</span></div>
+                <div className="col-span-2"><span className="text-muted-foreground">Grand Total:</span> <span className="font-bold text-primary text-base"> NPR {Number(viewDetail.grand_total).toLocaleString()}</span></div>
+              </div>
+              {viewDetail.notes && <p className="text-sm text-muted-foreground border-t pt-3">{viewDetail.notes}</p>}
+              {viewDetail.status === 'Cancelled' && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                  <p className="text-sm font-semibold text-red-700 flex items-center gap-1"><XCircle className="w-4 h-4" /> Cancelled</p>
+                  <p className="text-xs text-red-400 mt-1">Date: {viewDetail.cancelled_date}</p>
+                </div>
+              )}
+              {(viewDetail.line_items || []).length > 0 && (
+                <div className="border-t pt-3">
+                  <p className="text-sm font-semibold mb-2">Line Items</p>
+                  <table className="w-full text-xs">
+                    <thead><tr className="border-b text-muted-foreground"><th className="text-left py-1">Item</th><th className="text-right py-1">Qty</th><th className="text-right py-1">Price</th><th className="text-right py-1">Total</th></tr></thead>
+                    <tbody>
+                      {viewDetail.line_items.map((l, i) => (
+                        <tr key={i} className="border-b last:border-0">
+                          <td className="py-1">{l.item_name}</td>
+                          <td className="text-right py-1">{l.quantity}</td>
+                          <td className="text-right py-1">NPR {Number(l.unit_price).toLocaleString()}</td>
+                          <td className="text-right py-1 font-medium">NPR {Number(l.line_total).toLocaleString()}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 
