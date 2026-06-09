@@ -103,6 +103,10 @@ export async function fetchReportData(reportId, fromDate, toDate) {
     }
 
     case 'profit_loss': {
+      // Fetch all active accounts to build the tree
+      const allAccounts = await sajilo.entities.ChartOfAccount.filter({ is_active: true }, 'account_code', 2000);
+      const accounts = allAccounts.filter(a => ['Revenue', 'Other Income', 'Expense', 'COGS', 'OPEX', 'Cost of Goods Sold', 'Other Expense'].includes(a.account_type));
+
       // Fetch posted journals within date range
       const jRes = await supabase.from('GeneralLedgerJournal').select('id, entry_date').eq('status', 'Posted');
       const journals = jRes.data || [];
@@ -118,25 +122,28 @@ export async function fetchReportData(reportId, fromDate, toDate) {
         }
       }
 
-      const accMap = {};
+      // Compute balances dynamically
+      const balances = {};
       lines.forEach(l => {
-        if (!accMap[l.account_id]) accMap[l.account_id] = { id: l.account_id, code: l.account_code, name: l.account_name, type: l.account_type, balance: 0 };
+        if (!balances[l.account_id]) balances[l.account_id] = 0;
         const delta = (l.debit_amount || 0) - (l.credit_amount || 0);
         const isDebitNormal = ['Asset', 'COGS', 'Expense', 'OPEX', 'Cost of Goods Sold', 'Other Expense'].includes(l.account_type);
-        accMap[l.account_id].balance += (isDebitNormal ? delta : -delta);
+        balances[l.account_id] += (isDebitNormal ? delta : -delta);
       });
 
-      const allAccounts = Object.values(accMap).filter(a => a.balance !== 0);
-      const toRow = a => ({ account_code: a.code, account_name: a.name, balance: a.balance });
+      // Map balances to the tree nodes
+      const reportAccounts = accounts.map(a => ({
+        id: a.id,
+        parent_account_id: a.parent_account_id,
+        account_code: a.account_code,
+        account_name: a.account_name,
+        account_type: a.account_type,
+        account_subtype: a.account_subtype,
+        ledger_type: a.ledger_type,
+        balance: balances[a.id] || 0
+      }));
 
-      const revenue_accounts = allAccounts.filter(a => ['Revenue','Other Income'].includes(a.type)).map(toRow);
-      const cogs_accounts    = allAccounts.filter(a => ['COGS','Cost of Goods Sold'].includes(a.type)).map(toRow);
-      const opex_accounts    = allAccounts.filter(a => ['OPEX','Expense','Other Expense'].includes(a.type)).map(toRow);
-
-      const revenue = revenue_accounts.reduce((s, a) => s + a.balance, 0);
-      const cogs    = cogs_accounts.reduce((s, a) => s + a.balance, 0);
-      const opex    = opex_accounts.reduce((s, a) => s + a.balance, 0);
-      return { revenue_accounts, cogs_accounts, opex_accounts, revenue, cogs, opex, gross_profit: revenue - cogs, net_profit: revenue - cogs - opex };
+      return { accounts: reportAccounts };
     }
 
     case 'balance_sheet': {

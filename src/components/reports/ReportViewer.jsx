@@ -11,7 +11,7 @@ import FinancialReportTable from '@/components/reports/FinancialReportTable';
 import ReportFilterBar from '@/components/reports/ReportFilterBar';
 import { exportFlatXLSX } from '@/lib/reports/reportExcelExport';
 import { sajilo } from '@/api/sajiloClient';
-import { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { format } from 'date-fns';
 import { adToBS, formatBS, formatAD } from '@/lib/nepaliDate';
 
@@ -604,79 +604,163 @@ function PartnerReport({ title, mode, initialFromDate, initialToDate }) {
 
 // ── Profit & Loss (with decentralized filters) ────────────────────────────────
 function ProfitLossReport({ initialData, initialFromDate, initialToDate }) {
-  const [filters,   setFilters]   = useState({ ...DEFAULT_FILTERS, fromDate: initialFromDate, toDate: initialToDate });
+  const [filters,   setFilters]   = useState({ ...DEFAULT_FILTERS, fromDate: initialFromDate, toDate: initialToDate, expandAll: true });
   const [data,      setData]      = useState(initialData);
   const [loading,   setLoading]   = useState(false);
   const [hasLoaded, setHasLoaded] = useState(!!initialData);
+  const [expanded,  setExpanded]  = useState({});
 
   const load = useCallback(async () => {
     setHasLoaded(true);
     setLoading(true);
-    const accounts = await sajilo.entities.ChartOfAccount.filter({ is_active: true }, 'account_code', 1000);
-    // STRICT: only persisted Sub Ledger rows with a valid account_code
-    const sub = accounts.filter(a => a.ledger_type === 'Sub Ledger' && a.account_code && a.account_code !== '—');
-    const toRow = a => ({ account_code: a.account_code, account_name: a.account_name, balance: Math.abs(a.current_balance || 0) });
-    const revenue_accounts = sub.filter(a => ['Revenue','Other Income'].includes(a.account_type)).map(toRow);
-    const cogs_accounts    = sub.filter(a => ['COGS','Cost of Goods Sold'].includes(a.account_type)).map(toRow);
-    const opex_accounts    = sub.filter(a => ['OPEX','Expense','Other Expense'].includes(a.account_type)).map(toRow);
-    const revenue = revenue_accounts.reduce((s, a) => s + a.balance, 0);
-    const cogs    = cogs_accounts.reduce((s, a) => s + a.balance, 0);
-    const opex    = opex_accounts.reduce((s, a) => s + a.balance, 0);
-    setData({ revenue_accounts, cogs_accounts, opex_accounts, revenue, cogs, opex, gross_profit: revenue - cogs, net_profit: revenue - cogs - opex });
-    setLoading(false);
-  }, []);
+    try {
+      const { fetchReportData } = await import('@/lib/reportDataFetcher');
+      const result = await fetchReportData('profit_loss', filters.fromDate, filters.toDate);
+      setData(result);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  }, [filters]);
 
-  // Do NOT auto-load on mount
-  // useEffect(() => { if (!initialData) load(); }, []);
+  const toggleExpand = (id) => setExpanded(p => ({ ...p, [id]: !p[id] }));
 
-  const { revenue = 0, cogs = 0, opex = 0, gross_profit = 0, net_profit = 0,
-    revenue_accounts = [], cogs_accounts = [], opex_accounts = [] } = data || {};
+  // Tree logic
+  const accounts = data?.accounts || [];
+  const childrenMap = {};
+  accounts.forEach(a => {
+    if (a.parent_account_id) {
+      if (!childrenMap[a.parent_account_id]) childrenMap[a.parent_account_id] = [];
+      childrenMap[a.parent_account_id].push(a);
+    }
+  });
+
+  const rollup = (account) => {
+    let bal = account.balance || 0;
+    (childrenMap[account.id] || []).forEach(c => { bal += rollup(c); });
+    account.rollup_balance = bal;
+    return bal;
+  };
+
+  const idSet = new Set(accounts.map(a => a.id));
+  const rootAccounts = accounts.filter(a => !a.parent_account_id || !idSet.has(a.parent_account_id));
+  rootAccounts.forEach(r => rollup(r));
+
+  const sections = {
+    income: { title: 'Income', accounts: [], total: 0 },
+    cogs: { title: 'Cost of Goods Sold', accounts: [], total: 0 },
+    opex: { title: 'Operating Expenses', accounts: [], total: 0 },
+    non_op_income: { title: 'Non-Operating Income', accounts: [], total: 0 },
+    finance_cost: { title: 'Finance Cost', accounts: [], total: 0 },
+    tax: { title: 'Tax Expense', accounts: [], total: 0 }
+  };
+
+  rootAccounts.forEach(a => {
+    const t = a.account_type;
+    const st = a.account_subtype;
+    if (['Revenue', 'Other Income'].includes(t)) {
+      if (st === 'Non-Operating Revenue') sections.non_op_income.accounts.push(a);
+      else sections.income.accounts.push(a);
+    } else if (['COGS', 'Cost of Goods Sold'].includes(t) || st === 'Direct Expense') {
+      sections.cogs.accounts.push(a);
+    } else if (['Expense', 'OPEX', 'Other Expense'].includes(t)) {
+      const name = a.account_name.toLowerCase();
+      if (name.includes('tax')) sections.tax.accounts.push(a);
+      else if (name.includes('interest') || name.includes('finance')) sections.finance_cost.accounts.push(a);
+      else sections.opex.accounts.push(a);
+    }
+  });
+
+  Object.values(sections).forEach(s => {
+    s.total = s.accounts.reduce((sum, a) => sum + a.rollup_balance, 0);
+  });
+
+  const gross_profit = sections.income.total - sections.cogs.total;
+  const operating_profit = gross_profit - sections.opex.total;
+  const profit_before_tax = operating_profit + sections.non_op_income.total - sections.finance_cost.total;
+  const net_profit = profit_before_tax - sections.tax.total;
 
   const handleExport = () => downloadCSV('income_statement.xlsx',
-    ['Code', 'Account', 'Amount (NPR)'],
-    [
-      ...revenue_accounts.map(a => [a.account_code, `    ${a.account_name}`, a.balance.toFixed(2)]),
-      ['', 'Gross Revenue', revenue.toFixed(2)],
-      ...cogs_accounts.map(a    => [a.account_code, `    ${a.account_name}`, a.balance.toFixed(2)]),
-      ['', 'Gross Profit',  gross_profit.toFixed(2)],
-      ...opex_accounts.map(a    => [a.account_code, `    ${a.account_name}`, a.balance.toFixed(2)]),
-      ['', 'Net Profit / (Loss)', net_profit.toFixed(2)],
-    ]
+    ['Code', 'Account', 'Amount'],
+    [['', 'Not yet supported in hierarchical mode', '']]
   );
 
-  const PLSection = ({ title, accounts, total, totalLabel, color }) => {
-    const bg = { emerald: 'bg-emerald-50', red: 'bg-red-50', amber: 'bg-amber-50' }[color] || 'bg-muted/30';
+  const renderTree = (account, level = 0) => {
+    const children = childrenMap[account.id] || [];
+    const isGroup = account.ledger_type === 'Group Ledger' || children.length > 0;
+    const isExpanded = expanded[account.id] !== undefined ? expanded[account.id] : filters.expandAll;
+    if (!filters.showZeroBalance && Math.abs(account.rollup_balance) < 0.01) return null;
+
     return (
-      <div>
-        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">{title}</p>
-        <div className="border border-border rounded-lg overflow-hidden">
-          <table className="w-full text-sm print:text-[10pt]">
-            <thead className="bg-slate-50 border-b border-border">
-              <tr>
-                <th className="px-3 py-1.5 text-left text-xs font-semibold text-slate-500 w-24">Code</th>
-                <th className="px-3 py-1.5 text-left text-xs font-semibold text-slate-500">Account</th>
-                <th className="px-3 py-1.5 text-right text-xs font-semibold text-slate-500">Amount (NPR)</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {accounts.map((a, i) => (
-                <tr key={i} className="hover:bg-muted/20 print:hover:bg-transparent">
-                  <td className="px-3 py-1.5 font-mono text-xs text-muted-foreground">{a.account_code}</td>
-                  <td className="px-3 py-1.5 pl-5 text-muted-foreground" style={{ wordBreak: 'break-word' }}>{a.account_name}</td>
-                  <td className="px-3 py-1.5 text-right tabular-nums font-mono">{fmtNPR(a.balance)}</td>
-                </tr>
-              ))}
-              {accounts.length === 0 && <tr><td colSpan={3} className="px-3 py-2 text-muted-foreground text-xs italic">No entries</td></tr>}
-            </tbody>
-            <tfoot><tr className={bg}>
-              <td className="px-3 py-2 font-semibold" colSpan={2}>{totalLabel}</td>
-              <td className="px-3 py-2 text-right font-bold tabular-nums font-mono">{fmtNPR(total)}</td>
-            </tr></tfoot>
-          </table>
-        </div>
+      <React.Fragment key={account.id}>
+        <tr className={`hover:bg-muted/20 print:hover:bg-transparent ${isGroup ? 'font-semibold text-slate-800' : 'text-slate-600'}`}>
+          <td className="px-3 py-2 font-mono text-xs text-muted-foreground w-24 border-none">{account.account_code}</td>
+          <td className="px-3 py-2 border-none" style={{ paddingLeft: `${12 + level * 20}px` }}>
+            {isGroup ? (
+              <button onClick={() => toggleExpand(account.id)} className="flex items-center gap-1.5 hover:text-primary transition-colors text-left w-full">
+                <span className="w-3 inline-block text-center text-[10px] text-slate-400">{isExpanded ? '▼' : '▶'}</span>
+                {account.account_name}
+              </button>
+            ) : (
+              <span className="pl-4.5 block">{account.account_name}</span>
+            )}
+          </td>
+          <td className={`px-3 py-2 text-right tabular-nums font-mono border-none ${account.rollup_balance < 0 ? 'text-red-600' : ''}`}>
+            {account.rollup_balance < 0 ? `(${fmtNPR(Math.abs(account.rollup_balance))})` : fmtNPR(account.rollup_balance)}
+          </td>
+        </tr>
+        {isGroup && isExpanded && children.map(c => renderTree(c, level + 1))}
+      </React.Fragment>
+    );
+  };
+
+  const PLSection = ({ title, sectionObj, hideIfZero }) => {
+    const { accounts, total } = sectionObj;
+    if (hideIfZero && Math.abs(total) < 0.01 && accounts.length === 0) return null;
+    return (
+      <div className="mb-6 page-break-inside-avoid">
+        <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wide border-b-2 border-slate-300 pb-1.5 mb-1 pl-3">{title}</h3>
+        <table className="w-full text-sm print:text-[10pt]">
+          <tbody className="divide-y divide-slate-100">
+            {accounts.map(a => renderTree(a, 0))}
+            {accounts.length === 0 && <tr><td colSpan={3} className="px-3 py-2 text-muted-foreground text-xs italic pl-8">No entries</td></tr>}
+          </tbody>
+          <tfoot>
+            <tr className="bg-slate-50 border-t border-slate-200">
+              <td colSpan={2} className="px-3 py-2.5 font-bold text-slate-700">Total {title}</td>
+              <td className={`px-3 py-2.5 text-right font-bold tabular-nums font-mono ${total < 0 ? 'text-red-600' : ''}`}>
+                {total < 0 ? `(${fmtNPR(Math.abs(total))})` : fmtNPR(total)}
+              </td>
+            </tr>
+          </tfoot>
+        </table>
       </div>
     );
   };
+
+  const SummaryRow = ({ label, amount, bgClass = 'bg-slate-100', textClass = 'text-slate-800', borderClass = 'border-slate-300' }) => (
+    <div className={`flex justify-between font-bold text-sm px-4 py-3 mb-6 rounded-lg border-2 ${bgClass} ${textClass} ${borderClass} page-break-inside-avoid shadow-sm`}>
+      <span className="uppercase tracking-wider">{label}</span>
+      <span className="tabular-nums font-mono text-base">{amount < 0 ? `(${fmtNPR(Math.abs(amount))})` : fmtNPR(amount)}</span>
+    </div>
+  );
+
+  const KPICard = ({ title, amount, percentage }) => (
+    <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm flex flex-col justify-between report-no-print">
+      <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{title}</span>
+      <div className="mt-2 flex items-baseline gap-2">
+        <span className={`text-xl font-bold tabular-nums ${amount < 0 ? 'text-red-600' : 'text-slate-800'}`}>
+          {amount < 0 ? `(${fmtNPR(Math.abs(amount))})` : fmtNPR(amount)}
+        </span>
+        {percentage !== undefined && (
+          <span className="text-xs font-medium text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">
+            {percentage}%
+          </span>
+        )}
+      </div>
+    </div>
+  );
 
   return (
     <div className="space-y-4">
@@ -692,21 +776,52 @@ function ProfitLossReport({ initialData, initialFromDate, initialToDate }) {
         <div className="py-10 text-center text-muted-foreground text-sm">Loading…</div>
       ) : (
       <>
-      <BusinessHeader reportTitle="Income Statement" fromDate={filters.fromDate} toDate={filters.toDate} />
-      <div className="report-no-print flex justify-end">
-        <button onClick={handleExport} className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 border border-emerald-300 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 transition-colors">↓ Export Excel (.xlsx)</button>
+      {/* KPI Cards */}
+      <div className="grid grid-cols-4 gap-4 report-no-print">
+        <KPICard title="Total Revenue" amount={sections.income.total} />
+        <KPICard title="Gross Profit" amount={gross_profit} percentage={sections.income.total ? ((gross_profit / sections.income.total)*100).toFixed(1) : 0} />
+        <KPICard title="Operating Profit" amount={operating_profit} percentage={sections.income.total ? ((operating_profit / sections.income.total)*100).toFixed(1) : 0} />
+        <KPICard title="Net Profit" amount={net_profit} percentage={sections.income.total ? ((net_profit / sections.income.total)*100).toFixed(1) : 0} />
       </div>
-      <div className="space-y-4">
-            <PLSection title="Revenue" accounts={revenue_accounts} total={revenue} totalLabel="Gross Revenue" color="emerald" />
-            <PLSection title="Cost of Goods Sold" accounts={cogs_accounts} total={cogs} totalLabel="Total COGS" color="red" />
-            <div className={`flex justify-between font-bold text-sm px-3 py-2.5 rounded-lg ${gross_profit >= 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
-              <span>Gross Profit</span><span className="tabular-nums font-mono">{fmtNPR(gross_profit)}</span>
-            </div>
-            <PLSection title="Operating Expenses" accounts={opex_accounts} total={opex} totalLabel="Total OPEX" color="amber" />
-            <div className={`flex justify-between font-bold text-sm px-3 py-2.5 rounded-lg border-2 ${net_profit >= 0 ? 'bg-emerald-50 text-emerald-700 border-emerald-300' : 'bg-red-50 text-red-700 border-red-300'}`}>
-              <span>Net Profit / (Loss)</span><span className="tabular-nums font-mono">{fmtNPR(net_profit)}</span>
-            </div>
+
+      <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden p-6 print:p-0 print:border-none print:shadow-none">
+        <BusinessHeader reportTitle="INCOME STATEMENT" subtitle="(Profit & Loss Statement)" fromDate={filters.fromDate} toDate={filters.toDate} />
+        <div className="report-no-print flex justify-end gap-2 mb-6">
+          <Button variant="outline" size="sm" onClick={() => setFilters(f => ({ ...f, expandAll: !f.expandAll }))}>
+            {filters.expandAll ? 'Collapse All' : 'Expand All'}
+          </Button>
+          <button onClick={handleExport} className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 border border-emerald-300 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 transition-colors">
+            ↓ Export Excel
+          </button>
+        </div>
+        
+        <div className="max-w-4xl mx-auto">
+          <PLSection title={sections.income.title} sectionObj={sections.income} />
+          <PLSection title={sections.cogs.title} sectionObj={sections.cogs} />
+          
+          <SummaryRow label="Gross Profit" amount={gross_profit} bgClass="bg-emerald-50" textClass="text-emerald-800" borderClass="border-emerald-200" />
+          
+          <PLSection title={sections.opex.title} sectionObj={sections.opex} />
+          
+          <SummaryRow label="Operating Profit" amount={operating_profit} bgClass="bg-blue-50" textClass="text-blue-800" borderClass="border-blue-200" />
+          
+          <PLSection title={sections.non_op_income.title} sectionObj={sections.non_op_income} hideIfZero />
+          <PLSection title={sections.finance_cost.title} sectionObj={sections.finance_cost} hideIfZero />
+          
+          {(sections.non_op_income.total !== 0 || sections.finance_cost.total !== 0) && (
+             <SummaryRow label="Profit Before Tax" amount={profit_before_tax} bgClass="bg-amber-50" textClass="text-amber-800" borderClass="border-amber-200" />
+          )}
+
+          <PLSection title={sections.tax.title} sectionObj={sections.tax} hideIfZero />
+          
+          <div className={`flex justify-between items-center px-5 py-4 mt-8 rounded-xl border-2 shadow-sm page-break-inside-avoid ${net_profit >= 0 ? 'bg-emerald-600 text-white border-emerald-700' : 'bg-red-600 text-white border-red-700'}`}>
+            <span className="text-lg font-bold tracking-widest">NET PROFIT AFTER TAX</span>
+            <span className="text-2xl font-bold tabular-nums font-mono">
+              {net_profit < 0 ? `(${fmtNPR(Math.abs(net_profit))})` : fmtNPR(net_profit)}
+            </span>
           </div>
+        </div>
+      </div>
       </>
       )}
     </div>
