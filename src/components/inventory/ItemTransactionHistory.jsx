@@ -30,7 +30,7 @@ export default function ItemTransactionHistory({ item }) {
       const txns = [];
 
       // Extract lines from purchase invoices that match this item
-      purchaseInvoices.forEach(inv => {
+      purchaseInvoices.filter(inv => inv.status === 'Posted').forEach(inv => {
         (inv.line_items || []).forEach(line => {
           if (line.item_id === item.id || line.item_name === item.item_name) {
             txns.push({
@@ -50,7 +50,7 @@ export default function ItemTransactionHistory({ item }) {
       });
 
       // Extract lines from sales invoices that match this item
-      salesInvoices.forEach(inv => {
+      salesInvoices.filter(inv => inv.status === 'Posted').forEach(inv => {
         (inv.line_items || []).forEach(line => {
           if (line.item_id === item.id || line.item_name === item.item_name) {
             txns.push({
@@ -70,7 +70,7 @@ export default function ItemTransactionHistory({ item }) {
       });
 
       // Extract stock adjustments that match this item
-      stockAdj.forEach(adj => {
+      stockAdj.filter(adj => adj.status === 'Posted').forEach(adj => {
         (adj.line_items || []).forEach(line => {
           if (line.item_id === item.id || line.item_name === item.item_name) {
             txns.push({
