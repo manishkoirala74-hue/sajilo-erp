@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { sajilo } from '@/api/sajiloClient';
+import { sajilo, supabase } from '@/api/sajiloClient';
 import { Button } from '@/components/ui/button';
 import { RefreshCw, AlertTriangle, DatabaseBackup } from 'lucide-react';
 import { toast } from 'sonner';
@@ -26,7 +26,7 @@ export default function DataUtilities() {
     setLoading(true);
     const toastId = toast.loading('Recalculating inventory cost timeline. This may take a while...');
     try {
-      const { error } = await sajilo.client.rpc('rebuild_inventory_wac_timeline', {
+      const { error } = await supabase.rpc('rebuild_inventory_wac_timeline', {
         p_company_id: companyId,
         p_start_date: startDate,
         p_end_date: endDate
