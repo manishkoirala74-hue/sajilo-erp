@@ -359,6 +359,66 @@ export async function postSalesReturn(ret, itemsMap, settings) {
   if (error) handleDBError(error);
   return journalId;
 }
+
+
+// ─── 5. PURCHASE RETURN ──────────────────────────────────────────────────────────
+export async function postPurchaseReturn(ret, itemsMap, settings) {
+  const s = settings || {};
+  const lines = [];
+  const taxTypes = await loadActiveTaxTypes().catch(() => []);
+
+  let apId, apName;
+  // Phase 2: try vendor's dedicated AP ledger first
+  const partnerLedger = await resolvePartnerLedger(ret.vendor_id, 'payable_account_id');
+  apId   = partnerLedger?.id   || s.gl_accounts_payable_id;
+  apName = partnerLedger?.name || s.gl_accounts_payable_name || 'Accounts Payable';
+  if (!apId) return warnMissingAccount('Accounts Payable');
+
+  lines.push({ account_id: apId, account_name: apName, debit_amount: r2(ret.grand_total), credit_amount: 0, description: 'Vendor credit for return' });
+
+  for (const line of (ret.line_items || [])) {
+    const item = itemsMap[line.item_id];
+    const invAccId   = item?.inventory_account_id   || s.gl_default_inventory_account_id;
+    const invAccName = item?.inventory_account_name || s.gl_default_inventory_account_name || 'Inventory';
+    if (!invAccId) return warnMissingAccount('Inventory Asset');
+    lines.push({ account_id: invAccId, account_name: invAccName, debit_amount: 0, credit_amount: r2(line.line_total), description: `Return: ${line.item_name}` });
+  }
+
+  if (ret.vat_amount > 0) {
+    const taxAcc = await resolveTaxAccount(ret.vat_amount, s, taxTypes);
+    if (taxAcc) lines.push({ account_id: taxAcc.id, account_name: taxAcc.name, debit_amount: 0, credit_amount: r2(ret.vat_amount), description: 'Tax reversal' });
+  }
+
+  const payload = {
+    p_company_id: ret.company_id,
+    p_date: ret.return_date,
+    p_description: `Purchase Return ${ret.return_number}`,
+    p_module: 'Purchase',
+    p_source_id: ret.id,
+    p_source_type: 'PurchaseReturn',
+    p_lines: lines,
+    p_lock_cogs: false
+  };
+
+  const { data: journalId, error } = await supabase.rpc('rpc_post_gl_transaction', payload);
+  if (error) handleDBError(error);
+  return journalId;
+}
+
+
+// ─── 6. STOCK ADJUSTMENT ─────────────────────────────────────────────────────────
+export async function postStockAdjustment(adj, itemsMap, settings) {
+  const s = settings || {};
+  const lines = [];
+
+  const varAccId   = s.gl_stock_variance_account_id;
+  const varAccName = s.gl_stock_variance_account_name || 'Stock Variance';
+  if (!varAccId) return warnMissingAccount('Stock Variance');
+
+  for (const line of (adj.line_items || [])) {
+    const item = itemsMap[line.item_id];
+    const invAccId   = item?.inventory_account_id   || s.gl_default_inventory_account_id;
+    const invAccName = item?.inventory_account_name || s.gl_default_inventory_account_name || 'Inventory';
     if (!invAccId) return warnMissingAccount('Inventory Asset');
     const costAmt = r2(line.cost_impact || 0);
     if (costAmt <= 0) continue;
