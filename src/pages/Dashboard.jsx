@@ -14,14 +14,9 @@ import {
   BarChart, Bar, Legend
 } from 'recharts';
 
-const monthlyData = [
-  { month: 'Jan', sales: 420000, purchases: 310000 },
-  { month: 'Feb', sales: 380000, purchases: 290000 },
-  { month: 'Mar', sales: 510000, purchases: 405000 },
-  { month: 'Apr', sales: 470000, purchases: 350000 },
-  { month: 'May', sales: 620000, purchases: 430000 },
-  { month: 'Jun', sales: 580000, purchases: 460000 },
-];
+import { fetchReportData } from '@/lib/reportDataFetcher';
+
+
 
 function formatNPR(val) {
   if (val >= 1000000) return `NPR ${(val / 1000000).toFixed(1)}M`;
@@ -38,20 +33,57 @@ export default function Dashboard() {
   const [purchaseOrders, setPurchaseOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [amountsVisible, setAmountsVisible] = useState(true);
+  const [chartData, setChartData] = useState([]);
 
   useEffect(() => {
+    const td = new Date();
+    const fd = new Date();
+    fd.setMonth(fd.getMonth() - 5);
+    fd.setDate(1);
+    
+    const fromDate = fd.toISOString().slice(0, 10);
+    const toDate = td.toISOString().slice(0, 10);
+
     Promise.all([
-      sajilo.entities.SalesInvoice.list('-created_date', 20),
-      sajilo.entities.PurchaseInvoice.list('-created_date', 20),
+      sajilo.entities.SalesInvoice.list('-created_date', 50),
+      sajilo.entities.PurchaseInvoice.list('-created_date', 50),
       sajilo.entities.Item.list('-created_date', 50),
       sajilo.entities.BusinessPartner.list('-created_date', 50),
       sajilo.entities.PurchaseOrder.list('-created_date', 20),
-    ]).then(([si, pi, it, bp, po]) => {
+      fetchReportData('sales_summary', fromDate, toDate),
+      fetchReportData('purchase_summary', fromDate, toDate)
+    ]).then(([si, pi, it, bp, po, salesSum, purchSum]) => {
       setSalesInvoices(si);
       setPurchaseInvoices(pi);
       setItems(it);
       setPartners(bp);
       setPurchaseOrders(po);
+
+      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const monthlyMap = {};
+      
+      for (let i = 5; i >= 0; i--) {
+        const d = new Date();
+        d.setMonth(d.getMonth() - i);
+        const mKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        monthlyMap[mKey] = { month: monthNames[d.getMonth()], sortKey: mKey, sales: 0, purchases: 0 };
+      }
+
+      salesSum.forEach(s => {
+        if (s.invoice_date) {
+          const mKey = s.invoice_date.substring(0, 7);
+          if (monthlyMap[mKey]) monthlyMap[mKey].sales += s.grand_total || 0;
+        }
+      });
+
+      purchSum.forEach(p => {
+        if (p.invoice_date) {
+          const mKey = p.invoice_date.substring(0, 7);
+          if (monthlyMap[mKey]) monthlyMap[mKey].purchases += p.grand_total || 0;
+        }
+      });
+
+      setChartData(Object.values(monthlyMap).sort((a, b) => a.sortKey.localeCompare(b.sortKey)));
       setLoading(false);
     });
   }, []);
@@ -61,7 +93,7 @@ export default function Dashboard() {
   const unpaidSales = salesInvoices.filter(i => i.payment_status === 'Unpaid' && i.status === 'Posted').length;
   const lowStockItems = items.filter(i => i.quantity_on_hand <= i.reorder_level && i.reorder_level > 0);
   const pendingApprovals = purchaseOrders.filter(po => po.status === 'Pending Approval');
-  const recentSales = salesInvoices.slice(0, 5);
+  const recentSales = salesInvoices.filter(i => i.status === 'Posted').slice(0, 5);
 
   const mask = (val) => amountsVisible ? val : '••••••';
 
@@ -175,7 +207,7 @@ export default function Dashboard() {
         <div className="bg-white rounded-xl border border-border p-6">
           <h3 className="font-semibold text-foreground mb-4">Revenue vs Purchases</h3>
           <ResponsiveContainer width="100%" height={220}>
-            <AreaChart data={monthlyData}>
+            <AreaChart data={chartData}>
               <defs>
                 <linearGradient id="salesGrad" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="#4F46E5" stopOpacity={0.15} />
@@ -199,7 +231,7 @@ export default function Dashboard() {
         <div className="bg-white rounded-xl border border-border p-6">
           <h3 className="font-semibold text-foreground mb-4">Monthly Overview</h3>
           <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={monthlyData}>
+            <BarChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
               <XAxis dataKey="month" tick={{ fontSize: 12 }} />
               <YAxis tickFormatter={v => `${v / 1000}K`} tick={{ fontSize: 11 }} />
