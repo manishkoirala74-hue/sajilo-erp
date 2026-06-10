@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { sajilo } from '@/api/sajiloClient';
 import { toast } from 'sonner';
-import { Plus, Edit2, Tag, AlertTriangle } from 'lucide-react';
+import { Plus, Edit2, Tag } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';

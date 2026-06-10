@@ -7,7 +7,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Plus, Search, Eye, RefreshCw, BookOpen, CheckCircle2, AlertCircle, Clock } from 'lucide-react';
 import DateInput from '@/components/shared/DateInput';
 import { cn } from '@/lib/utils';
-import { toast } from 'sonner';
 import JournalEntryModal from '@/components/accounting/JournalEntryModal';
 import JournalDetailDrawer from '@/components/accounting/JournalDetailDrawer';
 

@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
-  LayoutDashboard, FileText, Package, Users, Settings,
+  LayoutDashboard, FileText, Package, Settings,
   ChevronDown, ChevronRight, TrendingUp, Building2,
   Receipt, ClipboardList, Menu, X, Boxes, Wallet,
   Landmark, ShieldCheck, UserCog, Banknote, Factory, Handshake, BookOpen,
@@ -162,7 +162,7 @@ export default function Sidebar({ collapsed, onToggle }) {
   return (
     <>
       <div className={cn(
-        "flex flex-col h-full bg-sidebar transition-all duration-300 border-r border-slate-700/50",
+        "hidden md:flex flex-col h-full bg-sidebar transition-all duration-300 border-r border-slate-700/50",
         collapsed ? "w-16" : "w-64"
       )}>
         {/* Logo */}

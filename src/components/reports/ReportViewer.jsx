@@ -13,7 +13,6 @@ import { exportFlatXLSX } from '@/lib/reports/reportExcelExport';
 import { sajilo } from '@/api/sajiloClient';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { format } from 'date-fns';
-import { adToBS, formatBS, formatAD } from '@/lib/nepaliDate';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function fmtNPR(n) {

@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react';
 import { sajilo } from '@/api/sajiloClient';
 import { createPartnerLedger } from '@/lib/partnerLedgerService';
-import { Upload, Download, FileSpreadsheet, CheckCircle2, XCircle, AlertTriangle, X, RefreshCw, Users, Truck, AlertCircle as AlertCircleIcon } from 'lucide-react';
+import { Upload, Download, CheckCircle2, XCircle, AlertTriangle, X, RefreshCw, Users, Truck, AlertCircle as AlertCircleIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';

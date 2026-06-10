@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { sajilo } from '@/api/sajiloClient';
-import { Paperclip, X, Upload, FileText, Loader2 } from 'lucide-react';
+import { X, Upload, FileText, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 

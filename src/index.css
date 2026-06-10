@@ -46,3 +46,9 @@
     @apply bg-background text-foreground font-inter;
   }
 }
+
+@layer utilities {
+  .touch-target {
+    @apply min-h-[48px] min-w-[48px];
+  }
+}

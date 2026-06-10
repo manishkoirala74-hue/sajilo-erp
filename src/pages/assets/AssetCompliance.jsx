@@ -3,7 +3,7 @@ import { sajilo } from '@/api/sajiloClient';
 import { toast } from 'sonner';
 import {
   Plus, AlertTriangle, RefreshCw, History, CheckCircle2,
-  ChevronDown, Search, FileText, Clock, X
+  ChevronDown, Search, FileText, Clock
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,7 +12,6 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
-import StatusBadge from '@/components/shared/StatusBadge';
 import DocumentUploader from '@/components/shared/DocumentUploader';
 import { cn } from '@/lib/utils';
 

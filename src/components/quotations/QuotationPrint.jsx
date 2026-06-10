@@ -1,6 +1,6 @@
 import { useRef } from 'react';
 import { Button } from '@/components/ui/button';
-import { X, Printer, Download } from 'lucide-react';
+import { X, Printer } from 'lucide-react';
 
 const FONT_MAP = { inter: 'Inter, sans-serif', georgia: 'Georgia, serif', mono: 'monospace' };
 

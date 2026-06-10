@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { sajilo } from '@/api/sajiloClient';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
-import { Badge } from '@/components/ui/badge';
 import { CheckCircle2, AlertCircle, Layers, RotateCcw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';

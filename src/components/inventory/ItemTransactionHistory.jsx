@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { sajilo } from '@/api/sajiloClient';
 import { useDateFormat } from '@/lib/DateFormatContext';
-import { ShoppingCart, TrendingUp, ArrowUpCircle, ArrowDownCircle, RefreshCw } from 'lucide-react';
+import { ArrowUpCircle, ArrowDownCircle, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const fmt = (n) => `NPR ${Number(n || 0).toLocaleString()}`;

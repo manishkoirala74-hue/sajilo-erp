@@ -1,9 +1,7 @@
-import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   X, Receipt, Plus, FileText, Banknote, UserCheck, SlidersHorizontal 
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
 
 export default function QuickCreateModal({ isOpen, onClose }) {
   const navigate = useNavigate();

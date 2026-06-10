@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { sajilo } from '@/api/sajiloClient';
-import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';

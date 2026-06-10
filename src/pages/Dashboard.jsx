@@ -2,8 +2,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '@/lib/AuthContext';
 import { sajilo } from '@/api/sajiloClient';
 import {
-  TrendingUp, ShoppingCart, Package, Users, FileText,
-  Receipt, AlertCircle, CheckCircle2, Clock, ArrowRight,
+  TrendingUp, ShoppingCart, Users, FileText, AlertCircle, Clock, ArrowRight,
   Eye, EyeOff, Building
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -130,41 +129,49 @@ export default function Dashboard() {
       )}
 
       {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard
-          title="Total Sales Revenue"
-          value={mask(formatNPR(totalSales))}
-          subtitle="All posted invoices"
-          icon={TrendingUp}
-          color="indigo"
-          trend="up"
-          trendValue="+12% this month"
-        />
-        <StatCard
-          title="Total Purchases"
-          value={mask(formatNPR(totalPurchases))}
-          subtitle="All posted bills"
-          icon={ShoppingCart}
-          color="amber"
-        />
-        <StatCard
-          title="Unpaid Invoices"
-          value={mask(unpaidSales)}
-          subtitle="Accounts receivable"
-          icon={FileText}
-          color="red"
-        />
-        <StatCard
-          title="Active Partners"
-          value={partners.filter(p => p.is_active !== false).length}
-          subtitle="Customers & vendors"
-          icon={Users}
-          color="blue"
-        />
+      <div className="flex overflow-x-auto snap-x snap-mandatory pb-4 -mx-4 px-4 gap-4 md:grid md:grid-cols-2 lg:grid-cols-4 md:gap-4 md:overflow-visible md:pb-0 md:mx-0 md:px-0 scrollbar-none">
+        <div className="snap-center shrink-0 w-[85vw] md:w-auto">
+          <StatCard
+            title="Total Sales Revenue"
+            value={mask(formatNPR(totalSales))}
+            subtitle="All posted invoices"
+            icon={TrendingUp}
+            color="indigo"
+            trend="up"
+            trendValue="+12% this month"
+          />
+        </div>
+        <div className="snap-center shrink-0 w-[85vw] md:w-auto">
+          <StatCard
+            title="Total Purchases"
+            value={mask(formatNPR(totalPurchases))}
+            subtitle="All posted bills"
+            icon={ShoppingCart}
+            color="amber"
+          />
+        </div>
+        <div className="snap-center shrink-0 w-[85vw] md:w-auto">
+          <StatCard
+            title="Unpaid Invoices"
+            value={mask(unpaidSales)}
+            subtitle="Accounts receivable"
+            icon={FileText}
+            color="red"
+          />
+        </div>
+        <div className="snap-center shrink-0 w-[85vw] md:w-auto">
+          <StatCard
+            title="Active Partners"
+            value={partners.filter(p => p.is_active !== false).length}
+            subtitle="Customers & vendors"
+            icon={Users}
+            color="blue"
+          />
+        </div>
       </div>
 
       {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="hidden md:grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-white rounded-xl border border-border p-6">
           <h3 className="font-semibold text-foreground mb-4">Revenue vs Purchases</h3>
           <ResponsiveContainer width="100%" height={220}>

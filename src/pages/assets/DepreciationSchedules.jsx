@@ -5,7 +5,6 @@ import { TrendingDown, CheckCircle2, AlertCircle, BookOpen, Calculator } from 'l
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import PageHeader from '@/components/shared/PageHeader';
-import StatusBadge from '@/components/shared/StatusBadge';
 import { cn } from '@/lib/utils';
 
 const fmt = n => `NPR ${Number(n || 0).toLocaleString()}`;

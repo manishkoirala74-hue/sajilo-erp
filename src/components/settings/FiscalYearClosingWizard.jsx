@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { sajilo } from '@/api/sajiloClient';
-import { AlertTriangle, CheckCircle2, ArrowRight, Save, DatabaseBackup } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ArrowRight, DatabaseBackup } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';

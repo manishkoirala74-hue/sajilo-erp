@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { sajilo } from '@/api/sajiloClient';
-import { Plus, Eye, TrendingUp, TrendingDown } from 'lucide-react';
+import { Eye, TrendingUp, TrendingDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';

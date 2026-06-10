@@ -4,7 +4,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { TrendingDown, BookOpen, Calculator, Settings2 } from 'lucide-react';
+import { BookOpen, Calculator } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 function SectionCard({ title, icon: Icon, children }) {

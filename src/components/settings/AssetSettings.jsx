@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { Plus, X, Calendar } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 
 const DEFAULT_CATEGORIES = ['IT Equipment', 'Vehicles', 'Furniture', 'Machinery', 'Buildings', 'Other'];
 const DEFAULT_EVENT_TYPES = ['Insurance', 'Government Tax', 'Preventative Maintenance', 'Safety Inspection', 'License Renewal'];

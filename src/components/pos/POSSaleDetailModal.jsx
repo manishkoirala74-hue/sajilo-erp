@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { sajilo } from '@/api/sajiloClient';
 import { postPOSSale, loadItemsMap, loadSettings } from '@/lib/glPostingService';
 import { toast } from 'sonner';
-import { RotateCcw, XCircle, Printer } from 'lucide-react';
+import { RotateCcw, XCircle } from 'lucide-react';
 import StatusBadge from '@/components/shared/StatusBadge';
 import POSReturnModal from '@/components/pos/POSReturnModal';
 

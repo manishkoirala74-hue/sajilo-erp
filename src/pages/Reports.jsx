@@ -1,8 +1,7 @@
 import { useState } from 'react';
 import {
-  BarChart2, Package, TrendingUp, Users, CreditCard, Receipt,
-  FileText, ChevronRight, Download, RefreshCw, History,
-  BookOpen, ShoppingCart, Warehouse, Settings2, ArrowRight
+  BarChart2, TrendingUp, Users, CreditCard, Receipt,
+  FileText, ChevronRight, RefreshCw, History, ShoppingCart, Warehouse, Settings2
 } from 'lucide-react';
 import UserActivityLog from '@/pages/reports/UserActivityLog';
 import { Button } from '@/components/ui/button';

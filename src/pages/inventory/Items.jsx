@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { sajilo } from '@/api/sajiloClient';
 import { loadActiveTaxTypes } from '@/lib/taxService';
-import { Plus, Edit2, Package, AlertTriangle, Upload, X, History, ChevronDown, CheckSquare, Square, Minus, Trash2 } from 'lucide-react';
+import { Plus, Edit2, Package, AlertTriangle, Upload, X, History, CheckSquare, Square, Minus, Trash2 } from 'lucide-react';
 import ItemTransactionHistory from '@/components/inventory/ItemTransactionHistory';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { sajilo } from '@/api/sajiloClient';
-import { Plus, Eye, CheckCircle2, XCircle, Pencil } from 'lucide-react';
+import { Plus, Eye, XCircle, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -14,7 +14,7 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 import DateInput from '@/components/shared/DateInput';
 import { postPurchaseInvoice, loadItemsMap, loadSettings } from '@/lib/glPostingService';
-import { loadActiveTaxTypes, computeTotalTax } from '@/lib/taxService';
+import { computeTotalTax } from '@/lib/taxService';
 import { useSajiloSync } from '@/hooks/useSajiloSync';
 
 const emptyPI = {

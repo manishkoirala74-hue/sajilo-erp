@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/AuthContext';
 import { sajilo } from '@/api/sajiloClient';
 import {
-  Save, Building2, Users, Settings2, FileText, Mail,
-  ChevronRight, Globe, Bell, Hash, Palette, Shield, Database, TrendingDown, FileSpreadsheet, BookOpen, Calendar, HardDrive, Percent
+  Save, Users, Settings2, FileText, Mail,
+  ChevronRight, Globe, Bell, Hash, Palette, Database, TrendingDown, FileSpreadsheet, BookOpen, Calendar, HardDrive, Percent
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';

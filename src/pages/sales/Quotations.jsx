@@ -1,13 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { sajilo } from '@/api/sajiloClient';
-import { Plus, Eye, Edit2, Printer, Copy, CheckCircle, XCircle, ArrowRight, FileText, Send } from 'lucide-react';
+import { Plus, Edit2, Printer, Copy, CheckCircle, XCircle, ArrowRight, FileText, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import PageHeader from '@/components/shared/PageHeader';
-import StatusBadge from '@/components/shared/StatusBadge';
 import DateInput from '@/components/shared/DateInput';
 import { toast } from 'sonner';
 import { format, addDays } from 'date-fns';

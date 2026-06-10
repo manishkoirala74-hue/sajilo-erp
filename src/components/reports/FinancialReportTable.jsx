@@ -7,7 +7,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { ChevronRight, ChevronDown, FileSpreadsheet, Folder, FolderOpen, FileText, Lock } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { buildVisibleColumns, fmtNPR, filterZeroRows } from '@/lib/reports/reportColumnUtils';
+import { buildVisibleColumns, fmtNPR } from '@/lib/reports/reportColumnUtils';
 import { exportFinancialXLSX } from '@/lib/reports/reportExcelExport';
 
 const TYPE_BADGE = {
@@ -307,7 +307,7 @@ export default function FinancialReportTable({
     } else {
       setExpandedGroups(new Set());
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   }, [columnState.expandAll, allGroupIds.length]);
 
   const toggleGroup = useCallback((id) => {
