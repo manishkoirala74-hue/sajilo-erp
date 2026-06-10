@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { sajilo } from '@/api/sajiloClient';
-import { Plus, Eye, XCircle, Pencil } from 'lucide-react';
+import { Plus, Eye, XCircle, Pencil, CheckCircle2, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -187,6 +187,13 @@ export default function PurchaseInvoices() {
     fetchInvoices();
   };
 
+  const togglePaymentStatus = async (inv) => {
+    const newStatus = inv.payment_status === 'Paid' ? 'Unpaid' : 'Paid';
+    await sajilo.entities.PurchaseInvoice.update(inv.id, { payment_status: newStatus });
+    toast.success(`Invoice marked as ${newStatus}`);
+    fetchInvoices();
+  };
+
   // ── CANCEL (reverses all transactions, stock restored) ──
   const handleConfirmCancel = async () => {
     if (!cancelReason.trim()) { toast.error('Please provide a cancellation reason'); return; }
@@ -226,7 +233,9 @@ export default function PurchaseInvoices() {
   };
 
   const filtered = filterStatus === 'all' ? invoices : invoices.filter(i =>
-    filterStatus === 'payment' ? i.payment_status === 'Unpaid' : i.status === filterStatus
+    filterStatus === 'Unpaid' ? i.payment_status === 'Unpaid' && i.status === 'Posted'
+    : filterStatus === 'Paid' ? i.payment_status === 'Paid' && i.status === 'Posted'
+    : i.status === filterStatus
   );
 
   const columns = [
@@ -252,6 +261,11 @@ export default function PurchaseInvoices() {
           <Button variant="ghost" size="icon" title="View" onClick={() => setViewDetail(row)}>
             <Eye className="w-4 h-4" />
           </Button>
+          {row.status === 'Posted' && (
+            <Button variant="ghost" size="icon" className={row.payment_status === 'Paid' ? 'text-amber-500' : 'text-emerald-500'} title={`Mark as ${row.payment_status === 'Paid' ? 'Unpaid' : 'Paid'}`} onClick={() => togglePaymentStatus(row)}>
+              {row.payment_status === 'Paid' ? <RotateCcw className="w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />}
+            </Button>
+          )}
           {(row.status === 'Draft' || row.status === 'Posted') && (
             <Button variant="ghost" size="icon" className="text-primary" title="Edit Invoice" onClick={() => openEdit(row)}>
               <Pencil className="w-4 h-4" />
@@ -282,7 +296,8 @@ export default function PurchaseInvoices() {
           { key: 'all', label: 'All' },
           { key: 'Draft', label: 'Draft' },
           { key: 'Posted', label: 'Posted' },
-          { key: 'payment', label: 'Unpaid' },
+          { key: 'Unpaid', label: 'Unpaid' },
+          { key: 'Paid', label: 'Paid' },
           { key: 'Cancelled', label: 'Cancelled' },
         ].map(f => (
           <button
