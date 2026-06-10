@@ -162,7 +162,7 @@ export async function postPOSSale(sale, itemsMap, settings, isReversal = false) 
   }
 
   const payload = {
-    p_company_id: sale.company_id,
+    p_company_id: sale.company_id || sajilo.getCompanyId(),
     p_date: sale.sale_date,
     p_description: `POS Sale ${sale.sale_number}${isReversal ? ' — VOIDED' : ''}`,
     p_module: 'Sales',
@@ -234,7 +234,7 @@ export async function postSalesInvoice(invoice, itemsMap, settings, isReversal =
   }
 
   const payload = {
-    p_company_id: invoice.company_id,
+    p_company_id: invoice.company_id || sajilo.getCompanyId(),
     p_date: invoice.invoice_date,
     p_description: `Sales Invoice ${invoice.invoice_number}${isReversal ? ' — CANCELLED' : ''}`,
     p_module: 'Sales',
@@ -292,7 +292,7 @@ export async function postPurchaseInvoice(invoice, itemsMap, settings, isReversa
   }
 
   const payload = {
-    p_company_id: invoice.company_id,
+    p_company_id: invoice.company_id || sajilo.getCompanyId(),
     p_date: invoice.invoice_date,
     p_description: `Purchase Invoice ${invoice.invoice_number}${isReversal ? ' — CANCELLED' : ''}`,
     p_module: 'Purchase',
@@ -308,7 +308,7 @@ export async function postPurchaseInvoice(invoice, itemsMap, settings, isReversa
 
   if (!isReversal) {
     const { error: wacError } = await supabase.rpc('rpc_recalculate_wac_on_purchase', {
-      p_company_id: invoice.company_id,
+      p_company_id: invoice.company_id || sajilo.getCompanyId(),
       p_invoice_lines: invoice.line_items || []
     });
     if (wacError) console.error("WAC recalculation failed: ", wacError);
@@ -355,7 +355,7 @@ export async function postSalesReturn(ret, itemsMap, settings) {
   }
 
   const payload = {
-    p_company_id: ret.company_id,
+    p_company_id: ret.company_id || sajilo.getCompanyId(),
     p_date: ret.return_date,
     p_description: `Sales Return ${ret.return_number}`,
     p_module: 'Sales',
@@ -400,7 +400,7 @@ export async function postPurchaseReturn(ret, itemsMap, settings) {
   }
 
   const payload = {
-    p_company_id: ret.company_id,
+    p_company_id: ret.company_id || sajilo.getCompanyId(),
     p_date: ret.return_date,
     p_description: `Purchase Return ${ret.return_number}`,
     p_module: 'Purchase',
@@ -443,7 +443,7 @@ export async function postStockAdjustment(adj, itemsMap, settings) {
   }
 
   const payload = {
-    p_company_id: adj.company_id,
+    p_company_id: adj.company_id || sajilo.getCompanyId(),
     p_date: adj.adjustment_date,
     p_description: `Stock Adjustment ${adj.adjustment_number} — ${adj.reason}`,
     p_module: 'Stock',
