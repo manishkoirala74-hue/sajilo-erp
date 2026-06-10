@@ -602,7 +602,7 @@ function PartnerReport({ title, mode, initialFromDate, initialToDate }) {
   );
 }
 
-// ── Profit & Loss (with decentralized filters) ────────────────────────────────
+// ── Profit & Loss (Multi-Step Enterprise Format) ────────────────────────────────
 function ProfitLossReport({ initialData, initialFromDate, initialToDate }) {
   const [filters,   setFilters]   = useState({ ...DEFAULT_FILTERS, fromDate: initialFromDate, toDate: initialToDate, expandAll: true });
   const [data,      setData]      = useState(initialData);
@@ -637,66 +637,112 @@ function ProfitLossReport({ initialData, initialFromDate, initialToDate }) {
   });
 
   const rollup = (account) => {
-    let bal = account.balance || 0;
-    (childrenMap[account.id] || []).forEach(c => { bal += rollup(c); });
-    account.rollup_balance = bal;
-    return bal;
+    // If the RPC returned 'current_balance', use it. Fallback to 'balance' for older RPCs.
+    let cb = Number(account.current_balance !== undefined ? account.current_balance : (account.balance || 0));
+    let cob = Number(account.comparative_balance || 0);
+    (childrenMap[account.id] || []).forEach(c => {
+      const [child_cb, child_cob] = rollup(c);
+      cb += child_cb;
+      cob += child_cob;
+    });
+    account.rollup_current = cb;
+    account.rollup_comparative = cob;
+    return [cb, cob];
   };
 
   const idSet = new Set(accounts.map(a => a.id));
   const rootAccounts = accounts.filter(a => !a.parent_account_id || !idSet.has(a.parent_account_id));
   rootAccounts.forEach(r => rollup(r));
 
+  // Multi-step Tiers
   const sections = {
-    income: { title: 'Income', accounts: [], total: 0 },
-    cogs: { title: 'Cost of Goods Sold', accounts: [], total: 0 },
-    opex: { title: 'Operating Expenses', accounts: [], total: 0 },
-    non_op_income: { title: 'Non-Operating Income', accounts: [], total: 0 },
-    finance_cost: { title: 'Finance Cost', accounts: [], total: 0 },
-    tax: { title: 'Tax Expense', accounts: [], total: 0 }
+    revenue: { accounts: [], cur: 0, comp: 0 },
+    sales_returns: { accounts: [], cur: 0, comp: 0 },
+    cogs: { accounts: [], cur: 0, comp: 0 },
+    opex_admin: { accounts: [], cur: 0, comp: 0 },
+    opex_selling: { accounts: [], cur: 0, comp: 0 },
+    non_op_income: { accounts: [], cur: 0, comp: 0 },
+    finance_cost: { accounts: [], cur: 0, comp: 0 },
+    tax: { accounts: [], cur: 0, comp: 0 }
   };
 
   rootAccounts.forEach(a => {
     const t = a.account_type;
     const st = a.account_subtype;
+    const name = (a.account_name || '').toLowerCase();
+
     if (['Revenue', 'Other Income'].includes(t)) {
-      if (st === 'Non-Operating Revenue') sections.non_op_income.accounts.push(a);
-      else sections.income.accounts.push(a);
+      if (st === 'Non-Operating Revenue' || name.includes('interest income')) {
+        sections.non_op_income.accounts.push(a);
+      } else if (name.includes('return') || name.includes('allowance')) {
+        sections.sales_returns.accounts.push(a);
+      } else {
+        sections.revenue.accounts.push(a);
+      }
     } else if (['COGS', 'Cost of Goods Sold'].includes(t) || st === 'Direct Expense') {
       sections.cogs.accounts.push(a);
     } else if (['Expense', 'OPEX', 'Other Expense'].includes(t)) {
-      const name = a.account_name.toLowerCase();
-      if (name.includes('tax')) sections.tax.accounts.push(a);
-      else if (name.includes('interest') || name.includes('finance')) sections.finance_cost.accounts.push(a);
-      else sections.opex.accounts.push(a);
+      if (name.includes('tax')) {
+        sections.tax.accounts.push(a);
+      } else if (name.includes('interest') || name.includes('finance') || name.includes('bank charge')) {
+        sections.finance_cost.accounts.push(a);
+      } else if (name.includes('market') || name.includes('sell') || name.includes('advert') || name.includes('deliver') || name.includes('logist')) {
+        sections.opex_selling.accounts.push(a);
+      } else {
+        sections.opex_admin.accounts.push(a);
+      }
     }
   });
 
   Object.values(sections).forEach(s => {
-    s.total = s.accounts.reduce((sum, a) => sum + a.rollup_balance, 0);
+    s.cur = s.accounts.reduce((sum, a) => sum + a.rollup_current, 0);
+    s.comp = s.accounts.reduce((sum, a) => sum + a.rollup_comparative, 0);
   });
 
-  const gross_profit = sections.income.total - sections.cogs.total;
-  const operating_profit = gross_profit - sections.opex.total;
-  const profit_before_tax = operating_profit + sections.non_op_income.total - sections.finance_cost.total;
-  const net_profit = profit_before_tax - sections.tax.total;
+  // Calculate Subtotals
+  const net_sales_cur = sections.revenue.cur - Math.abs(sections.sales_returns.cur);
+  const net_sales_comp = sections.revenue.comp - Math.abs(sections.sales_returns.comp);
+
+  const gross_profit_cur = net_sales_cur - sections.cogs.cur;
+  const gross_profit_comp = net_sales_comp - sections.cogs.comp;
+
+  const total_opex_cur = sections.opex_admin.cur + sections.opex_selling.cur;
+  const total_opex_comp = sections.opex_admin.comp + sections.opex_selling.comp;
+
+  const op_profit_cur = gross_profit_cur - total_opex_cur;
+  const op_profit_comp = gross_profit_comp - total_opex_comp;
+
+  const non_op_net_cur = sections.non_op_income.cur - sections.finance_cost.cur;
+  const non_op_net_comp = sections.non_op_income.comp - sections.finance_cost.comp;
+
+  const pbt_cur = op_profit_cur + non_op_net_cur;
+  const pbt_comp = op_profit_comp + non_op_net_comp;
+
+  const net_profit_cur = pbt_cur - sections.tax.cur;
+  const net_profit_comp = pbt_comp - sections.tax.comp;
 
   const handleExport = () => downloadCSV('income_statement.xlsx',
-    ['Code', 'Account', 'Amount'],
-    [['', 'Not yet supported in hierarchical mode', '']]
+    ['Financial Particulars', 'Notes', 'Current Period (NPR)', 'Comparative Period (NPR)'],
+    [['', 'Not yet supported in hierarchical mode', '', '']]
   );
 
-  const renderTree = (account, level = 0) => {
+  const fmtAcct = (amount, isDeduction = false) => {
+    if (!amount || Math.abs(amount) < 0.01) return '—';
+    const val = Math.abs(amount).toLocaleString('en-NP', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return (amount < 0 || isDeduction) ? `(${val})` : val;
+  };
+
+  const renderTree = (account, level = 0, isDeduction = false) => {
     const children = childrenMap[account.id] || [];
     const isGroup = account.ledger_type === 'Group Ledger' || children.length > 0;
     const isExpanded = expanded[account.id] !== undefined ? expanded[account.id] : filters.expandAll;
-    if (!filters.showZeroBalance && Math.abs(account.rollup_balance) < 0.01) return null;
+    
+    if (!filters.showZeroBalance && Math.abs(account.rollup_current) < 0.01 && Math.abs(account.rollup_comparative) < 0.01) return null;
 
     return (
       <React.Fragment key={account.id}>
         <tr className={`hover:bg-muted/20 print:hover:bg-transparent ${isGroup ? 'font-semibold text-slate-800' : 'text-slate-600'}`}>
-          <td className="px-3 py-2 font-mono text-xs text-muted-foreground w-24 border-none">{account.account_code}</td>
-          <td className="px-3 py-2 border-none" style={{ paddingLeft: `${12 + level * 20}px` }}>
+          <td className="px-3 py-1.5 border-none" style={{ paddingLeft: `${16 + level * 20}px` }}>
             {isGroup ? (
               <button onClick={() => toggleExpand(account.id)} className="flex items-center gap-1.5 hover:text-primary transition-colors text-left w-full">
                 <span className="w-3 inline-block text-center text-[10px] text-slate-400">{isExpanded ? '▼' : '▶'}</span>
@@ -706,61 +752,33 @@ function ProfitLossReport({ initialData, initialFromDate, initialToDate }) {
               <span className="pl-4.5 block">{account.account_name}</span>
             )}
           </td>
-          <td className={`px-3 py-2 text-right tabular-nums font-mono border-none ${account.rollup_balance < 0 ? 'text-red-600' : ''}`}>
-            {account.rollup_balance < 0 ? `(${fmtNPR(Math.abs(account.rollup_balance))})` : fmtNPR(account.rollup_balance)}
+          <td className="px-3 py-1.5 text-center text-xs text-muted-foreground border-none"></td>
+          <td className="px-3 py-1.5 text-right tabular-nums font-mono border-none">
+            {fmtAcct(account.rollup_current, isDeduction)}
+          </td>
+          <td className="px-3 py-1.5 text-right tabular-nums font-mono border-none text-slate-500">
+            {fmtAcct(account.rollup_comparative, isDeduction)}
           </td>
         </tr>
-        {isGroup && isExpanded && children.map(c => renderTree(c, level + 1))}
+        {isGroup && isExpanded && children.map(c => renderTree(c, level + 1, isDeduction))}
       </React.Fragment>
     );
   };
 
-  const PLSection = ({ title, sectionObj, hideIfZero }) => {
-    const { accounts, total } = sectionObj;
-    if (hideIfZero && Math.abs(total) < 0.01 && accounts.length === 0) return null;
+  const PLSection = ({ title, sectionObj, isDeduction = false, note = '' }) => {
+    const { accounts, cur, comp } = sectionObj;
+    if (Math.abs(cur) < 0.01 && Math.abs(comp) < 0.01 && accounts.length === 0) return null;
     return (
-      <div className="mb-6 page-break-inside-avoid">
-        <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wide border-b-2 border-slate-300 pb-1.5 mb-1 pl-3">{title}</h3>
-        <table className="w-full text-sm print:text-[10pt]">
-          <tbody className="divide-y divide-slate-100">
-            {accounts.map(a => renderTree(a, 0))}
-            {accounts.length === 0 && <tr><td colSpan={3} className="px-3 py-2 text-muted-foreground text-xs italic pl-8">No entries</td></tr>}
-          </tbody>
-          <tfoot>
-            <tr className="bg-slate-50 border-t border-slate-200">
-              <td colSpan={2} className="px-3 py-2.5 font-bold text-slate-700">Total {title}</td>
-              <td className={`px-3 py-2.5 text-right font-bold tabular-nums font-mono ${total < 0 ? 'text-red-600' : ''}`}>
-                {total < 0 ? `(${fmtNPR(Math.abs(total))})` : fmtNPR(total)}
-              </td>
-            </tr>
-          </tfoot>
-        </table>
-      </div>
+      <React.Fragment>
+        {title && (
+          <tr>
+            <td className="px-3 py-2 font-semibold text-slate-800 bg-slate-50" colSpan={4}>{title}</td>
+          </tr>
+        )}
+        {accounts.map(a => renderTree(a, 0, isDeduction))}
+      </React.Fragment>
     );
   };
-
-  const SummaryRow = ({ label, amount, bgClass = 'bg-slate-100', textClass = 'text-slate-800', borderClass = 'border-slate-300' }) => (
-    <div className={`flex justify-between font-bold text-sm px-4 py-3 mb-6 rounded-lg border-2 ${bgClass} ${textClass} ${borderClass} page-break-inside-avoid shadow-sm`}>
-      <span className="uppercase tracking-wider">{label}</span>
-      <span className="tabular-nums font-mono text-base">{amount < 0 ? `(${fmtNPR(Math.abs(amount))})` : fmtNPR(amount)}</span>
-    </div>
-  );
-
-  const KPICard = ({ title, amount, percentage }) => (
-    <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm flex flex-col justify-between report-no-print">
-      <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{title}</span>
-      <div className="mt-2 flex items-baseline gap-2">
-        <span className={`text-xl font-bold tabular-nums ${amount < 0 ? 'text-red-600' : 'text-slate-800'}`}>
-          {amount < 0 ? `(${fmtNPR(Math.abs(amount))})` : fmtNPR(amount)}
-        </span>
-        {percentage !== undefined && (
-          <span className="text-xs font-medium text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">
-            {percentage}%
-          </span>
-        )}
-      </div>
-    </div>
-  );
 
   return (
     <div className="space-y-4">
@@ -778,14 +796,15 @@ function ProfitLossReport({ initialData, initialFromDate, initialToDate }) {
       <>
       {/* KPI Cards */}
       <div className="grid grid-cols-4 gap-4 report-no-print">
-        <KPICard title="Total Revenue" amount={sections.income.total} />
-        <KPICard title="Gross Profit" amount={gross_profit} percentage={sections.income.total ? ((gross_profit / sections.income.total)*100).toFixed(1) : 0} />
-        <KPICard title="Operating Profit" amount={operating_profit} percentage={sections.income.total ? ((operating_profit / sections.income.total)*100).toFixed(1) : 0} />
-        <KPICard title="Net Profit" amount={net_profit} percentage={sections.income.total ? ((net_profit / sections.income.total)*100).toFixed(1) : 0} />
+        <KPICard title="Net Sales Revenue" amount={net_sales_cur} />
+        <KPICard title="Gross Profit" amount={gross_profit_cur} percentage={net_sales_cur ? ((gross_profit_cur / net_sales_cur)*100).toFixed(1) : 0} />
+        <KPICard title="Operating Profit" amount={op_profit_cur} percentage={net_sales_cur ? ((op_profit_cur / net_sales_cur)*100).toFixed(1) : 0} />
+        <KPICard title="Net Profit" amount={net_profit_cur} percentage={net_sales_cur ? ((net_profit_cur / net_sales_cur)*100).toFixed(1) : 0} />
       </div>
 
       <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden p-6 print:p-0 print:border-none print:shadow-none">
         <BusinessHeader reportTitle="INCOME STATEMENT" subtitle="(Profit & Loss Statement)" fromDate={filters.fromDate} toDate={filters.toDate} />
+        
         <div className="report-no-print flex justify-end gap-2 mb-6">
           <Button variant="outline" size="sm" onClick={() => setFilters(f => ({ ...f, expandAll: !f.expandAll }))}>
             {filters.expandAll ? 'Collapse All' : 'Expand All'}
@@ -795,31 +814,121 @@ function ProfitLossReport({ initialData, initialFromDate, initialToDate }) {
           </button>
         </div>
         
-        <div className="max-w-4xl mx-auto">
-          <PLSection title={sections.income.title} sectionObj={sections.income} />
-          <PLSection title={sections.cogs.title} sectionObj={sections.cogs} />
-          
-          <SummaryRow label="Gross Profit" amount={gross_profit} bgClass="bg-emerald-50" textClass="text-emerald-800" borderClass="border-emerald-200" />
-          
-          <PLSection title={sections.opex.title} sectionObj={sections.opex} />
-          
-          <SummaryRow label="Operating Profit" amount={operating_profit} bgClass="bg-blue-50" textClass="text-blue-800" borderClass="border-blue-200" />
-          
-          <PLSection title={sections.non_op_income.title} sectionObj={sections.non_op_income} hideIfZero />
-          <PLSection title={sections.finance_cost.title} sectionObj={sections.finance_cost} hideIfZero />
-          
-          {(sections.non_op_income.total !== 0 || sections.finance_cost.total !== 0) && (
-             <SummaryRow label="Profit Before Tax" amount={profit_before_tax} bgClass="bg-amber-50" textClass="text-amber-800" borderClass="border-amber-200" />
-          )}
+        <div className="max-w-5xl mx-auto">
+          <table className="w-full text-sm print:text-[10pt] border-collapse">
+            <thead>
+              <tr className="border-b-2 border-slate-400 bg-slate-100">
+                <th className="px-3 py-2.5 text-left font-bold text-slate-700">Financial Particulars</th>
+                <th className="px-3 py-2.5 text-center font-bold text-slate-700 w-16">Notes</th>
+                <th className="px-3 py-2.5 text-right font-bold text-slate-700 w-40">Current Period (NPR)</th>
+                <th className="px-3 py-2.5 text-right font-bold text-slate-700 w-40">Comparative Period (NPR)</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              
+              {/* 1. Gross Operating Revenue */}
+              <tr className="bg-slate-100"><td colSpan={4} className="px-3 py-2 font-bold text-slate-800">1. Gross Operating Revenue</td></tr>
+              <PLSection sectionObj={sections.revenue} />
+              {sections.sales_returns.accounts.length > 0 && (
+                <>
+                  <tr><td colSpan={4} className="px-3 py-1.5 font-medium italic text-slate-600 pl-4">Less: Sales Returns & Allowances</td></tr>
+                  <PLSection sectionObj={sections.sales_returns} isDeduction={true} />
+                </>
+              )}
+              <tr className="bg-slate-50 border-t border-slate-300">
+                <td className="px-3 py-2.5 font-bold text-slate-800 pl-4">Net Sales Revenue</td>
+                <td className="px-3 py-2.5 text-center text-xs text-muted-foreground">Note 1</td>
+                <td className="px-3 py-2.5 text-right font-bold tabular-nums font-mono">{fmtAcct(net_sales_cur)}</td>
+                <td className="px-3 py-2.5 text-right font-bold tabular-nums font-mono text-slate-600">{fmtAcct(net_sales_comp)}</td>
+              </tr>
 
-          <PLSection title={sections.tax.title} sectionObj={sections.tax} hideIfZero />
-          
-          <div className={`flex justify-between items-center px-5 py-4 mt-8 rounded-xl border-2 shadow-sm page-break-inside-avoid ${net_profit >= 0 ? 'bg-emerald-600 text-white border-emerald-700' : 'bg-red-600 text-white border-red-700'}`}>
-            <span className="text-lg font-bold tracking-widest">NET PROFIT AFTER TAX</span>
-            <span className="text-2xl font-bold tabular-nums font-mono">
-              {net_profit < 0 ? `(${fmtNPR(Math.abs(net_profit))})` : fmtNPR(net_profit)}
-            </span>
-          </div>
+              {/* 2. Cost of Goods Sold */}
+              <tr className="bg-slate-100"><td colSpan={4} className="px-3 py-2 font-bold text-slate-800">2. Cost of Goods Sold (COGS)</td></tr>
+              <PLSection sectionObj={sections.cogs} />
+              <tr className="bg-slate-50 border-t border-slate-300">
+                <td className="px-3 py-2.5 font-bold text-slate-800 pl-4">Total Cost of Goods Sold</td>
+                <td className="px-3 py-2.5 text-center text-xs text-muted-foreground">Note 2</td>
+                <td className="px-3 py-2.5 text-right font-bold tabular-nums font-mono">{fmtAcct(sections.cogs.cur, true)}</td>
+                <td className="px-3 py-2.5 text-right font-bold tabular-nums font-mono text-slate-600">{fmtAcct(sections.cogs.comp, true)}</td>
+              </tr>
+
+              {/* GROSS PROFIT */}
+              <tr className="bg-emerald-50 border-y-2 border-emerald-200">
+                <td colSpan={2} className="px-3 py-3 font-bold text-emerald-900 tracking-wide">📊 GROSS PROFIT</td>
+                <td className="px-3 py-3 text-right font-bold tabular-nums font-mono text-emerald-900 text-base">{fmtAcct(gross_profit_cur)}</td>
+                <td className="px-3 py-3 text-right font-bold tabular-nums font-mono text-emerald-700 text-base">{fmtAcct(gross_profit_comp)}</td>
+              </tr>
+
+              {/* 3. Operating Expenses */}
+              <tr className="bg-slate-100"><td colSpan={4} className="px-3 py-2 font-bold text-slate-800">3. Operating Expenses (OPEX)</td></tr>
+              {sections.opex_admin.accounts.length > 0 && (
+                <>
+                  <tr><td colSpan={4} className="px-3 py-1.5 font-semibold text-slate-700 pl-4">Administrative Expenses:</td></tr>
+                  <PLSection sectionObj={sections.opex_admin} />
+                </>
+              )}
+              {sections.opex_selling.accounts.length > 0 && (
+                <>
+                  <tr><td colSpan={4} className="px-3 py-1.5 font-semibold text-slate-700 pl-4">Selling & Distribution Expenses:</td></tr>
+                  <PLSection sectionObj={sections.opex_selling} />
+                </>
+              )}
+              <tr className="bg-slate-50 border-t border-slate-300">
+                <td className="px-3 py-2.5 font-bold text-slate-800 pl-4">Total Operating Expenses</td>
+                <td className="px-3 py-2.5 text-center text-xs text-muted-foreground">Note 3</td>
+                <td className="px-3 py-2.5 text-right font-bold tabular-nums font-mono">{fmtAcct(total_opex_cur, true)}</td>
+                <td className="px-3 py-2.5 text-right font-bold tabular-nums font-mono text-slate-600">{fmtAcct(total_opex_comp, true)}</td>
+              </tr>
+
+              {/* OPERATING PROFIT */}
+              <tr className="bg-blue-50 border-y-2 border-blue-200">
+                <td colSpan={2} className="px-3 py-3 font-bold text-blue-900 tracking-wide">⚙️ OPERATING PROFIT (EBIT)</td>
+                <td className="px-3 py-3 text-right font-bold tabular-nums font-mono text-blue-900 text-base">{fmtAcct(op_profit_cur)}</td>
+                <td className="px-3 py-3 text-right font-bold tabular-nums font-mono text-blue-700 text-base">{fmtAcct(op_profit_comp)}</td>
+              </tr>
+
+              {/* 4. Finance & Non-Operating */}
+              <tr className="bg-slate-100"><td colSpan={4} className="px-3 py-2 font-bold text-slate-800">4. Finance Costs & Non-Operating Items</td></tr>
+              {sections.non_op_income.accounts.length > 0 && (
+                <>
+                  <tr><td colSpan={4} className="px-3 py-1.5 font-medium text-slate-700 pl-4">Add: Non-Operating Income</td></tr>
+                  <PLSection sectionObj={sections.non_op_income} />
+                </>
+              )}
+              {sections.finance_cost.accounts.length > 0 && (
+                <>
+                  <tr><td colSpan={4} className="px-3 py-1.5 font-medium text-slate-700 pl-4">Less: Finance Costs</td></tr>
+                  <PLSection sectionObj={sections.finance_cost} isDeduction={true} />
+                </>
+              )}
+              <tr className="bg-slate-50 border-t border-slate-300">
+                <td className="px-3 py-2.5 font-bold text-slate-800 pl-4">Net Non-Operating Balance</td>
+                <td className="px-3 py-2.5 text-center text-xs text-muted-foreground">Note 4</td>
+                <td className="px-3 py-2.5 text-right font-bold tabular-nums font-mono">{fmtAcct(non_op_net_cur, non_op_net_cur < 0)}</td>
+                <td className="px-3 py-2.5 text-right font-bold tabular-nums font-mono text-slate-600">{fmtAcct(non_op_net_comp, non_op_net_comp < 0)}</td>
+              </tr>
+
+              {/* PROFIT BEFORE TAX */}
+              <tr className="bg-amber-50 border-y-2 border-amber-200">
+                <td colSpan={2} className="px-3 py-3 font-bold text-amber-900 tracking-wide">5. PROFIT BEFORE TAX (PBT)</td>
+                <td className="px-3 py-3 text-right font-bold tabular-nums font-mono text-amber-900 text-base">{fmtAcct(pbt_cur)}</td>
+                <td className="px-3 py-3 text-right font-bold tabular-nums font-mono text-amber-700 text-base">{fmtAcct(pbt_comp)}</td>
+              </tr>
+
+              {/* TAX */}
+              <tr><td colSpan={4} className="px-3 py-1.5 font-medium text-slate-700 pl-4 pt-3">Less: Provision for Corporate Income Tax</td></tr>
+              <PLSection sectionObj={sections.tax} isDeduction={true} />
+
+            </tbody>
+            <tfoot>
+              {/* NET PROFIT */}
+              <tr className={`border-y-4 ${net_profit_cur >= 0 ? 'bg-emerald-600 border-emerald-700 text-white' : 'bg-red-600 border-red-700 text-white'}`}>
+                <td colSpan={2} className="px-4 py-4 font-bold tracking-widest text-lg">🏁 NET PROFIT / (LOSS) FOR THE YEAR</td>
+                <td className="px-4 py-4 text-right font-bold tabular-nums font-mono text-xl">{fmtAcct(net_profit_cur, net_profit_cur < 0)}</td>
+                <td className={`px-4 py-4 text-right font-bold tabular-nums font-mono text-lg ${net_profit_cur >= 0 ? 'text-emerald-100' : 'text-red-100'}`}>{fmtAcct(net_profit_comp, net_profit_comp < 0)}</td>
+              </tr>
+            </tfoot>
+          </table>
         </div>
       </div>
       </>

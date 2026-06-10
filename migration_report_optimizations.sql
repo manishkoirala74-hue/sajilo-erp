@@ -175,3 +175,75 @@ BEGIN
   HAVING COALESCE(SUM(l.debit_amount), 0) > 0 OR COALESCE(SUM(l.credit_amount), 0) > 0;
 END;
 $$;
+
+-- 5. Comparative Profit & Loss RPC
+CREATE OR REPLACE FUNCTION get_comparative_profit_loss_rpc(
+  p_company_id UUID, 
+  p_from_date DATE, 
+  p_to_date DATE,
+  p_comp_from_date DATE,
+  p_comp_to_date DATE
+)
+RETURNS TABLE (
+  id UUID,
+  parent_account_id TEXT,
+  account_code TEXT,
+  account_name TEXT,
+  account_type TEXT,
+  account_subtype TEXT,
+  ledger_type TEXT,
+  current_balance NUMERIC,
+  comparative_balance NUMERIC
+) LANGUAGE plpgsql AS $$
+BEGIN
+  RETURN QUERY
+  WITH current_activity AS (
+    SELECT
+      l.account_id,
+      SUM(l.debit_amount - l.credit_amount) as net_debit
+    FROM "GeneralLedgerLine" l
+    JOIN "GeneralLedgerJournal" j ON l.journal_id = j.id::text
+    WHERE j.status = 'Posted'
+      AND l.company_id = p_company_id
+      AND j.company_id = p_company_id
+      AND j.entry_date::DATE >= p_from_date
+      AND j.entry_date::DATE <= p_to_date
+    GROUP BY l.account_id
+  ),
+  comparative_activity AS (
+    SELECT
+      l.account_id,
+      SUM(l.debit_amount - l.credit_amount) as net_debit
+    FROM "GeneralLedgerLine" l
+    JOIN "GeneralLedgerJournal" j ON l.journal_id = j.id::text
+    WHERE j.status = 'Posted'
+      AND l.company_id = p_company_id
+      AND j.company_id = p_company_id
+      AND j.entry_date::DATE >= p_comp_from_date
+      AND j.entry_date::DATE <= p_comp_to_date
+    GROUP BY l.account_id
+  )
+  SELECT 
+    a.id,
+    a.parent_account_id,
+    a.account_code,
+    a.account_name,
+    a.account_type,
+    a.account_subtype,
+    a.ledger_type,
+    CASE 
+      WHEN a.account_type IN ('Asset','COGS','Expense','OPEX','Cost of Goods Sold','Other Expense') THEN COALESCE(ca.net_debit, 0)
+      ELSE -COALESCE(ca.net_debit, 0)
+    END AS current_balance,
+    CASE 
+      WHEN a.account_type IN ('Asset','COGS','Expense','OPEX','Cost of Goods Sold','Other Expense') THEN COALESCE(coa.net_debit, 0)
+      ELSE -COALESCE(coa.net_debit, 0)
+    END AS comparative_balance
+  FROM "ChartOfAccount" a
+  LEFT JOIN current_activity ca ON a.id::text = ca.account_id
+  LEFT JOIN comparative_activity coa ON a.id::text = coa.account_id
+  WHERE a.company_id = p_company_id
+    AND a.is_active = true
+    AND a.account_type IN ('Revenue', 'Other Income', 'Expense', 'COGS', 'OPEX', 'Cost of Goods Sold', 'Other Expense');
+END;
+$$;
