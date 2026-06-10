@@ -1138,12 +1138,14 @@ function GeneralLedgerDetailReport({ initialFromDate, initialToDate }) {
     setHasLoaded(true);
     setLoading(true);
     try {
-      const [allLines, journals] = await Promise.all([
-        sajilo.entities.GeneralLedgerLine.filter({ account_id: filters.accountId }, '', 10000),
-        sajilo.entities.GeneralLedgerJournal.filter({ status: 'Posted' }, 'entry_date', 10000)
-      ]);
-      const journalMap = {};
-      journals.forEach(j => { journalMap[j.id] = j; });
+      const { supabase } = await import('@/config/supabaseClient');
+      const { data, error } = await supabase.rpc('get_detail_general_ledger_rpc', {
+        p_company_id: sajilo.getCompanyId(),
+        p_account_id: filters.accountId,
+        p_from_date: filters.fromDate,
+        p_to_date: filters.toDate
+      });
+      if (error) throw error;
       
       const acc = accounts.find(a => a.id === filters.accountId);
       const isDebitNormal = acc ? ['Asset','COGS','Expense','OPEX','Cost of Goods Sold','Other Expense'].includes(acc.account_type) : true;
@@ -1151,45 +1153,39 @@ function GeneralLedgerDetailReport({ initialFromDate, initialToDate }) {
       let obBase = Number(acc?.opening_balance || 0);
       let obDr = isDebitNormal ? obBase : 0;
       let obCr = isDebitNormal ? 0 : obBase;
-
-      const validLines = [];
-      for (const l of allLines) {
-        const j = journalMap[l.journal_id];
-        if (!j || !j.entry_date) continue;
-        const date = j.entry_date.split('T')[0];
-        
-        if (date < filters.fromDate) {
-          obDr += (l.debit_amount || 0);
-          obCr += (l.credit_amount || 0);
-        } else if (date >= filters.fromDate && date <= filters.toDate) {
-          validLines.push({
-            ...l,
-            date,
-            voucher_no: j.voucher_no || '',
-            description: l.description || j.memo || ''
-          });
+      
+      const dbRows = data || [];
+      for (const r of dbRows) {
+        if (r.is_opening) {
+           obDr += Number(r.debit_amount || 0);
+           obCr += Number(r.credit_amount || 0);
         }
       }
       
-      validLines.sort((a,b) => a.date.localeCompare(b.date));
-
       let netOb = isDebitNormal ? (obDr - obCr) : (obCr - obDr);
       const obIsDr = isDebitNormal ? netOb >= 0 : netOb < 0;
       netOb = Math.abs(netOb);
 
       let runningBal = isDebitNormal ? (obDr - obCr) : (obCr - obDr);
-
-      const rows = validLines.map(l => {
-        const dr = l.debit_amount || 0;
-        const cr = l.credit_amount || 0;
+      
+      const validLines = dbRows.filter(r => !r.is_opening).map(l => {
+        const dr = Number(l.debit_amount || 0);
+        const cr = Number(l.credit_amount || 0);
         runningBal += isDebitNormal ? (dr - cr) : (cr - dr);
-        return { ...l, dr, cr, bal: Math.abs(runningBal), balIsDr: isDebitNormal ? runningBal >= 0 : runningBal < 0 };
+        return { 
+          ...l, 
+          date: l.entry_date, 
+          dr, 
+          cr, 
+          bal: Math.abs(runningBal), 
+          balIsDr: isDebitNormal ? runningBal >= 0 : runningBal < 0 
+        };
       });
 
       const cbIsDr = isDebitNormal ? runningBal >= 0 : runningBal < 0;
 
       setSummary({ ob: netOb, obIsDr, cb: Math.abs(runningBal), cbIsDr });
-      setLines(rows);
+      setLines(validLines);
     } catch (e) {
       console.error(e);
     }
