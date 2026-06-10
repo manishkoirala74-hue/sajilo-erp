@@ -2,50 +2,67 @@ import { sajilo, supabase } from '@/api/sajiloClient';
 
 async function injectPeriodicInventory(baseAccounts, companyId, fromDate, toDate) {
   try {
+    let opening = 0;
+    let closing = 0;
+
     // 1. Resolve Inventory Account IDs reliably
-    const [{ data: settings }, { data: items }] = await Promise.all([
-      supabase.from('CompanySettings').select('gl_default_inventory_account_id').eq('company_id', companyId).single(),
-      supabase.from('Item').select('inventory_account_id').eq('company_id', companyId)
+    const [{ data: settingsData }, { data: items }, { data: namedAccs }] = await Promise.all([
+      supabase.from('CompanySettings').select('gl_default_inventory_account_id').eq('company_id', companyId).limit(1),
+      supabase.from('Item').select('inventory_account_id').eq('company_id', companyId),
+      supabase.from('ChartOfAccount').select('id').eq('company_id', companyId).or('account_name.ilike.%inventory%,account_name.ilike.%stock%')
     ]);
     
-    const defaultInvId = settings?.gl_default_inventory_account_id;
+    const defaultInvId = settingsData?.[0]?.gl_default_inventory_account_id;
     const itemInvIds = items ? items.map(i => i.inventory_account_id) : [];
-    const invIds = [...new Set([defaultInvId, ...itemInvIds])].filter(Boolean);
+    const namedIds = namedAccs ? namedAccs.map(a => a.id) : [];
+    const invIds = [...new Set([defaultInvId, ...itemInvIds, ...namedIds])].filter(Boolean);
 
     if (invIds.length > 0) {
-      const { data: glLines } = await supabase.from('GeneralLedgerLine')
-        .select('debit_amount, credit_amount, GeneralLedgerJournal!inner(entry_date, status, company_id)')
-        .in('account_id', invIds)
-        .eq('GeneralLedgerJournal.company_id', companyId)
-        .eq('GeneralLedgerJournal.status', 'Posted');
-        
-      if (glLines) {
-        let opening = 0;
-        let closing = 0;
-        for (const line of glLines) {
-          const date = line.GeneralLedgerJournal.entry_date.split('T')[0];
-          const net = (line.debit_amount || 0) - (line.credit_amount || 0);
-          if (date < fromDate) opening += net;
-          if (date <= toDate) closing += net;
-        }
-        
-        // Sum all COGS to mathematically deduce Net Purchases
-        // Ending = Beginning + Purchases - COGS  =>  Purchases = Ending - Beginning + COGS
-        const cogsTotal = baseAccounts
-          .filter(a => ['COGS', 'Cost of Goods Sold'].includes(a.account_type))
-          .reduce((sum, a) => sum + (a.current_balance || a.balance || 0), 0);
-          
-        const purchases = closing - opening + cogsTotal;
-        
-        if (opening > 0 || closing > 0 || purchases > 0) {
-          const accs = [...baseAccounts];
-          accs.push({ id: 'virt-ob', account_name: 'Opening Stock', account_code: '', account_type: 'Cost of Sales', current_balance: opening, comparative_balance: 0, balance: opening, is_group: false });
-          accs.push({ id: 'virt-pur', account_name: 'Purchases', account_code: '', account_type: 'Cost of Sales', current_balance: purchases, comparative_balance: 0, balance: purchases, is_group: false });
-          accs.push({ id: 'virt-cb', account_name: 'Closing Stock', account_code: '', account_type: 'Cost of Sales', current_balance: closing, comparative_balance: 0, balance: closing, is_group: false });
-          return accs;
+      // 2. Fetch all Posted journals up to toDate safely
+      const { data: journals } = await supabase.from('GeneralLedgerJournal')
+        .select('id, entry_date')
+        .eq('company_id', companyId)
+        .eq('status', 'Posted'); // Do filtering locally to avoid timezone issues
+
+      if (journals && journals.length > 0) {
+        const jMap = {};
+        journals.forEach(j => jMap[j.id] = j.entry_date.split('T')[0]);
+
+        // 3. Fetch GL lines for inventory accounts
+        const { data: glLines, error: linesErr } = await supabase.from('GeneralLedgerLine')
+          .select('debit_amount, credit_amount, journal_id')
+          .in('account_id', invIds);
+
+        if (linesErr) console.error('Failed fetching lines:', linesErr);
+
+        if (glLines) {
+          for (const line of glLines) {
+            const date = jMap[line.journal_id];
+            if (!date) continue; // Skip if journal is not posted
+
+            const net = (line.debit_amount || 0) - (line.credit_amount || 0);
+            if (date < fromDate) opening += net;
+            if (date <= toDate) closing += net;
+          }
         }
       }
     }
+
+    // Sum all COGS to mathematically deduce Net Purchases
+    // Ending = Beginning + Purchases - COGS  =>  Purchases = Ending - Beginning + COGS
+    const cogsTotal = baseAccounts
+      .filter(a => ['COGS', 'Cost of Goods Sold'].includes(a.account_type))
+      .reduce((sum, a) => sum + (a.current_balance || a.balance || 0), 0);
+      
+    const purchases = closing - opening + cogsTotal;
+    
+    // Always inject to ensure UI renders rows (even if 0) so we avoid "(No purchases recorded)"
+    const accs = [...baseAccounts];
+    accs.push({ id: 'virt-ob', account_name: 'Opening Stock', account_code: '', account_type: 'Cost of Sales', current_balance: opening, comparative_balance: 0, balance: opening, is_group: false });
+    accs.push({ id: 'virt-pur', account_name: 'Purchases', account_code: '', account_type: 'Cost of Sales', current_balance: purchases, comparative_balance: 0, balance: purchases, is_group: false });
+    accs.push({ id: 'virt-cb', account_name: 'Closing Stock', account_code: '', account_type: 'Cost of Sales', current_balance: closing, comparative_balance: 0, balance: closing, is_group: false });
+    return accs;
+
   } catch (e) {
     console.error('Virtual inventory calc failed:', e);
   }
