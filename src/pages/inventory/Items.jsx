@@ -269,7 +269,7 @@ export default function Items() {
     if (!form.item_name) { toast.error('Item name is required'); return; }
     setSaving(true);
     try {
-      const { image_urls, ...payload } = form;
+      const { image_urls, total_asset_value, ...payload } = form;
       // Derive is_vat_applicable from tax_type_ids for backward compatibility
       const taxIds = Array.isArray(form.tax_type_ids) ? form.tax_type_ids : [];
       payload.tax_type_ids = taxIds;
