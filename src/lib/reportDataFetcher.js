@@ -31,15 +31,33 @@ export async function fetchReportData(reportId, fromDate, toDate) {
       const compFromDate = new Date(fd.setFullYear(fd.getFullYear() - 1)).toISOString().slice(0, 10);
       const compToDate = new Date(td.setFullYear(td.getFullYear() - 1)).toISOString().slice(0, 10);
 
-      const { data, error } = await supabase.rpc('get_comparative_profit_loss_rpc', {
-        p_company_id,
-        p_from_date: fromDate,
-        p_to_date: toDate,
-        p_comp_from_date: compFromDate,
-        p_comp_to_date: compToDate
-      });
-      if (error) throw error;
-      return { accounts: data || [] };
+      try {
+        const { data, error } = await supabase.rpc('get_comparative_profit_loss_rpc', {
+          p_company_id,
+          p_from_date: fromDate,
+          p_to_date: toDate,
+          p_comp_from_date: compFromDate,
+          p_comp_to_date: compToDate
+        });
+        if (error) throw error;
+        return { accounts: data || [] };
+      } catch (err) {
+        console.warn('Comparative RPC not found or failed, falling back to standard RPC.', err);
+        // Fallback to standard profit_loss if the comparative RPC hasn't been migrated
+        const { data, error } = await supabase.rpc('get_profit_loss_rpc', {
+          p_company_id,
+          p_from_date: fromDate,
+          p_to_date: toDate
+        });
+        if (error) throw error;
+        // Map the old data structure to the new comparative structure
+        const mappedData = (data || []).map(a => ({
+          ...a,
+          current_balance: a.balance,
+          comparative_balance: 0
+        }));
+        return { accounts: mappedData };
+      }
     }
 
     case 'balance_sheet': {
