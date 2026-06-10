@@ -1138,7 +1138,7 @@ function GeneralLedgerDetailReport({ initialFromDate, initialToDate }) {
     setHasLoaded(true);
     setLoading(true);
     try {
-      const { supabase } = await import('@/config/supabaseClient');
+      const { supabase } = await import('@/api/sajiloClient');
       const { data, error } = await supabase.rpc('get_detail_general_ledger_rpc', {
         p_company_id: sajilo.getCompanyId(),
         p_account_id: filters.accountId,
