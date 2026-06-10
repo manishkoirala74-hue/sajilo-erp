@@ -49,7 +49,7 @@ BEGIN
         j.id::TEXT as journal_id,
         j.entry_date::DATE as entry_date,
         COALESCE(j.voucher_no, j.id::TEXT) as voucher_no,
-        COALESCE(l.description, j.memo, 'Journal Entry') as description,
+        COALESCE(l.description, j.description, 'Journal Entry') as description,
         COALESCE(l.debit_amount, 0) as debit_amount,
         COALESCE(l.credit_amount, 0) as credit_amount,
         FALSE as is_opening
