@@ -48,13 +48,16 @@ BEGIN
         l.id::UUID,
         j.id::TEXT as journal_id,
         j.entry_date::DATE as entry_date,
-        COALESCE(j.source_document_id, j.id::TEXT) as voucher_no,
+        COALESCE(pi.invoice_number, si.invoice_number, fv.voucher_number, j.source_document_id, j.id::TEXT) as voucher_no,
         COALESCE(l.description, j.description, 'Journal Entry') as description,
         COALESCE(l.debit_amount, 0) as debit_amount,
         COALESCE(l.credit_amount, 0) as credit_amount,
         FALSE as is_opening
     FROM "GeneralLedgerLine" l
     JOIN "GeneralLedgerJournal" j ON l.journal_id = j.id::text
+    LEFT JOIN "PurchaseInvoice" pi ON j.source_document_type = 'PurchaseInvoice' AND j.source_document_id = pi.id::text
+    LEFT JOIN "SalesInvoice" si ON j.source_document_type = 'SalesInvoice' AND j.source_document_id = si.id::text
+    LEFT JOIN "FinancialVoucher" fv ON j.source_document_type = 'FinancialVoucher' AND j.source_document_id = fv.id::text
     WHERE l.account_id = p_account_id::text
       AND j.company_id = p_company_id
       AND l.company_id = p_company_id
