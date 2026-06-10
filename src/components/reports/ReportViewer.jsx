@@ -780,6 +780,22 @@ function ProfitLossReport({ initialData, initialFromDate, initialToDate }) {
     );
   };
 
+  const KPICard = ({ title, amount, percentage }) => (
+    <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm flex flex-col justify-between report-no-print">
+      <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{title}</span>
+      <div className="mt-2 flex items-baseline gap-2">
+        <span className={`text-xl font-bold tabular-nums ${amount < 0 ? 'text-red-600' : 'text-slate-800'}`}>
+          {fmtAcct(amount, amount < 0)}
+        </span>
+        {percentage !== undefined && (
+          <span className="text-xs font-medium text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">
+            {percentage}%
+          </span>
+        )}
+      </div>
+    </div>
+  );
+
   return (
     <div className="space-y-4">
       <div className="report-no-print">
