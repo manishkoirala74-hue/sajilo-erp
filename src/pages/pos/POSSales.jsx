@@ -13,6 +13,7 @@ import { useDateFormat } from '@/lib/DateFormatContext';
 import { cn } from '@/lib/utils';
 import POSSaleDetailModal from '@/components/pos/POSSaleDetailModal';
 import { postPOSSale, loadItemsMap, loadSettings } from '@/lib/glPostingService';
+import { loadActiveTaxTypes, computeTotalTax } from '@/lib/taxService';
 import { useSajiloSync } from '@/hooks/useSajiloSync';
 
 const fmt = n => `NPR ${Number(n || 0).toLocaleString()}`;
@@ -35,6 +36,9 @@ export default function POSSales() {
   const [selectedSale, setSelectedSale] = useState(null);
   const [customers, setCustomers] = useState([]);
   const [cashAccounts, setCashAccounts] = useState([]);
+  const [selectedCashAccountId, setSelectedCashAccountId] = useState('');
+  const [selectedCashAccountName, setSelectedCashAccountName] = useState('');
+  const [taxTypes, setTaxTypes] = useState([]);
 
   const isCredit = paymentMethod === 'Credit';
 
@@ -50,14 +54,13 @@ export default function POSSales() {
       sajilo.entities.POSSale.list('-created_date', 100),
       sajilo.entities.BusinessPartner.filter({ is_active: true }, 'name', 500),
       sajilo.entities.ChartOfAccount.filter({ is_active: true }, 'account_code', 1000),
-    ]).then(([its, hist, partners, accounts]) => {
+      loadActiveTaxTypes(),
+    ]).then(([its, hist, partners, accounts, txTypes]) => {
       setItems(its.filter(i => i.item_type !== 'Raw Material'));
       setHistory(hist);
       setSaleCount(hist.length);
-      // POS: show customers + suppliers flagged as treat_as_customer
       setCustomers(partners.filter(p => p.is_customer || p.treat_as_customer));
-      // Cash & Cash Equivalents: Asset sub-ledgers with cash/bank in name
-      setCashAccounts(accounts.filter(a =>
+      const drawerAccounts = accounts.filter(a =>
         a.ledger_type === 'Sub Ledger' &&
         a.account_type === 'Asset' &&
         (
@@ -65,7 +68,14 @@ export default function POSSales() {
           (a.account_name || '').toLowerCase().includes('bank') ||
           (a.account_name || '').toLowerCase().includes('petty')
         )
-      ));
+      );
+      setCashAccounts(drawerAccounts);
+      setTaxTypes(txTypes || []);
+      // Auto-select the first drawer account if none selected
+      if (drawerAccounts.length > 0 && !selectedCashAccountId) {
+        setSelectedCashAccountId(drawerAccounts[0].id);
+        setSelectedCashAccountName(drawerAccounts[0].account_name);
+      }
     });
   };
 
@@ -118,7 +128,7 @@ export default function POSSales() {
   const subtotal = cart.reduce((s, c) => s + c.line_total, 0);
   const globalDiscount = subtotal * (discountPercent / 100);
   const afterDiscount = subtotal - globalDiscount;
-  const vat = cart.reduce((s, c) => c.vat_applicable ? s + c.line_total * 0.13 : s, 0);
+  const { totalTaxAmount: vat } = computeTotalTax(cart, taxTypes);
   const grandTotal = afterDiscount + vat;
   const change = Math.max(0, amountTendered - grandTotal);
 
@@ -130,7 +140,11 @@ export default function POSSales() {
       sale_number: saleNum,
       sale_date: format(new Date(), 'yyyy-MM-dd'),
       customer_name: customerName || 'Walk-in Customer',
+      customer_id: customerId || null,
       payment_method: paymentMethod,
+      // Phase 3: per-drawer account — GL posting uses this as Priority 1
+      cash_bank_account_id:   !isCredit ? (selectedCashAccountId   || null) : null,
+      cash_bank_account_name: !isCredit ? (selectedCashAccountName || null) : null,
       subtotal: parseFloat(subtotal.toFixed(2)),
       discount_amount: parseFloat(globalDiscount.toFixed(2)),
       vat_amount: parseFloat(vat.toFixed(2)),
@@ -289,14 +303,18 @@ export default function POSSales() {
               />
             </div>
           </div>
-          {/* Cash account selector for non-credit payments */}
+          {/* Phase 3: Cash drawer selector — wired to state, passed to GL posting */}
           {!isCredit && cashAccounts.length > 0 && (
             <div>
-              <Label className="text-xs">Payment Account (Cash & Cash Equivalents)</Label>
+              <Label className="text-xs">Cash / Bank Drawer *</Label>
               <SearchableSelect
-                value=""
-                onValueChange={() => {}}
-                placeholder="Default from Settings…"
+                value={selectedCashAccountId}
+                onValueChange={v => {
+                  setSelectedCashAccountId(v);
+                  const acc = cashAccounts.find(a => a.id === v);
+                  setSelectedCashAccountName(acc?.account_name || '');
+                }}
+                placeholder="Select drawer account…"
                 options={cashAccounts.map(a => ({ value: a.id, label: a.account_name, sub: a.account_code }))}
               />
             </div>
@@ -317,7 +335,7 @@ export default function POSSales() {
         <div className="border-t border-border px-4 py-3 space-y-1 text-sm">
           <div className="flex justify-between text-muted-foreground"><span>Subtotal</span><span>{fmt(subtotal)}</span></div>
           {globalDiscount > 0 && <div className="flex justify-between text-red-500"><span>Discount ({discountPercent}%)</span><span>-{fmt(globalDiscount)}</span></div>}
-          {vat > 0 && <div className="flex justify-between text-muted-foreground"><span>VAT (13%)</span><span>{fmt(vat)}</span></div>}
+          {vat > 0 && <div className="flex justify-between text-muted-foreground"><span>Tax</span><span>{fmt(vat)}</span></div>}
           <div className="flex justify-between font-bold text-base border-t border-border pt-1 mt-1"><span>Total</span><span className="text-primary">{fmt(grandTotal)}</span></div>
           {amountTendered > 0 && <div className="flex justify-between text-emerald-600 font-semibold"><span>Change</span><span>{fmt(change)}</span></div>}
         </div>

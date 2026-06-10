@@ -14,6 +14,7 @@ import { format, addDays } from 'date-fns';
 import QuotationPrint from '@/components/quotations/QuotationPrint';
 import QuotationLineItems from '@/components/quotations/QuotationLineItems';
 import { useSajiloSync } from '@/hooks/useSajiloSync';
+import { loadActiveTaxTypes, computeTotalTax } from '@/lib/taxService';
 
 const STATUS_COLORS = {
   Draft: 'bg-gray-100 text-gray-700',
@@ -38,6 +39,7 @@ export default function Quotations() {
   const [printTarget, setPrintTarget] = useState(null);
   const [form, setForm] = useState({});
   const [saving, setSaving] = useState(false);
+  const [taxTypes, setTaxTypes] = useState([]);
   const printRef = useRef();
 
   const loadData = () => {
@@ -46,11 +48,13 @@ export default function Quotations() {
       sajilo.entities.BusinessPartner.filter({ is_customer: true }),
       sajilo.entities.Item.filter({ is_active: true }),
       sajilo.entities.CompanySettings.list(),
-    ]).then(([qs, cs, its, ss]) => {
+      loadActiveTaxTypes(),
+    ]).then(([qs, cs, its, ss, txTypes]) => {
       setQuotations(qs);
       setCustomers(cs.filter(c => c.is_active !== false));
       setItems(its);
       setSettings(ss[0] || {});
+      setTaxTypes(txTypes || []);
       setLoading(false);
     });
   };
@@ -99,7 +103,7 @@ export default function Quotations() {
 
   const handleLineChange = (lines) => {
     const subtotal = lines.reduce((s, l) => s + (l.line_total || 0), 0);
-    const tax = lines.reduce((s, l) => l.vat_applicable ? s + (l.line_total || 0) * 0.13 : s, 0);
+    const { totalTaxAmount: tax } = computeTotalTax(lines, taxTypes);
     setForm(prev => ({
       ...prev, line_items: lines, goods_subtotal: subtotal,
       total_tax_amount: tax, grand_total: subtotal + tax - (prev.discount_amount || 0),
@@ -381,7 +385,7 @@ export default function Quotations() {
                     className="w-32 h-7 text-right text-sm" />
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">VAT ({settings?.vat_rate || 13}%)</span>
+                  <span className="text-muted-foreground">Tax</span>
                   <span>NPR {Number(form.total_tax_amount || 0).toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between font-bold text-base border-t border-border pt-2">

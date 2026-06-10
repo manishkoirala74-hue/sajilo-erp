@@ -14,6 +14,7 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 import DateInput from '@/components/shared/DateInput';
 import { postSalesInvoice, loadItemsMap, loadSettings } from '@/lib/glPostingService';
+import { loadActiveTaxTypes, computeTotalTax } from '@/lib/taxService';
 import { useSajiloSync } from '@/hooks/useSajiloSync';
 
 const emptySI = {
@@ -32,6 +33,7 @@ export default function SalesInvoices() {
   const [salesOrders, setSalesOrders] = useState([]);
   const [accounts, setAccounts] = useState([]);
   const [settings, setSettings] = useState(null);
+  const [taxTypes, setTaxTypes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [viewDetail, setViewDetail] = useState(null);
@@ -59,14 +61,15 @@ export default function SalesInvoices() {
       sajilo.entities.BusinessPartner.filter({ is_active: true }),
       sajilo.entities.SalesOrder.filter({ fulfillment_status: 'Confirmed' }),
       sajilo.entities.CompanySettings.list(),
-      sajilo.entities.ChartOfAccount.filter({ is_active: true }, 'account_code', 500)
-    ]).then(([inv, cs, sos, sett, accs]) => {
+      sajilo.entities.ChartOfAccount.filter({ is_active: true }, 'account_code', 500),
+      loadActiveTaxTypes(),
+    ]).then(([inv, cs, sos, sett, accs, txTypes]) => {
       setInvoices(inv);
-      // Sales module: show customers + suppliers flagged as treat_as_customer
       setCustomers(cs.filter(c => c.is_customer || c.treat_as_customer));
       setSalesOrders(sos);
       setSettings(sett.length > 0 ? sett[0] : {});
       setAccounts(accs);
+      setTaxTypes(txTypes || []);
       setLoading(false);
     });
   };
@@ -126,7 +129,7 @@ export default function SalesInvoices() {
 
   const handleLineChange = (lines) => {
     const subtotal = lines.reduce((s, l) => s + (l.line_total || 0), 0);
-    const taxAmount = lines.reduce((s, l) => l.vat_applicable ? s + (l.line_total || 0) * 0.13 : s, 0);
+    const { totalTaxAmount: taxAmount } = computeTotalTax(lines, taxTypes);
     setForm(f => ({
       ...f, line_items: lines, goods_subtotal: subtotal,
       total_tax_amount: taxAmount,
@@ -515,7 +518,7 @@ export default function SalesInvoices() {
 
           <div className="mt-6">
             <Label className="text-base font-semibold mb-3 block">Line Items</Label>
-            <LineItemsEditor value={form.line_items} onChange={handleLineChange} />
+            <LineItemsEditor value={form.line_items} onChange={handleLineChange} taxTypes={taxTypes} />
           </div>
 
           <div className="flex justify-end gap-3 mt-4 pt-4 border-t border-border">
@@ -545,7 +548,7 @@ export default function SalesInvoices() {
                 <div><span className="text-muted-foreground">Due Date:</span> <span className="font-medium">{viewDetail.due_date}</span></div>
                 <div><span className="text-muted-foreground">Payment:</span> <StatusBadge status={viewDetail.payment_status} /></div>
                 <div><span className="text-muted-foreground">Subtotal:</span> <span className="font-medium">NPR {Number(viewDetail.goods_subtotal).toLocaleString()}</span></div>
-                <div><span className="text-muted-foreground">VAT:</span> <span className="font-medium">NPR {Number(viewDetail.total_tax_amount).toLocaleString()}</span></div>
+                <div><span className="text-muted-foreground">Tax:</span> <span className="font-medium">NPR {Number(viewDetail.total_tax_amount).toLocaleString()}</span></div>
                 <div className="col-span-2"><span className="text-muted-foreground">Grand Total:</span> <span className="font-bold text-primary text-base"> NPR {Number(viewDetail.grand_total).toLocaleString()}</span></div>
               </div>
               {viewDetail.notes && <p className="text-sm text-muted-foreground border-t pt-3">{viewDetail.notes}</p>}

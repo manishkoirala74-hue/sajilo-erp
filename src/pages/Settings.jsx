@@ -3,7 +3,7 @@ import { useAuth } from '@/lib/AuthContext';
 import { sajilo } from '@/api/sajiloClient';
 import {
   Save, Building2, Users, Settings2, FileText, Mail,
-  ChevronRight, Globe, Bell, Hash, Palette, Shield, Database, TrendingDown, FileSpreadsheet, BookOpen, Calendar, HardDrive
+  ChevronRight, Globe, Bell, Hash, Palette, Shield, Database, TrendingDown, FileSpreadsheet, BookOpen, Calendar, HardDrive, Percent
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -23,6 +23,7 @@ import GLAccountSettings from '@/components/settings/GLAccountSettings';
 import PayrollGLSettings from '@/components/settings/PayrollGLSettings';
 import CompanyManagement from '@/components/settings/CompanyManagement';
 import FiscalYearSettings from '@/components/settings/FiscalYearSettings';
+import TaxSettings from '@/components/settings/TaxSettings';
 import { cn } from '@/lib/utils';
 
 const SECTIONS = [
@@ -31,12 +32,13 @@ const SECTIONS = [
   { id: 'configuration', label: 'Configuration', icon: Settings2 },
   { id: 'opening_balances', label: 'Opening Balances', icon: Database },
   { id: 'fiscal_years', label: 'Fiscal Years', icon: Calendar },
+  { id: 'tax_vat', label: 'Tax & VAT', icon: Percent },
+  { id: 'gl_accounts', label: 'GL Account Mapping', icon: BookOpen },
   { id: 'depreciation', label: 'Fixed Assets Depreciation', icon: TrendingDown },
   { id: 'vouchers', label: 'Voucher & Invoice Setup', icon: FileText },
   { id: 'quotation', label: 'Quotation Design', icon: FileText },
   { id: 'import_export', label: 'Import / Export', icon: FileSpreadsheet },
   { id: 'data_utilities', label: 'Data Utilities', icon: HardDrive, adminOnly: true },
-  { id: 'gl_accounts', label: 'GL Account Mapping', icon: BookOpen },
   { id: 'email', label: 'Email Notifications', icon: Mail },
 ];
 
@@ -377,6 +379,13 @@ export default function Settings() {
         {/* ── DATA UTILITIES ── */}
         {activeSection === 'data_utilities' && (
           <DataUtilities />
+        )}
+
+        {/* ── TAX & VAT ── */}
+        {activeSection === 'tax_vat' && (
+          <SectionCard title="Tax & VAT Configuration" icon={Percent}>
+            <TaxSettings />
+          </SectionCard>
         )}
 
         {/* ── GL ACCOUNT MAPPING ── */}

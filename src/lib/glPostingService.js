@@ -2,12 +2,17 @@
  * GL Posting Service — Sajilo ERP
  * Central double-entry journal posting for all transactional modules.
  *
- * Refactored to leverage atomic PostgreSQL RPC functions to ensure perfect consistency,
- * strict Group Ledger validation, and race-condition-free inventory costing.
+ * Architecture (3-tier account resolution):
+ *   Priority 1: Transaction-level account (explicitly chosen per document)
+ *   Priority 2: Partner-level account (customer.receivable_account_id / vendor.payable_account_id)
+ *   Priority 3: Company-level fallback (CompanySettings global mapping)
+ *
+ * Tax resolution: Dynamic from TaxType table — no hardcoded rates.
  */
 
 import { supabase, sajilo } from '@/api/sajiloClient';
 import { toast } from 'sonner';
+import { loadActiveTaxTypes } from '@/lib/taxService';
 
 function r2(n) { return Math.round((n || 0) * 100) / 100; }
 
@@ -33,6 +38,44 @@ function resolvePaymentAccount(paymentMethod, s) {
   return { id: s.gl_bank_account_id, name: s.gl_bank_account_name || 'Bank' };
 }
 
+/**
+ * Resolve the tax payable account for a given tax amount.
+ * Priority: TaxType record's gl_account_id → global s.gl_vat_payable_id (legacy fallback)
+ * Returns null silently if taxAmount is 0 or no account found (non-fatal).
+ */
+async function resolveTaxAccount(taxAmount, s, taxTypes) {
+  if (!taxAmount || taxAmount <= 0) return null;
+  // Try to find the default TaxType's GL account
+  const types = taxTypes || await loadActiveTaxTypes().catch(() => []);
+  const defaultType = types.find(t => t.is_default) || types[0];
+  if (defaultType?.gl_account_id) {
+    return { id: defaultType.gl_account_id, name: defaultType.gl_account_name || defaultType.tax_name };
+  }
+  // Legacy fallback: global vat_payable mapping
+  if (s.gl_vat_payable_id) {
+    return { id: s.gl_vat_payable_id, name: s.gl_vat_payable_name || 'VAT Payable' };
+  }
+  // Soft warn — don't abort posting just because VAT account is missing
+  toast.warning('Tax account not configured in Settings → Tax & VAT. VAT line skipped.', { duration: 5000 });
+  return null;
+}
+
+/**
+ * Fetch a partner's dedicated AR or AP ledger account.
+ * Returns null if not found — caller falls back to global mapping.
+ */
+async function resolvePartnerLedger(partnerId, ledgerField) {
+  if (!partnerId) return null;
+  try {
+    const partners = await sajilo.entities.BusinessPartner.filter({ id: partnerId }, '', 1);
+    const partner = partners[0];
+    if (!partner || !partner[ledgerField]) return null;
+    return { id: partner[ledgerField], name: partner.name || '' };
+  } catch {
+    return null;
+  }
+}
+
 // ─── Resolve "Difference in Trial Balance" ledger ────────────────────────────
 export async function resolveDifferenceInTrialBalance() {
   const { data } = await supabase.from('ChartOfAccount').select('id, account_name').eq('is_active', true).ilike('account_name', '%difference in trial balance%').limit(1);
@@ -44,17 +87,37 @@ export async function resolveDifferenceInTrialBalance() {
 }
 
 
-// ─── 1. POS SALE ─────────────────────────────────────────────────────────────
+// ─── 1. POS SALE ──────────────────────────────────────────────────────────
+// Phase 3: POS now uses sale.cash_bank_account_id (per-drawer) as Priority 1.
+//          Falls back to global gl_cash_account_id / gl_bank_account_id.
 export async function postPOSSale(sale, itemsMap, settings, isReversal = false) {
   const s = settings || {};
   const sign = isReversal ? -1 : 1;
   const lines = [];
+  const taxTypes = await loadActiveTaxTypes().catch(() => []);
 
-  const payAcc = resolvePaymentAccount(sale.payment_method, s);
-  if (!payAcc.id) return warnMissingAccount('Cash/Bank');
+  // Priority 1: per-sale drawer account; Priority 2: global fallback
+  let payAccId, payAccName;
+  if (sale.cash_bank_account_id) {
+    payAccId   = sale.cash_bank_account_id;
+    payAccName = sale.cash_bank_account_name || sale.payment_method || 'Cash';
+  } else {
+    const fallback = resolvePaymentAccount(sale.payment_method, s);
+    payAccId   = fallback.id;
+    payAccName = fallback.name;
+  }
+  if (!payAccId) return warnMissingAccount('Cash/Bank (configure in Settings → GL Account Mapping or select a drawer on POS)');
 
-  // DR Cash/Bank
-  lines.push({ account_id: payAcc.id, account_name: payAcc.name, debit_amount: r2(sign * sale.grand_total), credit_amount: 0, description: 'Payment received' });
+  // DR Cash/Bank or AR (Credit sales)
+  if (sale.payment_method === 'Credit' && sale.customer_id) {
+    const partnerLedger = await resolvePartnerLedger(sale.customer_id, 'receivable_account_id');
+    const arId   = partnerLedger?.id   || s.gl_accounts_receivable_id;
+    const arName = partnerLedger?.name || s.gl_accounts_receivable_name || 'Accounts Receivable';
+    if (!arId) return warnMissingAccount('Accounts Receivable');
+    lines.push({ account_id: arId, account_name: arName, debit_amount: r2(sign * sale.grand_total), credit_amount: 0, description: 'Credit sale' });
+  } else {
+    lines.push({ account_id: payAccId, account_name: payAccName, debit_amount: r2(sign * sale.grand_total), credit_amount: 0, description: 'Payment received' });
+  }
 
   for (const line of (sale.line_items || [])) {
     const item = itemsMap[line.item_id];
@@ -82,10 +145,10 @@ export async function postPOSSale(sale, itemsMap, settings, isReversal = false) 
     });
   }
 
-  // CR VAT Payable
+  // CR Tax Payable (dynamic)
   if (sale.vat_amount > 0) {
-    if (!s.gl_vat_payable_id) return warnMissingAccount('VAT Payable');
-    lines.push({ account_id: s.gl_vat_payable_id, account_name: s.gl_vat_payable_name || 'VAT Payable', debit_amount: 0, credit_amount: r2(sign * sale.vat_amount), description: 'VAT collected' });
+    const taxAcc = await resolveTaxAccount(sale.vat_amount, s, taxTypes);
+    if (taxAcc) lines.push({ account_id: taxAcc.id, account_name: taxAcc.name, debit_amount: 0, credit_amount: r2(sign * sale.vat_amount), description: 'Tax collected' });
   }
 
   const payload = {
@@ -106,11 +169,14 @@ export async function postPOSSale(sale, itemsMap, settings, isReversal = false) 
   return journalId;
 }
 
-// ─── 2. SALES INVOICE ────────────────────────────────────────────────────────
+
+// ─── 2. SALES INVOICE ──────────────────────────────────────────────────────────
+// Phase 2: AR resolved from customer.receivable_account_id → global fallback.
 export async function postSalesInvoice(invoice, itemsMap, settings, isReversal = false) {
   const s = settings || {};
   const sign = isReversal ? -1 : 1;
   const lines = [];
+  const taxTypes = await loadActiveTaxTypes().catch(() => []);
 
   if (['Cash', 'Bank'].includes(invoice.payment_mode)) {
     const cbId = invoice.cash_bank_account_id;
@@ -118,8 +184,10 @@ export async function postSalesInvoice(invoice, itemsMap, settings, isReversal =
     if (!cbId) return warnMissingAccount(`${invoice.payment_mode} Account`);
     lines.push({ account_id: cbId, account_name: cbName, debit_amount: r2(sign * invoice.grand_total), credit_amount: 0 });
   } else {
-    const arId   = s.gl_accounts_receivable_id;
-    const arName = s.gl_accounts_receivable_name || 'Accounts Receivable';
+    // Phase 2: try customer's dedicated AR ledger first
+    const partnerLedger = await resolvePartnerLedger(invoice.customer_id, 'receivable_account_id');
+    const arId   = partnerLedger?.id   || s.gl_accounts_receivable_id;
+    const arName = partnerLedger?.name || s.gl_accounts_receivable_name || 'Accounts Receivable';
     if (!arId) return warnMissingAccount('Accounts Receivable');
     lines.push({ account_id: arId, account_name: arName, debit_amount: r2(sign * invoice.grand_total), credit_amount: 0 });
   }
@@ -149,8 +217,10 @@ export async function postSalesInvoice(invoice, itemsMap, settings, isReversal =
     });
   }
 
-  if (invoice.total_tax_amount > 0 && s.gl_vat_payable_id) {
-    lines.push({ account_id: s.gl_vat_payable_id, account_name: s.gl_vat_payable_name || 'VAT Payable', debit_amount: 0, credit_amount: r2(sign * invoice.total_tax_amount) });
+  // CR Tax Payable (dynamic)
+  if (invoice.total_tax_amount > 0) {
+    const taxAcc = await resolveTaxAccount(invoice.total_tax_amount, s, taxTypes);
+    if (taxAcc) lines.push({ account_id: taxAcc.id, account_name: taxAcc.name, debit_amount: 0, credit_amount: r2(sign * invoice.total_tax_amount) });
   }
 
   const payload = {
@@ -171,16 +241,20 @@ export async function postSalesInvoice(invoice, itemsMap, settings, isReversal =
 }
 
 
-// ─── 3. PURCHASE INVOICE ─────────────────────────────────────────────────────
+// ─── 3. PURCHASE INVOICE ──────────────────────────────────────────────────────────
+// Phase 2: AP resolved from vendor.payable_account_id → global fallback.
 export async function postPurchaseInvoice(invoice, itemsMap, settings, isReversal = false) {
   const s = settings || {};
   const sign = isReversal ? -1 : 1;
   const lines = [];
+  const taxTypes = await loadActiveTaxTypes().catch(() => []);
 
   let apId, apName;
   if (!['Cash', 'Bank'].includes(invoice.payment_mode)) {
-    apId   = s.gl_accounts_payable_id;
-    apName = s.gl_accounts_payable_name || 'Accounts Payable';
+    // Phase 2: try vendor's dedicated AP ledger first
+    const partnerLedger = await resolvePartnerLedger(invoice.vendor_id, 'payable_account_id');
+    apId   = partnerLedger?.id   || s.gl_accounts_payable_id;
+    apName = partnerLedger?.name || s.gl_accounts_payable_name || 'Accounts Payable';
     if (!apId) return warnMissingAccount('Accounts Payable');
   }
 
@@ -192,8 +266,10 @@ export async function postPurchaseInvoice(invoice, itemsMap, settings, isReversa
     lines.push({ account_id: invAccId, account_name: invAccName, debit_amount: r2(sign * line.line_total), credit_amount: 0, description: `Purchase: ${line.item_name}` });
   }
 
-  if (invoice.vat_amount > 0 && s.gl_vat_payable_id) {
-    lines.push({ account_id: s.gl_vat_payable_id, account_name: s.gl_vat_payable_name || 'VAT Payable', debit_amount: r2(sign * invoice.vat_amount), credit_amount: 0, description: 'Input VAT' });
+  // DR Input Tax (dynamic)
+  if (invoice.vat_amount > 0) {
+    const taxAcc = await resolveTaxAccount(invoice.vat_amount, s, taxTypes);
+    if (taxAcc) lines.push({ account_id: taxAcc.id, account_name: taxAcc.name, debit_amount: r2(sign * invoice.vat_amount), credit_amount: 0, description: 'Input Tax' });
   }
 
   if (['Cash', 'Bank'].includes(invoice.payment_mode)) {
@@ -232,10 +308,11 @@ export async function postPurchaseInvoice(invoice, itemsMap, settings, isReversa
 }
 
 
-// ─── 4. SALES RETURN ─────────────────────────────────────────────────────────
+// ─── 4. SALES RETURN ──────────────────────────────────────────────────────────
 export async function postSalesReturn(ret, itemsMap, settings) {
   const s = settings || {};
   const lines = [];
+  const taxTypes = await loadActiveTaxTypes().catch(() => []);
 
   const srAccId   = s.gl_sales_return_account_id;
   const srAccName = s.gl_sales_return_account_name || 'Sales Returns & Allowances';
@@ -247,8 +324,9 @@ export async function postSalesReturn(ret, itemsMap, settings) {
 
   lines.push({ account_id: srAccId, account_name: srAccName, debit_amount: r2(ret.subtotal), credit_amount: 0 });
 
-  if (ret.vat_amount > 0 && s.gl_vat_payable_id) {
-    lines.push({ account_id: s.gl_vat_payable_id, account_name: s.gl_vat_payable_name || 'VAT Payable', debit_amount: r2(ret.vat_amount), credit_amount: 0, description: 'VAT reversal' });
+  if (ret.vat_amount > 0) {
+    const taxAcc = await resolveTaxAccount(ret.vat_amount, s, taxTypes);
+    if (taxAcc) lines.push({ account_id: taxAcc.id, account_name: taxAcc.name, debit_amount: r2(ret.vat_amount), credit_amount: 0, description: 'Tax reversal' });
   }
 
   lines.push({ account_id: refundAcc.id, account_name: refundAcc.name, debit_amount: 0, credit_amount: r2(ret.grand_total), description: `Refund via ${refundMethod}` });
@@ -281,61 +359,6 @@ export async function postSalesReturn(ret, itemsMap, settings) {
   if (error) handleDBError(error);
   return journalId;
 }
-
-
-// ─── 5. PURCHASE RETURN ──────────────────────────────────────────────────────
-export async function postPurchaseReturn(ret, itemsMap, settings) {
-  const s = settings || {};
-  const lines = [];
-
-  const apId   = s.gl_accounts_payable_id;
-  const apName = s.gl_accounts_payable_name || 'Accounts Payable';
-  if (!apId) return warnMissingAccount('Accounts Payable');
-
-  lines.push({ account_id: apId, account_name: apName, debit_amount: r2(ret.grand_total), credit_amount: 0, description: 'Vendor credit for return' });
-
-  for (const line of (ret.line_items || [])) {
-    const item = itemsMap[line.item_id];
-    const invAccId   = item?.inventory_account_id   || s.gl_default_inventory_account_id;
-    const invAccName = item?.inventory_account_name || s.gl_default_inventory_account_name || 'Inventory';
-    if (!invAccId) return warnMissingAccount('Inventory Asset');
-    lines.push({ account_id: invAccId, account_name: invAccName, debit_amount: 0, credit_amount: r2(line.line_total), description: `Return: ${line.item_name}` });
-  }
-
-  if (ret.vat_amount > 0 && s.gl_vat_payable_id) {
-    lines.push({ account_id: s.gl_vat_payable_id, account_name: s.gl_vat_payable_name || 'VAT Payable', debit_amount: 0, credit_amount: r2(ret.vat_amount), description: 'Input VAT reversal' });
-  }
-
-  const payload = {
-    p_company_id: ret.company_id,
-    p_date: ret.return_date,
-    p_description: `Purchase Return ${ret.return_number}`,
-    p_module: 'Purchase',
-    p_source_id: ret.id,
-    p_source_type: 'PurchaseReturn',
-    p_lines: lines,
-    p_lock_cogs: false
-  };
-
-  const { data: journalId, error } = await supabase.rpc('rpc_post_gl_transaction', payload);
-  if (error) handleDBError(error);
-  return journalId;
-}
-
-
-// ─── 6. STOCK ADJUSTMENT ─────────────────────────────────────────────────────
-export async function postStockAdjustment(adj, itemsMap, settings) {
-  const s = settings || {};
-  const lines = [];
-
-  const varAccId   = s.gl_stock_variance_account_id;
-  const varAccName = s.gl_stock_variance_account_name || 'Stock Variance';
-  if (!varAccId) return warnMissingAccount('Stock Variance');
-
-  for (const line of (adj.line_items || [])) {
-    const item = itemsMap[line.item_id];
-    const invAccId   = item?.inventory_account_id   || s.gl_default_inventory_account_id;
-    const invAccName = item?.inventory_account_name || s.gl_default_inventory_account_name || 'Inventory';
     if (!invAccId) return warnMissingAccount('Inventory Asset');
     const costAmt = r2(line.cost_impact || 0);
     if (costAmt <= 0) continue;

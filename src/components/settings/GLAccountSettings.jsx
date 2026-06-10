@@ -8,19 +8,23 @@ import { seedDefaultChartOfAccounts } from '@/lib/defaultCoaSeeder';
 import { RefreshCw } from 'lucide-react';
 
 // Standard GL posting account mappings (Sub Ledger accounts)
+// NOTE: Cash/Bank are POS-fallback only — Sales/Purchase invoices use the
+//       per-transaction ledger selected by the user.
+// NOTE: AR/AP are company-wide fallbacks — partner-linked sub-ledgers take
+//       priority when a customer_id / vendor_id is present on the transaction.
+// NOTE: VAT Payable is no longer configured here — use Settings → Tax & VAT.
 const GL_FIELDS = [
-  { key: 'gl_cash_account',            label: 'Cash-in-Hand',                     desc: 'Used for POS Cash payments' },
-  { key: 'gl_bank_account',            label: 'Bank / Card Account',              desc: 'Used for Card & Digital Wallet payments' },
-  { key: 'gl_accounts_receivable',     label: 'Accounts Receivable',              desc: 'Debited on Sales Invoice posting' },
-  { key: 'gl_accounts_payable',        label: 'Accounts Payable',                 desc: 'Credited on Purchase Invoice posting' },
-  { key: 'gl_vat_payable',             label: 'VAT Payable',                      desc: 'VAT collected on sales / input VAT on purchase' },
-  { key: 'gl_sales_return_account',    label: 'Sales Returns & Allowances',       desc: 'Contra-revenue — debited on sales return' },
-  { key: 'gl_purchase_return_account', label: 'Purchase Returns & Allowances',    desc: 'Contra-COGS — credited on purchase return' },
-  { key: 'gl_default_sales_account',   label: 'Default Sales Revenue',            desc: 'Fallback if item has no sales account' },
-  { key: 'gl_default_cogs_account',    label: 'Default COGS',                     desc: 'Fallback if item has no purchase account' },
-  { key: 'gl_default_inventory_account', label: 'Default Inventory Asset',        desc: 'Fallback if item has no inventory account' },
-  { key: 'gl_stock_variance_account',  label: 'Stock Variance / Write-off',       desc: 'Used for stock adjustment journals & item deletion write-offs' },
-  { key: 'gl_opening_equity_account',  label: 'Opening Balance Equity',           desc: 'Credited when posting opening stock on item import' },
+  { key: 'gl_cash_account',            label: 'Cash-in-Hand (POS Fallback)',       desc: 'Used by POS when no specific drawer account is selected' },
+  { key: 'gl_bank_account',            label: 'Bank / Card Account (POS Fallback)', desc: 'Used by POS for Card & Digital Wallet when no specific account is selected' },
+  { key: 'gl_accounts_receivable',     label: 'Accounts Receivable (Fallback)',    desc: 'Used for Sales Invoices when customer has no dedicated AR sub-ledger' },
+  { key: 'gl_accounts_payable',        label: 'Accounts Payable (Fallback)',       desc: 'Used for Purchase Invoices when vendor has no dedicated AP sub-ledger' },
+  { key: 'gl_sales_return_account',    label: 'Sales Returns & Allowances',        desc: 'Contra-revenue — debited on sales return' },
+  { key: 'gl_purchase_return_account', label: 'Purchase Returns & Allowances',     desc: 'Contra-COGS — credited on purchase return' },
+  { key: 'gl_default_sales_account',   label: 'Default Sales Revenue',             desc: 'Fallback if item has no sales account' },
+  { key: 'gl_default_cogs_account',    label: 'Default COGS',                      desc: 'Fallback if item has no purchase account' },
+  { key: 'gl_default_inventory_account', label: 'Default Inventory Asset',         desc: 'Fallback if item has no inventory account' },
+  { key: 'gl_stock_variance_account',  label: 'Stock Variance / Write-off',        desc: 'Used for stock adjustment journals & item deletion write-offs' },
+  { key: 'gl_opening_equity_account',  label: 'Opening Balance Equity',            desc: 'Credited when posting opening stock on item import' },
 ];
 
 // Ledger Group Parent mappings (Group Ledger accounts only)
@@ -144,9 +148,14 @@ export default function GLAccountSettings({ settings, onChange }) {
 
       {/* ── Standard GL Posting Accounts ── */}
       <div className="space-y-3">
-        <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 text-sm text-blue-800">
-          Map your Chart of Accounts to each GL posting role. Used automatically when posting transactions.
-          Items with their own account mappings will use those; these are the system-wide fallbacks.
+        <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 text-sm text-blue-800 space-y-1">
+          <p>Map your Chart of Accounts to each GL posting role. Used automatically when posting transactions.</p>
+          <p className="text-xs">
+            <strong>Priority order:</strong> Transaction-level selection → Partner-dedicated ledger → These fallback defaults.
+          </p>
+          <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1 mt-1">
+            ⚠️ <strong>VAT Payable</strong> is no longer configured here. Go to <strong>Settings → Tax &amp; VAT</strong> to manage tax types and their ledger accounts.
+          </p>
         </div>
         <div className="grid grid-cols-1 gap-4">
           {GL_FIELDS.map(f => (

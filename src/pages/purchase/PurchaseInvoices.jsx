@@ -14,6 +14,7 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 import DateInput from '@/components/shared/DateInput';
 import { postPurchaseInvoice, loadItemsMap, loadSettings } from '@/lib/glPostingService';
+import { loadActiveTaxTypes, computeTotalTax } from '@/lib/taxService';
 import { useSajiloSync } from '@/hooks/useSajiloSync';
 
 const emptyPI = {
@@ -32,6 +33,8 @@ export default function PurchaseInvoices() {
   const [vendors, setVendors] = useState([]);
   const [approvedPOs, setApprovedPOs] = useState([]);
   const [accounts, setAccounts] = useState([]);
+  const [settings, setSettings] = useState(null);
+  const [taxTypes, setTaxTypes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [viewDetail, setViewDetail] = useState(null);
@@ -107,7 +110,7 @@ export default function PurchaseInvoices() {
 
   const handleLineChange = (lines) => {
     const subtotal = lines.reduce((s, l) => s + (l.line_total || 0), 0);
-    const vatAmount = lines.reduce((s, l) => l.vat_applicable ? s + (l.line_total || 0) * 0.13 : s, 0);
+    const { totalTaxAmount: vatAmount } = computeTotalTax(lines, taxTypes);
     setForm(f => ({
       ...f, line_items: lines, subtotal,
       vat_amount: vatAmount,

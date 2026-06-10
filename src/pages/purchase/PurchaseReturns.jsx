@@ -13,6 +13,7 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 import DateInput from '@/components/shared/DateInput';
 import { postPurchaseReturn, loadItemsMap, loadSettings } from '@/lib/glPostingService';
+import { loadActiveTaxTypes, computeTotalTax } from '@/lib/taxService';
 
 const emptyReturn = {
   return_number: '', purchase_invoice_id: '', purchase_invoice_number: '',
@@ -27,6 +28,7 @@ export default function PurchaseReturns() {
   const [invoices, setInvoices] = useState([]);
   const [vendors, setVendors] = useState([]);
   const [items, setItems] = useState([]);
+  const [taxTypes, setTaxTypes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [viewDetail, setViewDetail] = useState(null);
@@ -39,10 +41,13 @@ export default function PurchaseReturns() {
       sajilo.entities.PurchaseInvoice.filter({ status: 'Posted' }, '-invoice_date', 200),
       sajilo.entities.BusinessPartner.filter({ is_vendor: true }),
       sajilo.entities.Item.filter({ is_active: true }, 'item_name', 500),
-    ]).then(([r, inv, vs, its]) => {
+      loadActiveTaxTypes(),
+    ]).then(([r, inv, vs, its, txTypes]) => {
       setReturns(r); setInvoices(inv);
       setVendors(vs.filter(v => v.is_active !== false));
-      setItems(its); setLoading(false);
+      setItems(its);
+      setTaxTypes(txTypes || []);
+      setLoading(false);
     });
   }, []);
 
@@ -77,7 +82,7 @@ export default function PurchaseReturns() {
       lines[idx].line_total = parseFloat((q * p).toFixed(2));
     }
     const subtotal = lines.reduce((s, l) => s + (l.line_total || 0), 0);
-    const vat = lines.reduce((s, l) => l.vat_applicable ? s + (l.line_total || 0) * 0.13 : s, 0);
+    const { totalTaxAmount: vat } = computeTotalTax(lines, taxTypes);
     setForm(f => ({ ...f, line_items: lines, subtotal, vat_amount: vat, grand_total: subtotal + vat }));
   };
 

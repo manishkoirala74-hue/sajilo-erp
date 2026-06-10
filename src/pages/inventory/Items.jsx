@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { sajilo } from '@/api/sajiloClient';
+import { loadActiveTaxTypes } from '@/lib/taxService';
 import { Plus, Edit2, Package, AlertTriangle, Upload, X, History, ChevronDown, CheckSquare, Square, Minus, Trash2 } from 'lucide-react';
 import ItemTransactionHistory from '@/components/inventory/ItemTransactionHistory';
 import { Button } from '@/components/ui/button';
@@ -24,7 +25,9 @@ const emptyItem = {
   sales_account_id: '', sales_account_name: '',
   inventory_account_id: '', inventory_account_name: '',
   discount_scheme_id: '', discount_scheme_name: '',
-  is_active: true, is_vat_applicable: false, description: '', barcode: '', hs_code: ''
+  is_active: true, is_vat_applicable: false,
+  tax_type_ids: [], // multi-tax: list of TaxType IDs applied to this item
+  description: '', barcode: '', hs_code: ''
 };
 
 // ── Bulk Action Panel ──────────────────────────────────────────────
@@ -169,6 +172,7 @@ export default function Items() {
   const [uoms, setUoms] = useState([]);
   const [accounts, setAccounts] = useState([]);
   const [discountSchemes, setDiscountSchemes] = useState([]);
+  const [taxTypes, setTaxTypes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -190,12 +194,14 @@ export default function Items() {
       sajilo.entities.ChartOfAccount.filter({ is_active: true }, 'account_code', 500),
       sajilo.entities.DiscountScheme.filter({ is_active: true }, 'scheme_name', 200),
       sajilo.entities.CompanySettings.list(),
-    ]).then(([its, cats, us, accs, ds, cs]) => {
+      loadActiveTaxTypes(),
+    ]).then(([its, cats, us, accs, ds, cs, txTypes]) => {
       setItems(its);
       setCategories(cats);
       setUoms(us);
       setAccounts(accs);
       setDiscountSchemes(ds);
+      setTaxTypes((txTypes || []).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0)));
       if (cs[0]) setImgSettings({ max_size_mb: cs[0].item_image_max_size_mb || 2, max_count: cs[0].item_image_max_count || 3 });
       setLoading(false);
     });
@@ -224,7 +230,15 @@ export default function Items() {
     setEditing(null); 
     setShowForm(true); 
   };
-  const openEdit = (item) => { setForm({ ...item, image_urls: item.image_urls || (item.image_url ? [item.image_url] : []) }); setEditing(item); setShowForm(true); };
+  const openEdit = (item) => {
+    setForm({
+      ...item,
+      image_urls: item.image_urls || (item.image_url ? [item.image_url] : []),
+      tax_type_ids: Array.isArray(item.tax_type_ids) ? item.tax_type_ids : (item.tax_type_ids ? JSON.parse(item.tax_type_ids) : []),
+    });
+    setEditing(item);
+    setShowForm(true);
+  };
 
   const handleImageUpload = async (e) => {
     const files = Array.from(e.target.files || []);
@@ -256,6 +270,10 @@ export default function Items() {
     setSaving(true);
     try {
       const { image_urls, ...payload } = form;
+      // Derive is_vat_applicable from tax_type_ids for backward compatibility
+      const taxIds = Array.isArray(form.tax_type_ids) ? form.tax_type_ids : [];
+      payload.tax_type_ids = taxIds;
+      payload.is_vat_applicable = taxIds.length > 0;
       if (editing) {
         await sajilo.entities.Item.update(editing.id, payload);
         toast.success('Item updated');
@@ -782,11 +800,90 @@ export default function Items() {
               <p className="text-xs text-muted-foreground mt-2">{(form.image_urls || []).length}/{imgSettings.max_count} images • Max {imgSettings.max_size_mb}MB per image</p>
             </Section>
 
-            <div className="flex items-center gap-6 bg-muted/50 rounded-lg p-4">
-              <div className="flex items-center gap-3">
-                <Switch checked={form.is_vat_applicable} onCheckedChange={v => sf('is_vat_applicable', v)} />
-                <Label>VAT Applicable (13%)</Label>
+            {/* Tax Types — Multi-Select */}
+            <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-3">
+              <div>
+                <p className="text-sm font-semibold">Applicable Tax Types</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Select one or more taxes for this item. Taxes are applied in Sort Order (lowest first).
+                  Compound taxes are calculated on net + prior taxes.
+                </p>
               </div>
+
+              {taxTypes.length === 0 ? (
+                <p className="text-xs text-amber-600 flex items-center gap-1.5">
+                  <AlertTriangle className="w-3.5 h-3.5" />
+                  No tax types configured. Go to Settings → Tax & VAT to create them.
+                </p>
+              ) : (
+                <div className="grid grid-cols-2 gap-2">
+                  {taxTypes.map(tt => {
+                    const selected = (form.tax_type_ids || []).includes(tt.id);
+                    const toggle = () => {
+                      const ids = form.tax_type_ids || [];
+                      sf('tax_type_ids', selected ? ids.filter(x => x !== tt.id) : [...ids, tt.id]);
+                    };
+                    return (
+                      <label key={tt.id}
+                        className={cn(
+                          'flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors',
+                          selected
+                            ? 'bg-primary/5 border-primary/40 ring-1 ring-primary/20'
+                            : 'bg-white border-border hover:bg-muted/40'
+                        )}
+                      >
+                        <Checkbox checked={selected} onCheckedChange={toggle} className="mt-0.5" />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-sm font-medium">{tt.tax_name}</span>
+                            <span className="text-xs font-semibold tabular-nums text-primary bg-primary/10 px-1.5 py-0.5 rounded">{tt.tax_rate}%</span>
+                            {tt.is_compound && (
+                              <span className="text-xs text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded">Compound</span>
+                            )}
+                            {tt.sort_order != null && (
+                              <span className="text-xs text-muted-foreground">#{tt.sort_order}</span>
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {tt.tax_type} · {tt.applies_to}
+                            {tt.tax_code ? ` · ${tt.tax_code}` : ''}
+                          </p>
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+
+              {(form.tax_type_ids || []).length > 1 && (() => {
+                // Show cascade preview
+                const sorted = (form.tax_type_ids || [])
+                  .map(id => taxTypes.find(t => t.id === id))
+                  .filter(Boolean)
+                  .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+                const base = 100;
+                let cum = 0;
+                const steps = sorted.map(tt => {
+                  const taxBase = tt.is_compound ? base + cum : base;
+                  const tax = Math.round(taxBase * Number(tt.tax_rate) / 100 * 100) / 100;
+                  cum += tax;
+                  return { name: tt.tax_name, rate: tt.tax_rate, tax };
+                });
+                return (
+                  <div className="bg-blue-50 border border-blue-100 rounded px-3 py-2 text-xs">
+                    <p className="font-semibold text-blue-900 mb-1">Cascade Preview on Net=100:</p>
+                    {steps.map((s, i) => (
+                      <p key={i} className="font-mono text-blue-800">{s.name} ({s.rate}%) = {s.tax}</p>
+                    ))}
+                    <p className="font-mono font-semibold text-blue-900 border-t border-blue-200 mt-1 pt-1">
+                      Total Tax = {steps.reduce((s, x) => s + x.tax, 0).toFixed(2)} → Grand Total = {(100 + steps.reduce((s, x) => s + x.tax, 0)).toFixed(2)}
+                    </p>
+                  </div>
+                );
+              })()}
+            </div>
+
+            <div className="flex items-center gap-6 bg-muted/50 rounded-lg p-4">
               <div className="flex items-center gap-3">
                 <Switch checked={form.is_active} onCheckedChange={v => sf('is_active', v)} />
                 <Label>Active</Label>

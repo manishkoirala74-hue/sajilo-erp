@@ -14,6 +14,7 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 import DateInput from '@/components/shared/DateInput';
 import { useSajiloSync } from '@/hooks/useSajiloSync';
+import { loadActiveTaxTypes, computeTotalTax } from '@/lib/taxService';
 
 const FULFILLMENT_STATUSES = ['Draft', 'Confirmed', 'Preparing', 'Ready', 'Dispatched', 'Delivered'];
 
@@ -33,14 +34,17 @@ export default function SalesOrders() {
   const [form, setForm] = useState(emptySO);
   const [saving, setSaving] = useState(false);
   const [filterStatus, setFilterStatus] = useState('all');
+  const [taxTypes, setTaxTypes] = useState([]);
 
   const loadData = () => {
     Promise.all([
       sajilo.entities.SalesOrder.list('-created_date'),
       sajilo.entities.BusinessPartner.filter({ is_active: true }),
-    ]).then(([sos, cs]) => {
+      loadActiveTaxTypes(),
+    ]).then(([sos, cs, txTypes]) => {
       setOrders(sos);
       setCustomers(cs.filter(c => c.is_customer || c.treat_as_customer));
+      setTaxTypes(txTypes || []);
       setLoading(false);
     });
   };
@@ -69,7 +73,7 @@ export default function SalesOrders() {
 
   const handleLineChange = (lines) => {
     const subtotal = lines.reduce((s, l) => s + (l.line_total || 0), 0);
-    const vatAmount = lines.reduce((s, l) => l.vat_applicable ? s + (l.line_total || 0) * 0.13 : s, 0);
+    const { totalTaxAmount: vatAmount } = computeTotalTax(lines, taxTypes);
     setForm(f => ({ ...f, line_items: lines, subtotal, vat_amount: vatAmount, total_amount: subtotal + vatAmount }));
   };
 
@@ -180,7 +184,7 @@ export default function SalesOrders() {
           </div>
           <div className="mt-6">
             <Label className="text-base font-semibold mb-3 block">Line Items</Label>
-            <LineItemsEditor value={form.line_items} onChange={handleLineChange} />
+            <LineItemsEditor value={form.line_items} onChange={handleLineChange} taxTypes={taxTypes} />
           </div>
           <div className="flex justify-end gap-3 mt-4 pt-4 border-t border-border">
             <Button variant="outline" onClick={() => setShowForm(false)}>Cancel</Button>

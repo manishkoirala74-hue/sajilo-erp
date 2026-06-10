@@ -16,6 +16,7 @@ import { format } from 'date-fns';
 import ItemPurchaseHistory from '@/components/purchase/ItemPurchaseHistory';
 import DateInput from '@/components/shared/DateInput';
 import { useSajiloSync } from '@/hooks/useSajiloSync';
+import { loadActiveTaxTypes, computeTotalTax } from '@/lib/taxService';
 
 const emptyPO = {
   po_number: '', vendor_id: '', vendor_name: '', status: 'Draft',
@@ -33,14 +34,17 @@ export default function PurchaseOrders() {
   const [form, setForm] = useState(emptyPO);
   const [saving, setSaving] = useState(false);
   const [filterStatus, setFilterStatus] = useState('all');
+  const [taxTypes, setTaxTypes] = useState([]);
 
   const loadData = () => {
     Promise.all([
       sajilo.entities.PurchaseOrder.list('-created_date'),
       sajilo.entities.BusinessPartner.filter({ is_active: true }),
-    ]).then(([pos, vs]) => {
+      loadActiveTaxTypes(),
+    ]).then(([pos, vs, txTypes]) => {
       setOrders(pos);
       setVendors(vs.filter(v => v.is_vendor || v.treated_as_vendor));
+      setTaxTypes(txTypes || []);
       setLoading(false);
     });
   };
@@ -69,7 +73,7 @@ export default function PurchaseOrders() {
 
   const handleLineChange = (lines) => {
     const subtotal = lines.reduce((s, l) => s + (l.line_total || 0), 0);
-    const vatAmount = lines.reduce((s, l) => l.vat_applicable ? s + (l.line_total || 0) * 0.13 : s, 0);
+    const { totalTaxAmount: vatAmount } = computeTotalTax(lines, taxTypes);
     setForm(f => ({ ...f, line_items: lines, subtotal, vat_amount: vatAmount, total_amount: subtotal + vatAmount }));
   };
 
@@ -211,7 +215,7 @@ export default function PurchaseOrders() {
 
           <div className="mt-6">
             <Label className="text-base font-semibold mb-3 block">Line Items</Label>
-            <LineItemsEditor value={form.line_items} onChange={handleLineChange} />
+            <LineItemsEditor value={form.line_items} onChange={handleLineChange} taxTypes={taxTypes} />
           </div>
 
           {form.vendor_id && (
