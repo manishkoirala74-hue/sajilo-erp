@@ -652,7 +652,10 @@ function ProfitLossReport({ initialData, initialFromDate, initialToDate }) {
     const sections = {
       revenue: { accounts: [], cur: 0, comp: 0 },
       sales_returns: { accounts: [], cur: 0, comp: 0 },
-      cogs: { accounts: [], cur: 0, comp: 0 },
+      opening_stock: { accounts: [], cur: 0, comp: 0 },
+      purchases: { accounts: [], cur: 0, comp: 0 },
+      closing_stock: { accounts: [], cur: 0, comp: 0 },
+      cogs_other: { accounts: [], cur: 0, comp: 0 },
       opex_admin: { accounts: [], cur: 0, comp: 0 },
       opex_selling: { accounts: [], cur: 0, comp: 0 },
       non_op_income: { accounts: [], cur: 0, comp: 0 },
@@ -674,8 +677,11 @@ function ProfitLossReport({ initialData, initialFromDate, initialToDate }) {
           }
         } 
         else if (a.account_type === 'Expense' || a.account_type === 'Expenses' || a.account_type === 'Cost of Sales') {
-          if (a.account_type === 'Cost of Sales' || name.includes('cogs') || name.includes('cost of goods') || name.includes('purchase')) {
-            sections.cogs.accounts.push(a);
+          if (a.account_type === 'Cost of Sales' || name.includes('cogs') || name.includes('cost of goods') || name.includes('purchase') || name.includes('stock') || name.includes('inventory')) {
+            if (name.includes('opening')) sections.opening_stock.accounts.push(a);
+            else if (name.includes('purchase') && !name.includes('return')) sections.purchases.accounts.push(a);
+            else if (name.includes('closing')) sections.closing_stock.accounts.push(a);
+            else sections.cogs_other.accounts.push(a);
           } else if (name.includes('interest') || name.includes('bank charge') || name.includes('finance')) {
             sections.finance_cost.accounts.push(a);
           } else if (name.includes('tax') && !name.includes('property')) {
@@ -697,8 +703,12 @@ function ProfitLossReport({ initialData, initialFromDate, initialToDate }) {
 
     const net_sales_cur = sections.revenue.cur - Math.abs(sections.sales_returns.cur);
     const net_sales_comp = sections.revenue.comp - Math.abs(sections.sales_returns.comp);
-    const gross_profit_cur = net_sales_cur - Math.abs(sections.cogs.cur);
-    const gross_profit_comp = net_sales_comp - Math.abs(sections.cogs.comp);
+    
+    const cogs_total_cur = Math.abs(sections.opening_stock.cur) + Math.abs(sections.purchases.cur) - Math.abs(sections.closing_stock.cur) + Math.abs(sections.cogs_other.cur);
+    const cogs_total_comp = Math.abs(sections.opening_stock.comp) + Math.abs(sections.purchases.comp) - Math.abs(sections.closing_stock.comp) + Math.abs(sections.cogs_other.comp);
+
+    const gross_profit_cur = net_sales_cur - cogs_total_cur;
+    const gross_profit_comp = net_sales_comp - cogs_total_comp;
 
     const total_opex_cur = Math.abs(sections.opex_admin.cur) + Math.abs(sections.opex_selling.cur);
     const total_opex_comp = Math.abs(sections.opex_admin.comp) + Math.abs(sections.opex_selling.comp);
@@ -831,6 +841,8 @@ function ProfitLossReport({ initialData, initialFromDate, initialToDate }) {
             
             <tbody className='divide-y divide-slate-100'>
               <tr className='bg-slate-100'><td colSpan={4} className='px-3 py-2 font-bold text-slate-800'>1. Gross Operating Revenue</td></tr>
+              
+              <tr><td colSpan={4} className='px-3 py-1.5 font-medium text-slate-700 pl-4'>Sales Revenue</td></tr>
               <PLSection sectionObj={sections.revenue} />
               
               {sections.sales_returns.accounts.length > 0 && (
@@ -847,7 +859,40 @@ function ProfitLossReport({ initialData, initialFromDate, initialToDate }) {
               </tr>
 
               <tr><td colSpan={4} className='px-3 py-2 font-bold text-slate-800 pt-4'>2. Cost of Goods Sold (COGS)</td></tr>
-              <PLSection sectionObj={sections.cogs} isDeduction={true} />
+              
+              {sections.opening_stock.accounts.length > 0 && (
+                <>
+                  <tr><td colSpan={4} className='px-3 py-1.5 font-medium text-slate-700 pl-4 pt-2'>Opening Stock</td></tr>
+                  <PLSection sectionObj={sections.opening_stock} />
+                </>
+              )}
+              
+              {sections.purchases.accounts.length > 0 && (
+                <>
+                  <tr><td colSpan={4} className='px-3 py-1.5 font-medium text-slate-700 pl-4 pt-2'>Add: Purchases</td></tr>
+                  <PLSection sectionObj={sections.purchases} />
+                </>
+              )}
+              
+              {sections.cogs_other.accounts.length > 0 && (
+                <>
+                  <tr><td colSpan={4} className='px-3 py-1.5 font-medium text-slate-700 pl-4 pt-2'>Add: Direct Expenses</td></tr>
+                  <PLSection sectionObj={sections.cogs_other} />
+                </>
+              )}
+              
+              {sections.closing_stock.accounts.length > 0 && (
+                <>
+                  <tr><td colSpan={4} className='px-3 py-1.5 font-medium text-slate-700 pl-4 pt-2'>Less: Closing Stock</td></tr>
+                  <PLSection sectionObj={sections.closing_stock} isDeduction={true} />
+                </>
+              )}
+
+              <tr className='border-t border-slate-200 bg-slate-50'>
+                <td className='px-3 py-2 font-bold text-slate-800 text-right' colSpan={2}>Total Cost of Goods Sold</td>
+                <td className='px-3 py-2 font-bold text-right tabular-nums'>{fmtAcct(cogs_total_cur, true)}</td>
+                <td className='px-3 py-2 font-bold text-right tabular-nums text-slate-600'>{fmtAcct(cogs_total_comp, true)}</td>
+              </tr>
               
               <tr className='border-t border-slate-300 bg-indigo-50/50'>
                 <td className='px-3 py-3 font-bold text-indigo-900 text-right uppercase tracking-wider' colSpan={2}>Gross Profit</td>
