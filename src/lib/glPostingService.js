@@ -26,6 +26,16 @@ function handleDBError(error) {
   throw error;
 }
 
+
+// Helper to push a line, automatically swapping DR and CR if isReversal is true
+function pushLine(lines, isReversal, account_id, account_name, debit_amount, credit_amount, extras = {}) {
+  if (isReversal) {
+    lines.push({ account_id, account_name, debit_amount: r2(credit_amount), credit_amount: r2(debit_amount), ...extras });
+  } else {
+    lines.push({ account_id, account_name, debit_amount: r2(debit_amount), credit_amount: r2(credit_amount), ...extras });
+  }
+}
+
 function warnMissingAccount(name) {
   toast.error(`GL Posting aborted: "${name}" account not configured in Settings → GL Accounts.`, { duration: 6000 });
   throw new Error('Missing Account Mapping');
@@ -92,7 +102,7 @@ export async function resolveDifferenceInTrialBalance() {
 //          Falls back to global gl_cash_account_id / gl_bank_account_id.
 export async function postPOSSale(sale, itemsMap, settings, isReversal = false) {
   const s = settings || {};
-  const sign = isReversal ? -1 : 1;
+  
   const lines = [];
   const taxTypes = await loadActiveTaxTypes().catch(() => []);
 
@@ -114,9 +124,9 @@ export async function postPOSSale(sale, itemsMap, settings, isReversal = false) 
     const arId   = partnerLedger?.id   || s.gl_accounts_receivable_id;
     const arName = partnerLedger?.name || s.gl_accounts_receivable_name || 'Accounts Receivable';
     if (!arId) return warnMissingAccount('Accounts Receivable');
-    lines.push({ account_id: arId, account_name: arName, debit_amount: r2(sign * sale.grand_total), credit_amount: 0, description: 'Credit sale' });
+    pushLine(lines, isReversal, arId, arName, r2(sale.grand_total), 0, { description: 'Credit sale' });
   } else {
-    lines.push({ account_id: payAccId, account_name: payAccName, debit_amount: r2(sign * sale.grand_total), credit_amount: 0, description: 'Payment received' });
+    pushLine(lines, isReversal, payAccId, payAccName, r2(sale.grand_total), 0, { description: 'Payment received' });
   }
 
   for (const line of (sale.line_items || [])) {
@@ -133,7 +143,7 @@ export async function postPOSSale(sale, itemsMap, settings, isReversal = false) 
 
     lines.push({ 
       account_id: salesAccId, account_name: salesAccName, 
-      debit_amount: 0, credit_amount: r2(sign * line.line_total), 
+      debit_amount: 0, credit_amount: r2(line.line_total), 
       description: `Sale: ${line.item_name}`,
       item_id: line.item_id,
       item_name: line.item_name,
@@ -141,14 +151,14 @@ export async function postPOSSale(sale, itemsMap, settings, isReversal = false) 
       is_physical: isPhysical,
       cogs_account_id: cogsAccId,
       inventory_account_id: invAccId,
-      cost_at_sale: line.cost_at_sale 
+      cost_at_sale: line.cost_at_sale || item?.current_unit_cost || item?.weighted_average_cost || 0
     });
   }
 
   // CR Tax Payable (dynamic)
   if (sale.vat_amount > 0) {
     const taxAcc = await resolveTaxAccount(sale.vat_amount, s, taxTypes);
-    if (taxAcc) lines.push({ account_id: taxAcc.id, account_name: taxAcc.name, debit_amount: 0, credit_amount: r2(sign * sale.vat_amount), description: 'Tax collected' });
+    if (taxAcc) pushLine(lines, isReversal, taxAcc.id, taxAcc.name, 0, r2(sale.vat_amount), { description: 'Tax collected' });
   }
 
   const payload = {
@@ -174,7 +184,7 @@ export async function postPOSSale(sale, itemsMap, settings, isReversal = false) 
 // Phase 2: AR resolved from customer.receivable_account_id → global fallback.
 export async function postSalesInvoice(invoice, itemsMap, settings, isReversal = false) {
   const s = settings || {};
-  const sign = isReversal ? -1 : 1;
+  
   const lines = [];
   const taxTypes = await loadActiveTaxTypes().catch(() => []);
 
@@ -182,14 +192,14 @@ export async function postSalesInvoice(invoice, itemsMap, settings, isReversal =
     const cbId = invoice.cash_bank_account_id;
     const cbName = invoice.cash_bank_account_name || invoice.payment_mode;
     if (!cbId) return warnMissingAccount(`${invoice.payment_mode} Account`);
-    lines.push({ account_id: cbId, account_name: cbName, debit_amount: r2(sign * invoice.grand_total), credit_amount: 0 });
+    pushLine(lines, isReversal, cbId, cbName, r2(invoice.grand_total), 0);
   } else {
     // Phase 2: try customer's dedicated AR ledger first
     const partnerLedger = await resolvePartnerLedger(invoice.customer_id, 'receivable_account_id');
     const arId   = partnerLedger?.id   || s.gl_accounts_receivable_id;
     const arName = partnerLedger?.name || s.gl_accounts_receivable_name || 'Accounts Receivable';
     if (!arId) return warnMissingAccount('Accounts Receivable');
-    lines.push({ account_id: arId, account_name: arName, debit_amount: r2(sign * invoice.grand_total), credit_amount: 0 });
+    pushLine(lines, isReversal, arId, arName, r2(invoice.grand_total), 0);
   }
 
   for (const line of (invoice.line_items || [])) {
@@ -205,7 +215,7 @@ export async function postSalesInvoice(invoice, itemsMap, settings, isReversal =
 
     lines.push({ 
       account_id: salesAccId, account_name: salesAccName, 
-      debit_amount: 0, credit_amount: r2(sign * line.line_total), 
+      debit_amount: 0, credit_amount: r2(line.line_total), 
       description: `Sale: ${line.item_name}`,
       item_id: line.item_id,
       item_name: line.item_name,
@@ -213,14 +223,14 @@ export async function postSalesInvoice(invoice, itemsMap, settings, isReversal =
       is_physical: isPhysical,
       cogs_account_id: cogsAccId,
       inventory_account_id: invAccId,
-      cost_at_sale: line.cost_at_sale
+      cost_at_sale: line.cost_at_sale || item?.current_unit_cost || item?.weighted_average_cost || 0
     });
   }
 
   // CR Tax Payable (dynamic)
   if (invoice.total_tax_amount > 0) {
     const taxAcc = await resolveTaxAccount(invoice.total_tax_amount, s, taxTypes);
-    if (taxAcc) lines.push({ account_id: taxAcc.id, account_name: taxAcc.name, debit_amount: 0, credit_amount: r2(sign * invoice.total_tax_amount) });
+    if (taxAcc) pushLine(lines, isReversal, taxAcc.id, taxAcc.name, 0, r2(invoice.total_tax_amount));
   }
 
   const payload = {
@@ -245,7 +255,7 @@ export async function postSalesInvoice(invoice, itemsMap, settings, isReversal =
 // Phase 2: AP resolved from vendor.payable_account_id → global fallback.
 export async function postPurchaseInvoice(invoice, itemsMap, settings, isReversal = false) {
   const s = settings || {};
-  const sign = isReversal ? -1 : 1;
+  
   const lines = [];
   const taxTypes = await loadActiveTaxTypes().catch(() => []);
 
@@ -263,22 +273,22 @@ export async function postPurchaseInvoice(invoice, itemsMap, settings, isReversa
     const invAccId   = item?.inventory_account_id   || s.gl_default_inventory_account_id;
     const invAccName = item?.inventory_account_name || s.gl_default_inventory_account_name || 'Inventory';
     if (!invAccId) return warnMissingAccount('Inventory Asset');
-    lines.push({ account_id: invAccId, account_name: invAccName, debit_amount: r2(sign * line.line_total), credit_amount: 0, description: `Purchase: ${line.item_name}` });
+    lines.push({ account_id: invAccId, account_name: invAccName, debit_amount: r2(line.line_total), credit_amount: 0, description: `Purchase: ${line.item_name}` });
   }
 
   // DR Input Tax (dynamic)
   if (invoice.vat_amount > 0) {
     const taxAcc = await resolveTaxAccount(invoice.vat_amount, s, taxTypes);
-    if (taxAcc) lines.push({ account_id: taxAcc.id, account_name: taxAcc.name, debit_amount: r2(sign * invoice.vat_amount), credit_amount: 0, description: 'Input Tax' });
+    if (taxAcc) pushLine(lines, isReversal, taxAcc.id, taxAcc.name, r2(invoice.vat_amount), 0, { description: 'Input Tax' });
   }
 
   if (['Cash', 'Bank'].includes(invoice.payment_mode)) {
     const cbId = invoice.cash_bank_account_id;
     const cbName = invoice.cash_bank_account_name || invoice.payment_mode;
     if (!cbId) return warnMissingAccount(`${invoice.payment_mode} Account`);
-    lines.push({ account_id: cbId, account_name: cbName, debit_amount: 0, credit_amount: r2(sign * invoice.grand_total) });
+    pushLine(lines, isReversal, cbId, cbName, 0, r2(invoice.grand_total));
   } else {
-    lines.push({ account_id: apId, account_name: apName, debit_amount: 0, credit_amount: r2(sign * invoice.grand_total) });
+    pushLine(lines, isReversal, apId, apName, 0, r2(invoice.grand_total));
   }
 
   const payload = {
@@ -322,11 +332,11 @@ export async function postSalesReturn(ret, itemsMap, settings) {
   const refundAcc = resolvePaymentAccount(refundMethod === 'Bank Transfer' ? 'Card' : refundMethod, s);
   if (!refundAcc.id) return warnMissingAccount('Cash/Bank (refund)');
 
-  lines.push({ account_id: srAccId, account_name: srAccName, debit_amount: r2(ret.subtotal), credit_amount: 0 });
+  pushLine(lines, isReversal, srAccId, srAccName, r2(ret.subtotal), 0);
 
   if (ret.vat_amount > 0) {
     const taxAcc = await resolveTaxAccount(ret.vat_amount, s, taxTypes);
-    if (taxAcc) lines.push({ account_id: taxAcc.id, account_name: taxAcc.name, debit_amount: r2(ret.vat_amount), credit_amount: 0, description: 'Tax reversal' });
+    if (taxAcc) pushLine(lines, isReversal, taxAcc.id, taxAcc.name, r2(ret.vat_amount), 0, { description: 'Tax reversal' });
   }
 
   lines.push({ account_id: refundAcc.id, account_name: refundAcc.name, debit_amount: 0, credit_amount: r2(ret.grand_total), description: `Refund via ${refundMethod}` });
@@ -374,7 +384,7 @@ export async function postPurchaseReturn(ret, itemsMap, settings) {
   apName = partnerLedger?.name || s.gl_accounts_payable_name || 'Accounts Payable';
   if (!apId) return warnMissingAccount('Accounts Payable');
 
-  lines.push({ account_id: apId, account_name: apName, debit_amount: r2(ret.grand_total), credit_amount: 0, description: 'Vendor credit for return' });
+  pushLine(lines, isReversal, apId, apName, r2(ret.grand_total), 0, { description: 'Vendor credit for return' });
 
   for (const line of (ret.line_items || [])) {
     const item = itemsMap[line.item_id];
@@ -386,7 +396,7 @@ export async function postPurchaseReturn(ret, itemsMap, settings) {
 
   if (ret.vat_amount > 0) {
     const taxAcc = await resolveTaxAccount(ret.vat_amount, s, taxTypes);
-    if (taxAcc) lines.push({ account_id: taxAcc.id, account_name: taxAcc.name, debit_amount: 0, credit_amount: r2(ret.vat_amount), description: 'Tax reversal' });
+    if (taxAcc) pushLine(lines, isReversal, taxAcc.id, taxAcc.name, 0, r2(ret.vat_amount), { description: 'Tax reversal' });
   }
 
   const payload = {
@@ -541,11 +551,11 @@ export async function postOpeningStock(items, settings, date, offsetAccount = nu
   if (totalAmount === 0) return null;
 
   if (inventoryAccount) {
-    lines.push({ account_id: inventoryAccount.id, account_name: inventoryAccount.account_name, debit_amount: r2(totalAmount), credit_amount: 0, description: `Opening stock batch import` });
+    pushLine(lines, isReversal, inventoryAccount.id, inventoryAccount.account_name, r2(totalAmount), 0, { description: `Opening stock batch import` });
   }
 
   // Single consolidated credit line
-  lines.push({ account_id: varAccId, account_name: varAccName, debit_amount: 0, credit_amount: r2(totalAmount), description: `Opening stock batch import` });
+  pushLine(lines, isReversal, varAccId, varAccName, 0, r2(totalAmount), { description: `Opening stock batch import` });
 
   return createJournal({
     date: entryDate,
@@ -619,7 +629,7 @@ export async function postItemDeletionWriteOff(items, settings) {
  */
 export async function postAssetPurchase(asset, settings, isReversal = false, preloadedAccounts = null, creditAccount = null) {
   const s = settings || {};
-  const sign = isReversal ? -1 : 1;
+  
 
   // Asset cost debit account ΓÇö MUST be per-asset or fail
   const assetAccId   = asset.asset_ledger_id;
@@ -650,8 +660,8 @@ export async function postAssetPurchase(asset, settings, isReversal = false, pre
   if (gross <= 0) return null;
 
   const lines = [
-    { account_id: assetAccId, account_name: assetAccName, debit_amount: r2(sign * gross), credit_amount: 0, description: `Asset cost: ${asset.asset_name}` },
-    { account_id: apId,       account_name: apName,        debit_amount: 0, credit_amount: r2(sign * gross), description: `Asset cost: ${asset.asset_name}` },
+    { account_id: assetAccId, account_name: assetAccName, debit_amount: r2(gross), credit_amount: 0, description: `Asset cost: ${asset.asset_name}` },
+    { account_id: apId,       account_name: apName,        debit_amount: 0, credit_amount: r2(gross), description: `Asset cost: ${asset.asset_name}` },
   ];
 
   return createJournal({
