@@ -83,6 +83,20 @@ const validateFiscalYear = async (tableName, payload) => {
 const buildEntityMethods = (tableName) => {
   const isGlobal = globalTables.includes(tableName);
   
+  const sanitizePayload = (obj) => {
+    if (!obj || typeof obj !== 'object') return obj;
+    if (Array.isArray(obj)) return obj.map(sanitizePayload);
+    const cleaned = { ...obj };
+    for (const key in cleaned) {
+      if (cleaned[key] === '' && (key === 'id' || key.endsWith('_id'))) {
+        cleaned[key] = null;
+      } else if (typeof cleaned[key] === 'object' && cleaned[key] !== null) {
+        cleaned[key] = sanitizePayload(cleaned[key]);
+      }
+    }
+    return cleaned;
+  };
+
   const applyCompanyFilter = (query) => {
     if (isGlobal) return query;
     const cid = sajilo.getCompanyId();
@@ -125,10 +139,11 @@ const buildEntityMethods = (tableName) => {
     },
     
     filter: async (matchObj, orderBy = '', limit = 1000) => {
-      const cacheKey = `${tableName}:filter:${JSON.stringify(matchObj)}:${orderBy}:${limit}:${sajilo.getCompanyId()}`;
+      const sanitizedMatch = sanitizePayload(matchObj);
+      const cacheKey = `${tableName}:filter:${JSON.stringify(sanitizedMatch)}:${orderBy}:${limit}:${sajilo.getCompanyId()}`;
       if (queryCache.has(cacheKey)) return queryCache.get(cacheKey);
 
-      let query = supabase.from(tableName).select('*').match(matchObj).limit(limit);
+      let query = supabase.from(tableName).select('*').match(sanitizedMatch).limit(limit);
       query = applyCompanyFilter(query);
       
       if (orderBy) {
@@ -145,8 +160,9 @@ const buildEntityMethods = (tableName) => {
     },
     
     create: async (obj) => {
-      await validateFiscalYear(tableName, obj);
-      const objWithCompany = injectCompanyId(obj);
+      const sanitized = sanitizePayload(obj);
+      await validateFiscalYear(tableName, sanitized);
+      const objWithCompany = injectCompanyId(sanitized);
       const { data, error } = await supabase.from(tableName).insert(objWithCompany).select().single();
       if (error) throw error;
       invalidateCache(tableName);
@@ -154,8 +170,9 @@ const buildEntityMethods = (tableName) => {
     },
     
     update: async (id, obj) => {
-      await validateFiscalYear(tableName, obj);
-      let query = supabase.from(tableName).update(obj).eq('id', id);
+      const sanitized = sanitizePayload(obj);
+      await validateFiscalYear(tableName, sanitized);
+      let query = supabase.from(tableName).update(sanitized).eq('id', id);
       query = applyCompanyFilter(query); // Ensure update is within company scope
       const { data, error } = await query.select().single();
       if (error) throw error;
@@ -164,8 +181,9 @@ const buildEntityMethods = (tableName) => {
     },
     
     bulkCreate: async (arr) => {
-      if (arr.length > 0) await validateFiscalYear(tableName, arr[0]); // Best effort for bulk
-      const arrWithCompany = arr.map(obj => injectCompanyId(obj));
+      const sanitizedArr = sanitizePayload(arr);
+      if (sanitizedArr.length > 0) await validateFiscalYear(tableName, sanitizedArr[0]); // Best effort for bulk
+      const arrWithCompany = sanitizedArr.map(obj => injectCompanyId(obj));
       const { data, error } = await supabase.from(tableName).insert(arrWithCompany).select();
       if (error) throw error;
       invalidateCache(tableName);
