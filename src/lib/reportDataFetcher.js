@@ -2,67 +2,25 @@ import { sajilo, supabase } from '@/api/sajiloClient';
 
 async function injectPeriodicInventory(baseAccounts, companyId, fromDate, toDate) {
   try {
-    let opening = 0;
-    let closing = 0;
-
-    // 1. Resolve Inventory Account IDs reliably
-    const [{ data: settingsData }, { data: items }, { data: namedAccs }] = await Promise.all([
-      supabase.from('CompanySettings').select('gl_default_inventory_account_id').eq('company_id', companyId).limit(1),
-      supabase.from('Item').select('inventory_account_id').eq('company_id', companyId),
-      supabase.from('ChartOfAccount').select('id').eq('company_id', companyId).or('account_name.ilike.%inventory%,account_name.ilike.%stock%')
-    ]);
+    const { data, error } = await supabase.rpc('get_periodic_inventory_balances_rpc', {
+      p_company_id: companyId,
+      p_from_date: fromDate,
+      p_to_date: toDate
+    });
     
-    const defaultInvId = settingsData?.[0]?.gl_default_inventory_account_id;
-    const itemInvIds = items ? items.map(i => i.inventory_account_id) : [];
-    const namedIds = namedAccs ? namedAccs.map(a => a.id) : [];
-    const invIds = [...new Set([defaultInvId, ...itemInvIds, ...namedIds])].filter(Boolean);
-
-    if (invIds.length > 0) {
-      // 2. Fetch all Posted journals up to toDate safely
-      const { data: journals } = await supabase.from('GeneralLedgerJournal')
-        .select('id, entry_date')
-        .eq('company_id', companyId)
-        .eq('status', 'Posted'); // Do filtering locally to avoid timezone issues
-
-      if (journals && journals.length > 0) {
-        const jMap = {};
-        journals.forEach(j => jMap[j.id] = j.entry_date.split('T')[0]);
-
-        // 3. Fetch GL lines for inventory accounts
-        const { data: glLines, error: linesErr } = await supabase.from('GeneralLedgerLine')
-          .select('debit_amount, credit_amount, journal_id')
-          .in('account_id', invIds);
-
-        if (linesErr) console.error('Failed fetching lines:', linesErr);
-
-        if (glLines) {
-          for (const line of glLines) {
-            const date = jMap[line.journal_id];
-            if (!date) continue; // Skip if journal is not posted
-
-            const net = (line.debit_amount || 0) - (line.credit_amount || 0);
-            if (date < fromDate) opening += net;
-            if (date <= toDate) closing += net;
-          }
-        }
-      }
+    if (error) {
+      console.error('Virtual inventory calc failed:', error);
+      return baseAccounts;
     }
 
-    // Sum all COGS to mathematically deduce Net Purchases
-    // Ending = Beginning + Purchases - COGS  =>  Purchases = Ending - Beginning + COGS
-    const cogsTotal = baseAccounts
-      .filter(a => ['COGS', 'Cost of Goods Sold'].includes(a.account_type))
-      .reduce((sum, a) => sum + (a.current_balance || a.balance || 0), 0);
-      
-    const purchases = closing - opening + cogsTotal;
-    
-    // Always inject to ensure UI renders rows (even if 0) so we avoid "(No purchases recorded)"
-    const accs = [...baseAccounts];
-    accs.push({ id: 'virt-ob', account_name: 'Opening Stock', account_code: '', account_type: 'Cost of Sales', current_balance: opening, comparative_balance: 0, balance: opening, is_group: false });
-    accs.push({ id: 'virt-pur', account_name: 'Purchases', account_code: '', account_type: 'Cost of Sales', current_balance: purchases, comparative_balance: 0, balance: purchases, is_group: false });
-    accs.push({ id: 'virt-cb', account_name: 'Closing Stock', account_code: '', account_type: 'Cost of Sales', current_balance: closing, comparative_balance: 0, balance: closing, is_group: false });
-    return accs;
-
+    if (data && data.length > 0) {
+      const { opening_stock, closing_stock, net_purchases } = data[0];
+      const accs = [...baseAccounts];
+      accs.push({ id: 'virt-ob', account_name: 'Opening Stock', account_code: '', account_type: 'Cost of Sales', current_balance: opening_stock, comparative_balance: 0, balance: opening_stock, is_group: false });
+      accs.push({ id: 'virt-pur', account_name: 'Purchases', account_code: '', account_type: 'Cost of Sales', current_balance: net_purchases, comparative_balance: 0, balance: net_purchases, is_group: false });
+      accs.push({ id: 'virt-cb', account_name: 'Closing Stock', account_code: '', account_type: 'Cost of Sales', current_balance: closing_stock, comparative_balance: 0, balance: closing_stock, is_group: false });
+      return accs;
+    }
   } catch (e) {
     console.error('Virtual inventory calc failed:', e);
   }
@@ -269,16 +227,26 @@ export async function fetchReportData(reportId, fromDate, toDate) {
     }
 
     case 'customer_balance': {
-      const invoices = await sajilo.entities.SalesInvoice.list('-invoice_date', 2000);
+      const p_company_id = sajilo.getCompanyId();
+      const [{ data: lines }, { data: customers }] = await Promise.all([
+        supabase.from('GeneralLedgerLine').select('entity_id, debit_amount, credit_amount').eq('company_id', p_company_id).eq('entity_type', 'Customer'),
+        supabase.from('Customer').select('id, name').eq('company_id', p_company_id)
+      ]);
+      const cMap = {};
+      if (customers) customers.forEach(c => cMap[c.id] = c.name);
+
       const map = {};
-      invoices.filter(i => i.status === 'Posted').forEach(i => {
-        if (!map[i.customer_name]) map[i.customer_name] = { customer: i.customer_name, total_invoiced: 0, total_paid: 0, balance: 0 };
-        map[i.customer_name].total_invoiced += i.grand_total || 0;
-        if (i.payment_status === 'Paid') map[i.customer_name].total_paid += i.grand_total || 0;
+      (lines || []).forEach(l => {
+        const id = l.entity_id;
+        if (!id) return;
+        const name = cMap[id] || 'Unknown';
+        if (!map[id]) map[id] = { customer: name, total_invoiced: 0, total_paid: 0, balance: 0 };
+        map[id].balance += (l.debit_amount || 0) - (l.credit_amount || 0);
+        if (l.debit_amount > 0) map[id].total_invoiced += l.debit_amount;
+        if (l.credit_amount > 0) map[id].total_paid += l.credit_amount;
       });
       return Object.values(map).map(r => ({
         ...r,
-        balance: r.total_invoiced - r.total_paid,
         total_invoiced: `NPR ${r.total_invoiced.toLocaleString('en-NP', { minimumFractionDigits: 2 })}`,
         total_paid: `NPR ${r.total_paid.toLocaleString('en-NP', { minimumFractionDigits: 2 })}`,
       }));
@@ -303,15 +271,27 @@ export async function fetchReportData(reportId, fromDate, toDate) {
     }
 
     case 'vendor_balance': {
-      const bills = await sajilo.entities.PurchaseInvoice.list('-invoice_date', 2000);
+      const p_company_id = sajilo.getCompanyId();
+      const [{ data: lines }, { data: vendors }] = await Promise.all([
+        supabase.from('GeneralLedgerLine').select('entity_id, debit_amount, credit_amount').eq('company_id', p_company_id).eq('entity_type', 'Vendor'),
+        supabase.from('Vendor').select('id, name').eq('company_id', p_company_id)
+      ]);
+      const vMap = {};
+      if (vendors) vendors.forEach(v => vMap[v.id] = v.name);
+
       const map = {};
-      (bills || []).filter(i => i.status === 'Posted').forEach(i => {
-        if (!map[i.vendor_name]) map[i.vendor_name] = { vendor: i.vendor_name, total_billed: 0 };
-        map[i.vendor_name].total_billed += i.grand_total || 0;
+      (lines || []).forEach(l => {
+        const id = l.entity_id;
+        if (!id) return;
+        const name = vMap[id] || 'Unknown';
+        if (!map[id]) map[id] = { vendor: name, total_billed: 0, total_paid: 0, balance: 0 };
+        map[id].balance += (l.credit_amount || 0) - (l.debit_amount || 0);
+        if (l.credit_amount > 0) map[id].total_billed += l.credit_amount;
+        if (l.debit_amount > 0) map[id].total_paid += l.debit_amount;
       });
       return Object.values(map).map(r => ({
         ...r,
-        balance: `NPR ${r.total_billed.toLocaleString('en-NP', { minimumFractionDigits: 2 })}`,
+        balance: `NPR ${r.balance.toLocaleString('en-NP', { minimumFractionDigits: 2 })}`,
         total_billed: `NPR ${r.total_billed.toLocaleString('en-NP', { minimumFractionDigits: 2 })}`,
       }));
     }
