@@ -860,32 +860,32 @@ function ProfitLossReport({ initialData, initialFromDate, initialToDate }) {
 
               <tr><td colSpan={4} className='px-3 py-2 font-bold text-slate-800 pt-4'>2. Cost of Goods Sold (COGS)</td></tr>
               
-              {sections.opening_stock.accounts.length > 0 && (
-                <>
-                  <tr><td colSpan={4} className='px-3 py-1.5 font-medium text-slate-700 pl-4 pt-2'>Opening Stock</td></tr>
-                  <PLSection sectionObj={sections.opening_stock} />
-                </>
+              <tr><td colSpan={4} className='px-3 py-1.5 font-medium text-slate-700 pl-4 pt-2'>Opening Stock</td></tr>
+              {sections.opening_stock.accounts.length > 0 ? (
+                <PLSection sectionObj={sections.opening_stock} />
+              ) : (
+                <tr className='text-slate-500'><td className='px-3 py-1.5 pl-8 border-none italic'>(No opening stock recorded)</td><td colSpan={3} className='border-none'></td></tr>
               )}
               
-              {sections.purchases.accounts.length > 0 && (
-                <>
-                  <tr><td colSpan={4} className='px-3 py-1.5 font-medium text-slate-700 pl-4 pt-2'>Add: Purchases</td></tr>
-                  <PLSection sectionObj={sections.purchases} />
-                </>
+              <tr><td colSpan={4} className='px-3 py-1.5 font-medium text-slate-700 pl-4 pt-2'>Add: Purchases</td></tr>
+              {sections.purchases.accounts.length > 0 ? (
+                <PLSection sectionObj={sections.purchases} />
+              ) : (
+                <tr className='text-slate-500'><td className='px-3 py-1.5 pl-8 border-none italic'>(No purchases recorded)</td><td colSpan={3} className='border-none'></td></tr>
               )}
               
-              {sections.cogs_other.accounts.length > 0 && (
-                <>
-                  <tr><td colSpan={4} className='px-3 py-1.5 font-medium text-slate-700 pl-4 pt-2'>Add: Direct Expenses</td></tr>
-                  <PLSection sectionObj={sections.cogs_other} />
-                </>
+              <tr><td colSpan={4} className='px-3 py-1.5 font-medium text-slate-700 pl-4 pt-2'>Add: Direct Expenses</td></tr>
+              {sections.cogs_other.accounts.length > 0 ? (
+                <PLSection sectionObj={sections.cogs_other} />
+              ) : (
+                <tr className='text-slate-500'><td className='px-3 py-1.5 pl-8 border-none italic'>(No direct expenses recorded)</td><td colSpan={3} className='border-none'></td></tr>
               )}
               
-              {sections.closing_stock.accounts.length > 0 && (
-                <>
-                  <tr><td colSpan={4} className='px-3 py-1.5 font-medium text-slate-700 pl-4 pt-2'>Less: Closing Stock</td></tr>
-                  <PLSection sectionObj={sections.closing_stock} isDeduction={true} />
-                </>
+              <tr><td colSpan={4} className='px-3 py-1.5 font-medium text-slate-700 pl-4 pt-2'>Less: Closing Stock</td></tr>
+              {sections.closing_stock.accounts.length > 0 ? (
+                <PLSection sectionObj={sections.closing_stock} isDeduction={true} />
+              ) : (
+                <tr className='text-slate-500'><td className='px-3 py-1.5 pl-8 border-none italic'>(No closing stock recorded)</td><td colSpan={3} className='border-none'></td></tr>
               )}
 
               <tr className='border-t border-slate-200 bg-slate-50'>
