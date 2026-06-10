@@ -283,8 +283,8 @@ BEGIN
         j.voucher_no,
         SUM(l.credit_amount) - SUM(l.debit_amount) as net_revenue
     FROM "GeneralLedgerLine" l
-    JOIN "GeneralLedgerJournal" j ON l.journal_id = j.id
-    JOIN "ChartOfAccount" c ON l.account_id = c.id
+    JOIN "GeneralLedgerJournal" j ON l.journal_id = j.id::TEXT
+    JOIN "ChartOfAccount" c ON l.account_id = c.id::TEXT
     WHERE c.account_type IN ('Revenue', 'Other Income')
       AND j.status = 'Posted'
       AND (p_company_id IS NULL OR j.company_id = p_company_id)
@@ -309,8 +309,8 @@ BEGIN
         j.voucher_no,
         SUM(l.debit_amount) - SUM(l.credit_amount) as net_expense
     FROM "GeneralLedgerLine" l
-    JOIN "GeneralLedgerJournal" j ON l.journal_id = j.id
-    JOIN "ChartOfAccount" c ON l.account_id = c.id
+    JOIN "GeneralLedgerJournal" j ON l.journal_id = j.id::TEXT
+    JOIN "ChartOfAccount" c ON l.account_id = c.id::TEXT
     WHERE c.account_type IN ('Expense', 'Cost of Goods Sold', 'OPEX', 'Other Expense')
       AND j.status = 'Posted'
       AND (p_company_id IS NULL OR j.company_id = p_company_id)

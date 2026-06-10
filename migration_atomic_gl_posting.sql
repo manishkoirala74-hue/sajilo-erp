@@ -13,7 +13,7 @@ DECLARE
     v_account_name TEXT;
 BEGIN
     SELECT ledger_type, account_name INTO v_ledger_type, v_account_name 
-    FROM "ChartOfAccount" WHERE id = NEW.account_id;
+    FROM "ChartOfAccount" WHERE id::TEXT = NEW.account_id::TEXT;
     
     IF v_ledger_type = 'Group Ledger' THEN
         RAISE EXCEPTION 'ERR_GROUP_LEDGER_POSTING: Cannot post to Group Ledger "%"', v_account_name
@@ -39,7 +39,7 @@ BEGIN
     SELECT 
         CASE WHEN account_type IN ('Asset', 'COGS', 'Expense', 'OPEX', 'Cost of Goods Sold', 'Other Expense') THEN true ELSE false END
     INTO v_is_debit_normal
-    FROM "ChartOfAccount" WHERE id = NEW.account_id;
+    FROM "ChartOfAccount" WHERE id::TEXT = NEW.account_id::TEXT;
 
     UPDATE "ChartOfAccount"
     SET current_balance = current_balance + 
@@ -47,7 +47,7 @@ BEGIN
             WHEN v_is_debit_normal THEN (NEW.debit_amount - NEW.credit_amount)
             ELSE (NEW.credit_amount - NEW.debit_amount)
         END
-    WHERE id = NEW.account_id;
+    WHERE id::TEXT = NEW.account_id::TEXT;
     
     RETURN NEW;
 END;
