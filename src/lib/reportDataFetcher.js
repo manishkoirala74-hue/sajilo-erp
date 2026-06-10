@@ -2,11 +2,17 @@ import { sajilo, supabase } from '@/api/sajiloClient';
 
 async function injectPeriodicInventory(baseAccounts, companyId, fromDate, toDate) {
   try {
-    const { data: invAccounts } = await supabase.from('ChartOfAccount')
-      .select('id').ilike('account_name', '%inventory%').eq('company_id', companyId);
+    // 1. Resolve Inventory Account IDs reliably
+    const [{ data: settings }, { data: items }] = await Promise.all([
+      supabase.from('CompanySettings').select('gl_default_inventory_account_id').eq('company_id', companyId).single(),
+      supabase.from('Item').select('inventory_account_id').eq('company_id', companyId)
+    ]);
     
-    if (invAccounts && invAccounts.length > 0) {
-      const invIds = invAccounts.map(a => a.id);
+    const defaultInvId = settings?.gl_default_inventory_account_id;
+    const itemInvIds = items ? items.map(i => i.inventory_account_id) : [];
+    const invIds = [...new Set([defaultInvId, ...itemInvIds])].filter(Boolean);
+
+    if (invIds.length > 0) {
       const { data: glLines } = await supabase.from('GeneralLedgerLine')
         .select('debit_amount, credit_amount, GeneralLedgerJournal!inner(entry_date, status, company_id)')
         .in('account_id', invIds)
@@ -15,15 +21,21 @@ async function injectPeriodicInventory(baseAccounts, companyId, fromDate, toDate
         
       if (glLines) {
         let opening = 0;
-        let purchases = 0;
         let closing = 0;
         for (const line of glLines) {
           const date = line.GeneralLedgerJournal.entry_date.split('T')[0];
           const net = (line.debit_amount || 0) - (line.credit_amount || 0);
           if (date < fromDate) opening += net;
-          if (date >= fromDate && date <= toDate) purchases += (line.debit_amount || 0);
           if (date <= toDate) closing += net;
         }
+        
+        // Sum all COGS to mathematically deduce Net Purchases
+        // Ending = Beginning + Purchases - COGS  =>  Purchases = Ending - Beginning + COGS
+        const cogsTotal = baseAccounts
+          .filter(a => ['COGS', 'Cost of Goods Sold'].includes(a.account_type))
+          .reduce((sum, a) => sum + (a.current_balance || a.balance || 0), 0);
+          
+        const purchases = closing - opening + cogsTotal;
         
         if (opening > 0 || closing > 0 || purchases > 0) {
           const accs = [...baseAccounts];
