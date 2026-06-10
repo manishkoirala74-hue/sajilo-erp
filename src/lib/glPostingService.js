@@ -124,9 +124,9 @@ export async function postPOSSale(sale, itemsMap, settings, isReversal = false) 
     const arId   = partnerLedger?.id   || s.gl_accounts_receivable_id;
     const arName = partnerLedger?.name || s.gl_accounts_receivable_name || 'Accounts Receivable';
     if (!arId) return warnMissingAccount('Accounts Receivable');
-    pushLine(lines, isReversal, arId, arName, r2(sale.grand_total), 0, { description: 'Credit sale' });
+    pushLine(lines, isReversal, arId, arName, r2(sale.grand_total), 0, { description: 'Credit sale', entity_type: 'Customer', entity_id: sale.customer_id, due_date: sale.sale_date });
   } else {
-    pushLine(lines, isReversal, payAccId, payAccName, r2(sale.grand_total), 0, { description: 'Payment received' });
+    pushLine(lines, isReversal, payAccId, payAccName, r2(sale.grand_total), 0, { description: 'Payment received', entity_type: 'Customer', entity_id: sale.customer_id, due_date: sale.sale_date });
   }
 
   for (const line of (sale.line_items || [])) {
@@ -192,14 +192,14 @@ export async function postSalesInvoice(invoice, itemsMap, settings, isReversal =
     const cbId = invoice.cash_bank_account_id;
     const cbName = invoice.cash_bank_account_name || invoice.payment_mode;
     if (!cbId) return warnMissingAccount(`${invoice.payment_mode} Account`);
-    pushLine(lines, isReversal, cbId, cbName, r2(invoice.grand_total), 0);
+    pushLine(lines, isReversal, cbId, cbName, r2(invoice.grand_total), 0, { entity_type: 'Customer', entity_id: invoice.customer_id, due_date: invoice.due_date || invoice.invoice_date || invoice.created_at });
   } else {
     // Phase 2: try customer's dedicated AR ledger first
     const partnerLedger = await resolvePartnerLedger(invoice.customer_id, 'receivable_account_id');
     const arId   = partnerLedger?.id   || s.gl_accounts_receivable_id;
     const arName = partnerLedger?.name || s.gl_accounts_receivable_name || 'Accounts Receivable';
     if (!arId) return warnMissingAccount('Accounts Receivable');
-    pushLine(lines, isReversal, arId, arName, r2(invoice.grand_total), 0);
+    pushLine(lines, isReversal, arId, arName, r2(invoice.grand_total), 0, { entity_type: 'Customer', entity_id: invoice.customer_id, due_date: invoice.due_date || invoice.invoice_date || invoice.created_at });
   }
 
   for (const line of (invoice.line_items || [])) {
@@ -286,9 +286,9 @@ export async function postPurchaseInvoice(invoice, itemsMap, settings, isReversa
     const cbId = invoice.cash_bank_account_id;
     const cbName = invoice.cash_bank_account_name || invoice.payment_mode;
     if (!cbId) return warnMissingAccount(`${invoice.payment_mode} Account`);
-    pushLine(lines, isReversal, cbId, cbName, 0, r2(invoice.grand_total));
+    pushLine(lines, isReversal, cbId, cbName, 0, r2(invoice.grand_total), { entity_type: 'Vendor', entity_id: invoice.vendor_id, due_date: invoice.due_date || invoice.invoice_date || invoice.created_at });
   } else {
-    pushLine(lines, isReversal, apId, apName, 0, r2(invoice.grand_total));
+    pushLine(lines, isReversal, apId, apName, 0, r2(invoice.grand_total), { entity_type: 'Vendor', entity_id: invoice.vendor_id, due_date: invoice.due_date || invoice.invoice_date || invoice.created_at });
   }
 
   const payload = {
@@ -384,7 +384,7 @@ export async function postPurchaseReturn(ret, itemsMap, settings) {
   apName = partnerLedger?.name || s.gl_accounts_payable_name || 'Accounts Payable';
   if (!apId) return warnMissingAccount('Accounts Payable');
 
-  pushLine(lines, isReversal, apId, apName, r2(ret.grand_total), 0, { description: 'Vendor credit for return' });
+  pushLine(lines, isReversal, apId, apName, r2(ret.grand_total), 0, { description: 'Vendor credit for return', entity_type: 'Vendor', entity_id: ret.vendor_id, due_date: ret.return_date || ret.created_at });
 
   for (const line of (ret.line_items || [])) {
     const item = itemsMap[line.item_id];

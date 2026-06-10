@@ -104,8 +104,12 @@ export async function fetchReportData(reportId, fromDate, toDate) {
     }
 
     case 'sales_summary': {
-      const invoices = await sajilo.entities.SalesInvoice.list('-invoice_date', 2000);
-      return invoices.filter(i => i.status === 'Posted' && inRange(i.invoice_date, fromDate, toDate));
+      const p_company_id = sajilo.getCompanyId();
+      const { data, error } = await supabase.rpc('get_sales_summary_rpc', {
+        p_company_id, p_from_date: fromDate, p_to_date: toDate
+      });
+      if (error) throw error;
+      return (data || []).map(r => ({ ...r, invoice_date: r.entry_date, grand_total: r.net_revenue }));
     }
 
     case 'sales_by_customer': {
@@ -151,18 +155,13 @@ export async function fetchReportData(reportId, fromDate, toDate) {
 
     case 'ar_aging': {
       const p_company_id = sajilo.getCompanyId();
-      let query = supabase.from('SalesInvoice').select('*').eq('status', 'Posted').neq('payment_status', 'Paid');
-      if (p_company_id) query = query.eq('company_id', p_company_id);
-      const { data: invoices } = await query;
-      const today = new Date().toISOString().slice(0, 10);
-      return (invoices || [])
-        .map(i => {
-          const due = i.due_date || i.invoice_date;
-          const days = due < today ? Math.floor((new Date(today) - new Date(due)) / 86400000) : 0;
-          const bucket = days === 0 ? 'Current' : days <= 30 ? '1–30 days' : days <= 60 ? '31–60 days' : '60+ days';
-          return { ...i, days_overdue: days, bucket };
-        })
-        .sort((a, b) => b.days_overdue - a.days_overdue);
+      const { data, error } = await supabase.rpc('get_ar_aging_rpc', { p_company_id });
+      if (error) throw error;
+      return (data || []).map(r => ({
+        customer_name: r.customer_name || 'Unknown',
+        bucket: r.bucket,
+        grand_total: r.balance
+      })).sort((a, b) => b.grand_total - a.grand_total);
     }
 
     case 'unpaid_invoices': {
@@ -188,18 +187,13 @@ export async function fetchReportData(reportId, fromDate, toDate) {
 
     case 'ap_aging': {
       const p_company_id = sajilo.getCompanyId();
-      let query = supabase.from('PurchaseInvoice').select('*').eq('status', 'Posted').neq('payment_status', 'Paid');
-      if (p_company_id) query = query.eq('company_id', p_company_id);
-      const { data: bills } = await query;
-      const today = new Date().toISOString().slice(0, 10);
-      return (bills || [])
-        .map(i => {
-          const due = i.due_date || i.invoice_date;
-          const days = due < today ? Math.floor((new Date(today) - new Date(due)) / 86400000) : 0;
-          const bucket = days === 0 ? 'Current' : days <= 30 ? '1–30 days' : days <= 60 ? '31–60 days' : '60+ days';
-          return { invoice_number: i.invoice_number, invoice_date: i.invoice_date, customer_name: i.vendor_name, due_date: i.due_date, grand_total: i.grand_total, days_overdue: days, bucket, payment_status: i.payment_status };
-        })
-        .sort((a, b) => b.days_overdue - a.days_overdue);
+      const { data, error } = await supabase.rpc('get_ap_aging_rpc', { p_company_id });
+      if (error) throw error;
+      return (data || []).map(r => ({
+        customer_name: r.vendor_name || 'Unknown',
+        bucket: r.bucket,
+        grand_total: r.balance
+      })).sort((a, b) => b.grand_total - a.grand_total);
     }
 
     case 'unpaid_bills': {
@@ -292,8 +286,12 @@ export async function fetchReportData(reportId, fromDate, toDate) {
     }
 
     case 'purchase_summary': {
-      const bills = await sajilo.entities.PurchaseInvoice.list('-invoice_date', 2000);
-      return (bills || []).filter(i => i.status === 'Posted' && inRange(i.invoice_date, fromDate, toDate));
+      const p_company_id = sajilo.getCompanyId();
+      const { data, error } = await supabase.rpc('get_purchase_summary_rpc', {
+        p_company_id, p_from_date: fromDate, p_to_date: toDate
+      });
+      if (error) throw error;
+      return (data || []).map(r => ({ ...r, invoice_date: r.entry_date, grand_total: r.net_expense }));
     }
 
     case 'purchase_by_vendor': {
@@ -323,21 +321,17 @@ export async function fetchReportData(reportId, fromDate, toDate) {
 
     case 'ar_aging_summary': {
       const p_company_id = sajilo.getCompanyId();
-      let query = supabase.from('SalesInvoice').select('due_date, invoice_date, customer_name, grand_total').eq('status', 'Posted').neq('payment_status', 'Paid');
-      if (p_company_id) query = query.eq('company_id', p_company_id);
-      const { data: invoices } = await query;
-      const today = new Date().toISOString().slice(0, 10);
+      const { data, error } = await supabase.rpc('get_ar_aging_rpc', { p_company_id });
+      if (error) throw error;
       const map = {};
-      (invoices || []).forEach(i => {
-        const due = i.due_date || i.invoice_date;
-        const days = due < today ? Math.floor((new Date(today) - new Date(due)) / 86400000) : 0;
-        const cust = i.customer_name || 'Unknown';
+      (data || []).forEach(r => {
+        const cust = r.customer_name || 'Unknown';
         if (!map[cust]) map[cust] = { customer: cust, current: 0, '30d': 0, '60d': 0, '60d+': 0, total: 0 };
-        const amt = i.grand_total || 0;
+        const amt = r.balance;
         map[cust].total += amt;
-        if (days === 0) map[cust].current += amt;
-        else if (days <= 30) map[cust]['30d'] += amt;
-        else if (days <= 60) map[cust]['60d'] += amt;
+        if (r.bucket === 'Current') map[cust].current += amt;
+        else if (r.bucket === '1–30 days') map[cust]['30d'] += amt;
+        else if (r.bucket === '31–60 days') map[cust]['60d'] += amt;
         else map[cust]['60d+'] += amt;
       });
       return Object.values(map).sort((a, b) => b.total - a.total);
@@ -345,21 +339,17 @@ export async function fetchReportData(reportId, fromDate, toDate) {
 
     case 'ap_aging_summary': {
       const p_company_id = sajilo.getCompanyId();
-      let query = supabase.from('PurchaseInvoice').select('due_date, invoice_date, vendor_name, grand_total').eq('status', 'Posted').neq('payment_status', 'Paid');
-      if (p_company_id) query = query.eq('company_id', p_company_id);
-      const { data: bills } = await query;
-      const today = new Date().toISOString().slice(0, 10);
+      const { data, error } = await supabase.rpc('get_ap_aging_rpc', { p_company_id });
+      if (error) throw error;
       const map = {};
-      (bills || []).forEach(i => {
-        const due = i.due_date || i.invoice_date;
-        const days = due < today ? Math.floor((new Date(today) - new Date(due)) / 86400000) : 0;
-        const vendor = i.vendor_name || 'Unknown';
+      (data || []).forEach(r => {
+        const vendor = r.vendor_name || 'Unknown';
         if (!map[vendor]) map[vendor] = { vendor, current: 0, '30d': 0, '60d': 0, '60d+': 0, total: 0 };
-        const amt = i.grand_total || 0;
+        const amt = r.balance;
         map[vendor].total += amt;
-        if (days === 0) map[vendor].current += amt;
-        else if (days <= 30) map[vendor]['30d'] += amt;
-        else if (days <= 60) map[vendor]['60d'] += amt;
+        if (r.bucket === 'Current') map[vendor].current += amt;
+        else if (r.bucket === '1–30 days') map[vendor]['30d'] += amt;
+        else if (r.bucket === '31–60 days') map[vendor]['60d'] += amt;
         else map[vendor]['60d+'] += amt;
       });
       return Object.values(map).sort((a, b) => b.total - a.total);
