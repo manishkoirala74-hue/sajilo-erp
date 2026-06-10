@@ -33,9 +33,10 @@ BEGIN
         SUM(COALESCE(l.credit_amount, 0)) as credit_amount,
         TRUE as is_opening
     FROM "GeneralLedgerLine" l
-    JOIN "GeneralLedgerJournal" j ON j.id::TEXT = l.journal_id
-    WHERE l.account_id::TEXT = p_account_id::TEXT
+    JOIN "GeneralLedgerJournal" j ON l.journal_id = j.id::text
+    WHERE l.account_id = p_account_id::text
       AND j.company_id = p_company_id
+      AND l.company_id = p_company_id
       AND j.status = 'Posted'
       AND j.entry_date::DATE < p_from_date
     HAVING SUM(COALESCE(l.debit_amount, 0)) > 0 OR SUM(COALESCE(l.credit_amount, 0)) > 0
@@ -53,9 +54,10 @@ BEGIN
         COALESCE(l.credit_amount, 0) as credit_amount,
         FALSE as is_opening
     FROM "GeneralLedgerLine" l
-    JOIN "GeneralLedgerJournal" j ON j.id::TEXT = l.journal_id
-    WHERE l.account_id::TEXT = p_account_id::TEXT
+    JOIN "GeneralLedgerJournal" j ON l.journal_id = j.id::text
+    WHERE l.account_id = p_account_id::text
       AND j.company_id = p_company_id
+      AND l.company_id = p_company_id
       AND j.status = 'Posted'
       AND j.entry_date::DATE >= p_from_date
       AND j.entry_date::DATE <= p_to_date
