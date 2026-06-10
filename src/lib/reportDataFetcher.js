@@ -1,5 +1,45 @@
 import { sajilo, supabase } from '@/api/sajiloClient';
 
+async function injectPeriodicInventory(baseAccounts, companyId, fromDate, toDate) {
+  try {
+    const { data: invAccounts } = await supabase.from('ChartOfAccount')
+      .select('id').ilike('account_name', '%inventory%').eq('company_id', companyId);
+    
+    if (invAccounts && invAccounts.length > 0) {
+      const invIds = invAccounts.map(a => a.id);
+      const { data: glLines } = await supabase.from('GeneralLedgerLine')
+        .select('debit_amount, credit_amount, GeneralLedgerJournal!inner(entry_date, status, company_id)')
+        .in('account_id', invIds)
+        .eq('GeneralLedgerJournal.company_id', companyId)
+        .eq('GeneralLedgerJournal.status', 'Posted');
+        
+      if (glLines) {
+        let opening = 0;
+        let purchases = 0;
+        let closing = 0;
+        for (const line of glLines) {
+          const date = line.GeneralLedgerJournal.entry_date.split('T')[0];
+          const net = (line.debit_amount || 0) - (line.credit_amount || 0);
+          if (date < fromDate) opening += net;
+          if (date >= fromDate && date <= toDate) purchases += (line.debit_amount || 0);
+          if (date <= toDate) closing += net;
+        }
+        
+        if (opening > 0 || closing > 0 || purchases > 0) {
+          const accs = [...baseAccounts];
+          accs.push({ id: 'virt-ob', account_name: 'Opening Stock', account_code: '', account_type: 'Cost of Sales', current_balance: opening, comparative_balance: 0, balance: opening, is_group: false });
+          accs.push({ id: 'virt-pur', account_name: 'Purchases', account_code: '', account_type: 'Cost of Sales', current_balance: purchases, comparative_balance: 0, balance: purchases, is_group: false });
+          accs.push({ id: 'virt-cb', account_name: 'Closing Stock', account_code: '', account_type: 'Cost of Sales', current_balance: closing, comparative_balance: 0, balance: closing, is_group: false });
+          return accs;
+        }
+      }
+    }
+  } catch (e) {
+    console.error('Virtual inventory calc failed:', e);
+  }
+  return baseAccounts;
+}
+
 // Helper to check if a date string falls within range
 function inRange(dateStr, from, to) {
   if (!dateStr) return false;
@@ -40,7 +80,9 @@ export async function fetchReportData(reportId, fromDate, toDate) {
           p_comp_to_date: compToDate
         });
         if (error) throw error;
-        return { accounts: data || [] };
+        let result = data || [];
+        result = await injectPeriodicInventory(result, p_company_id, fromDate, toDate);
+        return { accounts: result };
       } catch (err) {
         console.warn('Comparative RPC not found or failed, falling back to standard RPC.', err);
         // Fallback to standard profit_loss if the comparative RPC hasn't been migrated
@@ -56,7 +98,9 @@ export async function fetchReportData(reportId, fromDate, toDate) {
           current_balance: a.balance,
           comparative_balance: 0
         }));
-        return { accounts: mappedData };
+        let result = mappedData || [];
+        result = await injectPeriodicInventory(result, p_company_id, fromDate, toDate);
+        return { accounts: result };
       }
     }
 
