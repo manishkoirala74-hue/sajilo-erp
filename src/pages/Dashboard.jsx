@@ -45,13 +45,13 @@ export default function Dashboard() {
     const toDate = td.toISOString().slice(0, 10);
 
     Promise.all([
-      sajilo.entities.SalesInvoice.list('-created_date', 50),
-      sajilo.entities.PurchaseInvoice.list('-created_date', 50),
-      sajilo.entities.Item.list('-created_date', 50),
-      sajilo.entities.BusinessPartner.list('-created_date', 50),
-      sajilo.entities.PurchaseOrder.list('-created_date', 20),
-      fetchReportData('sales_summary', fromDate, toDate),
-      fetchReportData('purchase_summary', fromDate, toDate)
+      sajilo.entities.SalesInvoice.list('-created_date', 1000).catch(e => { console.error(e); return []; }),
+      sajilo.entities.PurchaseInvoice.list('-created_date', 1000).catch(e => { console.error(e); return []; }),
+      sajilo.entities.Item.list('-created_date', 1000).catch(e => { console.error(e); return []; }),
+      sajilo.entities.BusinessPartner.list('-created_date', 1000).catch(e => { console.error(e); return []; }),
+      sajilo.entities.PurchaseOrder.list('-created_date', 50).catch(e => { console.error(e); return []; }),
+      fetchReportData('sales_summary', fromDate, toDate).catch(e => { console.error(e); return []; }),
+      fetchReportData('purchase_summary', fromDate, toDate).catch(e => { console.error(e); return []; })
     ]).then(([si, pi, it, bp, po, salesSum, purchSum]) => {
       setSalesInvoices(si);
       setPurchaseInvoices(pi);
@@ -67,6 +67,15 @@ export default function Dashboard() {
         d.setMonth(d.getMonth() - i);
         const mKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
         monthlyMap[mKey] = { month: monthNames[d.getMonth()], sortKey: mKey, sales: 0, purchases: 0 };
+      }
+
+      if (!salesSum || salesSum.length === 0) {
+        salesSum = si.filter(i => i.status === 'Posted' && i.invoice_date >= fromDate && i.invoice_date <= toDate)
+          .map(i => ({ invoice_date: i.invoice_date, grand_total: i.grand_total }));
+      }
+      if (!purchSum || purchSum.length === 0) {
+        purchSum = pi.filter(i => i.status === 'Posted' && i.invoice_date >= fromDate && i.invoice_date <= toDate)
+          .map(i => ({ invoice_date: i.invoice_date, grand_total: i.grand_total }));
       }
 
       salesSum.forEach(s => {
