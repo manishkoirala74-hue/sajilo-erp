@@ -28,20 +28,14 @@ const LEDGER_GROUP_FIELDS = [
   {
     key: 'gl_customer_ledger_group',
     label: 'Customer Ledger Group Parent',
-    desc: 'Asset group under which new Customer sub-ledgers are auto-created (e.g. 1020 – Trade Debtors)',
+    desc: 'Asset group under which new Customer sub-ledgers are auto-created (e.g. 1020 – Trade Debtors). Dual-role partners (also marked as Vendor) also get their AR ledger here.',
     filterType: 'Asset',
   },
   {
     key: 'gl_supplier_ledger_group',
     label: 'Supplier Ledger Group Parent',
-    desc: 'Liability group under which new Supplier sub-ledgers are auto-created (e.g. 2010 – Trade Creditors)',
+    desc: 'Liability group under which new Supplier sub-ledgers are auto-created (e.g. 2010 – Trade Creditors). Dual-role partners (also marked as Customer) also get their AP ledger here.',
     filterType: 'Liability',
-  },
-  {
-    key: 'gl_dual_ledger_group',
-    label: 'Dual-Relationship Group Parent',
-    desc: 'Parent group for partners flagged as both Customer and Vendor — can map to either a Debtor or Creditor group',
-    filterType: null, // no type restriction — user explicitly chooses
   },
 ];
 
@@ -107,7 +101,9 @@ export default function GLAccountSettings({ settings, onChange }) {
         <div className="bg-indigo-50 border border-indigo-200 rounded-lg px-4 py-3 text-sm text-indigo-800">
           <p className="font-semibold mb-0.5">Automated Sub-Ledger Generation</p>
           Map each partner type to a <strong>Group Ledger</strong> parent. When a new Customer or Supplier is saved,
-          the system automatically creates a sequential sub-ledger under the assigned group and links it to the partner profile.
+          the system automatically creates a sequential sub-ledger under the assigned group and links it to the partner
+          profile. Partners marked as <em>both Customer and Vendor</em> receive ledgers under both groups, with
+          balances netting naturally on each ledger.
         </div>
         <div className="grid grid-cols-1 gap-4">
           {LEDGER_GROUP_FIELDS.map(f => {

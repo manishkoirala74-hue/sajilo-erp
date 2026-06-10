@@ -78,7 +78,15 @@ export async function createPartnerLedger({ partnerName, parentGroupId, accountT
 
 /**
  * Main entry point: called on partner save.
- * Handles single ledger (customer or vendor) and twin-ledger (dual-role partner).
+ * Handles single-role (customer or vendor) and dual-role (both) partners.
+ *
+ * Dual-role partners (is_customer = true AND is_vendor = true) receive both
+ * an AR ledger under the Customer Group and an AP ledger under the Supplier
+ * Group — the same groups used for single-role partners. Netting is handled
+ * naturally: buying from a customer simply reduces their AR balance (or goes
+ * negative), and selling to a vendor reduces their AP balance.
+ *
+ * No "Dual-Relationship Group" is needed or used.
  *
  * @param {object} partnerForm   The partner form data being saved
  * @param {object} settings      CompanySettings record
@@ -92,18 +100,16 @@ export async function provisionPartnerLedgers(partnerForm, settings) {
   const isVendor        = partnerForm.is_vendor;
   const customerGroupId = settings.gl_customer_ledger_group_id;
   const supplierGroupId = settings.gl_supplier_ledger_group_id;
-  const dualGroupId     = settings.gl_dual_ledger_group_id;
 
   // Skip if already has a ledger assigned (editing existing partner)
   const alreadyHasAR = !!partnerForm.receivable_account_id;
   const alreadyHasAP = !!partnerForm.payable_account_id;
 
-  // ── Customer → AR ledger ──────────────────────────────────────────────────
+  // ── Customer (or dual-role) → AR ledger under Customer Group ─────────────
   if (isCustomer && !alreadyHasAR && customerGroupId) {
-    const groupId = (isCustomer && isVendor && dualGroupId) ? dualGroupId : customerGroupId;
     const ledger = await createPartnerLedger({
       partnerName:    partnerForm.name,
-      parentGroupId:  groupId,
+      parentGroupId:  customerGroupId,
       accountType:    'Asset',
       normalBalance:  'Debit',
       accountSubtype: 'Current Asset',
@@ -113,12 +119,11 @@ export async function provisionPartnerLedgers(partnerForm, settings) {
     updates.receivable_account_code = ledger.account_code;
   }
 
-  // ── Vendor → AP ledger ───────────────────────────────────────────────────
+  // ── Vendor (or dual-role) → AP ledger under Supplier Group ───────────────
   if (isVendor && !alreadyHasAP && supplierGroupId) {
-    const groupId = (isCustomer && isVendor && dualGroupId) ? dualGroupId : supplierGroupId;
     const ledger = await createPartnerLedger({
       partnerName:    partnerForm.name,
-      parentGroupId:  groupId,
+      parentGroupId:  supplierGroupId,
       accountType:    'Liability',
       normalBalance:  'Credit',
       accountSubtype: 'Current Liability',
