@@ -263,12 +263,11 @@ BEGIN
             (p_from_date - INTERVAL '1 day')::DATE as entry_date,
             'OPENING_BAL'::TEXT as voucher_no,
             'Opening Balance'::TEXT as description,
-            h.ob_dr as debit_amount,
-            h.ob_cr as credit_amount,
+            COALESCE(h.ob_dr, 0) as debit_amount,
+            COALESCE(h.ob_cr, 0) as credit_amount,
             TRUE as is_opening,
             0::INTEGER as sort_order
         FROM historical_agg h
-        WHERE h.ob_dr > 0 OR h.ob_cr > 0
 
         UNION ALL
 
