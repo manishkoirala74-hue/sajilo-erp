@@ -1,58 +1,61 @@
 -- ==============================================================================
--- 014_backfill_voucher_numbers.sql
--- Backfill historical General Ledger Journals with proper voucher numbers
+-- BACKFILL HISTORICAL VOUCHER NUMBERS IN GENERAL LEDGER
+-- This script updates the 'voucher_no' column in GeneralLedgerJournal
+-- for older transactions by looking up their respective operational tables.
 -- ==============================================================================
 
--- 1. Backfill Sales Invoices
+-- 1. Sales Invoice
 UPDATE "GeneralLedgerJournal" j
-SET voucher_no = s.invoice_number
-FROM "SalesInvoice" s
-WHERE j.source_document_type = 'SalesInvoice' 
-  AND j.source_document_id = s.id::TEXT 
-  AND j.voucher_no IS NULL;
+SET voucher_no = si.invoice_number
+FROM "SalesInvoice" si
+WHERE j.source_document_type = 'SalesInvoice'
+  AND j.source_document_id = si.id::TEXT
+  AND (j.voucher_no IS NULL OR j.voucher_no = j.id::TEXT);
 
--- 2. Backfill Purchase Invoices
+-- 2. Purchase Invoice
 UPDATE "GeneralLedgerJournal" j
-SET voucher_no = p.invoice_number
-FROM "PurchaseInvoice" p
-WHERE j.source_document_type = 'PurchaseInvoice' 
-  AND j.source_document_id = p.id::TEXT 
-  AND j.voucher_no IS NULL;
+SET voucher_no = pi.invoice_number
+FROM "PurchaseInvoice" pi
+WHERE j.source_document_type = 'PurchaseInvoice'
+  AND j.source_document_id = pi.id::TEXT
+  AND (j.voucher_no IS NULL OR j.voucher_no = j.id::TEXT);
 
--- 3. Backfill POS Sales
+-- 3. POS Sale
 UPDATE "GeneralLedgerJournal" j
-SET voucher_no = p.sale_number
-FROM "POSSale" p
-WHERE j.source_document_type = 'POSSale' 
-  AND j.source_document_id = p.id::TEXT 
-  AND j.voucher_no IS NULL;
+SET voucher_no = ps.sale_number
+FROM "POSSale" ps
+WHERE j.source_document_type = 'POSSale'
+  AND j.source_document_id = ps.id::TEXT
+  AND (j.voucher_no IS NULL OR j.voucher_no = j.id::TEXT);
 
--- 4. Backfill Sales Returns
+-- 4. Sales Return
 UPDATE "GeneralLedgerJournal" j
-SET voucher_no = s.return_number
-FROM "SalesReturn" s
-WHERE j.source_document_type = 'SalesReturn' 
-  AND j.source_document_id = s.id::TEXT 
-  AND j.voucher_no IS NULL;
+SET voucher_no = sr.return_number
+FROM "SalesReturn" sr
+WHERE j.source_document_type = 'SalesReturn'
+  AND j.source_document_id = sr.id::TEXT
+  AND (j.voucher_no IS NULL OR j.voucher_no = j.id::TEXT);
 
--- 5. Backfill Purchase Returns
+-- 5. Purchase Return
 UPDATE "GeneralLedgerJournal" j
-SET voucher_no = p.return_number
-FROM "PurchaseReturn" p
-WHERE j.source_document_type = 'PurchaseReturn' 
-  AND j.source_document_id = p.id::TEXT 
-  AND j.voucher_no IS NULL;
+SET voucher_no = pr.return_number
+FROM "PurchaseReturn" pr
+WHERE j.source_document_type = 'PurchaseReturn'
+  AND j.source_document_id = pr.id::TEXT
+  AND (j.voucher_no IS NULL OR j.voucher_no = j.id::TEXT);
 
--- 6. Backfill Stock Adjustments
+-- 6. Financial Voucher
 UPDATE "GeneralLedgerJournal" j
-SET voucher_no = s.adjustment_number
-FROM "StockAdjustment" s
-WHERE j.source_document_type = 'StockAdjustment' 
-  AND j.source_document_id = s.id::TEXT 
-  AND j.voucher_no IS NULL;
+SET voucher_no = fv.voucher_number
+FROM "FinancialVoucher" fv
+WHERE j.source_document_type = 'FinancialVoucher'
+  AND j.source_document_id = fv.id::TEXT
+  AND (j.voucher_no IS NULL OR j.voucher_no = j.id::TEXT);
 
--- 7. Fix any previously Cancelled/Reversed transactions that don't map to a source
+-- 7. Stock Adjustment
 UPDATE "GeneralLedgerJournal" j
-SET voucher_no = 'REV-' || SUBSTRING(j.id::TEXT, 1, 8)
-WHERE j.reference_module = 'Reversal'
-  AND j.voucher_no IS NULL;
+SET voucher_no = sa.adjustment_number
+FROM "StockAdjustment" sa
+WHERE j.source_document_type = 'StockAdjustment'
+  AND j.source_document_id = sa.id::TEXT
+  AND (j.voucher_no IS NULL OR j.voucher_no = j.id::TEXT);
