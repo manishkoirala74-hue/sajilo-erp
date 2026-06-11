@@ -33,8 +33,20 @@ function inRange(dateStr, from, to) {
   return dateStr >= from && dateStr <= to;
 }
 
-export async function fetchReportData(reportId, fromDate, toDate) {
+export async function fetchReportData(reportId, fromDate, toDate, extraParams = {}) {
   switch (reportId) {
+
+    case 'ledger_detail': {
+      const p_company_id = sajilo.getCompanyId();
+      const { data, error } = await supabase.rpc('get_stabilized_general_ledger_statement_rpc', {
+        p_company_id,
+        p_account_id: extraParams.accountId,
+        p_from_date: fromDate,
+        p_to_date: toDate
+      });
+      if (error) throw error;
+      return data || [];
+    }
 
     case 'trial_balance': {
       const p_company_id = sajilo.getCompanyId();

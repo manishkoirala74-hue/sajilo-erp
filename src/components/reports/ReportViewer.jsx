@@ -17,7 +17,10 @@ import { format } from 'date-fns';
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function fmtNPR(n) {
   const num = Number(n || 0);
-  return num === 0 ? '—' : `NPR ${num.toLocaleString('en-NP', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  if (num === 0) return '—';
+  const absNum = Math.abs(num);
+  const formatted = `NPR ${absNum.toLocaleString('en-NP', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return num < 0 ? `(${formatted})` : formatted;
 }
 
 // downloadCSV replaced by exportFlatXLSX — kept as no-op shim to avoid refactor of every call site
@@ -1138,53 +1141,43 @@ function GeneralLedgerDetailReport({ initialFromDate, initialToDate }) {
     setHasLoaded(true);
     setLoading(true);
     try {
-      const { supabase } = await import('@/api/sajiloClient');
-      const { data, error } = await supabase.rpc('get_detail_general_ledger_rpc', {
-        p_company_id: sajilo.getCompanyId(),
-        p_account_id: filters.accountId,
-        p_from_date: filters.fromDate,
-        p_to_date: filters.toDate
-      });
-      if (error) throw error;
+      const { fetchReportData } = await import('@/lib/reportDataFetcher');
+      const data = await fetchReportData('ledger_detail', filters.fromDate, filters.toDate, { accountId: filters.accountId });
       
       const acc = accounts.find(a => a.id === filters.accountId);
-      const isDebitNormal = acc ? ['Asset','COGS','Expense','OPEX','Cost of Goods Sold','Other Expense'].includes(acc.account_type) : true;
-      
-      let obBase = Number(acc?.opening_balance || 0);
-      let obDr = isDebitNormal ? obBase : 0;
-      let obCr = isDebitNormal ? 0 : obBase;
-      
+      const isDebitNormal = acc?.normal_balance 
+        ? acc.normal_balance === 'Debit' 
+        : ['Asset','COGS','Expense','OPEX','Cost of Goods Sold','Other Expense'].includes(acc?.account_type);
+
       const dbRows = data || [];
-      for (const r of dbRows) {
-        if (r.is_opening) {
-           obDr += Number(r.debit_amount || 0);
-           obCr += Number(r.credit_amount || 0);
-        }
+      
+      const obRow = dbRows.find(r => r.is_opening);
+      let ob = 0, obIsDr = true;
+      if (obRow) {
+         ob = Math.abs(obRow.running_balance || 0);
+         obIsDr = isDebitNormal ? (obRow.running_balance || 0) >= 0 : (obRow.running_balance || 0) < 0;
       }
       
-      let netOb = isDebitNormal ? (obDr - obCr) : (obCr - obDr);
-      const obIsDr = isDebitNormal ? netOb >= 0 : netOb < 0;
-      netOb = Math.abs(netOb);
-
-      let runningBal = isDebitNormal ? (obDr - obCr) : (obCr - obDr);
-      
       const validLines = dbRows.filter(r => !r.is_opening).map(l => {
-        const dr = Number(l.debit_amount || 0);
-        const cr = Number(l.credit_amount || 0);
-        runningBal += isDebitNormal ? (dr - cr) : (cr - dr);
-        return { 
-          ...l, 
-          date: l.entry_date, 
-          dr, 
-          cr, 
-          bal: Math.abs(runningBal), 
-          balIsDr: isDebitNormal ? runningBal >= 0 : runningBal < 0 
+        const balNum = Number(l.running_balance || 0);
+        return {
+          ...l,
+          date: l.entry_date,
+          dr: Number(l.debit_amount || 0),
+          cr: Number(l.credit_amount || 0),
+          bal: Math.abs(balNum),
+          balIsDr: isDebitNormal ? balNum >= 0 : balNum < 0
         };
       });
 
-      const cbIsDr = isDebitNormal ? runningBal >= 0 : runningBal < 0;
+      let cb = ob, cbIsDr = obIsDr;
+      if (validLines.length > 0) {
+         const lastLine = validLines[validLines.length - 1];
+         cb = lastLine.bal;
+         cbIsDr = lastLine.balIsDr;
+      }
 
-      setSummary({ ob: netOb, obIsDr, cb: Math.abs(runningBal), cbIsDr });
+      setSummary({ ob, obIsDr, cb, cbIsDr });
       setLines(validLines);
     } catch (e) {
       console.error(e);

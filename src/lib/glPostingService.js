@@ -67,7 +67,8 @@ export async function postPOSSale(sale, itemsMap, settings, isReversal = false) 
     p_source_type: 'POSSale',
     p_lines: lines,
     p_is_reversal: false,
-    p_lock_cogs: true
+    p_lock_cogs: true,
+    p_voucher_no: sale.sale_number
   };
 
   const { data: journalId, error } = await supabase.rpc('rpc_post_gl_transaction', payload);
@@ -110,7 +111,8 @@ export async function postSalesInvoice(invoice, itemsMap, settings, isReversal =
     p_source_type: 'SalesInvoice',
     p_lines: lines,
     p_is_reversal: false,
-    p_lock_cogs: true
+    p_lock_cogs: true,
+    p_voucher_no: invoice.invoice_number
   };
 
   const { data: journalId, error } = await supabase.rpc('rpc_post_gl_transaction', payload);
@@ -149,7 +151,8 @@ export async function postPurchaseInvoice(invoice, itemsMap, settings, isReversa
     p_source_type: 'PurchaseInvoice',
     p_lines: lines,
     p_is_reversal: false,
-    p_lock_cogs: false
+    p_lock_cogs: false,
+    p_voucher_no: invoice.invoice_number
   };
 
   const { data: journalId, error } = await supabase.rpc('rpc_post_gl_transaction', payload);
@@ -198,7 +201,8 @@ export async function postSalesReturn(ret, itemsMap, settings) {
     p_source_type: 'SalesReturn',
     p_lines: lines,
     p_is_reversal: true, // triggers reverse COGS logic
-    p_lock_cogs: true
+    p_lock_cogs: true,
+    p_voucher_no: ret.return_number
   };
 
   const { data: journalId, error } = await supabase.rpc('rpc_post_gl_transaction', payload);
@@ -230,7 +234,8 @@ export async function postPurchaseReturn(ret, itemsMap, settings) {
     p_source_type: 'PurchaseReturn',
     p_lines: lines,
     p_is_reversal: false,
-    p_lock_cogs: false
+    p_lock_cogs: false,
+    p_voucher_no: ret.return_number
   };
 
   const { data: journalId, error } = await supabase.rpc('rpc_post_gl_transaction', payload);
@@ -245,7 +250,8 @@ export async function postStockAdjustment(adj, itemsMap, settings) {
     p_adjustment_id: adj.id,
     p_adjustment_date: adj.adjustment_date,
     p_reason: adj.reason,
-    p_lines: adj.line_items || []
+    p_lines: adj.line_items || [],
+    p_voucher_no: adj.adjustment_number
   };
 
   const { data: journalId, error } = await supabase.rpc('rpc_post_stock_adjustment', payload);
