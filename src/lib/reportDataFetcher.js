@@ -117,16 +117,40 @@ export async function fetchReportData(reportId, fromDate, toDate, extraParams = 
       const allAccounts = (data || []).map(a => {
         const isDebitNormal = ['Asset','COGS','Expense','OPEX','Cost of Goods Sold','Other Expense'].includes(a.account_type);
         const bal = isDebitNormal ? (a.closing_debit - a.closing_credit) : (a.closing_credit - a.closing_debit);
-        return { code: a.account_code, name: a.account_name, type: a.account_type, balance: bal };
-      }).filter(a => Math.abs(a.balance) > 0.01);
+        return { ...a, balance: bal };
+      });
 
-      const toRow = a => ({ account_code: a.code, account_name: a.name, balance: a.balance });
+      // Calculate Net Income (Revenue - Expenses)
+      const isIncomeStatement = a => ['Revenue', 'Other Income', 'Expense', 'COGS', 'OPEX', 'Cost of Goods Sold', 'Other Expense'].includes(a.account_type);
+      const netIncome = allAccounts.filter(isIncomeStatement).reduce((sum, a) => {
+        // Revenue increases Net Income, Expenses decrease Net Income
+        const isExpense = ['Expense', 'COGS', 'OPEX', 'Cost of Goods Sold', 'Other Expense'].includes(a.account_type);
+        // bal for expenses is positive, so subtract. bal for revenue is positive (credit normal), so add.
+        return isExpense ? sum - a.balance : sum + a.balance;
+      }, 0);
 
-      const assets      = allAccounts.filter(a => a.type === 'Asset').map(toRow);
-      const liabilities = allAccounts.filter(a => a.type === 'Liability').map(toRow);
-      const equity      = allAccounts.filter(a => a.type === 'Equity').map(toRow);
+      const toRow = a => ({ ...a, closing_balance: a.balance });
+
+      const assets      = allAccounts.filter(a => a.account_type === 'Asset').map(toRow);
+      const liabilities = allAccounts.filter(a => a.account_type === 'Liability').map(toRow);
+      const equity      = allAccounts.filter(a => a.account_type === 'Equity').map(toRow);
+
+      // Inject Current Year Earnings into Equity
+      equity.push({
+        id: 'virtual-current-year-earnings',
+        account_code: '—',
+        account_name: 'Current Year Earnings',
+        account_type: 'Equity',
+        ledger_type: 'Sub Ledger',
+        closing_balance: netIncome,
+        balance: netIncome
+      });
+
+      // Return flat array of all BS accounts so the UI can build the tree
+      const bsAccounts = [...assets, ...liabilities, ...equity];
 
       return {
+        accounts: bsAccounts,
         assets, liabilities, equity,
         total_assets:      assets.reduce((s, a) => s + a.balance, 0),
         total_liabilities: liabilities.reduce((s, a) => s + a.balance, 0),

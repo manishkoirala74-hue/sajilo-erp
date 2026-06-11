@@ -985,75 +985,49 @@ function ProfitLossReport({ initialData, initialFromDate, initialToDate }) {
 
 // ── Balance Sheet (with decentralized filters) ────────────────────────────────
 function BalanceSheetReport({ initialData, initialFromDate, initialToDate }) {
-  const [filters,   setFilters]   = useState({ ...DEFAULT_FILTERS, fromDate: initialFromDate, toDate: initialToDate });
-  const [data,      setData]      = useState(initialData);
-  const [loading,   setLoading]   = useState(false);
-  const [hasLoaded, setHasLoaded] = useState(!!initialData);
+  const [filters, setFilters] = useState({ ...DEFAULT_FILTERS, fromDate: initialFromDate, toDate: initialToDate, reportType: 'balance_sheet' });
+  const [accounts, setAccounts] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [hasLoaded, setHasLoaded] = useState(false);
 
   const load = useCallback(async () => {
     setHasLoaded(true);
     setLoading(true);
-    const accounts = await sajilo.entities.ChartOfAccount.filter({ is_active: true }, 'account_code', 1000);
-    // STRICT: only persisted Sub Ledger rows with a valid account_code and non-zero balance
-    const sub = accounts.filter(a => a.ledger_type === 'Sub Ledger' && a.account_code && a.account_code !== '—' && (a.current_balance || 0) !== 0);
-    const toRow = a => ({ account_code: a.account_code, account_name: a.account_name, balance: a.current_balance || 0 });
-    const assets      = sub.filter(a => a.account_type === 'Asset').map(toRow);
-    const liabilities = sub.filter(a => a.account_type === 'Liability').map(toRow);
-    const equity      = sub.filter(a => a.account_type === 'Equity').map(toRow);
-    setData({ assets, liabilities, equity, total_assets: assets.reduce((s,a)=>s+a.balance,0), total_liabilities: liabilities.reduce((s,a)=>s+a.balance,0), total_equity: equity.reduce((s,a)=>s+a.balance,0) });
+    try {
+      const { fetchReportData } = await import('@/lib/reportDataFetcher');
+      const [allCoA, { accounts: rpcAccounts }] = await Promise.all([
+        sajilo.entities.ChartOfAccount.filter({ is_active: true }, 'account_code', 2000),
+        fetchReportData('balance_sheet', filters.fromDate, filters.toDate)
+      ]);
+
+      const balanceMap = {};
+      rpcAccounts.forEach(a => { balanceMap[a.id] = a.closing_balance || 0; });
+
+      // Merge balances into Chart of Accounts (Sub Ledgers only)
+      const merged = allCoA.map(a => {
+        if (a.ledger_type === 'Sub Ledger') {
+          return { ...a, closing_balance: balanceMap[a.id] || 0 };
+        }
+        return a;
+      });
+
+      // Inject Current Year Earnings natively into the tree
+      const virtualEarnings = rpcAccounts.find(a => a.id === 'virtual-current-year-earnings');
+      if (virtualEarnings) {
+        // Find Equity root to nest under
+        const equityRoot = merged.find(a => a.account_type === 'Equity' && a.ledger_type === 'Group Ledger' && !a.parent_account_id);
+        merged.push({
+          ...virtualEarnings,
+          parent_account_id: equityRoot ? equityRoot.id : null
+        });
+      }
+
+      setAccounts(merged);
+    } catch (err) {
+      console.error('[BalanceSheet load error]', err);
+    }
     setLoading(false);
-  }, []);
-
-  // Do NOT auto-load on mount
-  // useEffect(() => { if (!initialData) load(); }, []);
-
-  const { assets=[], liabilities=[], equity=[], total_assets=0, total_liabilities=0, total_equity=0 } = data || {};
-
-  const handleExport = () => downloadCSV('balance_sheet.xlsx',
-    ['Code', 'Account', 'Balance (NPR)'],
-    [
-      ...assets.map(a      => [a.account_code, `    ${a.account_name}`, a.balance.toFixed(2)]),
-      ['', 'Total Assets',      total_assets.toFixed(2)],
-      ...liabilities.map(a => [a.account_code, `    ${a.account_name}`, a.balance.toFixed(2)]),
-      ['', 'Total Liabilities', total_liabilities.toFixed(2)],
-      ...equity.map(a      => [a.account_code, `    ${a.account_name}`, a.balance.toFixed(2)]),
-      ['', 'Total Equity',      total_equity.toFixed(2)],
-    ]
-  );
-
-  const BSSection = ({ title, accounts, total, color }) => {
-    const bg = { emerald: 'bg-emerald-50', red: 'bg-red-50', blue: 'bg-blue-50' }[color] || 'bg-muted/30';
-    return (
-      <div>
-        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">{title}</p>
-        <div className="border border-border rounded-lg overflow-hidden">
-          <table className="w-full text-sm print:text-[10pt]">
-            <thead className="bg-slate-50 border-b border-border">
-              <tr>
-                <th className="px-3 py-1.5 text-left text-xs font-semibold text-slate-500 w-24">Code</th>
-                <th className="px-3 py-1.5 text-left text-xs font-semibold text-slate-500">Account</th>
-                <th className="px-3 py-1.5 text-right text-xs font-semibold text-slate-500">Balance (NPR)</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {accounts.map((a, i) => (
-                <tr key={i} className="hover:bg-muted/20 print:hover:bg-transparent">
-                  <td className="px-3 py-1.5 font-mono text-xs text-muted-foreground">{a.account_code}</td>
-                  <td className="px-3 py-1.5 pl-5 text-muted-foreground" style={{ wordBreak: 'break-word' }}>{a.account_name}</td>
-                  <td className="px-3 py-1.5 text-right tabular-nums font-mono">{fmtNPR(a.balance)}</td>
-                </tr>
-              ))}
-              {accounts.length === 0 && <tr><td colSpan={3} className="px-3 py-2 text-muted-foreground text-xs italic">No entries</td></tr>}
-            </tbody>
-            <tfoot><tr className={bg}>
-              <td className="px-3 py-2 font-semibold" colSpan={2}>Total {title}</td>
-              <td className="px-3 py-2 text-right font-bold tabular-nums font-mono">{fmtNPR(total)}</td>
-            </tr></tfoot>
-          </table>
-        </div>
-      </div>
-    );
-  };
+  }, [filters.fromDate, filters.toDate]);
 
   return (
     <div className="space-y-4">
@@ -1066,18 +1040,18 @@ function BalanceSheetReport({ initialData, initialFromDate, initialToDate }) {
           <p className="text-sm font-semibold text-foreground">Select your date range and click <span className="text-primary">Apply</span> to generate the Balance Sheet.</p>
         </div>
       ) : loading ? (
-        <div className="py-10 text-center text-muted-foreground text-sm">Loading…</div>
+        <div className="py-10 text-center text-muted-foreground text-sm">Loading accounts…</div>
       ) : (
         <>
-          <BusinessHeader reportTitle="Balance Sheet" toDate={filters.toDate} subtitle={`As of ${filters.toDate}`} />
-          <div className="report-no-print flex justify-end">
-            <button onClick={handleExport} className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 border border-emerald-300 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 transition-colors">↓ Export Excel (.xlsx)</button>
-          </div>
-          <div className="space-y-4">
-            <BSSection title="Assets"      accounts={assets}      total={total_assets}      color="emerald" />
-            <BSSection title="Liabilities" accounts={liabilities} total={total_liabilities} color="red" />
-            <BSSection title="Equity"      accounts={equity}      total={total_equity}      color="blue" />
-          </div>
+          <BusinessHeader reportTitle="Balance Sheet" fromDate={filters.fromDate} toDate={filters.toDate} subtitle={`As of ${filters.toDate}`} />
+          <FinancialReportTable
+            accounts={accounts}
+            columnState={{ ...filters, reportType: 'balance_sheet' }}
+            filename="balance_sheet.xlsx"
+            reportTitle="Balance Sheet"
+            fromDate={filters.fromDate}
+            toDate={filters.toDate}
+          />
         </>
       )}
     </div>

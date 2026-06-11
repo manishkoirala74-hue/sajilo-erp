@@ -22,6 +22,11 @@ export function buildVisibleColumns(columnState) {
     { key: 'account_type',  label: 'Account Type',   align: 'left'  },
   ];
 
+  if (columnState.reportType === 'balance_sheet') {
+    cols.push({ key: 'closing_balance', label: 'Balance (NPR)', align: 'right' });
+    return cols;
+  }
+
   if (columnState.showOpeningBalance) {
     cols.push({ key: 'opening_debit', label: 'Debit (NPR)', align: 'right' });
     cols.push({ key: 'opening_credit', label: 'Credit (NPR)', align: 'right' });
