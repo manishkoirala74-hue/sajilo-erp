@@ -57,7 +57,7 @@ const CATEGORIES = [
     ]
   },
   {
-    id: 'purchase', label: 'Purchase Report', icon: ShoppingCart, color: 'emerald', placeholder: true,
+    id: 'purchase', label: 'Purchase Report', icon: ShoppingCart, color: 'emerald',
     reports: [
       { id: 'purchase_summary',     label: 'Purchase Summary',        desc: 'Total purchases by date range' },
       { id: 'purchase_by_vendor',   label: 'Purchase By Supplier',    desc: 'Spend breakdown per supplier' },
@@ -66,7 +66,7 @@ const CATEGORIES = [
     ]
   },
   {
-    id: 'tax', label: 'Tax Report', icon: Receipt, color: 'red', placeholder: true,
+    id: 'tax', label: 'Tax Report', icon: Receipt, color: 'red',
     reports: [
       { id: 'vat_summary',    label: 'VAT Summary Report',      desc: 'VAT collected on sales and paid on purchases' },
       { id: 'vat_sales',      label: 'Sales VAT Register',      desc: 'VAT-applicable sales with tax breakdown' },
@@ -75,7 +75,7 @@ const CATEGORIES = [
     ]
   },
   {
-    id: 'inventory', label: 'Inventory Report', icon: Warehouse, color: 'teal', placeholder: true,
+    id: 'inventory', label: 'Inventory Report', icon: Warehouse, color: 'teal',
     reports: [
       { id: 'stock_summary',     label: 'Stock Summary',          desc: 'Current stock levels and total value' },
       { id: 'low_stock',         label: 'Low Stock / Reorder',    desc: 'Items below reorder level' },
