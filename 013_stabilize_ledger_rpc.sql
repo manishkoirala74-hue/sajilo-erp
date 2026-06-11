@@ -252,7 +252,7 @@ BEGIN
         JOIN "GeneralLedgerJournal" j ON l.journal_id = j.id::TEXT
         WHERE l.account_id = p_account_id::TEXT
           AND j.company_id = p_company_id
-          AND j.status = 'Posted'
+          AND j.status IN ('Posted', 'Reversed')
           AND j.entry_date::DATE < p_from_date
     ),
     combined_stream AS (
@@ -286,7 +286,7 @@ BEGIN
         JOIN "GeneralLedgerJournal" j ON l.journal_id = j.id::TEXT
         WHERE l.account_id = p_account_id::TEXT
           AND j.company_id = p_company_id
-          AND j.status = 'Posted'
+          AND j.status IN ('Posted', 'Reversed')
           AND j.entry_date::DATE >= p_from_date
           AND j.entry_date::DATE <= p_to_date
     )

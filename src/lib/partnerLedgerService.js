@@ -80,13 +80,10 @@ export async function createPartnerLedger({ partnerName, parentGroupId, accountT
  * Main entry point: called on partner save.
  * Handles single-role (customer or vendor) and dual-role (both) partners.
  *
- * Dual-role partners (is_customer = true AND is_vendor = true) receive both
- * an AR ledger under the Customer Group and an AP ledger under the Supplier
- * Group — the same groups used for single-role partners. Netting is handled
- * naturally: buying from a customer simply reduces their AR balance (or goes
- * negative), and selling to a vendor reduces their AP balance.
- *
- * No "Dual-Relationship Group" is needed or used.
+ * Unified Ledger Update:
+ * Dual-role partners no longer receive separate AR and AP ledgers. Instead, 
+ * a single ledger is created under the group of their Primary Role (e.g. 
+ * Customer -> Trade Receivables) and reused for the secondary role.
  *
  * @param {object} partnerForm   The partner form data being saved
  * @param {object} settings      CompanySettings record
@@ -98,6 +95,12 @@ export async function provisionPartnerLedgers(partnerForm, settings) {
 
   const isCustomer      = partnerForm.is_customer;
   const isVendor        = partnerForm.is_vendor;
+  
+  // Infer primary role based on UI toggles, fallback to isCustomer if both
+  const primaryRole = partnerForm.treated_as_vendor ? 'Customer' : 
+                      partnerForm.treat_as_customer ? 'Vendor' :
+                      isCustomer ? 'Customer' : 'Vendor';
+
   const customerGroupId = settings.gl_customer_ledger_group_id;
   const supplierGroupId = settings.gl_supplier_ledger_group_id;
 
@@ -105,8 +108,12 @@ export async function provisionPartnerLedgers(partnerForm, settings) {
   const alreadyHasAR = !!partnerForm.receivable_account_id;
   const alreadyHasAP = !!partnerForm.payable_account_id;
 
-  // ── Customer (or dual-role) → AR ledger under Customer Group ─────────────
-  if (isCustomer && !alreadyHasAR && customerGroupId) {
+  let sharedLedgerId = null;
+  let sharedLedgerName = null;
+  let sharedLedgerCode = null;
+
+  // ── Primary Role: Customer ─────────────
+  if (primaryRole === 'Customer' && isCustomer && !alreadyHasAR && customerGroupId) {
     const ledger = await createPartnerLedger({
       partnerName:    partnerForm.name,
       parentGroupId:  customerGroupId,
@@ -117,10 +124,18 @@ export async function provisionPartnerLedgers(partnerForm, settings) {
     updates.receivable_account_id   = ledger.id;
     updates.receivable_account_name = ledger.account_name;
     updates.receivable_account_code = ledger.account_code;
+
+    sharedLedgerId = ledger.id;
+    sharedLedgerName = ledger.account_name;
+    sharedLedgerCode = ledger.account_code;
+  } else if (primaryRole === 'Customer' && alreadyHasAR) {
+    sharedLedgerId = partnerForm.receivable_account_id;
+    sharedLedgerName = partnerForm.receivable_account_name;
+    sharedLedgerCode = partnerForm.receivable_account_code;
   }
 
-  // ── Vendor (or dual-role) → AP ledger under Supplier Group ───────────────
-  if (isVendor && !alreadyHasAP && supplierGroupId) {
+  // ── Primary Role: Vendor ───────────────
+  if (primaryRole === 'Vendor' && isVendor && !alreadyHasAP && supplierGroupId) {
     const ledger = await createPartnerLedger({
       partnerName:    partnerForm.name,
       parentGroupId:  supplierGroupId,
@@ -131,6 +146,27 @@ export async function provisionPartnerLedgers(partnerForm, settings) {
     updates.payable_account_id   = ledger.id;
     updates.payable_account_name = ledger.account_name;
     updates.payable_account_code = ledger.account_code;
+
+    sharedLedgerId = ledger.id;
+    sharedLedgerName = ledger.account_name;
+    sharedLedgerCode = ledger.account_code;
+  } else if (primaryRole === 'Vendor' && alreadyHasAP) {
+    sharedLedgerId = partnerForm.payable_account_id;
+    sharedLedgerName = partnerForm.payable_account_name;
+    sharedLedgerCode = partnerForm.payable_account_code;
+  }
+
+  // ── Unified Ledger Re-use ──────────────
+  if (isVendor && primaryRole === 'Customer' && !alreadyHasAP && sharedLedgerId) {
+    updates.payable_account_id   = sharedLedgerId;
+    updates.payable_account_name = sharedLedgerName;
+    updates.payable_account_code = sharedLedgerCode;
+  }
+
+  if (isCustomer && primaryRole === 'Vendor' && !alreadyHasAR && sharedLedgerId) {
+    updates.receivable_account_id   = sharedLedgerId;
+    updates.receivable_account_name = sharedLedgerName;
+    updates.receivable_account_code = sharedLedgerCode;
   }
 
   return updates;

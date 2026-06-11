@@ -172,9 +172,15 @@ export default function PurchaseInvoices() {
         await sajilo.entities.PurchaseInvoice.update(form.id, payload);
 
         if (postStatus === 'Posted') {
-          const [itemsMap, glSettings] = await Promise.all([loadItemsMap(form.line_items.map(l => l.item_id)), loadSettings()]);
-          await postPurchaseInvoice(data, itemsMap, glSettings);
-          toast.success('Invoice updated and posted — stock, WAC & GL updated');
+          try {
+            const [itemsMap, glSettings] = await Promise.all([loadItemsMap(form.line_items.map(l => l.item_id)), loadSettings()]);
+            const journalId = await postPurchaseInvoice(data, itemsMap, glSettings);
+            await sajilo.entities.PurchaseInvoice.update(form.id, { gl_journal_id: journalId });
+            toast.success('Invoice updated and posted — stock, WAC & GL updated');
+          } catch (postErr) {
+            await sajilo.entities.PurchaseInvoice.update(form.id, { status: 'Draft' });
+            throw postErr;
+          }
         } else {
           toast.success('Invoice updated as draft');
         }
@@ -182,9 +188,15 @@ export default function PurchaseInvoices() {
         const created = await sajilo.entities.PurchaseInvoice.create(payload);
 
         if (postStatus === 'Posted') {
-          const [itemsMap, glSettings] = await Promise.all([loadItemsMap(form.line_items.map(l => l.item_id)), loadSettings()]);
-          await postPurchaseInvoice({ ...data, id: created.id }, itemsMap, glSettings);
-          toast.success('Invoice posted — stock, WAC & GL updated');
+          try {
+            const [itemsMap, glSettings] = await Promise.all([loadItemsMap(form.line_items.map(l => l.item_id)), loadSettings()]);
+            const journalId = await postPurchaseInvoice({ ...data, id: created.id }, itemsMap, glSettings);
+            await sajilo.entities.PurchaseInvoice.update(created.id, { gl_journal_id: journalId });
+            toast.success('Invoice posted — stock, WAC & GL updated');
+          } catch (postErr) {
+            await sajilo.entities.PurchaseInvoice.update(created.id, { status: 'Draft' });
+            throw postErr; // Re-throw to be caught by the outer catch for error toast
+          }
         } else {
           toast.success('Invoice saved as draft');
         }

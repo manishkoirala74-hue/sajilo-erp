@@ -446,7 +446,7 @@ export default function Suppliers() {
                 <Switch checked={!!form.treat_as_customer} onCheckedChange={v => setForm({ ...form, treat_as_customer: v, is_customer: v })} />
                 <div>
                   <Label className="cursor-pointer">Treat as Customer</Label>
-                  <p className="text-xs text-muted-foreground">Creates a twin AR sub-ledger under Customer Group and activates this partner in Sales/POS module dropdowns.</p>
+                  <p className="text-xs text-muted-foreground">Uses the same Supplier AP ledger for AR transactions and activates this partner in Sales/POS dropdowns.</p>
                 </div>
               </div>
               <div className="flex items-center gap-3">

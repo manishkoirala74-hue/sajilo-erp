@@ -8,6 +8,11 @@ import { RefreshCw } from 'lucide-react';
 
 // Standard GL posting account mappings (Sub Ledger accounts)
 const GL_FIELDS = [
+  { key: 'gl_accounts_receivable',     label: 'Accounts Receivable (AR)',          desc: 'Default control account for customer credit balances' },
+  { key: 'gl_accounts_payable',        label: 'Accounts Payable (AP)',             desc: 'Default control account for vendor credit balances' },
+  { key: 'gl_cash_account',            label: 'Default Cash Account',              desc: 'Used for cash sales and purchases' },
+  { key: 'gl_bank_account',            label: 'Default Bank Account',              desc: 'Used for bank transfers/cheque sales and purchases' },
+  { key: 'gl_vat_payable',             label: 'VAT Payable Account',               desc: 'Control account for input and output VAT' },
   { key: 'gl_sales_return_account',    label: 'Sales Returns & Allowances',        desc: 'Contra-revenue — debited on sales return' },
   { key: 'gl_purchase_return_account', label: 'Purchase Returns & Allowances',     desc: 'Contra-COGS — credited on purchase return' },
   { key: 'gl_default_sales_account',   label: 'Default Sales Revenue',             desc: 'Fallback if item has no sales account' },

@@ -40,9 +40,18 @@ export async function postPOSSale(sale, itemsMap, settings, isReversal = false) 
 
   const payAccId = sale.cash_bank_account_id || (sale.payment_method === 'Cash' ? s.gl_cash_account_id : s.gl_bank_account_id);
   
+  let customerArId = sale.receivable_account_id || sale.customer?.receivable_account_id;
+  if (!customerArId && sale.customer_id) {
+    const { data: cData } = await supabase.from('BusinessPartner').select('receivable_account_id').eq('id', sale.customer_id).maybeSingle();
+    if (cData) customerArId = cData.receivable_account_id;
+  }
+  const arId = customerArId || s.gl_accounts_receivable_id;
+
   if (sale.payment_method === 'Credit' && sale.customer_id) {
-    lines.push({ account_category: 'ar', account_id: s.gl_accounts_receivable_id, debit_amount: sale.grand_total, credit_amount: 0, description: 'Credit sale', entity_type: 'Customer', entity_id: sale.customer_id, due_date: sale.sale_date });
+    if (!arId) throw new Error('ERR_STRICT_ACCOUNT_MAPPING: Missing Accounts Receivable (AR) Account for this Customer');
+    lines.push({ account_category: 'ar', account_id: arId, debit_amount: sale.grand_total, credit_amount: 0, description: 'Credit sale', entity_type: 'Customer', entity_id: sale.customer_id, due_date: sale.sale_date });
   } else {
+    if (!payAccId) throw new Error(`ERR_STRICT_ACCOUNT_MAPPING: Missing ${sale.payment_method} Account in Company Settings`);
     lines.push({ account_id: payAccId, debit_amount: sale.grand_total, credit_amount: 0, description: 'Payment received', entity_type: 'Customer', entity_id: sale.customer_id, due_date: sale.sale_date });
   }
 
@@ -55,6 +64,7 @@ export async function postPOSSale(sale, itemsMap, settings, isReversal = false) 
   }
 
   if (sale.vat_amount > 0) {
+    if (!s.gl_vat_payable_id) throw new Error('ERR_STRICT_ACCOUNT_MAPPING: Missing VAT Payable Account in Company Settings');
     lines.push({ account_id: s.gl_vat_payable_id, debit_amount: 0, credit_amount: sale.vat_amount, description: 'Tax collected' });
   }
 
@@ -83,11 +93,20 @@ export async function postSalesInvoice(invoice, itemsMap, settings, isReversal =
   const s = settings || await sajilo.entities.CompanySettings.list().then(d => d[0] || {});
   const lines = [];
 
+  let customerArId = invoice.receivable_account_id || invoice.customer?.receivable_account_id;
+  if (!customerArId && invoice.customer_id) {
+    const { data: cData } = await supabase.from('BusinessPartner').select('receivable_account_id').eq('id', invoice.customer_id).maybeSingle();
+    if (cData) customerArId = cData.receivable_account_id;
+  }
+  const arId = customerArId || s.gl_accounts_receivable_id;
+
   if (['Cash', 'Bank'].includes(invoice.payment_mode)) {
     const cbId = invoice.cash_bank_account_id || (invoice.payment_mode === 'Cash' ? s.gl_cash_account_id : s.gl_bank_account_id);
+    if (!cbId) throw new Error(`ERR_STRICT_ACCOUNT_MAPPING: Missing ${invoice.payment_mode} Account in Company Settings`);
     lines.push({ account_id: cbId, debit_amount: invoice.grand_total, credit_amount: 0, entity_type: 'Customer', entity_id: invoice.customer_id, due_date: invoice.due_date || invoice.invoice_date });
   } else {
-    lines.push({ account_id: s.gl_accounts_receivable_id, debit_amount: invoice.grand_total, credit_amount: 0, entity_type: 'Customer', entity_id: invoice.customer_id, due_date: invoice.due_date || invoice.invoice_date });
+    if (!arId) throw new Error('ERR_STRICT_ACCOUNT_MAPPING: Missing Accounts Receivable (AR) Account for this Customer');
+    lines.push({ account_id: arId, debit_amount: invoice.grand_total, credit_amount: 0, entity_type: 'Customer', entity_id: invoice.customer_id, due_date: invoice.due_date || invoice.invoice_date });
   }
 
   for (const line of (invoice.line_items || [])) {
@@ -99,6 +118,7 @@ export async function postSalesInvoice(invoice, itemsMap, settings, isReversal =
   }
 
   if (invoice.total_tax_amount > 0) {
+    if (!s.gl_vat_payable_id) throw new Error('ERR_STRICT_ACCOUNT_MAPPING: Missing VAT Payable Account in Company Settings');
     lines.push({ account_id: s.gl_vat_payable_id, debit_amount: 0, credit_amount: invoice.total_tax_amount });
   }
 
@@ -122,8 +142,22 @@ export async function postSalesInvoice(invoice, itemsMap, settings, isReversal =
 
 // ─── 3. PURCHASE INVOICE ──────────────────────────────────────────────────────────
 export async function postPurchaseInvoice(invoice, itemsMap, settings, isReversal = false) {
-  if (isReversal && invoice.gl_journal_id) return reverseJournal(invoice.gl_journal_id, invoice.invoice_date, 'Purchase Invoice Cancelled');
+  let journalIdToReverse = invoice.gl_journal_id;
+  if (isReversal && !journalIdToReverse) {
+    const { data: journalData } = await supabase
+      .from('GeneralLedgerJournal')
+      .select('id')
+      .eq('source_document_id', invoice.id)
+      .eq('source_document_type', 'PurchaseInvoice')
+      .order('created_at', { ascending: false })
+      .limit(1);
+    if (journalData && journalData.length > 0) {
+      journalIdToReverse = journalData[0].id;
+    }
+  }
 
+  if (isReversal && journalIdToReverse) return reverseJournal(journalIdToReverse, invoice.invoice_date, 'Purchase Invoice Cancelled');
+  
   const s = settings || await sajilo.entities.CompanySettings.list().then(d => d[0] || {});
   const lines = [];
 
@@ -132,14 +166,24 @@ export async function postPurchaseInvoice(invoice, itemsMap, settings, isReversa
   }
 
   if (invoice.vat_amount > 0) {
+    if (!s.gl_vat_payable_id) throw new Error('ERR_STRICT_ACCOUNT_MAPPING: Missing VAT Payable Account in Company Settings');
     lines.push({ account_id: s.gl_vat_payable_id, debit_amount: invoice.vat_amount, credit_amount: 0, description: 'Input Tax' });
   }
 
+  let vendorApId = invoice.payable_account_id || invoice.vendor?.payable_account_id;
+  if (!vendorApId && invoice.vendor_id) {
+    const { data: vData } = await supabase.from('BusinessPartner').select('payable_account_id').eq('id', invoice.vendor_id).maybeSingle();
+    if (vData) vendorApId = vData.payable_account_id;
+  }
+  const apId = vendorApId || s.gl_accounts_payable_id;
+
   if (['Cash', 'Bank'].includes(invoice.payment_mode)) {
     const cbId = invoice.cash_bank_account_id || (invoice.payment_mode === 'Cash' ? s.gl_cash_account_id : s.gl_bank_account_id);
+    if (!cbId) throw new Error(`ERR_STRICT_ACCOUNT_MAPPING: Missing ${invoice.payment_mode} Account in Company Settings`);
     lines.push({ account_id: cbId, debit_amount: 0, credit_amount: invoice.grand_total, entity_type: 'Vendor', entity_id: invoice.vendor_id, due_date: invoice.due_date || invoice.invoice_date });
   } else {
-    lines.push({ account_id: s.gl_accounts_payable_id, debit_amount: 0, credit_amount: invoice.grand_total, entity_type: 'Vendor', entity_id: invoice.vendor_id, due_date: invoice.due_date || invoice.invoice_date });
+    if (!apId) throw new Error('ERR_STRICT_ACCOUNT_MAPPING: Missing Accounts Payable (AP) Account for this Vendor');
+    lines.push({ account_id: apId, debit_amount: 0, credit_amount: invoice.grand_total, entity_type: 'Vendor', entity_id: invoice.vendor_id, due_date: invoice.due_date || invoice.invoice_date });
   }
 
   const payload = {
@@ -176,12 +220,15 @@ export async function postSalesReturn(ret, itemsMap, settings) {
   const refundMethod = ret.refund_method || 'Cash';
   const refundAccId = (refundMethod === 'Bank Transfer' || refundMethod === 'Card') ? s.gl_bank_account_id : s.gl_cash_account_id;
 
+  if (!s.gl_sales_return_account_id) throw new Error('ERR_STRICT_ACCOUNT_MAPPING: Missing Sales Return Account in Company Settings');
   lines.push({ account_id: s.gl_sales_return_account_id, debit_amount: ret.subtotal, credit_amount: 0 });
 
   if (ret.vat_amount > 0) {
+    if (!s.gl_vat_payable_id) throw new Error('ERR_STRICT_ACCOUNT_MAPPING: Missing VAT Payable Account in Company Settings');
     lines.push({ account_id: s.gl_vat_payable_id, debit_amount: ret.vat_amount, credit_amount: 0, description: 'Tax reversal' });
   }
 
+  if (!refundAccId) throw new Error(`ERR_STRICT_ACCOUNT_MAPPING: Missing ${refundMethod} Account in Company Settings`);
   lines.push({ account_id: refundAccId, debit_amount: 0, credit_amount: ret.grand_total, description: `Refund via ${refundMethod}` });
 
   for (const line of (ret.line_items || [])) {
@@ -215,13 +262,22 @@ export async function postPurchaseReturn(ret, itemsMap, settings) {
   const s = settings || await sajilo.entities.CompanySettings.list().then(d => d[0] || {});
   const lines = [];
 
-  lines.push({ account_id: s.gl_accounts_payable_id, debit_amount: ret.grand_total, credit_amount: 0, entity_type: 'Vendor', entity_id: ret.vendor_id, due_date: ret.return_date });
+  let vendorApId = ret.payable_account_id || ret.vendor?.payable_account_id;
+  if (!vendorApId && ret.vendor_id) {
+    const { data: vData } = await supabase.from('BusinessPartner').select('payable_account_id').eq('id', ret.vendor_id).maybeSingle();
+    if (vData) vendorApId = vData.payable_account_id;
+  }
+  const apId = vendorApId || s.gl_accounts_payable_id;
+
+  if (!apId) throw new Error('ERR_STRICT_ACCOUNT_MAPPING: Missing Accounts Payable (AP) Account for this Vendor');
+  lines.push({ account_id: apId, debit_amount: ret.grand_total, credit_amount: 0, entity_type: 'Vendor', entity_id: ret.vendor_id, due_date: ret.return_date });
 
   for (const line of (ret.line_items || [])) {
     lines.push({ account_category: 'inventory', item_id: line.item_id, debit_amount: 0, credit_amount: line.line_total, description: `Return: ${line.item_name}` });
   }
 
   if (ret.vat_amount > 0) {
+    if (!s.gl_vat_payable_id) throw new Error('ERR_STRICT_ACCOUNT_MAPPING: Missing VAT Payable Account in Company Settings');
     lines.push({ account_id: s.gl_vat_payable_id, debit_amount: 0, credit_amount: ret.vat_amount, description: 'Tax reversal' });
   }
 
