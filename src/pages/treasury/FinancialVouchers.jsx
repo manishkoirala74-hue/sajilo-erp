@@ -413,7 +413,7 @@ export default function FinancialVouchers() {
                 <Button size="sm" variant="outline" onClick={addEntry}>+ Add Row</Button>
               </div>
               {isPaymentType && cashAccounts.length > 0 && (
-                <p className="text-xs text-blue-600 bg-blue-50 border border-blue-200 rounded px-3 py-1.5 mb-2">
+                <p className="text-xs text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 rounded px-3 py-1.5 mb-2">
                   Row 1 (payment source) is restricted to <strong>Cash & Cash Equivalents</strong> accounts only.
                 </p>
               )}
@@ -448,7 +448,7 @@ export default function FinancialVouchers() {
                           </td>
                           <td className="px-2 py-1 w-28"><Input type="number" value={e.debit} onChange={ev => handleEntry(idx, 'debit', ev.target.value)} className="h-8" /></td>
                           <td className="px-2 py-1 w-28"><Input type="number" value={e.credit} onChange={ev => handleEntry(idx, 'credit', ev.target.value)} className="h-8" /></td>
-                          <td className="px-2 py-1"><button onClick={() => removeEntry(idx)} className="text-red-500 hover:text-red-700 px-2">×</button></td>
+                          <td className="px-2 py-1"><button onClick={() => removeEntry(idx)} className="text-red-500 hover:text-red-700 dark:text-red-400 px-2">×</button></td>
                         </tr>
                       );
                     })}
@@ -475,7 +475,7 @@ export default function FinancialVouchers() {
           <DialogHeader><DialogTitle>Voucher — {selected?.voucher_number}</DialogTitle></DialogHeader>
           {selected && (
             <div className="space-y-4 text-sm">
-              <div id="voucher-content" className="space-y-4 p-4 bg-white">
+              <div id="voucher-content" className="space-y-4 p-4 bg-card">
                 <div className="text-center border-b pb-4 mb-4">
                   <h2 className="text-lg font-bold uppercase">{selected.voucher_type} VOUCHER</h2>
                   <p className="text-sm text-muted-foreground">{selected.voucher_number}</p>
@@ -541,7 +541,7 @@ export default function FinancialVouchers() {
                     <Button
                       variant="outline"
                       size="sm"
-                      className="gap-1.5 text-amber-600 border-amber-300 hover:bg-amber-50"
+                      className="gap-1.5 text-amber-600 dark:text-amber-400 border-amber-300 dark:border-amber-500/30 hover:bg-amber-50 dark:bg-amber-500/10"
                       onClick={() => { setActionReason(''); setActionDialog('reverse'); }}
                     >
                       <RotateCcw className="w-3.5 h-3.5" /> Reverse Voucher
@@ -549,7 +549,7 @@ export default function FinancialVouchers() {
                     <Button
                       variant="outline"
                       size="sm"
-                      className="gap-1.5 text-red-600 border-red-300 hover:bg-red-50"
+                      className="gap-1.5 text-red-600 dark:text-red-400 border-red-300 dark:border-red-500/30 hover:bg-red-50 dark:bg-red-500/10"
                       onClick={() => { setActionReason(''); setActionDialog('delete'); }}
                     >
                       <Trash2 className="w-3.5 h-3.5" /> Delete Voucher
@@ -566,22 +566,22 @@ export default function FinancialVouchers() {
       <Dialog open={!!actionDialog} onOpenChange={v => { if (!v) setActionDialog(null); }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle className={`flex items-center gap-2 ${actionDialog === 'delete' ? 'text-red-600' : 'text-amber-600'}`}>
+            <DialogTitle className={`flex items-center gap-2 ${actionDialog === 'delete' ? 'text-red-600 dark:text-red-400' : 'text-amber-600 dark:text-amber-400'}`}>
               {actionDialog === 'delete' ? <Trash2 className="w-4 h-4" /> : <RotateCcw className="w-4 h-4" />}
               {actionDialog === 'delete' ? 'Delete Voucher' : 'Reverse Voucher'}
             </DialogTitle>
           </DialogHeader>
 
           <div className="space-y-4">
-            <div className={`flex items-start gap-2 rounded-lg p-3 border ${actionDialog === 'delete' ? 'bg-red-50 border-red-200' : 'bg-amber-50 border-amber-200'}`}>
+            <div className={`flex items-start gap-2 rounded-lg p-3 border ${actionDialog === 'delete' ? 'bg-red-50 dark:bg-red-500/10 border-red-200 dark:border-red-500/20' : 'bg-amber-50 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/20'}`}>
               <AlertTriangle className={`w-4 h-4 mt-0.5 shrink-0 ${actionDialog === 'delete' ? 'text-red-500' : 'text-amber-500'}`} />
               <div className="text-sm">
                 {actionDialog === 'delete' ? (
-                  <p className="font-medium text-red-800">
+                  <p className="font-medium text-red-800 dark:text-red-300">
                     This will permanently delete <strong>{selected?.voucher_number}</strong> and reverse any GL postings. This action cannot be undone.
                   </p>
                 ) : (
-                  <p className="font-medium text-amber-800">
+                  <p className="font-medium text-amber-800 dark:text-amber-300">
                     This will create a <strong>reversal entry</strong> (REV-{selected?.voucher_number}) with opposite debit/credit lines, and mark the original as Cancelled.
                   </p>
                 )}

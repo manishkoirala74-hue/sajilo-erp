@@ -78,7 +78,7 @@ export default function Categories() {
       key: 'category_name', label: 'Category Name',
       render: (val) => (
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-md bg-indigo-50 flex items-center justify-center">
+          <div className="w-7 h-7 rounded-md bg-indigo-50 dark:bg-indigo-500/10 flex items-center justify-center">
             <Tag className="w-3.5 h-3.5 text-indigo-500" />
           </div>
           <span className="font-medium">{val}</span>
@@ -89,7 +89,7 @@ export default function Categories() {
     { key: 'description', label: 'Description' },
     {
       key: 'discount_scheme_name', label: 'Discount',
-      render: v => v ? <span className="text-xs bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full">{v}</span> : '—'
+      render: v => v ? <span className="text-xs bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20 px-2 py-0.5 rounded-full">{v}</span> : '—'
     },
     {
       key: 'actions', label: '',

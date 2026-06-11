@@ -111,7 +111,7 @@ export default function FiscalYearSettings() {
   if (loading) return <div className="p-8 text-center text-sm text-muted-foreground">Loading Fiscal Years...</div>;
 
   return (
-    <div className="bg-white border border-border rounded-xl overflow-hidden">
+    <div className="bg-card border border-border rounded-xl overflow-hidden">
       <div className="flex items-center justify-between px-5 py-4 border-b border-border bg-muted/20">
         <div className="flex items-center gap-2">
           <Calendar className="w-5 h-5 text-primary" />
@@ -153,7 +153,7 @@ export default function FiscalYearSettings() {
                     <div className="flex justify-center">
                       <button 
                         onClick={() => toggleActive(fy.id, fy.is_active)}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${fy.is_active ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${fy.is_active ? 'bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400 hover:bg-green-200' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
                       >
                         {fy.is_active ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Circle className="w-3.5 h-3.5" />}
                         {fy.is_active ? 'Active' : 'Inactive'}
@@ -170,7 +170,7 @@ export default function FiscalYearSettings() {
                             toggleLock(fy.id, fy.is_locked);
                           }
                         }}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${fy.is_locked ? 'bg-red-100 text-red-700 hover:bg-red-200' : 'bg-blue-50 text-blue-600 hover:bg-blue-100'}`}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${fy.is_locked ? 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400 hover:bg-red-200' : 'bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:bg-blue-500/20'}`}
                       >
                         {fy.is_locked ? <KeyRound className="w-3.5 h-3.5" /> : <Unlock className="w-3.5 h-3.5" />}
                         {fy.is_locked ? 'Re-Open' : 'Open'}
@@ -240,7 +240,7 @@ export default function FiscalYearSettings() {
             <DialogTitle>Re-Open Locked Year</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 mt-2">
-            <div className="bg-red-50 text-red-800 p-3 rounded-lg text-sm border border-red-200">
+            <div className="bg-red-50 dark:bg-red-500/10 text-red-800 dark:text-red-300 p-3 rounded-lg text-sm border border-red-200 dark:border-red-500/20">
               <strong>Warning:</strong> Re-opening a closed fiscal year allows historical modifications. 
               Any changes will trigger an automatic recascading to subsequent years.
             </div>

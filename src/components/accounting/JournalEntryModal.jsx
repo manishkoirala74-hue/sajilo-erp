@@ -142,7 +142,7 @@ export default function JournalEntryModal({ open, onClose, accounts, onSaved }) 
                 </div>
                 <div className="col-span-2">
                   <Select value={line.entity_id || "none"} onValueChange={v => selectEntity(i, v === "none" ? null : v)}>
-                    <SelectTrigger className="h-8 text-xs bg-white">
+                    <SelectTrigger className="h-8 text-xs bg-card">
                       <SelectValue placeholder="No Entity" />
                     </SelectTrigger>
                     <SelectContent>
@@ -175,10 +175,10 @@ export default function JournalEntryModal({ open, onClose, accounts, onSaved }) 
         </div>
 
         {/* Totals */}
-        <div className={cn('flex items-center justify-between rounded-xl px-4 py-3 text-sm font-medium mt-3', isBalanced ? 'bg-emerald-50 border border-emerald-200' : 'bg-amber-50 border border-amber-200')}>
+        <div className={cn('flex items-center justify-between rounded-xl px-4 py-3 text-sm font-medium mt-3', isBalanced ? 'bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20' : 'bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20')}>
           <div className="flex items-center gap-2">
-            {isBalanced ? <CheckCircle2 className="w-4 h-4 text-emerald-600" /> : <AlertCircle className="w-4 h-4 text-amber-600" />}
-            <span className={isBalanced ? 'text-emerald-700' : 'text-amber-700'}>{isBalanced ? 'Balanced — Ready to Post' : `Difference: NPR ${Math.abs(totalDebit - totalCredit).toLocaleString()}`}</span>
+            {isBalanced ? <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" /> : <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400" />}
+            <span className={isBalanced ? 'text-emerald-700 dark:text-emerald-400' : 'text-amber-700 dark:text-amber-400'}>{isBalanced ? 'Balanced — Ready to Post' : `Difference: NPR ${Math.abs(totalDebit - totalCredit).toLocaleString()}`}</span>
           </div>
           <div className="flex gap-6 text-xs">
             <span>Total Dr: <strong className="font-mono">NPR {totalDebit.toLocaleString()}</strong></span>

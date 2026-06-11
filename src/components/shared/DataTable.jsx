@@ -13,7 +13,7 @@ export default function DataTable({ columns, data, searchKey, loading }) {
     : data;
 
   return (
-    <div className="bg-white rounded-xl border border-border overflow-hidden">
+    <div className="bg-card rounded-xl border border-border overflow-hidden">
       {searchKey && (
         <div className="p-4 border-b border-border">
           <div className="flex items-center gap-2 bg-muted rounded-lg px-3 py-2 max-w-xs">

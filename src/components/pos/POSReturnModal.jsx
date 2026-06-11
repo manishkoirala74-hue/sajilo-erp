@@ -110,7 +110,7 @@ export default function POSReturnModal({ sale, onClose, onPosted }) {
         </DialogHeader>
 
         {/* Accounting notice */}
-        <div className="flex items-start gap-2 bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 text-sm text-blue-800">
+        <div className="flex items-start gap-2 bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 rounded-lg px-4 py-3 text-sm text-blue-800 dark:text-blue-300">
           <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
           <div>
             <strong>Accounting treatment on posting:</strong>
@@ -182,7 +182,7 @@ export default function POSReturnModal({ sale, onClose, onPosted }) {
                       </td>
                       <td className="px-3 py-2 text-right">{fmt(l.unit_price)}</td>
                       <td className="px-3 py-2 text-center">{l.vat_applicable ? '13%' : '—'}</td>
-                      <td className="px-3 py-2 text-right font-semibold text-orange-600">{l.selected ? fmt(lineRefund) : '—'}</td>
+                      <td className="px-3 py-2 text-right font-semibold text-orange-600 dark:text-orange-400">{l.selected ? fmt(lineRefund) : '—'}</td>
                     </tr>
                   );
                 })}
@@ -196,7 +196,7 @@ export default function POSReturnModal({ sale, onClose, onPosted }) {
           <div className="w-64 text-sm space-y-1 bg-muted/30 rounded-lg p-3">
             <div className="flex justify-between text-muted-foreground"><span>Refund Subtotal</span><span>{fmt(subtotal)}</span></div>
             {vatAmount > 0 && <div className="flex justify-between text-muted-foreground"><span>VAT Reversed (13%)</span><span>{fmt(vatAmount)}</span></div>}
-            <div className="flex justify-between font-bold border-t pt-1"><span>Total Refund</span><span className="text-orange-600">{fmt(grandTotal)}</span></div>
+            <div className="flex justify-between font-bold border-t pt-1"><span>Total Refund</span><span className="text-orange-600 dark:text-orange-400">{fmt(grandTotal)}</span></div>
             <p className="text-xs text-muted-foreground pt-1">Refund method: <strong>{refundMethod}</strong></p>
           </div>
         </div>

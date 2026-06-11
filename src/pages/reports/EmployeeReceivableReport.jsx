@@ -54,7 +54,7 @@ export default function EmployeeReceivableReport() {
     { key: 'code', label: 'Emp Code' },
     { key: 'name', label: 'Employee Name' },
     { key: 'dept', label: 'Department' },
-    { key: 'balance', label: 'Advances / Receivables Due', render: v => <span className="font-bold text-orange-600">{fmt(v)}</span> }
+    { key: 'balance', label: 'Advances / Receivables Due', render: v => <span className="font-bold text-orange-600 dark:text-orange-400">{fmt(v)}</span> }
   ];
 
   return (

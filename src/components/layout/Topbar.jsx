@@ -1,6 +1,7 @@
-import { Bell, ChevronDown, LogOut, User, Menu } from 'lucide-react';
+import { Bell, ChevronDown, LogOut, User, Menu, Sun, Moon } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
 import { useDateFormat } from '@/lib/DateFormatContext';
+import { useTheme } from '@/lib/ThemeContext';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
@@ -12,9 +13,10 @@ import GlobalSearch from './GlobalSearch';
 export default function Topbar({ pageTitle, onMenuClick }) {
   const { user, logout } = useAuth();
   const { dateFormat, toggleDateFormat } = useDateFormat();
+  const { theme, toggleTheme } = useTheme();
 
   return (
-    <header className="sticky top-0 z-30 h-16 bg-white border-b border-border flex items-center justify-between px-4 md:px-6 shrink-0">
+    <header className="sticky top-0 z-30 h-16 bg-card border-b border-border flex items-center justify-between px-4 md:px-6 shrink-0">
       <div className="flex items-center gap-3 md:gap-4">
         <button onClick={onMenuClick} className="md:hidden p-2 -ml-2 text-muted-foreground hover:bg-muted rounded-full touch-target">
           <Menu className="w-5 h-5" />
@@ -38,6 +40,11 @@ export default function Topbar({ pageTitle, onMenuClick }) {
           <span className="text-muted-foreground">/</span>
           <span className={dateFormat === 'BS' ? 'text-primary' : 'text-muted-foreground'}>BS</span>
         </button>
+
+        {/* Theme Toggle */}
+        <Button variant="ghost" size="icon" onClick={toggleTheme} className="relative">
+          {theme === 'dark' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
+        </Button>
 
         {/* Notifications */}
         <Button variant="ghost" size="icon" className="relative">

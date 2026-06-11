@@ -180,7 +180,7 @@ export default function CompanyManagement() {
               <Label>Address</Label>
               <Input value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} className="mt-1" />
             </div>
-            <div className="col-span-2 border border-border p-4 rounded-lg bg-white mt-2">
+            <div className="col-span-2 border border-border p-4 rounded-lg bg-card mt-2">
               <Label className="mb-2 block">Company Logo</Label>
               <div className="flex items-center gap-4">
                 {formData.logo_url ? (
@@ -214,7 +214,7 @@ export default function CompanyManagement() {
         </form>
       )}
 
-      <div className="bg-white border border-border rounded-lg overflow-hidden">
+      <div className="bg-card border border-border rounded-lg overflow-hidden">
         <table className="w-full text-sm text-left">
           <thead className="bg-muted/50 border-b border-border">
             <tr>
@@ -240,7 +240,7 @@ export default function CompanyManagement() {
                   <div className="text-xs">{c.phone}</div>
                 </td>
                 <td className="px-4 py-3">
-                  <span className={`px-2 py-1 rounded-full text-xs ${c.is_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                  <span className={`px-2 py-1 rounded-full text-xs ${c.is_active ? 'bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400' : 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400'}`}>
                     {c.is_active ? 'Active' : 'Inactive'}
                   </span>
                 </td>

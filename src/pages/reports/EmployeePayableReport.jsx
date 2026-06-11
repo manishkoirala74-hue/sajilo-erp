@@ -51,7 +51,7 @@ export default function EmployeePayableReport() {
     { key: 'code', label: 'Emp Code' },
     { key: 'name', label: 'Employee Name' },
     { key: 'dept', label: 'Department' },
-    { key: 'balance', label: 'Net Salary Payable', render: v => <span className="font-bold text-emerald-600">{fmt(v)}</span> }
+    { key: 'balance', label: 'Net Salary Payable', render: v => <span className="font-bold text-emerald-600 dark:text-emerald-400">{fmt(v)}</span> }
   ];
 
   return (

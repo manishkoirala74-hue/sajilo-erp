@@ -94,8 +94,8 @@ export default function BusinessPartners() {
       key: 'is_customer', label: 'Role',
       render: (_, row) => (
         <div className="flex gap-1.5">
-          {row.is_customer && <span className="px-2 py-0.5 rounded-full text-xs bg-blue-100 text-blue-700 font-medium">Customer</span>}
-          {row.is_vendor && <span className="px-2 py-0.5 rounded-full text-xs bg-purple-100 text-purple-700 font-medium">Vendor</span>}
+          {row.is_customer && <span className="px-2 py-0.5 rounded-full text-xs bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400 font-medium">Customer</span>}
+          {row.is_vendor && <span className="px-2 py-0.5 rounded-full text-xs bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-400 font-medium">Vendor</span>}
         </div>
       )
     },
@@ -140,7 +140,7 @@ export default function BusinessPartners() {
             key={f}
             onClick={() => setFilter(f)}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors capitalize ${
-              filter === f ? 'bg-primary text-white' : 'bg-white border border-border text-muted-foreground hover:bg-muted'
+              filter === f ? 'bg-primary text-white' : 'bg-card border border-border text-muted-foreground hover:bg-muted'
             }`}
           >
             {f === 'all' ? 'All Partners' : f === 'customer' ? 'Customers' : 'Vendors'}

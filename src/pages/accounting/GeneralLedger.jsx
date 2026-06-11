@@ -11,25 +11,25 @@ import JournalEntryModal from '@/components/accounting/JournalEntryModal';
 import JournalDetailDrawer from '@/components/accounting/JournalDetailDrawer';
 
 const MODULE_COLORS = {
-  Manufacturing: 'bg-orange-100 text-orange-700',
-  Payroll: 'bg-purple-100 text-purple-700',
-  Assets: 'bg-blue-100 text-blue-700',
-  General: 'bg-slate-100 text-slate-600',
-  Sales: 'bg-emerald-100 text-emerald-700',
-  Purchase: 'bg-amber-100 text-amber-700',
-  Stock: 'bg-cyan-100 text-cyan-700',
+  Manufacturing: 'bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-400',
+  Payroll: 'bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-400',
+  Assets: 'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400',
+  General: 'bg-slate-100 dark:bg-slate-500/20 text-muted-foreground',
+  Sales: 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400',
+  Purchase: 'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400',
+  Stock: 'bg-cyan-100 dark:bg-cyan-500/20 text-cyan-700 dark:text-cyan-400',
 };
 
 const STATUS_ICON = {
-  Posted: <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />,
+  Posted: <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />,
   Draft: <Clock className="w-3.5 h-3.5 text-amber-500" />,
   Reversed: <AlertCircle className="w-3.5 h-3.5 text-red-500" />,
 };
 
 const STATUS_COLORS = {
-  Posted: 'text-emerald-700 bg-emerald-50 border-emerald-200',
-  Draft: 'text-amber-700 bg-amber-50 border-amber-200',
-  Reversed: 'text-red-700 bg-red-50 border-red-200',
+  Posted: 'text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/20',
+  Draft: 'text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/20',
+  Reversed: 'text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-500/10 border-red-200 dark:border-red-500/20',
 };
 
 export default function GeneralLedger() {
@@ -73,11 +73,11 @@ export default function GeneralLedger() {
       <div className="grid grid-cols-4 gap-3">
         {[
           { label: 'Total Entries', val: filtered.length, color: 'text-foreground' },
-          { label: 'Posted', val: filtered.filter(j => j.status === 'Posted').length, color: 'text-emerald-700' },
-          { label: 'Total Posted Dr', val: `NPR ${totalPostedDr.toLocaleString()}`, color: 'text-blue-700' },
-          { label: 'Total Posted Cr', val: `NPR ${totalPostedCr.toLocaleString()}`, color: 'text-emerald-700' },
+          { label: 'Posted', val: filtered.filter(j => j.status === 'Posted').length, color: 'text-emerald-700 dark:text-emerald-400' },
+          { label: 'Total Posted Dr', val: `NPR ${totalPostedDr.toLocaleString()}`, color: 'text-blue-700 dark:text-blue-400' },
+          { label: 'Total Posted Cr', val: `NPR ${totalPostedCr.toLocaleString()}`, color: 'text-emerald-700 dark:text-emerald-400' },
         ].map(item => (
-          <div key={item.label} className="bg-white border border-border rounded-xl p-4">
+          <div key={item.label} className="bg-card border border-border rounded-xl p-4">
             <p className="text-xs text-muted-foreground">{item.label}</p>
             <p className={cn('text-xl font-bold mt-1', item.color)}>{item.val}</p>
           </div>
@@ -115,7 +115,7 @@ export default function GeneralLedger() {
       </div>
 
       {/* Table */}
-      <div className="bg-white border border-border rounded-xl overflow-hidden">
+      <div className="bg-card border border-border rounded-xl overflow-hidden">
         <div className="flex items-center gap-2 px-5 py-3 border-b border-border bg-muted/20">
           <BookOpen className="w-4 h-4 text-primary" />
           <span className="font-semibold text-sm">General Ledger Journal</span>
@@ -156,8 +156,8 @@ export default function GeneralLedger() {
                       <span className={cn('inline-flex px-2 py-0.5 rounded text-xs font-medium', MODULE_COLORS[j.reference_module] || MODULE_COLORS.General)}>{j.reference_module}</span>
                     </td>
                     <td className="px-4 py-3 text-xs text-muted-foreground">{j.source_document_type || '—'}</td>
-                    <td className="px-4 py-3 text-right font-mono text-blue-700 font-semibold">{(j.total_debit || 0).toLocaleString()}</td>
-                    <td className="px-4 py-3 text-right font-mono text-emerald-700 font-semibold">{(j.total_credit || 0).toLocaleString()}</td>
+                    <td className="px-4 py-3 text-right font-mono text-blue-700 dark:text-blue-400 font-semibold">{(j.total_debit || 0).toLocaleString()}</td>
+                    <td className="px-4 py-3 text-right font-mono text-emerald-700 dark:text-emerald-400 font-semibold">{(j.total_credit || 0).toLocaleString()}</td>
                     <td className="px-4 py-3 text-center">
                       {balanced
                         ? <CheckCircle2 className="w-4 h-4 text-emerald-500 mx-auto" />

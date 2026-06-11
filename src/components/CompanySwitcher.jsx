@@ -33,9 +33,9 @@ export const CompanySwitcher = () => {
       </div>
 
       {isSwitchingCompany && (
-        <div className="fixed inset-0 z-[9999] bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center">
+        <div className="fixed inset-0 z-[9999] bg-card/80 backdrop-blur-sm flex flex-col items-center justify-center">
           <Loader2 className="w-10 h-10 animate-spin text-primary mb-3" />
-          <h2 className="text-lg font-semibold text-gray-900">Switching Workspace...</h2>
+          <h2 className="text-lg font-semibold text-foreground">Switching Workspace...</h2>
           <p className="text-sm text-gray-500 mt-1">Loading company data into memory for faster access.</p>
         </div>
       )}

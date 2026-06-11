@@ -61,14 +61,14 @@ export function BSDatePicker({ label, adValue, onChange }) {
         <input
           type="number" min={1} max={maxDays} value={day}
           onChange={e => { const d = Number(e.target.value); setDay(d); commit(year, month, d); }}
-          className="w-14 h-8 rounded-md border border-input bg-white px-2 text-xs text-center focus:outline-none focus:ring-1 focus:ring-ring tabular-nums"
+          className="w-14 h-8 rounded-md border border-input bg-card px-2 text-xs text-center focus:outline-none focus:ring-1 focus:ring-ring tabular-nums"
           placeholder="DD"
         />
         {/* Month */}
         <select
           value={month}
           onChange={e => { const m = Number(e.target.value); setMonth(m); commit(year, m, day); }}
-          className="h-8 rounded-md border border-input bg-white px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+          className="h-8 rounded-md border border-input bg-card px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
         >
           {BS_MONTHS.map((name, i) => <option key={i + 1} value={i + 1}>{name}</option>)}
         </select>
@@ -76,7 +76,7 @@ export function BSDatePicker({ label, adValue, onChange }) {
         <select
           value={year}
           onChange={e => { const y = Number(e.target.value); setYear(y); commit(y, month, day); }}
-          className="h-8 rounded-md border border-input bg-white px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+          className="h-8 rounded-md border border-input bg-card px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
         >
           {BS_YEARS.map(y => <option key={y} value={y}>{y}</option>)}
         </select>
@@ -108,10 +108,10 @@ export default function ReportFilterBar({ filters, onChange, onApply, showApplyB
   const set = (key, val) => onChange({ ...filters, [key]: val });
 
   return (
-    <div className={cn('bg-white border border-border rounded-xl overflow-hidden shadow-sm', className)}>
+    <div className={cn('bg-card border border-border rounded-xl overflow-hidden shadow-sm', className)}>
       <button
         onClick={() => setCollapsed(p => !p)}
-        className="w-full flex items-center gap-2.5 px-4 py-2.5 bg-slate-50 hover:bg-slate-100 transition-colors text-left border-b border-border"
+        className="w-full flex items-center gap-2.5 px-4 py-2.5 bg-muted/50 hover:bg-slate-100 dark:bg-slate-500/20 transition-colors text-left border-b border-border"
       >
         <Filter className="w-3.5 h-3.5 text-primary shrink-0" />
         <span className="text-xs font-bold uppercase tracking-wider text-foreground flex-1">Filters</span>

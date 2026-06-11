@@ -235,7 +235,7 @@ export default function Suppliers() {
       </div>
 
       {/* Table */}
-      <div className="bg-white border border-border rounded-xl overflow-hidden">
+      <div className="bg-card border border-border rounded-xl overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-muted/30 border-b border-border">
             <tr>
@@ -279,11 +279,11 @@ export default function Suppliers() {
                 </td>
                 <td className="px-4 py-2.5" onClick={e => e.stopPropagation()}>
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center overflow-hidden">
+                    <div className="w-8 h-8 rounded-full bg-purple-100 dark:bg-purple-500/20 flex items-center justify-center overflow-hidden">
                       {row.profile_picture_url ? (
                         <img src={row.profile_picture_url} alt="Avatar" className="w-full h-full object-cover" />
                       ) : (
-                        row.partner_type === 'Company' ? <Building2 className="w-4 h-4 text-purple-600" /> : <User className="w-4 h-4 text-purple-600" />
+                        row.partner_type === 'Company' ? <Building2 className="w-4 h-4 text-purple-600 dark:text-purple-400" /> : <User className="w-4 h-4 text-purple-600 dark:text-purple-400" />
                       )}
                     </div>
                     <div>
@@ -295,11 +295,11 @@ export default function Suppliers() {
                 <td className="px-4 py-2.5 text-sm text-muted-foreground">{row.tax_id_number || '—'}</td>
                 <td className="px-4 py-2.5 text-sm text-muted-foreground">{row.city || '—'}</td>
                 <td className="px-4 py-2.5">
-                  {row.treat_as_customer ? <span className="px-2 py-0.5 rounded-full text-xs bg-blue-100 text-blue-700 font-medium">Also Customer</span> : null}
+                  {row.treat_as_customer ? <span className="px-2 py-0.5 rounded-full text-xs bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400 font-medium">Also Customer</span> : null}
                 </td>
                 <td className="px-4 py-2.5">
                   {row.payable_account_name
-                    ? <div><span className="text-xs font-mono font-semibold text-emerald-700">{row.payable_account_code || ''}</span>{row.payable_account_code && <span className="text-xs text-muted-foreground mx-1">—</span>}<span className="text-xs text-emerald-700">{row.payable_account_name}</span></div>
+                    ? <div><span className="text-xs font-mono font-semibold text-emerald-700 dark:text-emerald-400">{row.payable_account_code || ''}</span>{row.payable_account_code && <span className="text-xs text-muted-foreground mx-1">—</span>}<span className="text-xs text-emerald-700 dark:text-emerald-400">{row.payable_account_name}</span></div>
                     : <span className="text-xs text-muted-foreground">—</span>}
                 </td>
                 <td className="px-4 py-2.5"><StatusBadge status={row.is_active ? 'Active' : 'Inactive'} /></td>
@@ -309,7 +309,7 @@ export default function Suppliers() {
                     <Button variant="ghost" size="icon" onClick={() => toggleActive(row)}>
                       {row.is_active ? <ToggleRight className="w-4 h-4 text-emerald-500" /> : <ToggleLeft className="w-4 h-4 text-slate-400" />}
                     </Button>
-                    <Button variant="ghost" size="icon" className="text-red-500 hover:text-red-700 hover:bg-red-50" onClick={() => handleDelete(row)}><Trash2 className="w-4 h-4" /></Button>
+                    <Button variant="ghost" size="icon" className="text-red-500 hover:text-red-700 dark:text-red-400 hover:bg-red-50 dark:bg-red-500/10" onClick={() => handleDelete(row)}><Trash2 className="w-4 h-4" /></Button>
                   </div>
                 </td>
               </tr>
@@ -455,7 +455,7 @@ export default function Suppliers() {
               </div>
             </div>
             {editing?.payable_account_name && (
-              <div className="col-span-2 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 text-xs text-emerald-700">
+              <div className="col-span-2 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 rounded-lg px-3 py-2 text-xs text-emerald-700 dark:text-emerald-400">
                 AP Ledger: <span className="font-mono font-semibold">{editing.payable_account_code && `${editing.payable_account_code} — `}{editing.payable_account_name}</span>
               </div>
             )}

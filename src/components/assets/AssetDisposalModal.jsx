@@ -113,11 +113,11 @@ export default function AssetDisposalModal({ asset, accounts = [], settings, ope
           </div>
           <div>
             <p className="text-muted-foreground">Accum. Dep.</p>
-            <p className="font-mono font-semibold text-amber-600 truncate">{fmt(accumDep)}</p>
+            <p className="font-mono font-semibold text-amber-600 dark:text-amber-400 truncate">{fmt(accumDep)}</p>
           </div>
           <div>
             <p className="text-muted-foreground">Net Book Value</p>
-            <p className="font-mono font-semibold text-blue-700 truncate">{fmt(nbv)}</p>
+            <p className="font-mono font-semibold text-blue-700 dark:text-blue-400 truncate">{fmt(nbv)}</p>
           </div>
         </div>
 
@@ -183,8 +183,8 @@ export default function AssetDisposalModal({ asset, accounts = [], settings, ope
           {/* Gain / Loss Preview */}
           <div className={cn(
             'rounded-lg px-3 py-2.5 text-sm font-semibold flex items-center gap-2',
-            isGain      ? 'bg-emerald-50 border border-emerald-200 text-emerald-800' :
-            isLoss      ? 'bg-red-50 border border-red-200 text-red-800' :
+            isGain      ? 'bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 text-emerald-800 dark:text-emerald-300' :
+            isLoss      ? 'bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-800 dark:text-red-300' :
                           'bg-muted border border-border text-muted-foreground'
           )}>
             {isGain  ? <TrendingUp   className="w-4 h-4 shrink-0" /> :
@@ -215,36 +215,36 @@ export default function AssetDisposalModal({ asset, accounts = [], settings, ope
           </div>
 
           {/* GL Journal Preview */}
-          <div className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-xs space-y-1 font-mono overflow-x-auto">
+          <div className="bg-muted/50 border border-border rounded-lg px-3 py-2.5 text-xs space-y-1 font-mono overflow-x-auto">
             <p className="text-slate-500 font-sans font-semibold mb-1 text-xs">Journal Preview</p>
             {accumDep > 0 && (
               <p className="whitespace-nowrap">
-                <span className="text-blue-600">DR</span> {asset.accumulated_dep_ledger_name || 'Accum. Dep.'}{' '}
+                <span className="text-blue-600 dark:text-blue-400">DR</span> {asset.accumulated_dep_ledger_name || 'Accum. Dep.'}{' '}
                 <span className="float-right ml-4">{fmt(accumDep)}</span>
               </p>
             )}
             {proc > 0 && (
               <p className="whitespace-nowrap">
-                <span className="text-blue-600">DR</span> {resolvedPaymentLedgerName}{' '}
+                <span className="text-blue-600 dark:text-blue-400">DR</span> {resolvedPaymentLedgerName}{' '}
                 <span className="float-right ml-4">{fmt(proc)}</span>
               </p>
             )}
             {isLoss && (
               <p className="whitespace-nowrap">
-                <span className="text-blue-600">DR</span>{' '}
+                <span className="text-blue-600 dark:text-blue-400">DR</span>{' '}
                 {manualLedgerId
                   ? (accounts.find(a => a.id === manualLedgerId)?.account_name || 'Manual Ledger')
                   : 'Loss on Disposal of Assets'}{' '}
                 <span className="float-right ml-4">{fmt(Math.abs(gainOrLoss))}</span>
               </p>
             )}
-            <p className="border-t border-slate-200 pt-1 mt-1 whitespace-nowrap">
-              <span className="text-emerald-600">CR</span> {asset.asset_ledger_name || 'Asset Cost Ledger'}{' '}
+            <p className="border-t border-border pt-1 mt-1 whitespace-nowrap">
+              <span className="text-emerald-600 dark:text-emerald-400">CR</span> {asset.asset_ledger_name || 'Asset Cost Ledger'}{' '}
               <span className="float-right ml-4">{fmt(gross)}</span>
             </p>
             {isGain && (
               <p className="whitespace-nowrap">
-                <span className="text-emerald-600">CR</span>{' '}
+                <span className="text-emerald-600 dark:text-emerald-400">CR</span>{' '}
                 {manualLedgerId
                   ? (accounts.find(a => a.id === manualLedgerId)?.account_name || 'Manual Ledger')
                   : 'Gain on Disposal of Assets'}{' '}

@@ -527,9 +527,9 @@ export default function FixedAssets() {
         });
         const hasGroupLedger = groupLedgerAssets.length > 0;
         return (
-          <div className={`mb-4 border rounded-lg px-4 py-3 space-y-2 ${hasGroupLedger ? 'bg-red-50 border-red-200' : 'bg-amber-50 border-amber-200'}`}>
+          <div className={`mb-4 border rounded-lg px-4 py-3 space-y-2 ${hasGroupLedger ? 'bg-red-50 dark:bg-red-500/10 border-red-200 dark:border-red-500/20' : 'bg-amber-50 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/20'}`}>
             <div className="flex items-center justify-between gap-3">
-              <div className={`flex items-center gap-2 text-sm ${hasGroupLedger ? 'text-red-800' : 'text-amber-800'}`}>
+              <div className={`flex items-center gap-2 text-sm ${hasGroupLedger ? 'text-red-800 dark:text-red-300' : 'text-amber-800 dark:text-amber-300'}`}>
                 <AlertTriangle className="w-4 h-4 shrink-0" />
                 <span>
                   <strong>{unpostedCount} asset{unpostedCount > 1 ? 's' : ''}</strong> have ledger mappings but no GL purchase journal posted yet.
@@ -545,13 +545,13 @@ export default function FixedAssets() {
               )}
             </div>
             {hasGroupLedger && (
-              <div className="text-xs text-red-700 bg-red-100 rounded px-3 py-2 space-y-1">
+              <div className="text-xs text-red-700 dark:text-red-400 bg-red-100 dark:bg-red-500/20 rounded px-3 py-2 space-y-1">
                 <p className="font-semibold">⚠ Cannot post — these assets are mapped to a <em>Group Ledger</em>. Transactions must use a <em>Sub Ledger</em> account:</p>
                 {groupLedgerAssets.map(a => {
                   const acc = accounts.find(ac => ac.id === a.asset_ledger_id);
                   return (
                     <p key={a.id}>• <strong>{a.asset_name}</strong> → "{acc?.account_name}" is a Group Ledger.
-                      <button className="ml-1 underline text-red-800 font-medium" onClick={() => openEdit(a)}>Edit asset</button> and select a Sub Ledger instead.
+                      <button className="ml-1 underline text-red-800 dark:text-red-300 font-medium" onClick={() => openEdit(a)}>Edit asset</button> and select a Sub Ledger instead.
                     </p>
                   );
                 })}
@@ -653,11 +653,11 @@ export default function FixedAssets() {
                   <span className="text-xs bg-muted px-2 py-0.5 rounded">{a.depreciation_method}</span>
                 </td>
                 <td className="px-3 py-2.5 text-right font-mono text-xs">{fmt(a.gross_purchase_value)}</td>
-                <td className="px-3 py-2.5 text-right font-mono text-xs text-amber-600">{fmt(a.accumulated_depreciation)}</td>
-                <td className="px-3 py-2.5 text-right font-mono text-xs text-emerald-700 font-semibold">{fmt(a.net_book_value)}</td>
+                <td className="px-3 py-2.5 text-right font-mono text-xs text-amber-600 dark:text-amber-400">{fmt(a.accumulated_depreciation)}</td>
+                <td className="px-3 py-2.5 text-right font-mono text-xs text-emerald-700 dark:text-emerald-400 font-semibold">{fmt(a.net_book_value)}</td>
                 <td className="px-3 py-2.5 text-center">
                   {a.gl_posted
-                    ? <span title="Purchase journal posted"><CheckCircle2 className="w-4 h-4 text-emerald-600 mx-auto" /></span>
+                    ? <span title="Purchase journal posted"><CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 mx-auto" /></span>
                     : <span title="Purchase journal not yet posted"><AlertCircle className="w-4 h-4 text-amber-400 mx-auto" /></span>
                   }
                 </td>
@@ -667,7 +667,7 @@ export default function FixedAssets() {
                     <Button size="sm" variant="ghost" onClick={() => openEdit(a)} title="Edit"><Wrench className="w-3 h-3" /></Button>
                     <Button size="sm" variant="ghost" onClick={() => viewDepreciation(a)} title="Depreciation Schedule"><TrendingDown className="w-3 h-3" /></Button>
                     {(a.status === 'Active' || a.status === 'In Repair') && (
-                      <Button size="sm" variant="ghost" className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                      <Button size="sm" variant="ghost" className="text-red-500 hover:text-red-700 dark:text-red-400 hover:bg-red-50 dark:bg-red-500/10"
                         onClick={() => setDisposalAsset(a)} title="Dispose Asset">
                         <Trash2 className="w-3 h-3" />
                       </Button>
@@ -854,7 +854,7 @@ export default function FixedAssets() {
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <TrendingDown className="w-4 h-4 text-amber-600" />
+              <TrendingDown className="w-4 h-4 text-amber-600 dark:text-amber-400" />
               Depreciation Schedule — {selected?.asset_name}
             </DialogTitle>
           </DialogHeader>
@@ -862,18 +862,18 @@ export default function FixedAssets() {
             <div className="space-y-4">
               <div className="grid grid-cols-4 gap-3 text-sm bg-muted/30 rounded-lg p-3">
                 <div><p className="text-xs text-muted-foreground">Gross Value</p><p className="font-semibold">{fmt(selected.gross_purchase_value)}</p></div>
-                <div><p className="text-xs text-muted-foreground">Accumulated</p><p className="font-semibold text-amber-600">{fmt(selected.accumulated_depreciation)}</p></div>
-                <div><p className="text-xs text-muted-foreground">Net Book Value</p><p className="font-semibold text-emerald-700">{fmt(selected.net_book_value)}</p></div>
-                <div><p className="text-xs text-muted-foreground">Monthly Charge</p><p className="font-semibold text-blue-700">{fmt(calcMonthlyDep(selected, settings || {}))}</p></div>
+                <div><p className="text-xs text-muted-foreground">Accumulated</p><p className="font-semibold text-amber-600 dark:text-amber-400">{fmt(selected.accumulated_depreciation)}</p></div>
+                <div><p className="text-xs text-muted-foreground">Net Book Value</p><p className="font-semibold text-emerald-700 dark:text-emerald-400">{fmt(selected.net_book_value)}</p></div>
+                <div><p className="text-xs text-muted-foreground">Monthly Charge</p><p className="font-semibold text-blue-700 dark:text-blue-400">{fmt(calcMonthlyDep(selected, settings || {}))}</p></div>
               </div>
 
               {/* Per-asset GL wiring summary */}
-              <div className="flex flex-wrap gap-2 text-xs bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
-                <span className="font-semibold text-blue-800">GL Wiring:</span>
+              <div className="flex flex-wrap gap-2 text-xs bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 rounded-lg px-3 py-2">
+                <span className="font-semibold text-blue-800 dark:text-blue-300">GL Wiring:</span>
                 {selected.dep_expense_ledger_name
-                  ? <><span className="bg-white border border-blue-200 px-2 py-0.5 rounded text-blue-700">Dr: {selected.dep_expense_ledger_name}</span>
-                    <span className="bg-white border border-blue-200 px-2 py-0.5 rounded text-blue-700">Cr: {selected.accumulated_dep_ledger_name || '—'}</span></>
-                  : <span className="text-amber-600 italic">No per-asset ledger set — uses category defaults from Settings</span>
+                  ? <><span className="bg-card border border-blue-200 dark:border-blue-500/20 px-2 py-0.5 rounded text-blue-700 dark:text-blue-400">Dr: {selected.dep_expense_ledger_name}</span>
+                    <span className="bg-card border border-blue-200 dark:border-blue-500/20 px-2 py-0.5 rounded text-blue-700 dark:text-blue-400">Cr: {selected.accumulated_dep_ledger_name || '—'}</span></>
+                  : <span className="text-amber-600 dark:text-amber-400 italic">No per-asset ledger set — uses category defaults from Settings</span>
                 }
               </div>
 
@@ -905,17 +905,17 @@ export default function FixedAssets() {
                     {depSchedule.length === 0 ? (
                       <tr><td colSpan={6} className="px-3 py-8 text-center text-muted-foreground text-sm">No schedule yet. Click "Generate 12 Months".</td></tr>
                     ) : depSchedule.map(s => (
-                      <tr key={s.id} className={cn('transition-colors', s.is_posted ? 'bg-emerald-50/40' : 'hover:bg-muted/20')}>
+                      <tr key={s.id} className={cn('transition-colors', s.is_posted ? 'bg-emerald-50 dark:bg-emerald-500/10/40' : 'hover:bg-muted/20')}>
                         <td className="px-3 py-2.5 font-mono text-sm">{s.period_label}</td>
-                        <td className="px-3 py-2.5 text-right font-mono font-semibold text-amber-700">{fmt(s.calculated_depreciation_amount)}</td>
+                        <td className="px-3 py-2.5 text-right font-mono font-semibold text-amber-700 dark:text-amber-400">{fmt(s.calculated_depreciation_amount)}</td>
                         <td className="px-3 py-2.5 text-xs text-muted-foreground">
-                          <div><span className="text-blue-600">Dr</span> {selected.dep_expense_ledger_name || 'Dep. Expense'}</div>
-                          <div><span className="text-emerald-600">Cr</span> {selected.accumulated_dep_ledger_name || 'Accum. Dep.'}</div>
+                          <div><span className="text-blue-600 dark:text-blue-400">Dr</span> {selected.dep_expense_ledger_name || 'Dep. Expense'}</div>
+                          <div><span className="text-emerald-600 dark:text-emerald-400">Cr</span> {selected.accumulated_dep_ledger_name || 'Accum. Dep.'}</div>
                         </td>
                         <td className="px-3 py-2.5 text-center">
                           {s.is_posted
-                            ? <span className="inline-flex items-center gap-1 text-xs text-emerald-700"><CheckCircle2 className="w-3.5 h-3.5" /> Posted</span>
-                            : <span className="inline-flex items-center gap-1 text-xs text-amber-600"><AlertCircle className="w-3.5 h-3.5" /> Pending</span>
+                            ? <span className="inline-flex items-center gap-1 text-xs text-emerald-700 dark:text-emerald-400"><CheckCircle2 className="w-3.5 h-3.5" /> Posted</span>
+                            : <span className="inline-flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400"><AlertCircle className="w-3.5 h-3.5" /> Pending</span>
                           }
                         </td>
                         <td className="px-3 py-2.5 text-xs text-muted-foreground">{s.posted_date || '—'}</td>

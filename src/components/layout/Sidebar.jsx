@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { sajilo } from '@/api/sajiloClient';
+import { usePermissions, useAuth } from '@/lib/AuthContext';
 import QuickCreateModal from './QuickCreateModal';
 
 const buildNavGroups = (settings) => {
@@ -97,6 +98,8 @@ const buildNavGroups = (settings) => {
 
 export default function Sidebar({ collapsed, onToggle }) {
   const location = useLocation();
+  const { user } = useAuth();
+  const { sidebarVisibility } = usePermissions();
   const [settings, setSettings] = useState(null);
   const [navGroups, setNavGroups] = useState(buildNavGroups(null));
   const [expandedGroups, setExpandedGroups] = useState([]);
@@ -139,21 +142,41 @@ export default function Sidebar({ collapsed, onToggle }) {
 
   // Filter groups
   const filteredGroups = useMemo(() => {
-    if (!searchQuery.trim()) return navGroups;
-    const query = searchQuery.toLowerCase();
+    const query = searchQuery.trim().toLowerCase();
+    const isAdmin = user?.role === 'admin' && user?.company_scope === 'ALL';
     
     return navGroups.map(group => {
-      const items = group.items.map(item => {
+      let items = group.items.map(item => {
         if (item.isSubGroup) {
-          const subItems = item.items.filter(sub => sub.label.toLowerCase().includes(query));
+          let subItems = item.items;
+          // Apply RBAC
+          if (!isAdmin) {
+             subItems = subItems.filter(sub => sidebarVisibility.includes(sub.path) || sub.path === '/');
+          }
+          // Apply Search
+          if (query) {
+             subItems = subItems.filter(sub => sub.label.toLowerCase().includes(query));
+          }
           return subItems.length > 0 ? { ...item, items: subItems } : null;
         }
-        return item.label.toLowerCase().includes(query) ? item : null;
+        
+        // Root Items
+        let keep = true;
+        // Apply RBAC
+        if (!isAdmin) {
+           keep = sidebarVisibility.includes(item.path) || item.path === '/' || item.path === '/settings' || item.path === '/reports';
+        }
+        // Apply Search
+        if (keep && query) {
+           keep = item.label.toLowerCase().includes(query);
+        }
+        
+        return keep ? item : null;
       }).filter(Boolean);
       
-      return items.length > 0 || group.label.toLowerCase().includes(query) ? { ...group, items: items.length > 0 ? items : group.items } : null;
+      return items.length > 0 || (query && group.label.toLowerCase().includes(query)) ? { ...group, items: items.length > 0 ? items : group.items } : null;
     }).filter(Boolean);
-  }, [navGroups, searchQuery]);
+  }, [navGroups, searchQuery, sidebarVisibility, user]);
 
   // Auto-expand when searching
   const effectiveExpandedGroups = searchQuery ? filteredGroups.map(g => g.label) : expandedGroups;

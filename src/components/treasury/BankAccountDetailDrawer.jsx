@@ -3,11 +3,11 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
 const categoryStyle = {
-  Current: 'bg-indigo-50 text-indigo-600',
-  Savings: 'bg-teal-50 text-teal-600',
-  Overdraft: 'bg-red-50 text-red-600',
-  'Fixed Deposit': 'bg-yellow-50 text-yellow-700',
-  'Cash in Hand': 'bg-emerald-50 text-emerald-700',
+  Current: 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400',
+  Savings: 'bg-teal-50 dark:bg-teal-500/10 text-teal-600 dark:text-teal-400',
+  Overdraft: 'bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400',
+  'Fixed Deposit': 'bg-yellow-50 dark:bg-yellow-500/10 text-yellow-700 dark:text-yellow-400',
+  'Cash in Hand': 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
 };
 
 function formatNPR(n) {
@@ -44,12 +44,12 @@ export default function BankAccountDetailDrawer({ account, onClose, onEdit }) {
       <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={onClose} />
 
       {/* Panel */}
-      <div className="relative bg-white w-full max-w-md h-full flex flex-col shadow-2xl animate-in slide-in-from-right duration-200">
+      <div className="relative bg-card w-full max-w-md h-full flex flex-col shadow-2xl animate-in slide-in-from-right duration-200">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
           <div className="flex items-center gap-2.5">
-            <div className={cn('w-9 h-9 rounded-lg flex items-center justify-center shrink-0', isBank ? 'bg-blue-100' : 'bg-emerald-100')}>
-              {isBank ? <Landmark className="w-4.5 h-4.5 text-blue-600" /> : <Banknote className="w-4.5 h-4.5 text-emerald-600" />}
+            <div className={cn('w-9 h-9 rounded-lg flex items-center justify-center shrink-0', isBank ? 'bg-blue-100 dark:bg-blue-500/20' : 'bg-emerald-100 dark:bg-emerald-500/20')}>
+              {isBank ? <Landmark className="w-4.5 h-4.5 text-blue-600 dark:text-blue-400" /> : <Banknote className="w-4.5 h-4.5 text-emerald-600 dark:text-emerald-400" />}
             </div>
             <div>
               <p className="text-sm font-semibold text-foreground leading-tight">{account.account_name}</p>
@@ -81,7 +81,7 @@ export default function BankAccountDetailDrawer({ account, onClose, onEdit }) {
 
           {/* Status + Category */}
           <div className="flex items-center gap-2 flex-wrap">
-            <span className={cn('px-2.5 py-1 rounded-full text-xs font-medium', account.is_active !== false ? 'bg-emerald-100 text-emerald-700' : 'bg-muted text-muted-foreground')}>
+            <span className={cn('px-2.5 py-1 rounded-full text-xs font-medium', account.is_active !== false ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400' : 'bg-muted text-muted-foreground')}>
               {account.is_active !== false ? 'Active' : 'Inactive'}
             </span>
             {account.account_category && (
@@ -94,7 +94,7 @@ export default function BankAccountDetailDrawer({ account, onClose, onEdit }) {
           {/* Account Details */}
           <div>
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Account Details</p>
-            <div className="bg-white border border-border rounded-xl px-4">
+            <div className="bg-card border border-border rounded-xl px-4">
               <InfoRow label="Ledger Group" value={account.ledger_group_name} />
               <InfoRow label="GL Account" value={account.gl_account_name} />
               <InfoRow label="Signature Holder" value={account.account_holder_name} />

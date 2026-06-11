@@ -11,16 +11,16 @@ import { toast } from 'sonner';
 const GROUP_ORDER = ['Cash', 'Bank'];
 
 const typeStyle = {
-  Cash: 'bg-emerald-100 text-emerald-700',
-  Bank: 'bg-blue-100 text-blue-700',
+  Cash: 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400',
+  Bank: 'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400',
 };
 
 const categoryStyle = {
-  Current: 'bg-indigo-50 text-indigo-600',
-  Savings: 'bg-teal-50 text-teal-600',
-  Overdraft: 'bg-red-50 text-red-600',
-  'Fixed Deposit': 'bg-yellow-50 text-yellow-700',
-  'Cash in Hand': 'bg-emerald-50 text-emerald-700',
+  Current: 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400',
+  Savings: 'bg-teal-50 dark:bg-teal-500/10 text-teal-600 dark:text-teal-400',
+  Overdraft: 'bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400',
+  'Fixed Deposit': 'bg-yellow-50 dark:bg-yellow-500/10 text-yellow-700 dark:text-yellow-400',
+  'Cash in Hand': 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
 };
 
 function formatNPR(n) {
@@ -116,25 +116,25 @@ export default function BankAccounts() {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        <div className="bg-white border border-border rounded-xl p-4 flex items-center gap-4">
-          <div className="w-10 h-10 rounded-lg bg-emerald-100 flex items-center justify-center shrink-0">
-            <Banknote className="w-5 h-5 text-emerald-600" />
+        <div className="bg-card border border-border rounded-xl p-4 flex items-center gap-4">
+          <div className="w-10 h-10 rounded-lg bg-emerald-100 dark:bg-emerald-500/20 flex items-center justify-center shrink-0">
+            <Banknote className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
           </div>
           <div>
             <p className="text-xs text-muted-foreground">Total Cash Balance</p>
             <p className="text-lg font-bold text-foreground">NPR {formatNPR(totalCash)}</p>
           </div>
         </div>
-        <div className="bg-white border border-border rounded-xl p-4 flex items-center gap-4">
-          <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center shrink-0">
-            <Landmark className="w-5 h-5 text-blue-600" />
+        <div className="bg-card border border-border rounded-xl p-4 flex items-center gap-4">
+          <div className="w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-500/20 flex items-center justify-center shrink-0">
+            <Landmark className="w-5 h-5 text-blue-600 dark:text-blue-400" />
           </div>
           <div>
             <p className="text-xs text-muted-foreground">Total Bank Balance</p>
             <p className="text-lg font-bold text-foreground">NPR {formatNPR(totalBank)}</p>
           </div>
         </div>
-        <div className="bg-white border border-border rounded-xl p-4 flex items-center gap-4">
+        <div className="bg-card border border-border rounded-xl p-4 flex items-center gap-4">
           <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
             <Building className="w-5 h-5 text-primary" />
           </div>
@@ -164,14 +164,14 @@ export default function BankAccounts() {
             const isCollapsed = collapsed[type];
             const groupTotal = items.filter(a => a.is_active !== false).reduce((s, a) => s + getLiveBalance(a), 0);
             return (
-              <div key={type} className="bg-white border border-border rounded-xl overflow-hidden">
+              <div key={type} className="bg-card border border-border rounded-xl overflow-hidden">
                 {/* Group Header */}
                 <button
                   onClick={() => toggleGroup(type)}
                   className="w-full flex items-center justify-between px-5 py-3 bg-muted/30 hover:bg-muted/50 transition-colors border-b border-border"
                 >
                   <div className="flex items-center gap-2">
-                    {type === 'Cash' ? <Banknote className="w-4 h-4 text-emerald-600" /> : <Landmark className="w-4 h-4 text-blue-600" />}
+                    {type === 'Cash' ? <Banknote className="w-4 h-4 text-emerald-600 dark:text-emerald-400" /> : <Landmark className="w-4 h-4 text-blue-600 dark:text-blue-400" />}
                     <span className="font-semibold text-sm text-foreground">{type === 'Cash' ? 'Cash Accounts' : 'Bank Accounts'}</span>
                     <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">{items.length}</span>
                   </div>
@@ -233,7 +233,7 @@ export default function BankAccounts() {
                               <td className="px-4 py-3 text-xs text-muted-foreground">{acc.gl_account_name || '—'}</td>
                               <td className="px-4 py-3 text-right font-mono text-sm font-semibold text-foreground">{formatNPR(getLiveBalance(acc))}</td>
                               <td className="px-4 py-3 text-center">
-                                <span className={cn('px-2 py-0.5 rounded-full text-xs font-medium', acc.is_active !== false ? 'bg-emerald-100 text-emerald-700' : 'bg-muted text-muted-foreground')}>
+                                <span className={cn('px-2 py-0.5 rounded-full text-xs font-medium', acc.is_active !== false ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400' : 'bg-muted text-muted-foreground')}>
                                   {acc.is_active !== false ? 'Active' : 'Inactive'}
                                 </span>
                               </td>

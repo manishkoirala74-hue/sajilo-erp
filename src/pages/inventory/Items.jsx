@@ -149,8 +149,8 @@ function BulkActionBar({ selectedIds, onClear, accounts, categories, onBulkUpdat
           </Button>
         )}
         {bulkAction === 'delete' && confirmDelete && (
-          <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-lg px-3 py-1.5">
-            <span className="text-xs text-red-700 font-medium">Confirm delete {selectedIds.length} item(s)?</span>
+          <div className="flex items-center gap-2 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-lg px-3 py-1.5">
+            <span className="text-xs text-red-700 dark:text-red-400 font-medium">Confirm delete {selectedIds.length} item(s)?</span>
             <Button size="sm" variant="destructive" onClick={handleDelete} disabled={applying} className="h-7 text-xs">
               {applying ? 'Deleting…' : 'Yes, Delete'}
             </Button>
@@ -471,7 +471,7 @@ export default function Items() {
           { key: 'inactive', label: 'Inactive' },
         ].map(f => (
           <button key={f.key} onClick={() => { setFilterType(f.key); setSelectedIds([]); }}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filterType === f.key ? 'bg-primary text-white' : 'bg-white border border-border text-muted-foreground hover:bg-muted'}`}>
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filterType === f.key ? 'bg-primary text-white' : 'bg-card border border-border text-muted-foreground hover:bg-muted'}`}>
             {f.label}
           </button>
         ))}
@@ -503,7 +503,7 @@ export default function Items() {
           const allCatSel = catIds.length > 0 && catIds.every(id => selectedIds.includes(id));
           return (
             <button key={c.id} onClick={() => selectByCategory(c.id)}
-              className={cn('px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors', allCatSel ? 'bg-primary/10 border-primary text-primary' : 'bg-white border-border text-muted-foreground hover:bg-muted')}>
+              className={cn('px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors', allCatSel ? 'bg-primary/10 border-primary text-primary' : 'bg-card border-border text-muted-foreground hover:bg-muted')}>
               {allCatSel ? '✓ ' : ''}{c.category_name} ({catIds.length})
             </button>
           );
@@ -524,7 +524,7 @@ export default function Items() {
       )}
 
       {/* Items Table */}
-      <div className="bg-white border border-border rounded-xl overflow-hidden">
+      <div className="bg-card border border-border rounded-xl overflow-hidden">
         <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-muted/20">
           <div className="flex items-center gap-3">
             <button onClick={toggleSelectAll} className="flex items-center justify-center w-5 h-5">
@@ -594,7 +594,7 @@ export default function Items() {
                           {(item.image_url || (item.image_urls && item.image_urls[0])) ? (
                             <img src={item.image_url || item.image_urls[0]} alt={item.item_name} className="w-8 h-8 rounded-lg object-cover border border-border shrink-0" />
                           ) : (
-                            <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center shrink-0">
+                            <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-500/10 flex items-center justify-center shrink-0">
                               <Package className="w-3.5 h-3.5 text-indigo-500" />
                             </div>
                           )}
@@ -611,7 +611,7 @@ export default function Items() {
                         {item.item_type === 'Service'
                           ? <span className="text-xs text-blue-500 italic">N/A</span>
                           : <div className="flex items-center justify-end gap-1">
-                              <span className={cn('font-semibold', item.quantity_on_hand <= item.reorder_level && item.reorder_level > 0 ? 'text-red-600' : '')}>
+                              <span className={cn('font-semibold', item.quantity_on_hand <= item.reorder_level && item.reorder_level > 0 ? 'text-red-600 dark:text-red-400' : '')}>
                                 {item.quantity_on_hand}
                               </span>
                               {item.quantity_on_hand <= item.reorder_level && item.reorder_level > 0 && <AlertTriangle className="w-3 h-3 text-red-500" />}
@@ -823,7 +823,7 @@ export default function Items() {
               </div>
 
               {taxTypes.length === 0 ? (
-                <p className="text-xs text-amber-600 flex items-center gap-1.5">
+                <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
                   <AlertTriangle className="w-3.5 h-3.5" />
                   No tax types configured. Go to Settings → Tax & VAT to create them.
                 </p>
@@ -841,7 +841,7 @@ export default function Items() {
                           'flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors',
                           selected
                             ? 'bg-primary/5 border-primary/40 ring-1 ring-primary/20'
-                            : 'bg-white border-border hover:bg-muted/40'
+                            : 'bg-card border-border hover:bg-muted/40'
                         )}
                       >
                         <Checkbox checked={selected} onCheckedChange={toggle} className="mt-0.5" />
@@ -850,7 +850,7 @@ export default function Items() {
                             <span className="text-sm font-medium">{tt.tax_name}</span>
                             <span className="text-xs font-semibold tabular-nums text-primary bg-primary/10 px-1.5 py-0.5 rounded">{tt.tax_rate}%</span>
                             {tt.is_compound && (
-                              <span className="text-xs text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded">Compound</span>
+                              <span className="text-xs text-purple-700 dark:text-purple-400 bg-purple-50 dark:bg-purple-500/10 px-1.5 py-0.5 rounded">Compound</span>
                             )}
                             {tt.sort_order != null && (
                               <span className="text-xs text-muted-foreground">#{tt.sort_order}</span>
@@ -882,12 +882,12 @@ export default function Items() {
                   return { name: tt.tax_name, rate: tt.tax_rate, tax };
                 });
                 return (
-                  <div className="bg-blue-50 border border-blue-100 rounded px-3 py-2 text-xs">
+                  <div className="bg-blue-50 dark:bg-blue-500/10 border border-blue-100 rounded px-3 py-2 text-xs">
                     <p className="font-semibold text-blue-900 mb-1">Cascade Preview on Net=100:</p>
                     {steps.map((s, i) => (
-                      <p key={i} className="font-mono text-blue-800">{s.name} ({s.rate}%) = {s.tax}</p>
+                      <p key={i} className="font-mono text-blue-800 dark:text-blue-300">{s.name} ({s.rate}%) = {s.tax}</p>
                     ))}
-                    <p className="font-mono font-semibold text-blue-900 border-t border-blue-200 mt-1 pt-1">
+                    <p className="font-mono font-semibold text-blue-900 border-t border-blue-200 dark:border-blue-500/20 mt-1 pt-1">
                       Total Tax = {steps.reduce((s, x) => s + x.tax, 0).toFixed(2)} → Grand Total = {(100 + steps.reduce((s, x) => s + x.tax, 0)).toFixed(2)}
                     </p>
                   </div>

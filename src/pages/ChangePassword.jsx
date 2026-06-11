@@ -38,7 +38,7 @@ export default function ChangePassword({ user, reason = 'temp', onSuccess }) {
 
   return (
     <div className="fixed inset-0 bg-background flex items-center justify-center z-[9999]">
-      <div className="bg-white border border-border rounded-2xl shadow-xl w-full max-w-md p-8">
+      <div className="bg-card border border-border rounded-2xl shadow-xl w-full max-w-md p-8">
         <div className="flex flex-col items-center mb-6">
           <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center mb-4">
             <ShieldCheck className="w-7 h-7 text-primary" />
@@ -53,7 +53,7 @@ export default function ChangePassword({ user, reason = 'temp', onSuccess }) {
           </p>
         </div>
 
-        <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 flex items-start gap-2 mb-5 text-sm text-amber-700">
+        <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-lg px-4 py-3 flex items-start gap-2 mb-5 text-sm text-amber-700 dark:text-amber-400">
           <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
           <span>
             {isExpiry

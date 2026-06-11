@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils';
 
 function SectionCard({ title, icon: Icon, children }) {
   return (
-    <div className="bg-white border border-border rounded-xl overflow-hidden">
+    <div className="bg-card border border-border rounded-xl overflow-hidden">
       <div className="flex items-center gap-2 px-5 py-4 border-b border-border bg-muted/20">
         <Icon className="w-4 h-4 text-primary" />
         <h3 className="font-semibold text-foreground text-sm">{title}</h3>
@@ -141,7 +141,7 @@ export default function DepreciationSettings({ settings, onChange }) {
               className={cn('border rounded-xl p-4 text-left transition-all', postingMode === opt.value ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'hover:border-muted-foreground/30')}>
               <div className="flex items-center justify-between mb-1">
                 <p className="text-sm font-semibold">{opt.title}</p>
-                {opt.badge && <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded border border-blue-200">{opt.badge}</span>}
+                {opt.badge && <span className="text-xs bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400 px-2 py-0.5 rounded border border-blue-200 dark:border-blue-500/20">{opt.badge}</span>}
               </div>
               <p className="text-xs text-muted-foreground">{opt.desc}</p>
               {postingMode === opt.value && <div className="mt-2 w-3 h-3 rounded-full bg-primary" />}
@@ -154,13 +154,13 @@ export default function DepreciationSettings({ settings, onChange }) {
           <p className="font-semibold mb-2">Journal Entry Preview ({postingMode}):</p>
           {postingMode === 'Accumulated' ? (
             <table className="w-full text-xs"><tbody>
-              <tr><td className="py-0.5 text-blue-700 font-mono">Dr</td><td className="py-0.5">Depreciation Expense (OPEX/COGS)</td><td className="py-0.5 text-right font-mono">X</td></tr>
-              <tr><td className="py-0.5 pl-4 text-emerald-700 font-mono">Cr</td><td className="py-0.5 pl-4">Accumulated Depreciation (Contra-Asset)</td><td className="py-0.5 text-right font-mono">X</td></tr>
+              <tr><td className="py-0.5 text-blue-700 dark:text-blue-400 font-mono">Dr</td><td className="py-0.5">Depreciation Expense (OPEX/COGS)</td><td className="py-0.5 text-right font-mono">X</td></tr>
+              <tr><td className="py-0.5 pl-4 text-emerald-700 dark:text-emerald-400 font-mono">Cr</td><td className="py-0.5 pl-4">Accumulated Depreciation (Contra-Asset)</td><td className="py-0.5 text-right font-mono">X</td></tr>
             </tbody></table>
           ) : (
             <table className="w-full text-xs"><tbody>
-              <tr><td className="py-0.5 text-blue-700 font-mono">Dr</td><td className="py-0.5">Depreciation Expense (OPEX/COGS)</td><td className="py-0.5 text-right font-mono">X</td></tr>
-              <tr><td className="py-0.5 pl-4 text-emerald-700 font-mono">Cr</td><td className="py-0.5 pl-4">Asset Account (Cost) — Direct reduction</td><td className="py-0.5 text-right font-mono">X</td></tr>
+              <tr><td className="py-0.5 text-blue-700 dark:text-blue-400 font-mono">Dr</td><td className="py-0.5">Depreciation Expense (OPEX/COGS)</td><td className="py-0.5 text-right font-mono">X</td></tr>
+              <tr><td className="py-0.5 pl-4 text-emerald-700 dark:text-emerald-400 font-mono">Cr</td><td className="py-0.5 pl-4">Asset Account (Cost) — Direct reduction</td><td className="py-0.5 text-right font-mono">X</td></tr>
             </tbody></table>
           )}
         </div>

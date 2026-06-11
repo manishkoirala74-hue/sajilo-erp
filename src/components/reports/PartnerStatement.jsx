@@ -189,7 +189,7 @@ export default function PartnerStatement({ title, mode, initialFromDate, initial
       <div className="flex flex-col gap-1 min-w-[200px]">
         <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Select {isAR ? 'Customer' : 'Supplier'}</label>
         <select 
-          className="h-8 rounded-md border border-input bg-white px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+          className="h-8 rounded-md border border-input bg-card px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
           value={selectedPartnerId}
           onChange={e => setSelectedPartnerId(e.target.value)}
         >
@@ -209,7 +209,7 @@ export default function PartnerStatement({ title, mode, initialFromDate, initial
         <div className="mt-3 flex items-center gap-2">
           <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Date Format</label>
           <select 
-            className="h-7 rounded-md border border-input bg-white px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+            className="h-7 rounded-md border border-input bg-card px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
             value={printConfig.dateFormat}
             onChange={e => setPrintConfig(p => ({ ...p, dateFormat: e.target.value }))}
           >
@@ -235,7 +235,7 @@ export default function PartnerStatement({ title, mode, initialFromDate, initial
       ) : loading ? (
         <div className="py-10 text-center text-muted-foreground text-sm">Loading statement...</div>
       ) : (
-        <div className="bg-white border border-border shadow-sm p-8 sm:p-12 max-w-[210mm] mx-auto rounded-xl print:shadow-none print:border-none print:p-0 print:max-w-none text-slate-800" style={{ fontFamily: "'Inter', sans-serif" }}>
+        <div className="bg-card border border-border shadow-sm p-8 sm:p-12 max-w-[210mm] mx-auto rounded-xl print:shadow-none print:border-none print:p-0 print:max-w-none text-foreground" style={{ fontFamily: "'Inter', sans-serif" }}>
           
           {/* Header */}
           <div className="flex justify-between items-start border-b-2 border-primary/20 pb-6 mb-6">
@@ -252,29 +252,29 @@ export default function PartnerStatement({ title, mode, initialFromDate, initial
             </div>
             <div className="text-right">
               <h2 className="text-3xl font-light text-slate-300 uppercase tracking-widest">{isAR ? 'Customer Statement' : 'Vendor Statement'}</h2>
-              <p className="text-sm font-semibold mt-2 text-slate-600">Period: <span className="font-normal">{displayDate(filters.fromDate)} to {displayDate(filters.toDate)}</span></p>
-              <p className="text-sm font-semibold mt-1 text-slate-600">Generated: <span className="font-normal">{displayDate(new Date().toISOString().slice(0,10))}</span></p>
+              <p className="text-sm font-semibold mt-2 text-muted-foreground">Period: <span className="font-normal">{displayDate(filters.fromDate)} to {displayDate(filters.toDate)}</span></p>
+              <p className="text-sm font-semibold mt-1 text-muted-foreground">Generated: <span className="font-normal">{displayDate(new Date().toISOString().slice(0,10))}</span></p>
             </div>
           </div>
 
           {/* Partner Info */}
           {printConfig.showPartnerInfo && partner && (
-            <div className="mb-8 p-5 bg-slate-50 rounded-lg border border-slate-100 flex justify-between items-start">
+            <div className="mb-8 p-5 bg-muted/50 rounded-lg border border-slate-100 flex justify-between items-start">
               <div className="flex gap-5 items-start">
                 {partner.profile_picture_url && (
-                  <img src={partner.profile_picture_url} alt="Profile" className="w-16 h-16 rounded-full object-cover border border-slate-200" />
+                  <img src={partner.profile_picture_url} alt="Profile" className="w-16 h-16 rounded-full object-cover border border-border" />
                 )}
                 <div className="space-y-1">
                   <p className="text-xs font-bold text-primary uppercase tracking-wider mb-2">Statement To</p>
-                  <p className="text-lg font-bold text-slate-800">{partner.name}</p>
-                  {partner.address && <p className="text-sm text-slate-600">{partner.address}</p>}
-                  {partner.contact_person && <p className="text-sm text-slate-600">Attn: {partner.contact_person}</p>}
+                  <p className="text-lg font-bold text-foreground">{partner.name}</p>
+                  {partner.address && <p className="text-sm text-muted-foreground">{partner.address}</p>}
+                  {partner.contact_person && <p className="text-sm text-muted-foreground">Attn: {partner.contact_person}</p>}
                 </div>
               </div>
               <div className="text-right space-y-1">
-                {partner.tax_id_number && <p className="text-sm text-slate-600"><span className="font-semibold text-slate-400 mr-2">PAN/VAT:</span>{partner.tax_id_number}</p>}
-                {partner.phone && <p className="text-sm text-slate-600"><span className="font-semibold text-slate-400 mr-2">Phone:</span>{partner.phone}</p>}
-                {partner.email && <p className="text-sm text-slate-600"><span className="font-semibold text-slate-400 mr-2">Email:</span>{partner.email}</p>}
+                {partner.tax_id_number && <p className="text-sm text-muted-foreground"><span className="font-semibold text-slate-400 mr-2">PAN/VAT:</span>{partner.tax_id_number}</p>}
+                {partner.phone && <p className="text-sm text-muted-foreground"><span className="font-semibold text-slate-400 mr-2">Phone:</span>{partner.phone}</p>}
+                {partner.email && <p className="text-sm text-muted-foreground"><span className="font-semibold text-slate-400 mr-2">Email:</span>{partner.email}</p>}
               </div>
             </div>
           )}
@@ -282,17 +282,17 @@ export default function PartnerStatement({ title, mode, initialFromDate, initial
           {/* Summary Cards */}
           {printConfig.showSummary && (
             <div className="grid grid-cols-4 gap-4 mb-8">
-              <div className="p-4 bg-white border border-slate-200 rounded-lg text-center">
+              <div className="p-4 bg-card border border-border rounded-lg text-center">
                 <p className="text-xs font-bold text-slate-400 uppercase mb-1">Opening Balance</p>
-                <p className="text-lg font-bold font-mono text-slate-700">{fmtNPR(summary.opening)}</p>
+                <p className="text-lg font-bold font-mono text-muted-foreground">{fmtNPR(summary.opening)}</p>
               </div>
-              <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-lg text-center">
-                <p className="text-xs font-bold text-emerald-600/70 uppercase mb-1">Total Debit</p>
-                <p className="text-lg font-bold font-mono text-emerald-700">{fmtNPR(summary.debit)}</p>
+              <div className="p-4 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-100 rounded-lg text-center">
+                <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400/70 uppercase mb-1">Total Debit</p>
+                <p className="text-lg font-bold font-mono text-emerald-700 dark:text-emerald-400">{fmtNPR(summary.debit)}</p>
               </div>
-              <div className="p-4 bg-red-50 border border-red-100 rounded-lg text-center">
-                <p className="text-xs font-bold text-red-600/70 uppercase mb-1">Total Credit</p>
-                <p className="text-lg font-bold font-mono text-red-700">{fmtNPR(summary.credit)}</p>
+              <div className="p-4 bg-red-50 dark:bg-red-500/10 border border-red-100 rounded-lg text-center">
+                <p className="text-xs font-bold text-red-600 dark:text-red-400/70 uppercase mb-1">Total Credit</p>
+                <p className="text-lg font-bold font-mono text-red-700 dark:text-red-400">{fmtNPR(summary.credit)}</p>
               </div>
               <div className="p-4 bg-primary/5 border border-primary/20 rounded-lg text-center">
                 <p className="text-xs font-bold text-primary/70 uppercase mb-1">Closing Balance</p>
@@ -304,7 +304,7 @@ export default function PartnerStatement({ title, mode, initialFromDate, initial
           {/* Transaction Table */}
           <table className="w-full text-base text-left">
             <thead>
-              <tr className="border-y-2 border-slate-200 bg-slate-50/50">
+              <tr className="border-y-2 border-border bg-muted/50/50">
                 <th className="py-3 px-2 font-semibold text-slate-500">Date</th>
                 <th className="py-3 px-2 font-semibold text-slate-500">Voucher</th>
                 <th className="py-3 px-2 font-semibold text-slate-500 w-1/3">Description</th>
@@ -316,9 +316,9 @@ export default function PartnerStatement({ title, mode, initialFromDate, initial
             </thead>
             <tbody className="divide-y divide-slate-100">
               {/* Opening Balance Row */}
-              <tr className="bg-slate-50/30">
+              <tr className="bg-muted/50/30">
                 <td className="py-2.5 px-2 text-slate-400 italic">{displayDate(filters.fromDate)}</td>
-                <td colSpan={2} className="py-2.5 px-2 font-semibold text-slate-600">*** Opening Balance ***</td>
+                <td colSpan={2} className="py-2.5 px-2 font-semibold text-muted-foreground">*** Opening Balance ***</td>
                 <td className="py-2.5 px-2 text-right"></td>
                 <td className="py-2.5 px-2 text-right"></td>
                 <td className="py-2.5 px-2 text-right font-bold tabular-nums font-mono">{fmtNPR(summary.opening)}</td>
@@ -327,10 +327,10 @@ export default function PartnerStatement({ title, mode, initialFromDate, initial
 
               {/* Transactions */}
               {transactions.map((t, i) => (
-                <tr key={i} className="hover:bg-slate-50/50">
-                  <td className="py-2.5 px-2 whitespace-nowrap text-slate-600">{displayDate(t.date)}</td>
+                <tr key={i} className="hover:bg-muted/50/50">
+                  <td className="py-2.5 px-2 whitespace-nowrap text-muted-foreground">{displayDate(t.date)}</td>
                   <td className="py-2.5 px-2 font-mono text-sm text-primary">{t.voucher}</td>
-                  <td className="py-2.5 px-2 text-slate-700">{t.description} {t.reference && <span className="text-slate-400 text-xs ml-1">(Ref: {t.reference})</span>}</td>
+                  <td className="py-2.5 px-2 text-muted-foreground">{t.description} {t.reference && <span className="text-slate-400 text-xs ml-1">(Ref: {t.reference})</span>}</td>
                   <td className="py-2.5 px-2 text-right tabular-nums font-mono">{t.debit > 0 ? fmtNPR(t.debit) : ''}</td>
                   <td className="py-2.5 px-2 text-right tabular-nums font-mono">{t.credit > 0 ? fmtNPR(t.credit) : ''}</td>
                   <td className="py-2.5 px-2 text-right font-semibold tabular-nums font-mono">{fmtNPR(t.balance)}</td>
@@ -345,10 +345,10 @@ export default function PartnerStatement({ title, mode, initialFromDate, initial
               )}
             </tbody>
             <tfoot>
-              <tr className="border-t-2 border-slate-300 bg-slate-50 font-bold">
-                <td colSpan={3} className="py-3 px-2 text-slate-600 text-right">Closing Balance as of {displayDate(filters.toDate)}:</td>
-                <td className="py-3 px-2 text-right tabular-nums font-mono text-emerald-700">{fmtNPR(summary.debit)}</td>
-                <td className="py-3 px-2 text-right tabular-nums font-mono text-red-700">{fmtNPR(summary.credit)}</td>
+              <tr className="border-t-2 border-border bg-muted/50 font-bold">
+                <td colSpan={3} className="py-3 px-2 text-muted-foreground text-right">Closing Balance as of {displayDate(filters.toDate)}:</td>
+                <td className="py-3 px-2 text-right tabular-nums font-mono text-emerald-700 dark:text-emerald-400">{fmtNPR(summary.debit)}</td>
+                <td className="py-3 px-2 text-right tabular-nums font-mono text-red-700 dark:text-red-400">{fmtNPR(summary.credit)}</td>
                 <td className="py-3 px-2 text-right tabular-nums font-mono text-primary text-base">{fmtNPR(summary.closing)}</td>
                 {printConfig.showRemarks && <td></td>}
               </tr>
@@ -356,7 +356,7 @@ export default function PartnerStatement({ title, mode, initialFromDate, initial
           </table>
 
           {/* Footer Note */}
-          <div className="mt-12 pt-6 border-t border-slate-200 text-center text-sm text-slate-500 flex justify-between px-4 print:mt-auto">
+          <div className="mt-12 pt-6 border-t border-border text-center text-sm text-slate-500 flex justify-between px-4 print:mt-auto">
             <p>This is a computer-generated document. No signature is required.</p>
             <p className="font-mono">Ref: {partner?.id?.slice(0,8).toUpperCase()}-{new Date().getTime().toString().slice(-6)}</p>
           </div>

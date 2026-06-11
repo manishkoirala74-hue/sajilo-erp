@@ -97,9 +97,9 @@ export default function FiscalYearClosingWizard() {
   const openYears = fiscalYears.filter(f => !f.is_locked);
   
   return (
-    <div className="bg-white border border-border rounded-xl p-5 mt-6">
+    <div className="bg-card border border-border rounded-xl p-5 mt-6">
       <div className="flex items-center gap-2 mb-4">
-        <DatabaseBackup className="w-5 h-5 text-indigo-600" />
+        <DatabaseBackup className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
         <h3 className="font-semibold text-foreground text-sm">Automated Year-End Closing Wizard</h3>
       </div>
       <p className="text-sm text-muted-foreground mb-6">
@@ -120,7 +120,7 @@ export default function FiscalYearClosingWizard() {
           </Select>
 
           {closingYearId && preFlightDrafts !== null && (
-            <div className={`p-3 rounded-lg text-sm flex items-start gap-2 ${preFlightDrafts > 0 ? 'bg-red-50 text-red-800 border border-red-200' : 'bg-green-50 text-green-800 border border-green-200'}`}>
+            <div className={`p-3 rounded-lg text-sm flex items-start gap-2 ${preFlightDrafts > 0 ? 'bg-red-50 dark:bg-red-500/10 text-red-800 dark:text-red-300 border border-red-200 dark:border-red-500/20' : 'bg-green-50 dark:bg-green-500/10 text-green-800 dark:text-green-300 border border-green-200 dark:border-green-500/20'}`}>
               {preFlightDrafts > 0 ? <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" /> : <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />}
               <div>
                 <strong className="block mb-0.5">Pre-flight Check</strong>

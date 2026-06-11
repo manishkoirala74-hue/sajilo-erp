@@ -44,7 +44,7 @@ const SECTIONS = [
 
 function SectionCard({ title, icon: CardIcon, children }) {
   return (
-    <div className="bg-white border border-border rounded-xl overflow-hidden">
+    <div className="bg-card border border-border rounded-xl overflow-hidden">
       <div className="flex items-center gap-2 px-5 py-4 border-b border-border bg-muted/20">
         <CardIcon className="w-4 h-4 text-primary" />
         <h3 className="font-semibold text-foreground text-sm">{title}</h3>
@@ -301,7 +301,7 @@ export default function Settings() {
                 )}
               </div>
               {settings.invoice_numbering_method === 'Manual' && (
-                <div className={`mt-4 flex items-start gap-2 rounded-lg px-4 py-3 text-sm ${settings.invoice_duplicate_handling === 'Warn' ? 'bg-yellow-50 border border-yellow-200 text-yellow-800' : 'bg-red-50 border border-red-200 text-red-800'}`}>
+                <div className={`mt-4 flex items-start gap-2 rounded-lg px-4 py-3 text-sm ${settings.invoice_duplicate_handling === 'Warn' ? 'bg-yellow-50 dark:bg-yellow-500/10 border border-yellow-200 dark:border-yellow-500/20 text-yellow-800 dark:text-yellow-300' : 'bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-800 dark:text-red-300'}`}>
                   <span className="text-base">{settings.invoice_duplicate_handling === 'Warn' ? '⚠️' : '🚫'}</span>
                   <div>
                     {settings.invoice_duplicate_handling === 'Warn'
@@ -427,7 +427,7 @@ export default function Settings() {
                 Available variables: <code className="bg-muted px-1 rounded">{'{customer_name}'}</code>, <code className="bg-muted px-1 rounded">{'{invoice_number}'}</code>, <code className="bg-muted px-1 rounded">{'{amount}'}</code>, <code className="bg-muted px-1 rounded">{'{due_date}'}</code>, <code className="bg-muted px-1 rounded">{'{company_name}'}</code>
               </p>
               <textarea
-                className="w-full h-48 border border-input rounded-md px-3 py-2 text-sm font-mono resize-y focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                className="w-full h-48 bg-transparent border border-input rounded-md px-3 py-2 text-sm font-mono resize-y focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                 value={settings.email_debtor_template || ''}
                 onChange={e => set('email_debtor_template', e.target.value)}
               />

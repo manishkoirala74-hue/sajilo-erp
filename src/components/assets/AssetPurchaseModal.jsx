@@ -173,7 +173,7 @@ export default function AssetPurchaseModal({ open, onClose, assets, accounts, ba
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Net Book Value</span>
-                  <span className="font-medium text-emerald-700">{fmt(selectedAsset.net_book_value)}</span>
+                  <span className="font-medium text-emerald-700 dark:text-emerald-400">{fmt(selectedAsset.net_book_value)}</span>
                 </div>
               </div>
             )}
@@ -259,15 +259,15 @@ export default function AssetPurchaseModal({ open, onClose, assets, accounts, ba
 
           {/* Preview */}
           {selectedAsset?.asset_ledger_id && parseFloat(purchaseValue) > 0 && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-xs space-y-1">
-              <p className="font-semibold text-blue-800 mb-1.5">Journal Preview</p>
+            <div className="bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 rounded-lg px-3 py-2 text-xs space-y-1">
+              <p className="font-semibold text-blue-800 dark:text-blue-300 mb-1.5">Journal Preview</p>
               <div className="flex justify-between">
-                <span className="text-blue-700">DR {selectedAsset.asset_ledger_name}</span>
-                <span className="font-mono font-semibold text-blue-800">{fmt(parseFloat(purchaseValue) || 0)}</span>
+                <span className="text-blue-700 dark:text-blue-400">DR {selectedAsset.asset_ledger_name}</span>
+                <span className="font-mono font-semibold text-blue-800 dark:text-blue-300">{fmt(parseFloat(purchaseValue) || 0)}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-blue-700">CR {paymentAccountName || '(select payment account)'}</span>
-                <span className="font-mono font-semibold text-blue-800">{fmt(parseFloat(purchaseValue) || 0)}</span>
+                <span className="text-blue-700 dark:text-blue-400">CR {paymentAccountName || '(select payment account)'}</span>
+                <span className="font-mono font-semibold text-blue-800 dark:text-blue-300">{fmt(parseFloat(purchaseValue) || 0)}</span>
               </div>
             </div>
           )}

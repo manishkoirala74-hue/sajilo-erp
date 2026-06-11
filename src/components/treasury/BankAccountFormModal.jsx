@@ -162,11 +162,11 @@ export default function BankAccountFormModal({ account, onSave, onClose }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+      <div className="bg-card rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-border shrink-0">
           <div className="flex items-center gap-2">
-            {isBank ? <Landmark className="w-5 h-5 text-primary" /> : <Banknote className="w-5 h-5 text-emerald-600" />}
+            {isBank ? <Landmark className="w-5 h-5 text-primary" /> : <Banknote className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />}
             <h2 className="text-base font-semibold">{isEdit ? 'Edit Account' : `New ${isBank ? 'Bank' : 'Cash'} Account`}</h2>
           </div>
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground"><X className="w-5 h-5" /></button>

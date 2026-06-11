@@ -8,20 +8,20 @@ import { cn } from '@/lib/utils';
 import AccountFormModal from '@/components/accounting/AccountFormModal';
 
 const TYPE_META = {
-  Asset:               { badge: 'bg-blue-100 text-blue-700',    dot: 'bg-blue-500',    border: 'border-blue-200'   },
-  Liability:           { badge: 'bg-red-100 text-red-700',      dot: 'bg-red-500',     border: 'border-red-200'    },
-  Equity:              { badge: 'bg-purple-100 text-purple-700',dot: 'bg-purple-500',  border: 'border-purple-200' },
-  Revenue:             { badge: 'bg-emerald-100 text-emerald-700', dot: 'bg-emerald-500', border: 'border-emerald-200' },
-  COGS:                { badge: 'bg-amber-100 text-amber-700',  dot: 'bg-amber-500',   border: 'border-amber-200'  },
-  OPEX:                { badge: 'bg-orange-100 text-orange-700',dot: 'bg-orange-500',  border: 'border-orange-200' },
-  'Cost of Goods Sold':{ badge: 'bg-amber-100 text-amber-700',  dot: 'bg-amber-500',   border: 'border-amber-200'  },
-  'Other Income':      { badge: 'bg-teal-100 text-teal-700',    dot: 'bg-teal-500',    border: 'border-teal-200'   },
-  'Other Expense':     { badge: 'bg-rose-100 text-rose-700',    dot: 'bg-rose-500',    border: 'border-rose-200'   },
-  Expense:             { badge: 'bg-orange-100 text-orange-700',dot: 'bg-orange-500',  border: 'border-orange-200' },
+  Asset:               { badge: 'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400',    dot: 'bg-blue-500',    border: 'border-blue-200 dark:border-blue-500/20'   },
+  Liability:           { badge: 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400',      dot: 'bg-red-500',     border: 'border-red-200 dark:border-red-500/20'    },
+  Equity:              { badge: 'bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-400',dot: 'bg-purple-500',  border: 'border-purple-200 dark:border-purple-500/20' },
+  Revenue:             { badge: 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400', dot: 'bg-emerald-500', border: 'border-emerald-200 dark:border-emerald-500/20' },
+  COGS:                { badge: 'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400',  dot: 'bg-amber-500',   border: 'border-amber-200 dark:border-amber-500/20'  },
+  OPEX:                { badge: 'bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-400',dot: 'bg-orange-500',  border: 'border-orange-200 dark:border-orange-500/20' },
+  'Cost of Goods Sold':{ badge: 'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400',  dot: 'bg-amber-500',   border: 'border-amber-200 dark:border-amber-500/20'  },
+  'Other Income':      { badge: 'bg-teal-100 dark:bg-teal-500/20 text-teal-700 dark:text-teal-400',    dot: 'bg-teal-500',    border: 'border-teal-200 dark:border-teal-500/20'   },
+  'Other Expense':     { badge: 'bg-rose-100 dark:bg-rose-500/20 text-rose-700 dark:text-rose-400',    dot: 'bg-rose-500',    border: 'border-rose-200 dark:border-rose-500/20'   },
+  Expense:             { badge: 'bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-400',dot: 'bg-orange-500',  border: 'border-orange-200 dark:border-orange-500/20' },
 };
 
 const getMeta = (type) =>
-  TYPE_META[type] || { badge: 'bg-slate-100 text-slate-600', dot: 'bg-slate-400', border: 'border-slate-200' };
+  TYPE_META[type] || { badge: 'bg-slate-100 dark:bg-slate-500/20 text-muted-foreground', dot: 'bg-slate-400', border: 'border-border' };
 
 const fmt = (n) => (n || 0).toLocaleString('en-NP', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -30,7 +30,7 @@ function SubLedgerRow({ acc, depth, onEdit, onDelete }) {
   const indent = depth * 20 + 16;
   return (
     <div
-      className="flex items-center gap-3 py-2 pr-4 border-t border-border/30 hover:bg-slate-50 transition-colors group"
+      className="flex items-center gap-3 py-2 pr-4 border-t border-border/30 hover:bg-muted/50 transition-colors group"
       style={{ paddingLeft: `${indent}px` }}
     >
       {/* connector line */}
@@ -39,14 +39,14 @@ function SubLedgerRow({ acc, depth, onEdit, onDelete }) {
       <span className="font-mono text-xs text-muted-foreground w-20 shrink-0">{acc.account_code}</span>
       <span className="flex-1 text-sm text-foreground">{acc.account_name}</span>
       {acc.ifrs_reference && (
-        <span className="hidden sm:inline text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded border border-blue-100 shrink-0">
+        <span className="hidden sm:inline text-[10px] bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 px-1.5 py-0.5 rounded border border-blue-100 shrink-0">
           {acc.ifrs_reference}
         </span>
       )}
-      <span className={cn('text-[10px] px-1.5 py-0.5 rounded-full shrink-0', acc.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-400')}>
+      <span className={cn('text-[10px] px-1.5 py-0.5 rounded-full shrink-0', acc.is_active ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400' : 'bg-slate-100 dark:bg-slate-500/20 text-slate-400')}>
         {acc.is_active ? 'Active' : 'Inactive'}
       </span>
-      <span className={cn('font-mono text-xs font-semibold w-28 text-right shrink-0', (acc.current_balance || 0) >= 0 ? 'text-emerald-700' : 'text-red-600')}>
+      <span className={cn('font-mono text-xs font-semibold w-28 text-right shrink-0', (acc.current_balance || 0) >= 0 ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>
         {fmt(acc.current_balance)}
       </span>
       <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -73,7 +73,7 @@ function GroupLedgerRow({ grp, children, depth, expanded, onToggle, onEdit, onDe
       <div
         className={cn(
           'flex items-center gap-2 py-2.5 pr-4 border-t border-border/40 cursor-pointer transition-colors group',
-          depth === 0 ? 'bg-slate-50/80 hover:bg-slate-100/80' : 'bg-white hover:bg-slate-50'
+          depth === 0 ? 'bg-muted/50/80 hover:bg-slate-100 dark:bg-slate-500/20/80' : 'bg-card hover:bg-muted/50'
         )}
         style={{ paddingLeft: `${indent}px` }}
         onClick={e => { e.stopPropagation(); onToggle(); }}
@@ -93,7 +93,7 @@ function GroupLedgerRow({ grp, children, depth, expanded, onToggle, onEdit, onDe
           : <Folder className="w-4 h-4 text-primary/60 shrink-0" />
         }
         <span className="font-mono text-xs text-muted-foreground w-20 shrink-0">{grp.account_code}</span>
-        <span className={cn('font-semibold text-sm flex-1', depth === 0 ? 'text-foreground' : 'text-slate-700')}>
+        <span className={cn('font-semibold text-sm flex-1', depth === 0 ? 'text-foreground' : 'text-muted-foreground')}>
           {grp.account_name}
         </span>
         {grp.is_system_account && <Lock className="w-3 h-3 text-slate-400 shrink-0" title="System account — locked" />}
@@ -102,7 +102,7 @@ function GroupLedgerRow({ grp, children, depth, expanded, onToggle, onEdit, onDe
             {children.length}
           </span>
         )}
-        <span className={cn('font-mono text-xs font-bold w-28 text-right shrink-0', (grp.current_balance || 0) >= 0 ? 'text-emerald-700' : 'text-red-600')}>
+        <span className={cn('font-mono text-xs font-bold w-28 text-right shrink-0', (grp.current_balance || 0) >= 0 ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>
           {fmt(grp.current_balance)}
         </span>
         <div
@@ -177,14 +177,14 @@ function TypeSection({ type, typeData, meta, isExpanded, onToggle, expandedGroup
       {/* Type header */}
       <button
         onClick={onToggle}
-        className="w-full flex items-center gap-3 px-4 py-3 text-left bg-white hover:bg-muted/20 transition-colors border-b border-border"
+        className="w-full flex items-center gap-3 px-4 py-3 text-left bg-card hover:bg-muted/20 transition-colors border-b border-border"
       >
         <span className={cn('w-2 h-2 rounded-full shrink-0', meta.dot)} />
         <span className="font-bold text-sm text-foreground flex-1">{type}</span>
         <span className={cn('text-[10px] font-semibold px-2 py-0.5 rounded-full border', meta.badge, meta.border)}>
           {totalInType} accounts
         </span>
-        <span className={cn('font-mono text-xs font-bold w-28 text-right shrink-0', typeBalance >= 0 ? 'text-emerald-700' : 'text-red-600')}>
+        <span className={cn('font-mono text-xs font-bold w-28 text-right shrink-0', typeBalance >= 0 ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>
           {fmt(typeBalance)}
         </span>
         {isExpanded
@@ -195,7 +195,7 @@ function TypeSection({ type, typeData, meta, isExpanded, onToggle, expandedGroup
 
       {/* Groups */}
       {isExpanded && (
-        <div className="bg-white">
+        <div className="bg-card">
           {(typeData?.rootGroups || []).map(grp => (
             <GroupLedgerRow
               key={grp.id}
@@ -406,9 +406,9 @@ export default function ChartOfAccounts() {
       </div>
 
       {/* Tree */}
-      <div className="border border-border rounded-xl overflow-hidden bg-white">
+      <div className="border border-border rounded-xl overflow-hidden bg-card">
         {/* Table header */}
-        <div className="grid grid-cols-[1fr_auto_auto] items-center px-4 py-2 bg-slate-100 border-b border-border text-[11px] font-bold uppercase tracking-wider text-slate-500 gap-2">
+        <div className="grid grid-cols-[1fr_auto_auto] items-center px-4 py-2 bg-slate-100 dark:bg-slate-500/20 border-b border-border text-[11px] font-bold uppercase tracking-wider text-slate-500 gap-2">
           <span>Account Code — Name</span>
           <span className="w-28 text-right">Balance (NPR)</span>
           <span className="w-20" />

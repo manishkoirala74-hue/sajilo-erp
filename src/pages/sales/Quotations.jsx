@@ -17,11 +17,11 @@ import { loadActiveTaxTypes, computeTotalTax } from '@/lib/taxService';
 
 const STATUS_COLORS = {
   Draft: 'bg-gray-100 text-gray-700',
-  Sent: 'bg-blue-100 text-blue-700',
-  Accepted: 'bg-green-100 text-green-700',
-  Rejected: 'bg-red-100 text-red-700',
-  Expired: 'bg-orange-100 text-orange-700',
-  Converted: 'bg-purple-100 text-purple-700',
+  Sent: 'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400',
+  Accepted: 'bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400',
+  Rejected: 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400',
+  Expired: 'bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-400',
+  Converted: 'bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-400',
 };
 
 const ALL_STATUSES = ['Draft', 'Sent', 'Accepted', 'Rejected', 'Expired', 'Converted'];
@@ -199,14 +199,14 @@ export default function Quotations() {
           ...ALL_STATUSES.map(s => ({ key: s, label: `${s} (${quotations.filter(q => q.status === s).length})` }))
         ].map(f => (
           <button key={f.key} onClick={() => setFilterStatus(f.key)}
-            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${filterStatus === f.key ? 'bg-primary text-white' : 'bg-white border border-border text-muted-foreground hover:bg-muted'}`}>
+            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${filterStatus === f.key ? 'bg-primary text-white' : 'bg-card border border-border text-muted-foreground hover:bg-muted'}`}>
             {f.label}
           </button>
         ))}
       </div>
 
       {/* Table */}
-      <div className="bg-white border border-border rounded-xl overflow-hidden">
+      <div className="bg-card border border-border rounded-xl overflow-hidden">
         {loading ? (
           <div className="p-8 space-y-3">{Array(5).fill(0).map((_, i) => <div key={i} className="h-10 bg-muted rounded animate-pulse" />)}</div>
         ) : filtered.length === 0 ? (

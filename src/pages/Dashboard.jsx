@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/lib/AuthContext';
+import { useTheme } from '@/lib/ThemeContext';
 import { sajilo } from '@/api/sajiloClient';
 import {
   TrendingUp, ShoppingCart, Users, FileText, AlertCircle, Clock, ArrowRight,
@@ -34,6 +35,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [amountsVisible, setAmountsVisible] = useState(true);
   const [chartData, setChartData] = useState([]);
+  const { theme } = useTheme();
 
   useEffect(() => {
     const td = new Date();
@@ -133,7 +135,7 @@ export default function Dashboard() {
         <button
           onClick={() => setAmountsVisible(v => !v)}
           title={amountsVisible ? 'Hide amounts' : 'Show amounts'}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-white text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors text-xs font-medium"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-card text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors text-xs font-medium"
         >
           {amountsVisible ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
           {amountsVisible ? 'Hide Amounts' : 'Show Amounts'}
@@ -143,25 +145,25 @@ export default function Dashboard() {
       {(pendingApprovals.length > 0 || lowStockItems.length > 0) && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {pendingApprovals.length > 0 && (
-            <Link to="/purchase/orders" className="flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-xl p-4 hover:bg-amber-100 transition-colors">
-              <div className="p-2 bg-amber-100 rounded-lg">
-                <Clock className="w-5 h-5 text-amber-600" />
+            <Link to="/purchase/orders" className="flex items-center gap-3 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-xl p-4 hover:bg-amber-100 dark:bg-amber-500/20 transition-colors">
+              <div className="p-2 bg-amber-100 dark:bg-amber-500/20 rounded-lg">
+                <Clock className="w-5 h-5 text-amber-600 dark:text-amber-400" />
               </div>
               <div>
-                <p className="font-semibold text-amber-800 text-sm">{pendingApprovals.length} PO{pendingApprovals.length > 1 ? 's' : ''} Awaiting Approval</p>
-                <p className="text-xs text-amber-600">Click to review purchase orders</p>
+                <p className="font-semibold text-amber-800 dark:text-amber-300 text-sm">{pendingApprovals.length} PO{pendingApprovals.length > 1 ? 's' : ''} Awaiting Approval</p>
+                <p className="text-xs text-amber-600 dark:text-amber-400">Click to review purchase orders</p>
               </div>
               <ArrowRight className="w-4 h-4 text-amber-500 ml-auto" />
             </Link>
           )}
           {lowStockItems.length > 0 && (
-            <Link to="/inventory/items" className="flex items-center gap-3 bg-red-50 border border-red-200 rounded-xl p-4 hover:bg-red-100 transition-colors">
-              <div className="p-2 bg-red-100 rounded-lg">
-                <AlertCircle className="w-5 h-5 text-red-600" />
+            <Link to="/inventory/items" className="flex items-center gap-3 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-xl p-4 hover:bg-red-100 dark:bg-red-500/20 transition-colors">
+              <div className="p-2 bg-red-100 dark:bg-red-500/20 rounded-lg">
+                <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400" />
               </div>
               <div>
-                <p className="font-semibold text-red-800 text-sm">{lowStockItems.length} Item{lowStockItems.length > 1 ? 's' : ''} Below Reorder Level</p>
-                <p className="text-xs text-red-600">Stock replenishment needed</p>
+                <p className="font-semibold text-red-800 dark:text-red-300 text-sm">{lowStockItems.length} Item{lowStockItems.length > 1 ? 's' : ''} Below Reorder Level</p>
+                <p className="text-xs text-red-600 dark:text-red-400">Stock replenishment needed</p>
               </div>
               <ArrowRight className="w-4 h-4 text-red-500 ml-auto" />
             </Link>
@@ -213,7 +215,7 @@ export default function Dashboard() {
 
       {/* Charts */}
       <div className="hidden md:grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white rounded-xl border border-border p-6">
+        <div className="bg-card rounded-xl border border-border p-6">
           <h3 className="font-semibold text-foreground mb-4">Revenue vs Purchases</h3>
           <ResponsiveContainer width="100%" height={220}>
             <AreaChart data={chartData}>
@@ -227,25 +229,31 @@ export default function Dashboard() {
                   <stop offset="95%" stopColor="#F59E0B" stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-              <XAxis dataKey="month" tick={{ fontSize: 12 }} />
-              <YAxis tickFormatter={v => `${v / 1000}K`} tick={{ fontSize: 11 }} />
-              <Tooltip formatter={v => formatNPR(v)} />
+              <CartesianGrid strokeDasharray="3 3" stroke={theme === 'dark' ? '#334155' : '#f0f0f0'} />
+              <XAxis dataKey="month" tick={{ fontSize: 12, fill: theme === 'dark' ? '#94a3b8' : '#64748b' }} />
+              <YAxis tickFormatter={v => `${v / 1000}K`} tick={{ fontSize: 11, fill: theme === 'dark' ? '#94a3b8' : '#64748b' }} />
+              <Tooltip 
+                formatter={v => formatNPR(v)} 
+                contentStyle={{ backgroundColor: theme === 'dark' ? '#1e293b' : '#fff', borderColor: theme === 'dark' ? '#334155' : '#e2e8f0', color: theme === 'dark' ? '#f8fafc' : '#0f172a' }}
+              />
               <Area type="monotone" dataKey="sales" stroke="#4F46E5" fill="url(#salesGrad)" strokeWidth={2} name="Sales" />
               <Area type="monotone" dataKey="purchases" stroke="#F59E0B" fill="url(#purchGrad)" strokeWidth={2} name="Purchases" />
             </AreaChart>
           </ResponsiveContainer>
         </div>
 
-        <div className="bg-white rounded-xl border border-border p-6">
+        <div className="bg-card rounded-xl border border-border p-6">
           <h3 className="font-semibold text-foreground mb-4">Monthly Overview</h3>
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-              <XAxis dataKey="month" tick={{ fontSize: 12 }} />
-              <YAxis tickFormatter={v => `${v / 1000}K`} tick={{ fontSize: 11 }} />
-              <Tooltip formatter={v => formatNPR(v)} />
-              <Legend />
+              <CartesianGrid strokeDasharray="3 3" stroke={theme === 'dark' ? '#334155' : '#f0f0f0'} />
+              <XAxis dataKey="month" tick={{ fontSize: 12, fill: theme === 'dark' ? '#94a3b8' : '#64748b' }} />
+              <YAxis tickFormatter={v => `${v / 1000}K`} tick={{ fontSize: 11, fill: theme === 'dark' ? '#94a3b8' : '#64748b' }} />
+              <Tooltip 
+                formatter={v => formatNPR(v)}
+                contentStyle={{ backgroundColor: theme === 'dark' ? '#1e293b' : '#fff', borderColor: theme === 'dark' ? '#334155' : '#e2e8f0', color: theme === 'dark' ? '#f8fafc' : '#0f172a' }}
+              />
+              <Legend wrapperStyle={{ color: theme === 'dark' ? '#cbd5e1' : '#475569' }} />
               <Bar dataKey="sales" name="Sales" fill="#4F46E5" radius={[4, 4, 0, 0]} />
               <Bar dataKey="purchases" name="Purchases" fill="#10B981" radius={[4, 4, 0, 0]} />
             </BarChart>
@@ -256,7 +264,7 @@ export default function Dashboard() {
       {/* Recent Activity */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Recent Sales Invoices */}
-        <div className="bg-white rounded-xl border border-border overflow-hidden">
+        <div className="bg-card rounded-xl border border-border overflow-hidden">
           <div className="flex items-center justify-between p-4 border-b border-border">
             <h3 className="font-semibold text-foreground">Recent Sales Invoices</h3>
             <Link to="/sales/invoices" className="text-xs text-primary hover:underline flex items-center gap-1">
@@ -288,7 +296,7 @@ export default function Dashboard() {
         </div>
 
         {/* Quick Stats */}
-        <div className="bg-white rounded-xl border border-border p-4">
+        <div className="bg-card rounded-xl border border-border p-4">
           <h3 className="font-semibold text-foreground mb-4">Inventory Summary</h3>
           <div className="space-y-3">
             <div className="flex justify-between items-center py-2 border-b border-border">
@@ -297,11 +305,11 @@ export default function Dashboard() {
             </div>
             <div className="flex justify-between items-center py-2 border-b border-border">
               <span className="text-sm text-muted-foreground">Active Items</span>
-              <span className="font-semibold text-emerald-600">{items.filter(i => i.is_active !== false).length}</span>
+              <span className="font-semibold text-emerald-600 dark:text-emerald-400">{items.filter(i => i.is_active !== false).length}</span>
             </div>
             <div className="flex justify-between items-center py-2 border-b border-border">
               <span className="text-sm text-muted-foreground">Low Stock Items</span>
-              <span className="font-semibold text-red-600">{lowStockItems.length}</span>
+              <span className="font-semibold text-red-600 dark:text-red-400">{lowStockItems.length}</span>
             </div>
             <div className="flex justify-between items-center py-2 border-b border-border">
               <span className="text-sm text-muted-foreground">Total Customers</span>

@@ -206,7 +206,7 @@ export default function Employees() {
               <div className="grid grid-cols-2 gap-6">
                 {/* EARNINGS */}
                 <div>
-                  <Label className="text-emerald-600 font-semibold mb-3 block">Earnings (Debits)</Label>
+                  <Label className="text-emerald-600 dark:text-emerald-400 font-semibold mb-3 block">Earnings (Debits)</Label>
                   {settings.earnings.length === 0 && <p className="text-xs text-muted-foreground italic">No earnings mapped in settings.</p>}
                   {settings.earnings.map(earn => (
                     <div key={earn.name} className="mb-3">
@@ -222,7 +222,7 @@ export default function Employees() {
 
                 {/* DEDUCTIONS */}
                 <div>
-                  <Label className="text-orange-600 font-semibold mb-3 block">Deductions (Credits)</Label>
+                  <Label className="text-orange-600 dark:text-orange-400 font-semibold mb-3 block">Deductions (Credits)</Label>
                   {settings.deductions.length === 0 && <p className="text-xs text-muted-foreground italic">No deductions mapped in settings.</p>}
                   {settings.deductions.map(ded => {
                     const isPct = ded.name.toLowerCase().includes('pf') || ded.name.toLowerCase().includes('tds') || ded.name.toLowerCase().includes('tax');

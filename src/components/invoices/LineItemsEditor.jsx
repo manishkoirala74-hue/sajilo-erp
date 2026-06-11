@@ -127,7 +127,7 @@ export default function LineItemsEditor({ value = [], onChange, taxTypes = [] })
                     <select
                       value={line.item_id}
                       onChange={e => updateLine(idx, 'item_id', e.target.value)}
-                      className="w-full bg-white border border-input rounded-md px-2 py-1.5 text-sm outline-none focus:ring-1 focus:ring-ring"
+                      className="w-full bg-card border border-input rounded-md px-2 py-1.5 text-sm outline-none focus:ring-1 focus:ring-ring"
                     >
                       <option value="">Select item...</option>
                       {items.map(i => <option key={i.id} value={i.id}>{i.item_name} ({i.item_code || i.unit_of_measure})</option>)}
@@ -182,7 +182,7 @@ export default function LineItemsEditor({ value = [], onChange, taxTypes = [] })
                     NPR {Number(line.line_total || 0).toLocaleString()}
                   </td>
                   <td className="px-3 py-2">
-                    <Button variant="ghost" size="icon" className="h-7 w-7 text-red-400 hover:text-red-600" onClick={() => removeLine(idx)}>
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-red-400 hover:text-red-600 dark:text-red-400" onClick={() => removeLine(idx)}>
                       <Trash2 className="w-3.5 h-3.5" />
                     </Button>
                   </td>

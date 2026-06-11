@@ -17,6 +17,7 @@ import DateInput from '@/components/shared/DateInput';
 import { postSalesInvoice, loadItemsMap, loadSettings } from '@/lib/glPostingService';
 import { loadActiveTaxTypes, computeTotalTax } from '@/lib/taxService';
 import { useSajiloSync } from '@/hooks/useSajiloSync';
+import { usePermissions } from '@/lib/AuthContext';
 
 const emptySI = {
   invoice_number: '', customer_id: '', customer_name: '', sales_order_id: '',
@@ -29,7 +30,10 @@ const emptySI = {
 };
 
 export default function SalesInvoices() {
-  
+  const { hasAccess } = usePermissions();
+  const canCreate = hasAccess('sales_invoices', 'create');
+  const canEdit = hasAccess('sales_invoices', 'edit');
+  const canReverse = hasAccess('sales_invoices', 'reverse');
 
   const [invoices, setInvoices] = useState([]);
   const [customers, setCustomers] = useState([]);
@@ -358,12 +362,12 @@ export default function SalesInvoices() {
               {row.payment_status === 'Paid' ? <RotateCcw className="w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />}
             </Button>
           )}
-          {(row.status === 'Draft' || row.status === 'Posted') && (
+          {(row.status === 'Draft' || row.status === 'Posted') && canEdit && (
             <Button variant="ghost" size="icon" className="text-primary" title="Edit Invoice" onClick={() => openEdit(row)}>
               <Pencil className="w-4 h-4" />
             </Button>
           )}
-          {(row.status === 'Draft' || row.status === 'Posted') && (
+          {(row.status === 'Draft' || row.status === 'Posted') && canReverse && (
             <Button variant="ghost" size="icon" className="text-destructive" title="Cancel Invoice (reverse transactions)" onClick={() => { setCancelTarget(row); setCancelReason(''); }}>
               <XCircle className="w-4 h-4" />
             </Button>
@@ -383,9 +387,9 @@ export default function SalesInvoices() {
       <PageHeader
         title="Sales Invoices"
         subtitle="Create and manage customer invoices and track payments"
-        action={openNew}
-        actionLabel="New Invoice"
-        actionIcon={Plus}
+        action={canCreate ? openNew : undefined}
+        actionLabel={canCreate ? "New Invoice" : undefined}
+        actionIcon={canCreate ? Plus : undefined}
       />
 
       <div className="flex gap-2 mb-4 flex-wrap">
@@ -402,12 +406,12 @@ export default function SalesInvoices() {
             key={f.key}
             onClick={() => setFilterStatus(f.key)}
             className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-              filterStatus === f.key ? 'bg-primary text-white' : 'bg-white border border-border text-muted-foreground hover:bg-muted'
+              filterStatus === f.key ? 'bg-primary text-white' : 'bg-card border border-border text-muted-foreground hover:bg-muted'
             }`}
           >
             {f.label}
-            {f.key === 'Cancelled' && <span className="ml-1.5 text-xs bg-red-100 text-red-600 rounded-full px-1.5">{invoices.filter(i => i.status === 'Cancelled').length}</span>}
-            {f.key === 'Rejected' && <span className="ml-1.5 text-xs bg-orange-100 text-orange-600 rounded-full px-1.5">{invoices.filter(i => i.status === 'Rejected').length}</span>}
+            {f.key === 'Cancelled' && <span className="ml-1.5 text-xs bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400 rounded-full px-1.5">{invoices.filter(i => i.status === 'Cancelled').length}</span>}
+            {f.key === 'Rejected' && <span className="ml-1.5 text-xs bg-orange-100 dark:bg-orange-500/20 text-orange-600 dark:text-orange-400 rounded-full px-1.5">{invoices.filter(i => i.status === 'Rejected').length}</span>}
           </button>
         ))}
       </div>
@@ -568,16 +572,16 @@ export default function SalesInvoices() {
               </div>
               {viewDetail.notes && <p className="text-sm text-muted-foreground border-t pt-3">{viewDetail.notes}</p>}
               {viewDetail.status === 'Cancelled' && (
-                <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                  <p className="text-sm font-semibold text-red-700 flex items-center gap-1"><XCircle className="w-4 h-4" /> Cancelled</p>
-                  <p className="text-sm text-red-600 mt-1">{viewDetail.cancellation_reason}</p>
+                <div className="bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-lg p-3">
+                  <p className="text-sm font-semibold text-red-700 dark:text-red-400 flex items-center gap-1"><XCircle className="w-4 h-4" /> Cancelled</p>
+                  <p className="text-sm text-red-600 dark:text-red-400 mt-1">{viewDetail.cancellation_reason}</p>
                   <p className="text-xs text-red-400 mt-1">Date: {viewDetail.cancelled_date}</p>
                 </div>
               )}
               {viewDetail.status === 'Rejected' && (
-                <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
-                  <p className="text-sm font-semibold text-orange-700 flex items-center gap-1"><Ban className="w-4 h-4" /> Rejected (Number Voided)</p>
-                  <p className="text-sm text-orange-600 mt-1">{viewDetail.rejection_reason}</p>
+                <div className="bg-orange-50 dark:bg-orange-500/10 border border-orange-200 dark:border-orange-500/20 rounded-lg p-3">
+                  <p className="text-sm font-semibold text-orange-700 dark:text-orange-400 flex items-center gap-1"><Ban className="w-4 h-4" /> Rejected (Number Voided)</p>
+                  <p className="text-sm text-orange-600 dark:text-orange-400 mt-1">{viewDetail.rejection_reason}</p>
                   <p className="text-xs text-orange-400 mt-1">Date: {viewDetail.rejected_date}</p>
                 </div>
               )}
@@ -613,7 +617,7 @@ export default function SalesInvoices() {
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
-            <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
+            <div className="bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-lg p-3 text-sm text-red-700 dark:text-red-400">
               <p className="font-semibold">This action will:</p>
               <ul className="list-disc list-inside mt-1 space-y-0.5">
                 {cancelTarget?.status === 'Posted' && <li>Reverse all stock deductions (restore inventory)</li>}
@@ -644,12 +648,12 @@ export default function SalesInvoices() {
       <Dialog open={!!rejectTarget} onOpenChange={() => setRejectTarget(null)}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-orange-600">
+            <DialogTitle className="flex items-center gap-2 text-orange-600 dark:text-orange-400">
               <Ban className="w-5 h-5" /> Reject Invoice Number {rejectTarget?.invoice_number}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
-            <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 text-sm text-orange-700">
+            <div className="bg-orange-50 dark:bg-orange-500/10 border border-orange-200 dark:border-orange-500/20 rounded-lg p-3 text-sm text-orange-700 dark:text-orange-400">
               <p className="font-semibold">Rejecting a Draft invoice:</p>
               <ul className="list-disc list-inside mt-1 space-y-0.5">
                 <li>No stock or financial transactions are reversed (draft has none)</li>
@@ -680,7 +684,7 @@ export default function SalesInvoices() {
       <Dialog open={dupWarning} onOpenChange={() => { setDupWarning(false); setPendingPostStatus(null); }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-yellow-600">
+            <DialogTitle className="flex items-center gap-2 text-yellow-600 dark:text-yellow-400">
               <AlertTriangle className="w-5 h-5" /> Duplicate Invoice Number
             </DialogTitle>
           </DialogHeader>

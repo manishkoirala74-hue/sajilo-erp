@@ -157,7 +157,7 @@ export default function EditCompanyDetails({ companyId, onBack }) {
         </Button>
       </div>
 
-      <div className="bg-white border border-border rounded-xl overflow-hidden">
+      <div className="bg-card border border-border rounded-xl overflow-hidden">
         <form onSubmit={handleSave} className="p-5 space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -184,7 +184,7 @@ export default function EditCompanyDetails({ companyId, onBack }) {
               <Label>Address</Label>
               <Input value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} className="mt-1" />
             </div>
-            <div className="col-span-2 border border-border p-4 rounded-lg bg-white mt-2">
+            <div className="col-span-2 border border-border p-4 rounded-lg bg-card mt-2">
               <Label className="mb-2 block">Company Logo</Label>
               <div className="flex items-center gap-4">
                 {formData.logo_url ? (
@@ -219,13 +219,13 @@ export default function EditCompanyDetails({ companyId, onBack }) {
         </form>
       </div>
 
-      <div className="bg-red-50 border border-red-200 rounded-xl overflow-hidden mt-8">
-        <div className="flex items-center gap-2 px-5 py-4 border-b border-red-200 bg-red-100/50 text-red-800">
+      <div className="bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-xl overflow-hidden mt-8">
+        <div className="flex items-center gap-2 px-5 py-4 border-b border-red-200 dark:border-red-500/20 bg-red-100 dark:bg-red-500/20/50 text-red-800 dark:text-red-300">
           <ShieldAlert className="w-4 h-4" />
           <h3 className="font-semibold text-sm">Danger Zone</h3>
         </div>
         <div className="p-5">
-          <p className="text-sm text-red-800 mb-4">
+          <p className="text-sm text-red-800 dark:text-red-300 mb-4">
             Warning: Deleting a company will permanently remove the company record, all transactions, items, customers, vendors, and uploaded files. 
             <strong> This action cannot be undone.</strong>
           </p>
@@ -239,7 +239,7 @@ export default function EditCompanyDetails({ companyId, onBack }) {
       <Dialog open={showDeleteModal} onOpenChange={setShowDeleteModal}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
-            <DialogTitle className="text-red-600 flex items-center gap-2">
+            <DialogTitle className="text-red-600 dark:text-red-400 flex items-center gap-2">
               <AlertTriangle className="w-5 h-5" />
               Confirm Complete Deletion
             </DialogTitle>
@@ -250,7 +250,7 @@ export default function EditCompanyDetails({ companyId, onBack }) {
           </DialogHeader>
           
           <div className="py-4 space-y-4">
-            <div className="p-3 bg-red-50 border border-red-200 text-red-800 rounded text-sm">
+            <div className="p-3 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-800 dark:text-red-300 rounded text-sm">
               Please enter your password to confirm you want to perform this high-risk action.
             </div>
             
@@ -263,7 +263,7 @@ export default function EditCompanyDetails({ companyId, onBack }) {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
               />
-              {deleteError && <p className="text-sm text-red-600">{deleteError}</p>}
+              {deleteError && <p className="text-sm text-red-600 dark:text-red-400">{deleteError}</p>}
             </div>
           </div>
 

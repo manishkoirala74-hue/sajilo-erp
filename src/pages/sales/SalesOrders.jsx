@@ -143,7 +143,7 @@ export default function SalesOrders() {
             key={s}
             onClick={() => setFilterStatus(s)}
             className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-              filterStatus === s ? 'bg-primary text-white' : 'bg-white border border-border text-muted-foreground hover:bg-muted'
+              filterStatus === s ? 'bg-primary text-white' : 'bg-card border border-border text-muted-foreground hover:bg-muted'
             }`}
           >
             {s === 'all' ? 'All' : s}

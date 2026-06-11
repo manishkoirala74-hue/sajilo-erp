@@ -18,15 +18,15 @@ export default function AssetBulkToolbar({ selectedIds, onBulkStatus, onBulkDele
     <div className="flex items-center gap-3 px-4 py-2.5 bg-primary/5 border border-primary/20 rounded-xl mb-3">
       <span className="text-sm font-semibold text-primary">{count} asset{count > 1 ? 's' : ''} selected</span>
       <div className="flex gap-2 ml-auto">
-        <Button size="sm" variant="outline" className="gap-1.5 text-emerald-700 border-emerald-300 hover:bg-emerald-50"
+        <Button size="sm" variant="outline" className="gap-1.5 text-emerald-700 dark:text-emerald-400 border-emerald-300 dark:border-emerald-500/30 hover:bg-emerald-50 dark:bg-emerald-500/10"
           onClick={() => onBulkStatus('Active')}>
           <CheckCircle2 className="w-3.5 h-3.5" /> Set Active
         </Button>
-        <Button size="sm" variant="outline" className="gap-1.5 text-amber-700 border-amber-300 hover:bg-amber-50"
+        <Button size="sm" variant="outline" className="gap-1.5 text-amber-700 dark:text-amber-400 border-amber-300 dark:border-amber-500/30 hover:bg-amber-50 dark:bg-amber-500/10"
           onClick={() => onBulkStatus('In Repair')}>
           <PauseCircle className="w-3.5 h-3.5" /> Set In Repair
         </Button>
-        <Button size="sm" variant="outline" className="gap-1.5 text-slate-600 border-slate-300 hover:bg-slate-50"
+        <Button size="sm" variant="outline" className="gap-1.5 text-muted-foreground border-border hover:bg-muted/50"
           onClick={() => onBulkStatus('Disposed')}>
           Set Disposed
         </Button>

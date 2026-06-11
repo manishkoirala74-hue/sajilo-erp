@@ -278,7 +278,7 @@ export default function PartnerBatchActions({ selectedIds, selectedPartners, par
       <Dialog open={showDelete} onOpenChange={v => { if (!processing) setShowDelete(v); }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-red-600">
+            <DialogTitle className="flex items-center gap-2 text-red-600 dark:text-red-400">
               <Trash2 className="w-4 h-4" />
               Confirm Deletion
             </DialogTitle>
@@ -286,13 +286,13 @@ export default function PartnerBatchActions({ selectedIds, selectedPartners, par
 
           {blockedList.length > 0 ? (
             <div className="space-y-3">
-              <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-lg p-3">
+              <div className="flex items-start gap-2 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-lg p-3">
                 <AlertTriangle className="w-4 h-4 text-red-500 mt-0.5 shrink-0" />
-                <p className="text-sm text-red-700 font-medium">Deletion Blocked — Transaction Records Found</p>
+                <p className="text-sm text-red-700 dark:text-red-400 font-medium">Deletion Blocked — Transaction Records Found</p>
               </div>
               <div className="space-y-2 max-h-52 overflow-y-auto">
                 {blockedList.map((b, i) => (
-                  <div key={i} className="bg-red-50 border border-red-100 rounded-lg px-3 py-2 text-xs text-red-700">
+                  <div key={i} className="bg-red-50 dark:bg-red-500/10 border border-red-100 rounded-lg px-3 py-2 text-xs text-red-700 dark:text-red-400">
                     <span className="font-semibold">"{b.name}"</span> has active {b.reason} in the system.
                     Consider marking them <span className="font-semibold">Inactive</span> instead.
                   </div>
@@ -302,11 +302,11 @@ export default function PartnerBatchActions({ selectedIds, selectedPartners, par
             </div>
           ) : (
             <div className="space-y-4">
-              <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg p-3">
+              <div className="flex items-start gap-2 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-lg p-3">
                 <AlertTriangle className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
                 <div>
-                  <p className="text-sm font-medium text-amber-800">This action is permanent and cannot be undone.</p>
-                  <p className="text-xs text-amber-700 mt-1">
+                  <p className="text-sm font-medium text-amber-800 dark:text-amber-300">This action is permanent and cannot be undone.</p>
+                  <p className="text-xs text-amber-700 dark:text-amber-400 mt-1">
                     A referential integrity check will run first. Partners with existing transactions will be blocked.
                   </p>
                 </div>

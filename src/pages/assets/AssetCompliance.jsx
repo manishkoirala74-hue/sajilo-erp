@@ -50,7 +50,7 @@ function AssetPicker({ assets, value, onChange }) {
         type="button"
         onClick={() => { setOpen(v => !v); setSearch(''); }}
         className={cn(
-          'flex items-center justify-between w-full h-9 px-3 text-sm border rounded-md bg-white hover:bg-muted/30 transition-colors',
+          'flex items-center justify-between w-full h-9 px-3 text-sm border rounded-md bg-card hover:bg-muted/30 transition-colors',
           !selected && 'text-muted-foreground',
           open && 'border-primary ring-1 ring-primary'
         )}
@@ -61,7 +61,7 @@ function AssetPicker({ assets, value, onChange }) {
         <ChevronDown className="w-4 h-4 shrink-0 text-muted-foreground ml-2" />
       </button>
       {open && (
-        <div className="absolute top-full left-0 z-50 mt-1 w-full bg-white border border-border rounded-lg shadow-lg">
+        <div className="absolute top-full left-0 z-50 mt-1 w-full bg-card border border-border rounded-lg shadow-lg">
           <div className="p-2 border-b border-border">
             <div className="relative">
               <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
@@ -294,9 +294,9 @@ export default function AssetCompliance() {
   const upcoming = items.filter(i => i.status === 'Upcoming').length;
 
   const statusColor = {
-    Safe: 'text-emerald-700 bg-emerald-50 border-emerald-200',
-    Upcoming: 'text-amber-700 bg-amber-50 border-amber-200',
-    Overdue: 'text-red-700 bg-red-50 border-red-200',
+    Safe: 'text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/20',
+    Upcoming: 'text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/20',
+    Overdue: 'text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-500/10 border-red-200 dark:border-red-500/20',
   };
 
   return (
@@ -316,13 +316,13 @@ export default function AssetCompliance() {
       {(overdue > 0 || upcoming > 0) && (
         <div className="flex gap-3 mb-4">
           {overdue > 0 && (
-            <div className="flex items-center gap-2 bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded-lg text-sm">
+            <div className="flex items-center gap-2 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-700 dark:text-red-400 px-4 py-2 rounded-lg text-sm">
               <AlertTriangle className="w-4 h-4" />
               {overdue} overdue item{overdue > 1 ? 's' : ''}
             </div>
           )}
           {upcoming > 0 && (
-            <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 text-amber-700 px-4 py-2 rounded-lg text-sm">
+            <div className="flex items-center gap-2 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 text-amber-700 dark:text-amber-400 px-4 py-2 rounded-lg text-sm">
               <AlertTriangle className="w-4 h-4" />
               {upcoming} upcoming within 30 days
             </div>
@@ -395,7 +395,7 @@ export default function AssetCompliance() {
                   <td className="px-4 py-2.5">
                     <div className="text-xs">{fmt(item.next_due_date)}</div>
                     {daysUntil !== null && (
-                      <div className={cn('text-xs mt-0.5', daysUntil < 0 ? 'text-red-600' : daysUntil <= 30 ? 'text-amber-600' : 'text-muted-foreground')}>
+                      <div className={cn('text-xs mt-0.5', daysUntil < 0 ? 'text-red-600 dark:text-red-400' : daysUntil <= 30 ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground')}>
                         {daysUntil < 0 ? `${Math.abs(daysUntil)}d overdue` : `in ${daysUntil}d`}
                       </div>
                     )}
@@ -462,7 +462,7 @@ export default function AssetCompliance() {
               </p>
             )}
           </DialogHeader>
-          <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-2.5 text-xs text-amber-800 mb-2 flex items-start gap-2">
+          <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-lg px-4 py-2.5 text-xs text-amber-800 dark:text-amber-300 mb-2 flex items-start gap-2">
             <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
             Fill in the renewal details below, then click <strong>Post Renewal</strong> to update the compliance record.
           </div>

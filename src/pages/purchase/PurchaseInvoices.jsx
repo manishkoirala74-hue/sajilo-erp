@@ -316,7 +316,7 @@ export default function PurchaseInvoices() {
             key={f.key}
             onClick={() => setFilterStatus(f.key)}
             className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-              filterStatus === f.key ? 'bg-primary text-white' : 'bg-white border border-border text-muted-foreground hover:bg-muted'
+              filterStatus === f.key ? 'bg-primary text-white' : 'bg-card border border-border text-muted-foreground hover:bg-muted'
             }`}
           >
             {f.label}
@@ -458,8 +458,8 @@ export default function PurchaseInvoices() {
               </div>
               {viewDetail.notes && <p className="text-sm text-muted-foreground border-t pt-3">{viewDetail.notes}</p>}
               {viewDetail.status === 'Cancelled' && (
-                <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                  <p className="text-sm font-semibold text-red-700 flex items-center gap-1"><XCircle className="w-4 h-4" /> Cancelled</p>
+                <div className="bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-lg p-3">
+                  <p className="text-sm font-semibold text-red-700 dark:text-red-400 flex items-center gap-1"><XCircle className="w-4 h-4" /> Cancelled</p>
                   <p className="text-xs text-red-400 mt-1">Date: {viewDetail.cancelled_date}</p>
                 </div>
               )}
@@ -495,7 +495,7 @@ export default function PurchaseInvoices() {
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
-            <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
+            <div className="bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-lg p-3 text-sm text-red-700 dark:text-red-400">
               <p className="font-semibold">This action will:</p>
               <ul className="list-disc list-inside mt-1 space-y-0.5">
                 {cancelTarget?.status === 'Posted' && <li>Reverse all stock additions (deduct inventory)</li>}

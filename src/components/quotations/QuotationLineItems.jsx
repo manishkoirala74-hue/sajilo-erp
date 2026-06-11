@@ -101,7 +101,7 @@ export default function QuotationLineItems({ value = [], onChange, items = [], v
                   {Number(line.line_total || 0).toLocaleString()}
                 </td>
                 <td className="px-1 py-1.5">
-                  <Button variant="ghost" size="icon" className="h-7 w-7 text-red-400 hover:text-red-600" onClick={() => removeLine(idx)}>
+                  <Button variant="ghost" size="icon" className="h-7 w-7 text-red-400 hover:text-red-600 dark:text-red-400" onClick={() => removeLine(idx)}>
                     <Trash2 className="w-3.5 h-3.5" />
                   </Button>
                 </td>

@@ -118,7 +118,7 @@ export default function StockAdjustments() {
       render: v => (
         <div className="flex items-center gap-1">
           {v === 'Increase' ? <TrendingUp className="w-3.5 h-3.5 text-emerald-500" /> : <TrendingDown className="w-3.5 h-3.5 text-red-500" />}
-          <span className={cn('text-xs font-medium', v === 'Increase' ? 'text-emerald-600' : 'text-red-600')}>{v}</span>
+          <span className={cn('text-xs font-medium', v === 'Increase' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>{v}</span>
         </div>
       )
     },
@@ -137,7 +137,7 @@ export default function StockAdjustments() {
         <Button onClick={() => openNew('Increase')} className="bg-emerald-600 hover:bg-emerald-700">
           <TrendingUp className="w-4 h-4 mr-2" /> Stock Increase
         </Button>
-        <Button onClick={() => openNew('Decrease')} variant="outline" className="border-red-300 text-red-600 hover:bg-red-50">
+        <Button onClick={() => openNew('Decrease')} variant="outline" className="border-red-300 dark:border-red-500/30 text-red-600 dark:text-red-400 hover:bg-red-50 dark:bg-red-500/10">
           <TrendingDown className="w-4 h-4 mr-2" /> Stock Decrease
         </Button>
       </div>
@@ -147,7 +147,7 @@ export default function StockAdjustments() {
       <Dialog open={showForm} onOpenChange={setShowForm}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className={cn('flex items-center gap-2', form.adjustment_type === 'Increase' ? 'text-emerald-700' : 'text-red-700')}>
+            <DialogTitle className={cn('flex items-center gap-2', form.adjustment_type === 'Increase' ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-700 dark:text-red-400')}>
               {form.adjustment_type === 'Increase' ? <TrendingUp className="w-5 h-5" /> : <TrendingDown className="w-5 h-5" />}
               Stock {form.adjustment_type} — {form.adjustment_number}
             </DialogTitle>
@@ -194,7 +194,7 @@ export default function StockAdjustments() {
                 </tr></thead>
                 <tbody className="divide-y divide-border">
                   {form.line_items.map((line, idx) => (
-                    <tr key={idx} className={line.difference_qty > 0 ? 'bg-emerald-50/30' : line.difference_qty < 0 ? 'bg-red-50/30' : ''}>
+                    <tr key={idx} className={line.difference_qty > 0 ? 'bg-emerald-50 dark:bg-emerald-500/10/30' : line.difference_qty < 0 ? 'bg-red-50 dark:bg-red-500/10/30' : ''}>
                       <td className="px-3 py-2">
                         <p className="font-medium">{line.item_name}</p>
                         <p className="text-xs text-muted-foreground">{line.item_code}</p>
@@ -205,7 +205,7 @@ export default function StockAdjustments() {
                           onChange={e => updateLine(idx, 'adjusted_qty', e.target.value)}
                           className="h-8 text-right w-24 ml-auto" />
                       </td>
-                      <td className={cn('px-3 py-2 text-right font-semibold', line.difference_qty > 0 ? 'text-emerald-600' : line.difference_qty < 0 ? 'text-red-600' : 'text-muted-foreground')}>
+                      <td className={cn('px-3 py-2 text-right font-semibold', line.difference_qty > 0 ? 'text-emerald-600 dark:text-emerald-400' : line.difference_qty < 0 ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground')}>
                         {line.difference_qty > 0 ? `+${line.difference_qty}` : line.difference_qty}
                       </td>
                       <td className="px-2 py-1 text-right">
@@ -261,7 +261,7 @@ export default function StockAdjustments() {
                       <td className="px-3 py-2">{l.item_name}</td>
                       <td className="px-3 py-2 text-right">{l.current_qty}</td>
                       <td className="px-3 py-2 text-right">{l.adjusted_qty}</td>
-                      <td className={cn('px-3 py-2 text-right font-semibold', l.difference_qty > 0 ? 'text-emerald-600' : 'text-red-600')}>
+                      <td className={cn('px-3 py-2 text-right font-semibold', l.difference_qty > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>
                         {l.difference_qty > 0 ? `+${l.difference_qty}` : l.difference_qty}
                       </td>
                       <td className="px-3 py-2 text-right">NPR {Number(l.cost_impact || 0).toLocaleString()}</td>

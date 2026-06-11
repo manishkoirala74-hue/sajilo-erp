@@ -50,7 +50,7 @@ export default function QuotationPrint({ quotation: q, settings: s = {}, onClose
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 overflow-y-auto py-8">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl mx-4">
+      <div className="bg-card rounded-2xl shadow-2xl w-full max-w-3xl mx-4">
         {/* Toolbar */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-border">
           <h2 className="font-semibold text-base">Print Preview — {q.quotation_number}</h2>
@@ -64,7 +64,7 @@ export default function QuotationPrint({ quotation: q, settings: s = {}, onClose
 
         {/* Preview */}
         <div className="p-6">
-          <div ref={printRef} style={{ fontFamily: font }} className="bg-white text-[#1a1a2e] text-[13px] leading-relaxed">
+          <div ref={printRef} style={{ fontFamily: font }} className="bg-card text-[#1a1a2e] text-[13px] leading-relaxed">
             {/* Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 28 }}>
               <div>

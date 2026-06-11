@@ -6,7 +6,7 @@ import { FileText, Palette, AlignLeft } from 'lucide-react';
 
 function SectionCard({ title, icon: Icon, children }) {
   return (
-    <div className="bg-white border border-border rounded-xl overflow-hidden">
+    <div className="bg-card border border-border rounded-xl overflow-hidden">
       <div className="flex items-center gap-2 px-5 py-4 border-b border-border bg-muted/20">
         <Icon className="w-4 h-4 text-primary" />
         <h3 className="font-semibold text-foreground text-sm">{title}</h3>

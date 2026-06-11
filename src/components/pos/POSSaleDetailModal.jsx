@@ -70,7 +70,7 @@ export default function POSSaleDetailModal({ sale, onClose, onVoided }) {
             <div><span className="text-muted-foreground">Payment Method:</span> <strong>{sale.payment_method}</strong></div>
             <div><span className="text-muted-foreground">Amount Tendered:</span> <strong>{fmt(sale.amount_tendered)}</strong></div>
             {sale.change_amount > 0 && (
-              <div><span className="text-muted-foreground">Change Given:</span> <strong className="text-emerald-600">{fmt(sale.change_amount)}</strong></div>
+              <div><span className="text-muted-foreground">Change Given:</span> <strong className="text-emerald-600 dark:text-emerald-400">{fmt(sale.change_amount)}</strong></div>
             )}
             {sale.notes && (
               <div className="col-span-2"><span className="text-muted-foreground">Notes:</span> {sale.notes}</div>
@@ -125,7 +125,7 @@ export default function POSSaleDetailModal({ sale, onClose, onVoided }) {
               <div className="flex gap-2">
                 <Button
                   variant="outline"
-                  className="border-orange-300 text-orange-600 hover:bg-orange-50"
+                  className="border-orange-300 dark:border-orange-500/30 text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:bg-orange-500/10"
                   onClick={() => setShowReturn(true)}
                 >
                   <RotateCcw className="w-4 h-4 mr-1" />
@@ -133,7 +133,7 @@ export default function POSSaleDetailModal({ sale, onClose, onVoided }) {
                 </Button>
                 <Button
                   variant="outline"
-                  className="border-red-300 text-red-600 hover:bg-red-50"
+                  className="border-red-300 dark:border-red-500/30 text-red-600 dark:text-red-400 hover:bg-red-50 dark:bg-red-500/10"
                   onClick={() => { setVoidInput(''); setShowVoidConfirm(true); }}
                 >
                   <XCircle className="w-4 h-4 mr-1" />
@@ -142,7 +142,7 @@ export default function POSSaleDetailModal({ sale, onClose, onVoided }) {
               </div>
             )}
             {isVoided && (
-              <Badge className="bg-red-100 text-red-700 border border-red-200 px-3 py-1.5 text-sm">
+              <Badge className="bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-500/20 px-3 py-1.5 text-sm">
                 This sale has been voided
               </Badge>
             )}
@@ -154,14 +154,14 @@ export default function POSSaleDetailModal({ sale, onClose, onVoided }) {
       <AlertDialog open={showVoidConfirm} onOpenChange={setShowVoidConfirm}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-red-600">Void POS Sale {sale.sale_number}?</AlertDialogTitle>
+            <AlertDialogTitle className="text-red-600 dark:text-red-400">Void POS Sale {sale.sale_number}?</AlertDialogTitle>
             <AlertDialogDescription>
               This action is irreversible. The sale will be marked as <strong>Voided</strong> and all stock will be restored.
               Type <strong>VOID</strong> below to confirm.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <Input
-            className="border-red-300 focus-visible:ring-red-400"
+            className="border-red-300 dark:border-red-500/30 focus-visible:ring-red-400"
             placeholder="Type VOID to confirm"
             value={voidInput}
             onChange={e => setVoidInput(e.target.value.toUpperCase())}

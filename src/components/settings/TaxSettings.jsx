@@ -157,10 +157,10 @@ export default function TaxSettings() {
   return (
     <div className="space-y-6">
       {/* Header info */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 text-sm text-blue-800 space-y-2">
+      <div className="bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 rounded-lg px-4 py-3 text-sm text-blue-800 dark:text-blue-300 space-y-2">
         <p className="font-semibold flex items-center gap-1.5"><Percent className="w-4 h-4" />Dynamic Tax & VAT Engine — Cascading Multi-Tax Support</p>
         <p>Each Tax Type has its own dedicated GL ledger. Mark one as <strong>Default</strong> for items with <em>VAT Applicable</em> toggled on.</p>
-        <div className="bg-white border border-blue-100 rounded px-3 py-2 text-xs space-y-1">
+        <div className="bg-card border border-blue-100 rounded px-3 py-2 text-xs space-y-1">
           <p className="font-semibold text-blue-900">How Cascading Works (Sort Order + Compound):</p>
           <p>Taxes are applied in <strong>Sort Order</strong> (lowest first). A <strong>Compound</strong> tax calculates on <em>net + all prior taxes</em>, not just net.</p>
           <p className="text-muted-foreground">Example — Excise 20% (sort 5, non-compound) + VAT 13% (sort 10, compound):</p>
@@ -199,19 +199,19 @@ export default function TaxSettings() {
                   <td className="px-4 py-3 text-center tabular-nums text-muted-foreground">{t.sort_order ?? 0}</td>
                   <td className="px-4 py-3 text-center">
                     {t.is_compound
-                      ? <span className="text-xs font-semibold text-purple-700 bg-purple-50 px-2 py-0.5 rounded-full">Compound</span>
+                      ? <span className="text-xs font-semibold text-purple-700 dark:text-purple-400 bg-purple-50 dark:bg-purple-500/10 px-2 py-0.5 rounded-full">Compound</span>
                       : <span className="text-xs text-muted-foreground">Simple</span>}
                   </td>
                   <td className="px-4 py-3">
                     <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                      t.tax_type === 'Exclusive' ? 'bg-blue-50 text-blue-700' : 'bg-purple-50 text-purple-700'
+                      t.tax_type === 'Exclusive' ? 'bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400' : 'bg-purple-50 dark:bg-purple-500/10 text-purple-700 dark:text-purple-400'
                     }`}>{t.tax_type}</span>
                   </td>
                   <td className="px-4 py-3 text-xs text-muted-foreground">{t.applies_to}</td>
                   <td className="px-4 py-3 text-xs">
                     {t.gl_account_name
-                      ? <span className="text-emerald-700 flex items-center gap-1"><CheckCircle2 className="w-3.5 h-3.5" />{t.gl_account_name}</span>
-                      : <span className="text-amber-600 flex items-center gap-1"><AlertCircle className="w-3.5 h-3.5" />Not linked</span>
+                      ? <span className="text-emerald-700 dark:text-emerald-400 flex items-center gap-1"><CheckCircle2 className="w-3.5 h-3.5" />{t.gl_account_name}</span>
+                      : <span className="text-amber-600 dark:text-amber-400 flex items-center gap-1"><AlertCircle className="w-3.5 h-3.5" />Not linked</span>
                     }
                   </td>
                   <td className="px-4 py-3 text-center">
@@ -244,7 +244,7 @@ export default function TaxSettings() {
 
       {/* Inline Form */}
       {form && (
-        <div className="border border-border rounded-xl p-5 space-y-4 bg-white shadow-sm">
+        <div className="border border-border rounded-xl p-5 space-y-4 bg-card shadow-sm">
           <h3 className="font-semibold text-sm text-foreground">{form.id ? 'Edit Tax Type' : 'New Tax Type'}</h3>
 
           <div className="grid grid-cols-2 gap-4">
@@ -293,7 +293,7 @@ export default function TaxSettings() {
           </div>
 
           {/* Compound toggle with explanation */}
-          <div className="border border-border rounded-lg p-4 bg-purple-50/40 space-y-2">
+          <div className="border border-border rounded-lg p-4 bg-purple-50 dark:bg-purple-500/10/40 space-y-2">
             <div className="flex items-center gap-3">
               <Switch checked={form.is_compound} onCheckedChange={v => sf('is_compound', v)} />
               <div>
@@ -305,7 +305,7 @@ export default function TaxSettings() {
               </div>
             </div>
             {form.is_compound && (
-              <div className="bg-white border border-purple-200 rounded px-3 py-2 text-xs text-purple-800 font-mono">
+              <div className="bg-card border border-purple-200 dark:border-purple-500/20 rounded px-3 py-2 text-xs text-purple-800 dark:text-purple-300 font-mono">
                 Example: if net=100 and prior taxes=20 → base for this tax = 120<br />
                 At {form.tax_rate}%: this tax = {((120) * Number(form.tax_rate || 0) / 100).toFixed(2)}
               </div>

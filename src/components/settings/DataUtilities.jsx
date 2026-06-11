@@ -45,7 +45,7 @@ export default function DataUtilities() {
   return (
     <div className="space-y-4">
       {/* Action Card: Ledger Timeline Recovery */}
-      <div className="bg-white border border-border rounded-xl p-5 shadow-sm">
+      <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
         <div className="flex items-start gap-4">
           <div className="p-3 bg-primary/10 rounded-lg text-primary shrink-0">
             <DatabaseBackup className="w-6 h-6" />
@@ -84,8 +84,8 @@ export default function DataUtilities() {
             </Button>
 
             {/* Warning Callout Box */}
-            <div className="mt-4 flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-sm text-amber-800">
-              <AlertTriangle className="w-5 h-5 shrink-0 text-amber-600 mt-0.5" />
+            <div className="mt-4 flex items-start gap-3 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-lg px-4 py-3 text-sm text-amber-800 dark:text-amber-300">
+              <AlertTriangle className="w-5 h-5 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
               <div>
                 <strong>Warning:</strong> This operation locks inventory recalculation states momentarily. 
                 Do not run this during peak business hours. Only specify the unclosed current fiscal year to prevent altering previously audited and locked financial periods.

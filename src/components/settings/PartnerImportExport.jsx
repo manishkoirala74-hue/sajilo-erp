@@ -421,7 +421,7 @@ export default function PartnerImportExport() {
   };
 
   return (
-    <div className="bg-white border border-border rounded-xl overflow-hidden">
+    <div className="bg-card border border-border rounded-xl overflow-hidden">
       <div className="flex items-center gap-2 px-5 py-4 border-b border-border bg-muted/20">
         <Users className="w-4 h-4 text-primary" />
         <h3 className="font-semibold text-foreground text-sm">Partner Import (Customers & Suppliers)</h3>
@@ -444,11 +444,11 @@ export default function PartnerImportExport() {
 
         {/* Actions */}
         <div className="flex items-center gap-3 flex-wrap">
-          <Button variant="outline" className="border-blue-200 text-blue-600 hover:bg-blue-50"
+          <Button variant="outline" className="border-blue-200 dark:border-blue-500/20 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:bg-blue-500/10"
             onClick={() => fileRef.current?.click()} disabled={step === 'validating' || step === 'importing'}>
             <Upload className="w-4 h-4 mr-1.5" /> Import {importType}
           </Button>
-          <Button variant="outline" className="border-green-200 text-green-600 hover:bg-green-50"
+          <Button variant="outline" className="border-green-200 dark:border-green-500/20 text-green-600 dark:text-green-400 hover:bg-green-50 dark:bg-green-500/10"
             onClick={handleDownloadTemplate}>
             <Download className="w-4 h-4 mr-1.5" /> Download Template
           </Button>
@@ -465,7 +465,7 @@ export default function PartnerImportExport() {
           <p className="text-xs font-semibold text-foreground mb-1.5">Template Columns:</p>
           <div className="flex flex-wrap gap-1.5">
             {PARTNER_TEMPLATE_HEADERS.map(h => (
-              <span key={h} className="text-xs bg-white border border-border rounded px-2 py-0.5 font-mono text-muted-foreground">{h}</span>
+              <span key={h} className="text-xs bg-card border border-border rounded px-2 py-0.5 font-mono text-muted-foreground">{h}</span>
             ))}
           </div>
         </div>
@@ -480,9 +480,9 @@ export default function PartnerImportExport() {
 
         {/* Importing */}
         {step === 'importing' && (
-          <div className="flex items-center gap-3 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <RefreshCw className="w-4 h-4 animate-spin text-blue-600" />
-            <span className="text-sm text-blue-700">Importing {importType}… generating ledgers and posting journals, please wait.</span>
+          <div className="flex items-center gap-3 p-4 bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 rounded-lg">
+            <RefreshCw className="w-4 h-4 animate-spin text-blue-600 dark:text-blue-400" />
+            <span className="text-sm text-blue-700 dark:text-blue-400">Importing {importType}… generating ledgers and posting journals, please wait.</span>
           </div>
         )}
 
@@ -499,27 +499,27 @@ export default function PartnerImportExport() {
                 <p className="text-xl font-bold text-foreground">{parsedRows.length}</p>
                 <p className="text-xs text-muted-foreground mt-0.5">Total Rows</p>
               </div>
-              <div className={cn('rounded-lg p-3 text-center', errors.length > 0 ? 'bg-red-50' : 'bg-emerald-50')}>
-                <p className={cn('text-xl font-bold', errors.length > 0 ? 'text-red-600' : 'text-emerald-600')}>{errors.length}</p>
+              <div className={cn('rounded-lg p-3 text-center', errors.length > 0 ? 'bg-red-50 dark:bg-red-500/10' : 'bg-emerald-50 dark:bg-emerald-500/10')}>
+                <p className={cn('text-xl font-bold', errors.length > 0 ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400')}>{errors.length}</p>
                 <p className="text-xs text-muted-foreground mt-0.5">Validation Errors</p>
               </div>
             </div>
 
             {errors.length > 0 && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-4 space-y-1.5 max-h-48 overflow-y-auto">
-                <p className="text-xs font-semibold text-red-700 flex items-center gap-1.5">
+              <div className="bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-lg p-4 space-y-1.5 max-h-48 overflow-y-auto">
+                <p className="text-xs font-semibold text-red-700 dark:text-red-400 flex items-center gap-1.5">
                   <XCircle className="w-4 h-4" /> Validation Errors — fix in your file and re-upload:
                 </p>
-                {errors.map((e, i) => <p key={i} className="text-xs text-red-600 pl-5">• {e}</p>)}
+                {errors.map((e, i) => <p key={i} className="text-xs text-red-600 dark:text-red-400 pl-5">• {e}</p>)}
               </div>
             )}
 
             {duplicateCount > 0 && errors.length === 0 && (
-              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-                <h4 className="text-sm font-semibold text-amber-800 flex items-center gap-2">
+              <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-lg p-4">
+                <h4 className="text-sm font-semibold text-amber-800 dark:text-amber-300 flex items-center gap-2">
                   <AlertTriangle className="w-4 h-4" /> Duplicate Detection
                 </h4>
-                <p className="text-xs text-amber-700 mt-1 mb-3">
+                <p className="text-xs text-amber-700 dark:text-amber-400 mt-1 mb-3">
                   We found <strong>{duplicateCount}</strong> records in your file with Tax PAN Numbers or Names that already exist in the system.
                 </p>
                 <div className="flex gap-4">
@@ -543,7 +543,7 @@ export default function PartnerImportExport() {
                   This import will create a total of <strong className="font-mono">NPR {totalDebitBalances.toLocaleString()}</strong> in Debits and <strong className="font-mono">NPR {totalCreditBalances.toLocaleString()}</strong> in Credits across individual partner ledgers.
                   Select an offsetting account to balance these individual transactions.
                 </p>
-                <div className="bg-white border rounded-lg text-sm mb-3">
+                <div className="bg-card border rounded-lg text-sm mb-3">
                   <div className="grid grid-cols-12 gap-2 bg-muted/30 px-3 py-2 font-medium text-xs border-b">
                     <div className="col-span-12">Offset Account Selection</div>
                   </div>
@@ -557,12 +557,12 @@ export default function PartnerImportExport() {
                   </div>
                 </div>
                 {!offsetAccountId && (
-                  <div className="flex items-center gap-2 text-amber-600 text-xs font-medium">
+                  <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400 text-xs font-medium">
                     <AlertCircleIcon className="w-4 h-4" /> Please select an offsetting account to proceed.
                   </div>
                 )}
                 {offsetAccountId && (
-                  <div className="flex items-center gap-2 text-emerald-600 text-xs font-medium">
+                  <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 text-xs font-medium">
                     <CheckCircle2 className="w-4 h-4" /> Ready to post individual journals balanced against the selected account.
                   </div>
                 )}
@@ -584,12 +584,12 @@ export default function PartnerImportExport() {
         {step === 'done' && result && (
           <div className="space-y-4">
             <div className={cn('flex items-center gap-3 p-4 rounded-lg border',
-              result.status === 'Success' ? 'bg-emerald-50 border-emerald-200'
-              : result.status === 'Partial' ? 'bg-yellow-50 border-yellow-200'
-              : 'bg-red-50 border-red-200')}>
+              result.status === 'Success' ? 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/20'
+              : result.status === 'Partial' ? 'bg-yellow-50 dark:bg-yellow-500/10 border-yellow-200 dark:border-yellow-500/20'
+              : 'bg-red-50 dark:bg-red-500/10 border-red-200 dark:border-red-500/20')}>
               {result.status === 'Success'
-                ? <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
-                : <AlertTriangle className="w-5 h-5 text-yellow-600 shrink-0" />}
+                ? <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                : <AlertTriangle className="w-5 h-5 text-yellow-600 dark:text-yellow-400 shrink-0" />}
               <div>
                 <p className="text-sm font-semibold">
                   {result.status === 'Success' ? 'Import completed!' : result.status === 'Partial' ? 'Completed with issues.' : 'Import failed.'}
@@ -601,8 +601,8 @@ export default function PartnerImportExport() {
               </div>
             </div>
             {result.errors.length > 0 && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-3 max-h-36 overflow-y-auto">
-                {result.errors.map((e, i) => <p key={i} className="text-xs text-red-600">• {e}</p>)}
+              <div className="bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-lg p-3 max-h-36 overflow-y-auto">
+                {result.errors.map((e, i) => <p key={i} className="text-xs text-red-600 dark:text-red-400">• {e}</p>)}
               </div>
             )}
             <Button variant="outline" onClick={reset} className="w-full">Import Another File</Button>

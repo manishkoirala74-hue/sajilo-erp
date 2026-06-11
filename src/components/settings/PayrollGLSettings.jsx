@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Plus, Trash2, ShieldCheck } from 'lucide-react';
 function SectionCard({ title, icon: CardIcon, children }) {
   return (
-    <div className="bg-white border border-border rounded-xl overflow-hidden mb-6">
+    <div className="bg-card border border-border rounded-xl overflow-hidden mb-6">
       <div className="flex items-center gap-2 px-5 py-4 border-b border-border bg-muted/20">
         <CardIcon className="w-4 h-4 text-primary" />
         <h3 className="font-semibold text-foreground text-sm">{title}</h3>
@@ -85,7 +85,7 @@ export default function PayrollGLSettings({ settings, onChange }) {
             value={settings.hr_salary_payable_account_id || ''}
             onValueChange={v => onChange({ hr_salary_payable_account_id: v })}
           >
-            <SelectTrigger className="h-9 bg-white">
+            <SelectTrigger className="h-9 bg-card">
               <SelectValue placeholder="— Select Liability Account —" />
             </SelectTrigger>
             <SelectContent>

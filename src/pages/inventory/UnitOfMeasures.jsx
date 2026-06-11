@@ -72,7 +72,7 @@ export default function UnitOfMeasures() {
     {
       key: 'is_base_unit', label: 'Role',
       render: (v, row) => v
-        ? <span className="text-xs bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded-full font-medium">Base Unit</span>
+        ? <span className="text-xs bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-500/20 px-2 py-0.5 rounded-full font-medium">Base Unit</span>
         : (
           <div className="flex items-center gap-1 text-xs text-muted-foreground">
             <ArrowRightLeft className="w-3 h-3" />
@@ -111,7 +111,7 @@ export default function UnitOfMeasures() {
           <p className="text-xs font-semibold text-muted-foreground uppercase mb-2">Active Conversions</p>
           <div className="flex flex-wrap gap-2">
             {uoms.filter(u => !u.is_base_unit && u.base_unit_code && u.is_active).map(u => (
-              <div key={u.id} className="flex items-center gap-2 bg-white border border-border rounded-lg px-3 py-2 text-sm">
+              <div key={u.id} className="flex items-center gap-2 bg-card border border-border rounded-lg px-3 py-2 text-sm">
                 <span className="font-semibold text-foreground">1 {u.uom_code}</span>
                 <ArrowRightLeft className="w-3.5 h-3.5 text-muted-foreground" />
                 <span className="text-muted-foreground">{u.conversion_factor} {u.base_unit_code}</span>
@@ -159,7 +159,7 @@ export default function UnitOfMeasures() {
             </div>
 
             {!form.is_base_unit && (
-              <div className="border border-border rounded-lg p-4 space-y-3 bg-blue-50/40">
+              <div className="border border-border rounded-lg p-4 space-y-3 bg-blue-50 dark:bg-blue-500/10/40">
                 <p className="text-xs font-semibold text-muted-foreground uppercase">Conversion Rule</p>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
@@ -180,7 +180,7 @@ export default function UnitOfMeasures() {
                   </div>
                 </div>
                 {form.base_unit_code && form.conversion_factor > 0 && (
-                  <p className="text-xs text-blue-700 font-medium">
+                  <p className="text-xs text-blue-700 dark:text-blue-400 font-medium">
                     1 {form.uom_code || '?'} = {form.conversion_factor} {form.base_unit_code}
                   </p>
                 )}

@@ -46,7 +46,7 @@ function DropdownCell({ value, options, onSelect, placeholder, width = 'w-48', g
         type="button"
         onClick={() => { onFocus(); setOpen(v => !v); setSearch(''); }}
         className={cn(
-          'flex items-center justify-between w-full h-8 px-2 text-xs border rounded bg-white hover:bg-muted/30 transition-colors gap-1',
+          'flex items-center justify-between w-full h-8 px-2 text-xs border rounded bg-card hover:bg-muted/30 transition-colors gap-1',
           !selected && 'text-muted-foreground',
           isActive && 'border-primary ring-1 ring-primary ring-offset-0',
           open && 'border-primary ring-1 ring-primary'
@@ -56,7 +56,7 @@ function DropdownCell({ value, options, onSelect, placeholder, width = 'w-48', g
         <ChevronDown className="w-3 h-3 shrink-0 text-muted-foreground" />
       </button>
       {open && (
-        <div className={cn('absolute top-full left-0 z-50 mt-1 bg-white border border-border rounded-lg shadow-lg', width)}>
+        <div className={cn('absolute top-full left-0 z-50 mt-1 bg-card border border-border rounded-lg shadow-lg', width)}>
           <div className="p-1.5 border-b border-border">
             <input
               autoFocus
@@ -436,8 +436,8 @@ export default function BulkAssetCreation({ open, onClose, accounts, assets, onS
                   <tr
                     key={idx}
                     className={cn(
-                      'border-b border-border hover:bg-blue-50/30 transition-colors',
-                      isValid ? 'bg-white' : 'bg-muted/10'
+                      'border-b border-border hover:bg-blue-50 dark:bg-blue-500/10/30 transition-colors',
+                      isValid ? 'bg-card' : 'bg-muted/10'
                     )}
                   >
                     <td className="px-2 py-1.5 text-center text-muted-foreground border-r border-border font-mono w-8">
@@ -448,7 +448,7 @@ export default function BulkAssetCreation({ open, onClose, accounts, assets, onS
                     <td className={cn('px-1.5 py-1 border-r border-border min-w-[200px]', isActive(idx, 'asset_name') && 'bg-primary/5')}>
                       <input
                         className={cn(
-                          'w-full h-8 px-2 text-xs border rounded bg-white focus:outline-none focus:ring-1 focus:ring-primary transition-colors',
+                          'w-full h-8 px-2 text-xs border rounded bg-card focus:outline-none focus:ring-1 focus:ring-primary transition-colors',
                           isActive(idx, 'asset_name') ? 'border-primary ring-1 ring-primary' : 'border-border/70'
                         )}
                         placeholder="Asset name…"
@@ -479,7 +479,7 @@ export default function BulkAssetCreation({ open, onClose, accounts, assets, onS
                       <input
                         type="date"
                         className={cn(
-                          'w-full h-8 px-2 text-xs border rounded bg-white focus:outline-none focus:ring-1 focus:ring-primary',
+                          'w-full h-8 px-2 text-xs border rounded bg-card focus:outline-none focus:ring-1 focus:ring-primary',
                           isActive(idx, 'purchase_date') ? 'border-primary ring-1 ring-primary' : 'border-border'
                         )}
                         value={row.purchase_date}
@@ -494,7 +494,7 @@ export default function BulkAssetCreation({ open, onClose, accounts, assets, onS
                       <input
                         type="number"
                         className={cn(
-                          'w-full h-8 px-2 text-xs border rounded bg-white focus:outline-none focus:ring-1 focus:ring-primary text-right',
+                          'w-full h-8 px-2 text-xs border rounded bg-card focus:outline-none focus:ring-1 focus:ring-primary text-right',
                           isActive(idx, 'gross_purchase_value') ? 'border-primary ring-1 ring-primary' : 'border-border'
                         )}
                         placeholder="0"
@@ -510,7 +510,7 @@ export default function BulkAssetCreation({ open, onClose, accounts, assets, onS
                       <input
                         type="number"
                         className={cn(
-                          'w-full h-8 px-2 text-xs border rounded bg-white focus:outline-none focus:ring-1 focus:ring-primary text-right',
+                          'w-full h-8 px-2 text-xs border rounded bg-card focus:outline-none focus:ring-1 focus:ring-primary text-right',
                           isActive(idx, 'salvage_value') ? 'border-primary ring-1 ring-primary' : 'border-border'
                         )}
                         placeholder="0"
@@ -526,7 +526,7 @@ export default function BulkAssetCreation({ open, onClose, accounts, assets, onS
                       <input
                         type="number"
                         className={cn(
-                          'w-full h-8 px-2 text-xs border rounded bg-white focus:outline-none focus:ring-1 focus:ring-primary text-right',
+                          'w-full h-8 px-2 text-xs border rounded bg-card focus:outline-none focus:ring-1 focus:ring-primary text-right',
                           isActive(idx, 'useful_life_months') ? 'border-primary ring-1 ring-primary' : 'border-border'
                         )}
                         placeholder="60"
@@ -575,7 +575,7 @@ export default function BulkAssetCreation({ open, onClose, accounts, assets, onS
               Your import creates a total asset value of <strong className="font-mono">NPR {totalGrossValue.toLocaleString()}</strong>.
               Select an offsetting account to balance the journal entry.
             </p>
-            <div className="bg-white border rounded-lg text-sm mb-3">
+            <div className="bg-card border rounded-lg text-sm mb-3">
               <div className="grid grid-cols-12 gap-2 bg-muted/30 px-3 py-2 font-medium text-xs border-b">
                 <div className="col-span-6">Account</div>
                 <div className="col-span-3 text-right">Debit (Dr)</div>
@@ -586,7 +586,7 @@ export default function BulkAssetCreation({ open, onClose, accounts, assets, onS
                   <span className="font-medium">Total Asset Ledgers</span>
                   <span className="text-xs text-muted-foreground">Mapped from rows above</span>
                 </div>
-                <div className="col-span-3 text-right font-mono text-emerald-600">NPR {totalGrossValue.toLocaleString()}</div>
+                <div className="col-span-3 text-right font-mono text-emerald-600 dark:text-emerald-400">NPR {totalGrossValue.toLocaleString()}</div>
                 <div className="col-span-3 text-right font-mono text-muted-foreground">0.00</div>
               </div>
               <div className="grid grid-cols-12 gap-2 px-3 py-2 items-center">
@@ -599,16 +599,16 @@ export default function BulkAssetCreation({ open, onClose, accounts, assets, onS
                   />
                 </div>
                 <div className="col-span-3 text-right font-mono text-muted-foreground">0.00</div>
-                <div className="col-span-3 text-right font-mono text-blue-600">NPR {totalGrossValue.toLocaleString()}</div>
+                <div className="col-span-3 text-right font-mono text-blue-600 dark:text-blue-400">NPR {totalGrossValue.toLocaleString()}</div>
               </div>
             </div>
             {!offsetAccountId && (
-              <div className="flex items-center gap-2 mt-3 text-amber-600 text-xs font-medium">
+              <div className="flex items-center gap-2 mt-3 text-amber-600 dark:text-amber-400 text-xs font-medium">
                 <AlertCircle className="w-4 h-4" /> Please select an offsetting account to balance the transaction and proceed.
               </div>
             )}
             {offsetAccountId && (
-              <div className="flex items-center gap-2 mt-3 text-emerald-600 text-xs font-medium">
+              <div className="flex items-center gap-2 mt-3 text-emerald-600 dark:text-emerald-400 text-xs font-medium">
                 <CheckCircle2 className="w-4 h-4" /> Journal is balanced and ready to import.
               </div>
             )}

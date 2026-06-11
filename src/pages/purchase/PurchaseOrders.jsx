@@ -125,12 +125,12 @@ export default function PurchaseOrders() {
             <Eye className="w-4 h-4" />
           </Button>
           {row.status === 'Pending Approval' && (
-            <Button variant="ghost" size="icon" className="text-emerald-500 hover:text-emerald-700" onClick={() => approveOrder(row)}>
+            <Button variant="ghost" size="icon" className="text-emerald-500 hover:text-emerald-700 dark:text-emerald-400" onClick={() => approveOrder(row)}>
               <CheckCircle2 className="w-4 h-4" />
             </Button>
           )}
           {(row.status === 'Draft' || row.status === 'Pending Approval') && (
-            <Button variant="ghost" size="icon" className="text-red-400 hover:text-red-600" onClick={() => cancelOrder(row)}>
+            <Button variant="ghost" size="icon" className="text-red-400 hover:text-red-600 dark:text-red-400" onClick={() => cancelOrder(row)}>
               <XCircle className="w-4 h-4" />
             </Button>
           )}
@@ -151,12 +151,12 @@ export default function PurchaseOrders() {
 
       {/* Pending Approvals Banner */}
       {orders.filter(o => o.status === 'Pending Approval').length > 0 && (
-        <div className="mb-4 flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-xl p-4">
-          <Clock className="w-5 h-5 text-amber-600 shrink-0" />
-          <p className="text-sm text-amber-800 font-medium">
+        <div className="mb-4 flex items-center gap-3 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-xl p-4">
+          <Clock className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0" />
+          <p className="text-sm text-amber-800 dark:text-amber-300 font-medium">
             {orders.filter(o => o.status === 'Pending Approval').length} purchase order(s) awaiting your approval
           </p>
-          <Button size="sm" variant="outline" className="ml-auto border-amber-300 text-amber-700 hover:bg-amber-100"
+          <Button size="sm" variant="outline" className="ml-auto border-amber-300 dark:border-amber-500/30 text-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:bg-amber-500/20"
             onClick={() => setFilterStatus('Pending Approval')}>
             Review Now
           </Button>
@@ -169,7 +169,7 @@ export default function PurchaseOrders() {
             key={s}
             onClick={() => setFilterStatus(s)}
             className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-              filterStatus === s ? 'bg-primary text-white' : 'bg-white border border-border text-muted-foreground hover:bg-muted'
+              filterStatus === s ? 'bg-primary text-white' : 'bg-card border border-border text-muted-foreground hover:bg-muted'
             }`}
           >
             {s === 'all' ? 'All' : s}

@@ -270,7 +270,7 @@ export default function AccountFormModal({ open, onClose, account, parentAccount
           <DialogTitle className="flex items-center gap-2">
             {isEdit ? 'Edit' : 'New'} {isGroup ? 'Ledger Group' : 'Ledger Account'}
             {isSystemAccount && (
-              <span className="flex items-center gap-1 text-xs font-normal text-slate-500 bg-slate-100 px-2 py-0.5 rounded border">
+              <span className="flex items-center gap-1 text-xs font-normal text-slate-500 bg-slate-100 dark:bg-slate-500/20 px-2 py-0.5 rounded border">
                 <Lock className="w-3 h-3" /> System — Read Only
               </span>
             )}

@@ -115,7 +115,7 @@ export default function ServiceContracts() {
         action={() => { setForm(empty); setEditing(null); setOpen(true); }} actionLabel="New Contract" actionIcon={Plus} />
 
       {expiring > 0 && (
-        <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 text-amber-700 px-4 py-2 rounded-lg text-sm mb-4">
+        <div className="flex items-center gap-2 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 text-amber-700 dark:text-amber-400 px-4 py-2 rounded-lg text-sm mb-4">
           <AlertTriangle className="w-4 h-4" />
           {expiring} contract{expiring > 1 ? 's' : ''} expiring within 30 days
         </div>

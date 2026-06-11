@@ -28,7 +28,7 @@ export default function BusinessHeader({ reportTitle, fromDate, toDate, subtitle
     : null;
 
   return (
-    <div className="flex items-start gap-4 pb-4 mb-4 border-b-2 border-slate-300 print:pb-3 print:mb-3">
+    <div className="flex items-start gap-4 pb-4 mb-4 border-b-2 border-border print:pb-3 print:mb-3">
       {/* Logo — left anchor */}
       <div className="shrink-0 w-16 h-16 flex items-center justify-center">
         {company?.company_logo_url

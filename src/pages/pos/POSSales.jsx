@@ -188,7 +188,7 @@ export default function POSSales() {
             <History className="w-4 h-4 mr-1" /> Recent Sales
           </Button>
         </div>
-        <div className="flex items-center gap-2 bg-white border border-border rounded-lg px-3 py-2 mb-4">
+        <div className="flex items-center gap-2 bg-card border border-border rounded-lg px-3 py-2 mb-4">
           <Search className="w-4 h-4 text-muted-foreground shrink-0" />
           <input className="flex-1 text-sm outline-none bg-transparent placeholder:text-muted-foreground"
             placeholder="Search items by name or code…" value={search} onChange={e => setSearch(e.target.value)} />
@@ -197,13 +197,13 @@ export default function POSSales() {
           <div className="grid grid-cols-2 xl:grid-cols-3 gap-3 pb-4">
             {filteredItems.map(item => (
               <button key={item.id} onClick={() => addToCart(item)}
-                className="bg-white border border-border rounded-xl p-3 text-left hover:border-primary hover:shadow-md transition-all group">
+                className="bg-card border border-border rounded-xl p-3 text-left hover:border-primary hover:shadow-md transition-all group">
                 <div className="flex items-start justify-between">
                   <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center mb-2 group-hover:bg-primary/20 transition-colors">
                     <ShoppingCart className="w-5 h-5 text-primary" />
                   </div>
                   {item.item_type === 'Service' && (
-                    <span className="text-[10px] bg-blue-50 text-blue-600 border border-blue-200 px-1.5 py-0.5 rounded font-medium">Service</span>
+                    <span className="text-[10px] bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-500/20 px-1.5 py-0.5 rounded font-medium">Service</span>
                   )}
                 </div>
                 <p className="text-sm font-semibold text-foreground leading-tight">{item.item_name}</p>
@@ -224,7 +224,7 @@ export default function POSSales() {
       </div>
 
       {/* RIGHT — Cart & Checkout */}
-      <div className="w-96 flex flex-col bg-white border border-border rounded-2xl overflow-hidden">
+      <div className="w-96 flex flex-col bg-card border border-border rounded-2xl overflow-hidden">
         {/* Cart Header */}
         <div className="px-4 py-3 border-b border-border flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -245,7 +245,7 @@ export default function POSSales() {
                   <p className="text-sm font-medium truncate">{line.item_name}</p>
                   <p className="text-xs text-muted-foreground">{fmt(line.unit_price)} each</p>
                 </div>
-                <button onClick={() => removeFromCart(line.item_id)} className="text-red-400 hover:text-red-600 shrink-0">
+                <button onClick={() => removeFromCart(line.item_id)} className="text-red-400 hover:text-red-600 dark:text-red-400 shrink-0">
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
               </div>
@@ -337,7 +337,7 @@ export default function POSSales() {
           {globalDiscount > 0 && <div className="flex justify-between text-red-500"><span>Discount ({discountPercent}%)</span><span>-{fmt(globalDiscount)}</span></div>}
           {vat > 0 && <div className="flex justify-between text-muted-foreground"><span>Tax</span><span>{fmt(vat)}</span></div>}
           <div className="flex justify-between font-bold text-base border-t border-border pt-1 mt-1"><span>Total</span><span className="text-primary">{fmt(grandTotal)}</span></div>
-          {amountTendered > 0 && <div className="flex justify-between text-emerald-600 font-semibold"><span>Change</span><span>{fmt(change)}</span></div>}
+          {amountTendered > 0 && <div className="flex justify-between text-emerald-600 dark:text-emerald-400 font-semibold"><span>Change</span><span>{fmt(change)}</span></div>}
         </div>
 
         <div className="px-4 pb-4">
@@ -367,7 +367,7 @@ export default function POSSales() {
                 {lastReceipt.discount_amount > 0 && <div className="flex justify-between text-red-500"><span>Discount</span><span>-{fmt(lastReceipt.discount_amount)}</span></div>}
                 {lastReceipt.vat_amount > 0 && <div className="flex justify-between"><span>VAT</span><span>{fmt(lastReceipt.vat_amount)}</span></div>}
                 <div className="flex justify-between font-bold"><span>Total</span><span>{fmt(lastReceipt.grand_total)}</span></div>
-                {lastReceipt.change_amount > 0 && <div className="flex justify-between text-emerald-600"><span>Change</span><span>{fmt(lastReceipt.change_amount)}</span></div>}
+                {lastReceipt.change_amount > 0 && <div className="flex justify-between text-emerald-600 dark:text-emerald-400"><span>Change</span><span>{fmt(lastReceipt.change_amount)}</span></div>}
               </div>
               <Button className="w-full" onClick={() => setLastReceipt(null)}>New Sale</Button>
             </div>

@@ -124,7 +124,7 @@ export default function SalesReturns() {
     { key: 'customer_name', label: 'Customer' },
     { key: 'return_source', label: 'Source', render: (v, row) => (
       <span className={cn('text-xs font-medium px-2 py-0.5 rounded-full border',
-        v === 'POS Sale' ? 'bg-purple-50 text-purple-700 border-purple-200' : 'bg-blue-50 text-blue-700 border-blue-200'
+        v === 'POS Sale' ? 'bg-purple-50 dark:bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-200 dark:border-purple-500/20' : 'bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-500/20'
       )}>
         {v === 'POS Sale' ? `POS: ${row.pos_sale_number || '—'}` : (row.sales_invoice_number || '—')}
       </span>

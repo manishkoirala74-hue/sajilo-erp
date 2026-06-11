@@ -96,14 +96,14 @@ const CATEGORIES = [
 
 // ── Color Map ─────────────────────────────────────────────────────────────────
 const CM = {
-  slate:   { bg: 'bg-slate-50',   border: 'border-slate-200',  icon: 'text-slate-600',   badge: 'bg-slate-100 text-slate-700',   btn: 'bg-slate-600 hover:bg-slate-700',   dot: 'bg-slate-400'   },
-  emerald: { bg: 'bg-emerald-50', border: 'border-emerald-200',icon: 'text-emerald-600', badge: 'bg-emerald-100 text-emerald-700',btn: 'bg-emerald-600 hover:bg-emerald-700',dot: 'bg-emerald-500' },
-  indigo:  { bg: 'bg-indigo-50',  border: 'border-indigo-200', icon: 'text-indigo-600',  badge: 'bg-indigo-100 text-indigo-700',  btn: 'bg-indigo-600 hover:bg-indigo-700', dot: 'bg-indigo-500'  },
-  blue:    { bg: 'bg-blue-50',    border: 'border-blue-200',   icon: 'text-blue-600',    badge: 'bg-blue-100 text-blue-700',      btn: 'bg-blue-600 hover:bg-blue-700',     dot: 'bg-blue-500'    },
-  amber:   { bg: 'bg-amber-50',   border: 'border-amber-200',  icon: 'text-amber-600',   badge: 'bg-amber-100 text-amber-700',    btn: 'bg-amber-600 hover:bg-amber-700',   dot: 'bg-amber-500'   },
-  purple:  { bg: 'bg-purple-50',  border: 'border-purple-200', icon: 'text-purple-600',  badge: 'bg-purple-100 text-purple-700',  btn: 'bg-purple-600 hover:bg-purple-700', dot: 'bg-purple-500'  },
-  red:     { bg: 'bg-red-50',     border: 'border-red-200',    icon: 'text-red-600',     badge: 'bg-red-100 text-red-700',        btn: 'bg-red-600 hover:bg-red-700',       dot: 'bg-red-400'     },
-  teal:    { bg: 'bg-teal-50',    border: 'border-teal-200',   icon: 'text-teal-600',    badge: 'bg-teal-100 text-teal-700',      btn: 'bg-teal-600 hover:bg-teal-700',     dot: 'bg-teal-500'    },
+  slate:   { bg: 'bg-muted/50',   border: 'border-border',  icon: 'text-muted-foreground',   badge: 'bg-slate-100 dark:bg-slate-500/20 text-muted-foreground',   btn: 'bg-slate-600 hover:bg-slate-700',   dot: 'bg-slate-400'   },
+  emerald: { bg: 'bg-emerald-50 dark:bg-emerald-500/10', border: 'border-emerald-200 dark:border-emerald-500/20',icon: 'text-emerald-600 dark:text-emerald-400', badge: 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400',btn: 'bg-emerald-600 hover:bg-emerald-700',dot: 'bg-emerald-500' },
+  indigo:  { bg: 'bg-indigo-50 dark:bg-indigo-500/10',  border: 'border-indigo-200 dark:border-indigo-500/20', icon: 'text-indigo-600 dark:text-indigo-400',  badge: 'bg-indigo-100 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-400',  btn: 'bg-indigo-600 hover:bg-indigo-700', dot: 'bg-indigo-500'  },
+  blue:    { bg: 'bg-blue-50 dark:bg-blue-500/10',    border: 'border-blue-200 dark:border-blue-500/20',   icon: 'text-blue-600 dark:text-blue-400',    badge: 'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400',      btn: 'bg-blue-600 hover:bg-blue-700',     dot: 'bg-blue-500'    },
+  amber:   { bg: 'bg-amber-50 dark:bg-amber-500/10',   border: 'border-amber-200 dark:border-amber-500/20',  icon: 'text-amber-600 dark:text-amber-400',   badge: 'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400',    btn: 'bg-amber-600 hover:bg-amber-700',   dot: 'bg-amber-500'   },
+  purple:  { bg: 'bg-purple-50 dark:bg-purple-500/10',  border: 'border-purple-200 dark:border-purple-500/20', icon: 'text-purple-600 dark:text-purple-400',  badge: 'bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-400',  btn: 'bg-purple-600 hover:bg-purple-700', dot: 'bg-purple-500'  },
+  red:     { bg: 'bg-red-50 dark:bg-red-500/10',     border: 'border-red-200 dark:border-red-500/20',    icon: 'text-red-600 dark:text-red-400',     badge: 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400',        btn: 'bg-red-600 hover:bg-red-700',       dot: 'bg-red-400'     },
+  teal:    { bg: 'bg-teal-50 dark:bg-teal-500/10',    border: 'border-teal-200 dark:border-teal-500/20',   icon: 'text-teal-600 dark:text-teal-400',    badge: 'bg-teal-100 dark:bg-teal-500/20 text-teal-700 dark:text-teal-400',      btn: 'bg-teal-600 hover:bg-teal-700',     dot: 'bg-teal-500'    },
 };
 
 import { useNavigate } from 'react-router-dom';
@@ -189,7 +189,7 @@ export default function Reports() {
 
           {/* System Report placeholder */}
           {category.isCustom && activeCategory === 'system' && (
-            <div className="bg-white border border-border rounded-xl p-8 text-center text-muted-foreground text-sm">
+            <div className="bg-card border border-border rounded-xl p-8 text-center text-muted-foreground text-sm">
               System reports coming soon.
             </div>
           )}
@@ -198,7 +198,7 @@ export default function Reports() {
           {!category.isCustom && category.reports.map(report => (
             <div
               key={report.id}
-              className={`bg-white border border-border rounded-xl p-4 flex items-center gap-4 transition-all hover:border-muted-foreground/30 ${category.placeholder ? 'opacity-60' : ''}`}
+              className={`bg-card border border-border rounded-xl p-4 flex items-center gap-4 transition-all hover:border-muted-foreground/30 ${category.placeholder ? 'opacity-60' : ''}`}
             >
               <div className="flex-1 min-w-0">
                 <p className="font-medium text-sm text-foreground">{report.label}</p>

@@ -77,13 +77,13 @@ export default function DiscountSchemes() {
       key: 'scheme_name', label: 'Scheme Name',
       render: (v, row) => (
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-md bg-emerald-50 flex items-center justify-center">
-            <Tag className="w-3.5 h-3.5 text-emerald-600" />
+          <div className="w-7 h-7 rounded-md bg-emerald-50 dark:bg-emerald-500/10 flex items-center justify-center">
+            <Tag className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
           </div>
           <div>
             <p className="font-medium text-sm">{v}</p>
             {isExpired(row) && <p className="text-xs text-red-500">Expired</p>}
-            {isUpcoming(row) && <p className="text-xs text-amber-600">Upcoming</p>}
+            {isUpcoming(row) && <p className="text-xs text-amber-600 dark:text-amber-400">Upcoming</p>}
           </div>
         </div>
       )
@@ -91,7 +91,7 @@ export default function DiscountSchemes() {
     {
       key: 'discount_value', label: 'Discount',
       render: (v, row) => (
-        <span className="font-semibold text-emerald-600">
+        <span className="font-semibold text-emerald-600 dark:text-emerald-400">
           {row.discount_type === 'Percentage' ? `${v}%` : `NPR ${Number(v).toLocaleString()}`}
         </span>
       )
@@ -155,7 +155,7 @@ export default function DiscountSchemes() {
           { label: 'Active Schemes', val: activeCount },
           { label: 'Expired', val: schemes.filter(s => isExpired(s)).length },
         ].map(s => (
-          <div key={s.label} className="bg-white border border-border rounded-xl p-4">
+          <div key={s.label} className="bg-card border border-border rounded-xl p-4">
             <p className="text-xs text-muted-foreground">{s.label}</p>
             <p className="text-2xl font-bold text-foreground mt-1">{s.val}</p>
           </div>

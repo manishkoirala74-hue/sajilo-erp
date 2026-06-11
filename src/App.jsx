@@ -10,6 +10,7 @@ import { DateFormatProvider } from '@/lib/DateFormatContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { Toaster as SonnerToaster } from 'sonner';
+import { ThemeProvider } from '@/lib/ThemeContext';
 
 // Layout
 import ERPLayout from '@/components/layout/ERPLayout';
@@ -117,8 +118,9 @@ const AuthenticatedApp = () => {
   }
 
   return (
-    <Routes>
-      {/* Public Auth Routes */}
+    <ThemeProvider defaultTheme="system" storageKey="erp-theme">
+      <Routes>
+        {/* Public Auth Routes */}
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
@@ -178,6 +180,7 @@ const AuthenticatedApp = () => {
 
       <Route path="*" element={<PageNotFound />} />
     </Routes>
+    </ThemeProvider>
   );
 };
 

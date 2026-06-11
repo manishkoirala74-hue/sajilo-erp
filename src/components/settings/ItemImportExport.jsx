@@ -311,7 +311,7 @@ function ItemImportCard() {
   };
 
   return (
-    <div className="bg-white border border-border rounded-xl overflow-hidden">
+    <div className="bg-card border border-border rounded-xl overflow-hidden">
       <div className="flex items-center gap-2 px-5 py-4 border-b border-border bg-muted/20">
         <FileSpreadsheet className="w-4 h-4 text-primary" />
         <h3 className="font-semibold text-foreground text-sm">Items Import / Export</h3>
@@ -321,15 +321,15 @@ function ItemImportCard() {
         {/* Action Buttons */}
         <div className="flex items-center gap-3 flex-wrap">
           <span className="text-sm font-medium text-muted-foreground mr-1">Products</span>
-          <Button variant="outline" className="border-blue-200 text-blue-600 hover:bg-blue-50"
+          <Button variant="outline" className="border-blue-200 dark:border-blue-500/20 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:bg-blue-500/10"
             onClick={() => fileRef.current?.click()} disabled={step === 'validating' || step === 'importing'}>
             <Upload className="w-4 h-4 mr-1.5" /> Import
           </Button>
-          <Button variant="outline" className="border-green-200 text-green-600 hover:bg-green-50"
+          <Button variant="outline" className="border-green-200 dark:border-green-500/20 text-green-600 dark:text-green-400 hover:bg-green-50 dark:bg-green-500/10"
             onClick={handleDownloadTemplate}>
             <Download className="w-4 h-4 mr-1.5" /> Download Template
           </Button>
-          <Button variant="outline" className="border-pink-200 text-pink-600 hover:bg-pink-50"
+          <Button variant="outline" className="border-pink-200 dark:border-pink-500/20 text-pink-600 dark:text-pink-400 hover:bg-pink-50 dark:bg-pink-500/10"
             onClick={handleExport}>
             <FileSpreadsheet className="w-4 h-4 mr-1.5" /> Export
           </Button>
@@ -351,9 +351,9 @@ function ItemImportCard() {
 
         {/* Importing spinner */}
         {step === 'importing' && (
-          <div className="flex items-center gap-3 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <RefreshCw className="w-4 h-4 animate-spin text-blue-600" />
-            <span className="text-sm text-blue-700">Importing items… please wait.</span>
+          <div className="flex items-center gap-3 p-4 bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 rounded-lg">
+            <RefreshCw className="w-4 h-4 animate-spin text-blue-600 dark:text-blue-400" />
+            <span className="text-sm text-blue-700 dark:text-blue-400">Importing items… please wait.</span>
           </div>
         )}
 
@@ -371,46 +371,46 @@ function ItemImportCard() {
                 <p className="text-xl font-bold text-foreground">{parsedRows.length}</p>
                 <p className="text-xs text-muted-foreground mt-0.5">Total Rows</p>
               </div>
-              <div className={cn('rounded-lg p-3 text-center', validationErrors.length > 0 ? 'bg-red-50' : 'bg-emerald-50')}>
-                <p className={cn('text-xl font-bold', validationErrors.length > 0 ? 'text-red-600' : 'text-emerald-600')}>{validationErrors.length}</p>
+              <div className={cn('rounded-lg p-3 text-center', validationErrors.length > 0 ? 'bg-red-50 dark:bg-red-500/10' : 'bg-emerald-50 dark:bg-emerald-500/10')}>
+                <p className={cn('text-xl font-bold', validationErrors.length > 0 ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400')}>{validationErrors.length}</p>
                 <p className="text-xs text-muted-foreground mt-0.5">Validation Errors</p>
               </div>
-              <div className={cn('rounded-lg p-3 text-center', duplicates.length > 0 ? 'bg-yellow-50' : 'bg-muted/40')}>
-                <p className={cn('text-xl font-bold', duplicates.length > 0 ? 'text-yellow-600' : 'text-foreground')}>{duplicates.length}</p>
+              <div className={cn('rounded-lg p-3 text-center', duplicates.length > 0 ? 'bg-yellow-50 dark:bg-yellow-500/10' : 'bg-muted/40')}>
+                <p className={cn('text-xl font-bold', duplicates.length > 0 ? 'text-yellow-600 dark:text-yellow-400' : 'text-foreground')}>{duplicates.length}</p>
                 <p className="text-xs text-muted-foreground mt-0.5">Duplicates Found</p>
               </div>
             </div>
 
             {/* Validation Errors */}
             {validationErrors.length > 0 && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-4 space-y-1.5 max-h-48 overflow-y-auto">
-                <p className="text-xs font-semibold text-red-700 flex items-center gap-1.5">
+              <div className="bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-lg p-4 space-y-1.5 max-h-48 overflow-y-auto">
+                <p className="text-xs font-semibold text-red-700 dark:text-red-400 flex items-center gap-1.5">
                   <XCircle className="w-4 h-4" /> Validation Errors — please fix these in your file and re-upload:
                 </p>
-                {validationErrors.map((e, i) => <p key={i} className="text-xs text-red-600 pl-5">• {e}</p>)}
+                {validationErrors.map((e, i) => <p key={i} className="text-xs text-red-600 dark:text-red-400 pl-5">• {e}</p>)}
               </div>
             )}
 
             {/* Duplicates */}
             {duplicates.length > 0 && (
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 space-y-3">
-                <p className="text-xs font-semibold text-yellow-800 flex items-center gap-1.5">
+              <div className="bg-yellow-50 dark:bg-yellow-500/10 border border-yellow-200 dark:border-yellow-500/20 rounded-lg p-4 space-y-3">
+                <p className="text-xs font-semibold text-yellow-800 dark:text-yellow-300 flex items-center gap-1.5">
                   <AlertTriangle className="w-4 h-4" /> {duplicates.length} duplicate item name(s) found:
                 </p>
                 <ul className="space-y-1 max-h-32 overflow-y-auto">
                   {duplicates.map((d, i) => (
-                    <li key={i} className="text-xs text-yellow-700 pl-5">• Row {d.rowNum}: "{d.item_name}"</li>
+                    <li key={i} className="text-xs text-yellow-700 dark:text-yellow-400 pl-5">• Row {d.rowNum}: "{d.item_name}"</li>
                   ))}
                 </ul>
                 <div className="flex items-center gap-3 pt-1">
                   <input type="checkbox" id="override" checked={overrideAll} onChange={e => setOverrideAll(e.target.checked)}
                     className="w-4 h-4 accent-yellow-600" />
-                  <label htmlFor="override" className="text-xs font-medium text-yellow-800 cursor-pointer">
+                  <label htmlFor="override" className="text-xs font-medium text-yellow-800 dark:text-yellow-300 cursor-pointer">
                     Override existing items with data from the file
                   </label>
                 </div>
                 {!overrideAll && (
-                  <p className="text-xs text-yellow-600">Duplicate rows will be <strong>skipped</strong> unless you check the box above.</p>
+                  <p className="text-xs text-yellow-600 dark:text-yellow-400">Duplicate rows will be <strong>skipped</strong> unless you check the box above.</p>
                 )}
               </div>
             )}
@@ -423,7 +423,7 @@ function ItemImportCard() {
                   This import brings in an initial stock value of <strong className="font-mono">NPR {totalOpeningStockValue.toLocaleString()}</strong>.
                   Select an offsetting account to balance the journal entry.
                 </p>
-                <div className="bg-white border rounded-lg text-sm mb-3">
+                <div className="bg-card border rounded-lg text-sm mb-3">
                   <div className="grid grid-cols-12 gap-2 bg-muted/30 px-3 py-2 font-medium text-xs border-b">
                     <div className="col-span-6">Account</div>
                     <div className="col-span-3 text-right">Debit (Dr)</div>
@@ -438,7 +438,7 @@ function ItemImportCard() {
                         placeholder="Select Inventory Asset Account (Debit)"
                       />
                     </div>
-                    <div className="col-span-3 text-right font-mono text-emerald-600">NPR {totalOpeningStockValue.toLocaleString()}</div>
+                    <div className="col-span-3 text-right font-mono text-emerald-600 dark:text-emerald-400">NPR {totalOpeningStockValue.toLocaleString()}</div>
                     <div className="col-span-3 text-right font-mono text-muted-foreground">0.00</div>
                   </div>
                   <div className="grid grid-cols-12 gap-2 px-3 py-2 items-center">
@@ -451,11 +451,11 @@ function ItemImportCard() {
                       />
                     </div>
                     <div className="col-span-3 text-right font-mono text-muted-foreground">0.00</div>
-                    <div className="col-span-3 text-right font-mono text-blue-600">NPR {totalOpeningStockValue.toLocaleString()}</div>
+                    <div className="col-span-3 text-right font-mono text-blue-600 dark:text-blue-400">NPR {totalOpeningStockValue.toLocaleString()}</div>
                   </div>
                 </div>
                 {(!offsetAccountId || !inventoryAccountId) && (
-                  <div className="flex items-center gap-2 mt-3 text-amber-600 text-xs font-medium">
+                  <div className="flex items-center gap-2 mt-3 text-amber-600 dark:text-amber-400 text-xs font-medium">
                     <AlertCircleIcon className="w-4 h-4" /> Please select both Debit and Credit accounts to proceed.
                   </div>
                 )}
@@ -481,12 +481,12 @@ function ItemImportCard() {
         {step === 'done' && result && (
           <div className="space-y-4">
             <div className={cn('flex items-center gap-3 p-4 rounded-lg border',
-              result.status === 'Success' ? 'bg-emerald-50 border-emerald-200'
-              : result.status === 'Partial' ? 'bg-yellow-50 border-yellow-200'
-              : 'bg-red-50 border-red-200')}>
+              result.status === 'Success' ? 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/20'
+              : result.status === 'Partial' ? 'bg-yellow-50 dark:bg-yellow-500/10 border-yellow-200 dark:border-yellow-500/20'
+              : 'bg-red-50 dark:bg-red-500/10 border-red-200 dark:border-red-500/20')}>
               {result.status === 'Success'
-                ? <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
-                : <AlertTriangle className="w-5 h-5 text-yellow-600 shrink-0" />}
+                ? <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                : <AlertTriangle className="w-5 h-5 text-yellow-600 dark:text-yellow-400 shrink-0" />}
               <div>
                 <p className="text-sm font-semibold">
                   {result.status === 'Success' ? 'Import completed successfully!' : result.status === 'Partial' ? 'Import completed with some issues.' : 'Import failed.'}
@@ -497,8 +497,8 @@ function ItemImportCard() {
               </div>
             </div>
             {result.errors.length > 0 && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-3 max-h-36 overflow-y-auto">
-                {result.errors.map((e, i) => <p key={i} className="text-xs text-red-600">• {e}</p>)}
+              <div className="bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-lg p-3 max-h-36 overflow-y-auto">
+                {result.errors.map((e, i) => <p key={i} className="text-xs text-red-600 dark:text-red-400">• {e}</p>)}
               </div>
             )}
             <Button variant="outline" onClick={reset} className="w-full">Import Another File</Button>

@@ -86,7 +86,7 @@ export default function UserActivityLog() {
   const formatChange = (prev, next) => {
     const diff = next - prev;
     if (diff === 0) return null;
-    const color = diff > 0 ? 'text-emerald-600' : 'text-red-600';
+    const color = diff > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400';
     return <span className={cn('text-xs font-medium', color)}>{diff > 0 ? '+' : ''}{diff.toLocaleString()}</span>;
   };
 
@@ -131,7 +131,7 @@ export default function UserActivityLog() {
             </span>
           </div>
 
-          <div className="bg-white border border-border rounded-xl overflow-hidden">
+          <div className="bg-card border border-border rounded-xl overflow-hidden">
             <table className="w-full text-sm">
               <thead className="bg-muted/30 border-b border-border">
                 <tr>
@@ -164,18 +164,18 @@ export default function UserActivityLog() {
                     <td className="px-4 py-2.5 text-xs text-muted-foreground">{log.imported_by}</td>
                     <td className="px-4 py-2.5 text-center">
                       <span className={cn('inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold',
-                        log.status === 'Success' ? 'bg-emerald-100 text-emerald-700'
-                        : log.status === 'Partial' ? 'bg-yellow-100 text-yellow-700'
-                        : 'bg-red-100 text-red-700')}>
+                        log.status === 'Success' ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400'
+                        : log.status === 'Partial' ? 'bg-yellow-100 dark:bg-yellow-500/20 text-yellow-700 dark:text-yellow-400'
+                        : 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400')}>
                         {log.status === 'Success' ? <CheckCircle2 className="w-3 h-3" /> : log.status === 'Partial' ? <AlertTriangle className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
                         {log.status}
                       </span>
                     </td>
                     <td className="px-4 py-2.5 text-right text-sm font-mono">{log.total_rows ?? 0}</td>
-                    <td className="px-4 py-2.5 text-right text-sm font-mono text-emerald-600 font-semibold">{log.items_created ?? 0}</td>
-                    <td className="px-4 py-2.5 text-right text-sm font-mono text-blue-600 font-semibold">{log.items_updated ?? 0}</td>
-                    <td className="px-4 py-2.5 text-right text-sm font-mono text-yellow-600">{log.items_skipped ?? 0}</td>
-                    <td className="px-4 py-2.5 text-right text-sm font-mono text-red-600">{log.items_failed ?? 0}</td>
+                    <td className="px-4 py-2.5 text-right text-sm font-mono text-emerald-600 dark:text-emerald-400 font-semibold">{log.items_created ?? 0}</td>
+                    <td className="px-4 py-2.5 text-right text-sm font-mono text-blue-600 dark:text-blue-400 font-semibold">{log.items_updated ?? 0}</td>
+                    <td className="px-4 py-2.5 text-right text-sm font-mono text-yellow-600 dark:text-yellow-400">{log.items_skipped ?? 0}</td>
+                    <td className="px-4 py-2.5 text-right text-sm font-mono text-red-600 dark:text-red-400">{log.items_failed ?? 0}</td>
                     <td className="px-4 py-2.5 text-xs text-muted-foreground">
                       {log.import_date ? new Date(log.import_date).toLocaleString() : log.created_date ? new Date(log.created_date).toLocaleString() : '—'}
                     </td>
@@ -204,7 +204,7 @@ export default function UserActivityLog() {
             </span>
           </div>
 
-          <div className="bg-white border border-border rounded-xl overflow-hidden">
+          <div className="bg-card border border-border rounded-xl overflow-hidden">
             <table className="w-full text-sm">
               <thead className="bg-muted/30 border-b border-border">
                 <tr>
@@ -269,7 +269,7 @@ export default function UserActivityLog() {
             </span>
           </div>
 
-          <div className="bg-white border border-border rounded-xl overflow-hidden">
+          <div className="bg-card border border-border rounded-xl overflow-hidden">
             <table className="w-full text-sm">
               <thead className="bg-muted/30 border-b border-border">
                 <tr>
@@ -303,26 +303,26 @@ export default function UserActivityLog() {
                     <td className="px-4 py-2.5 text-xs font-mono text-primary max-w-[140px] truncate">{log.file_name}</td>
                     <td className="px-4 py-2.5">
                       <span className={cn('text-xs font-semibold px-2 py-0.5 rounded-full',
-                        log.import_type === 'Customers' ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700')}>
+                        log.import_type === 'Customers' ? 'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400' : 'bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-400')}>
                         {log.import_type}
                       </span>
                     </td>
                     <td className="px-4 py-2.5 text-xs text-muted-foreground">{log.imported_by}</td>
                     <td className="px-4 py-2.5 text-center">
                       <span className={cn('inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold',
-                        log.status === 'Success' ? 'bg-emerald-100 text-emerald-700'
-                        : log.status === 'Partial' ? 'bg-yellow-100 text-yellow-700'
-                        : 'bg-red-100 text-red-700')}>
+                        log.status === 'Success' ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400'
+                        : log.status === 'Partial' ? 'bg-yellow-100 dark:bg-yellow-500/20 text-yellow-700 dark:text-yellow-400'
+                        : 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400')}>
                         {log.status === 'Success' ? <CheckCircle2 className="w-3 h-3" /> : log.status === 'Partial' ? <AlertTriangle className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
                         {log.status}
                       </span>
                     </td>
                     <td className="px-4 py-2.5 text-right text-sm font-mono">{log.total_rows ?? 0}</td>
-                    <td className="px-4 py-2.5 text-right text-sm font-mono text-emerald-600 font-semibold">{log.created_count ?? 0}</td>
-                    <td className="px-4 py-2.5 text-right text-sm font-mono text-blue-600 font-semibold">{log.updated_count ?? 0}</td>
-                    <td className="px-4 py-2.5 text-right text-sm font-mono text-red-600">{log.failed_count ?? 0}</td>
-                    <td className="px-4 py-2.5 text-right text-sm font-mono text-purple-600">{log.ledgers_generated ?? 0}</td>
-                    <td className="px-4 py-2.5 text-right text-sm font-mono text-indigo-600">{log.journals_posted ?? 0}</td>
+                    <td className="px-4 py-2.5 text-right text-sm font-mono text-emerald-600 dark:text-emerald-400 font-semibold">{log.created_count ?? 0}</td>
+                    <td className="px-4 py-2.5 text-right text-sm font-mono text-blue-600 dark:text-blue-400 font-semibold">{log.updated_count ?? 0}</td>
+                    <td className="px-4 py-2.5 text-right text-sm font-mono text-red-600 dark:text-red-400">{log.failed_count ?? 0}</td>
+                    <td className="px-4 py-2.5 text-right text-sm font-mono text-purple-600 dark:text-purple-400">{log.ledgers_generated ?? 0}</td>
+                    <td className="px-4 py-2.5 text-right text-sm font-mono text-indigo-600 dark:text-indigo-400">{log.journals_posted ?? 0}</td>
                     <td className="px-4 py-2.5 text-xs text-muted-foreground">
                       {log.import_date ? new Date(log.import_date).toLocaleString() : log.created_date ? new Date(log.created_date).toLocaleString() : '—'}
                     </td>
@@ -357,7 +357,7 @@ export default function UserActivityLog() {
             </span>
           </div>
 
-          <div className="bg-white border border-border rounded-xl overflow-hidden">
+          <div className="bg-card border border-border rounded-xl overflow-hidden">
             <table className="w-full text-sm">
               <thead className="bg-muted/30 border-b border-border">
                 <tr>
@@ -395,14 +395,14 @@ export default function UserActivityLog() {
                     <td className="px-4 py-2.5 font-medium text-sm">{log.partner_name}</td>
                     <td className="px-4 py-2.5">
                       <span className={cn('text-xs font-semibold px-2 py-0.5 rounded-full',
-                        log.partner_type === 'Customer' ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700')}>
+                        log.partner_type === 'Customer' ? 'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400' : 'bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-400')}>
                         {log.partner_type}
                       </span>
                     </td>
                     <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground">{log.tax_id_number || '—'}</td>
                     <td className="px-4 py-2.5">
                       <span className={cn('inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold',
-                        log.action_type === 'Bulk Delete' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700')}>
+                        log.action_type === 'Bulk Delete' ? 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400' : 'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400')}>
                         {log.action_type === 'Bulk Delete' ? <XCircle className="w-3 h-3" /> : <CheckCircle2 className="w-3 h-3" />}
                         {log.action_type}
                       </span>
@@ -437,7 +437,7 @@ export default function UserActivityLog() {
             </span>
           </div>
 
-          <div className="bg-white border border-border rounded-xl overflow-hidden">
+          <div className="bg-card border border-border rounded-xl overflow-hidden">
             <table className="w-full text-sm">
               <thead className="bg-muted/30 border-b border-border">
                 <tr>
@@ -469,7 +469,7 @@ export default function UserActivityLog() {
                     <td className="px-4 py-2.5 text-xs text-muted-foreground">{log.voucher_type || '—'}</td>
                     <td className="px-4 py-2.5">
                       <span className={cn('inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold',
-                        log.action_type === 'Delete' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700')}>
+                        log.action_type === 'Delete' ? 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400' : 'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400')}>
                         {log.action_type === 'Delete' ? <XCircle className="w-3 h-3" /> : <CheckCircle2 className="w-3 h-3" />}
                         {log.action_type}
                       </span>
@@ -506,7 +506,7 @@ export default function UserActivityLog() {
             </span>
           </div>
 
-          <div className="bg-white border border-border rounded-xl overflow-hidden">
+          <div className="bg-card border border-border rounded-xl overflow-hidden">
             <table className="w-full text-sm">
               <thead className="bg-muted/30 border-b border-border">
                 <tr>
@@ -573,7 +573,7 @@ export default function UserActivityLog() {
                     </td>
                     <td className="px-4 py-2.5 text-center">
                       <span className={cn('inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold',
-                        log.balance_type === 'Debit' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'
+                        log.balance_type === 'Debit' ? 'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400' : 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400'
                       )}>
                         {log.balance_type === 'Debit' ? 'Dr' : 'Cr'}
                       </span>

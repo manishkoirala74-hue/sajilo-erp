@@ -9,14 +9,14 @@ import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 
 const TYPE_META = {
-  Asset:    { dot: 'bg-blue-500',    badge: 'bg-blue-100 text-blue-700' },
-  Liability:{ dot: 'bg-red-500',     badge: 'bg-red-100 text-red-700' },
-  Equity:   { dot: 'bg-purple-500',  badge: 'bg-purple-100 text-purple-700' },
-  Revenue:  { dot: 'bg-emerald-500', badge: 'bg-emerald-100 text-emerald-700' },
-  COGS:     { dot: 'bg-amber-500',   badge: 'bg-amber-100 text-amber-700' },
-  OPEX:     { dot: 'bg-orange-500',  badge: 'bg-orange-100 text-orange-700' },
+  Asset:    { dot: 'bg-blue-500',    badge: 'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400' },
+  Liability:{ dot: 'bg-red-500',     badge: 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400' },
+  Equity:   { dot: 'bg-purple-500',  badge: 'bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-400' },
+  Revenue:  { dot: 'bg-emerald-500', badge: 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400' },
+  COGS:     { dot: 'bg-amber-500',   badge: 'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400' },
+  OPEX:     { dot: 'bg-orange-500',  badge: 'bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-400' },
 };
-const getMeta = (t) => TYPE_META[t] || { dot: 'bg-slate-400', badge: 'bg-slate-100 text-slate-600' };
+const getMeta = (t) => TYPE_META[t] || { dot: 'bg-slate-400', badge: 'bg-slate-100 dark:bg-slate-500/20 text-muted-foreground' };
 
 const TABS = [
   { id: 'accounts',  label: 'Accounts'  },
@@ -126,7 +126,7 @@ function AccountsTab({ openingDate }) {
 
   return (
     <div className="space-y-4">
-      <div className="bg-white border border-border rounded-xl p-4">
+      <div className="bg-card border border-border rounded-xl p-4">
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
             <h3 className="font-semibold text-sm">Chart of Accounts — Opening Balances</h3>
@@ -142,7 +142,7 @@ function AccountsTab({ openingDate }) {
           </div>
         </div>
         {saved && dirtyCount === 0 && (
-          <div className="flex items-center gap-2 mt-2 text-xs text-emerald-600"><CheckCircle className="w-3.5 h-3.5" />All changes saved</div>
+          <div className="flex items-center gap-2 mt-2 text-xs text-emerald-600 dark:text-emerald-400"><CheckCircle className="w-3.5 h-3.5" />All changes saved</div>
         )}
       </div>
 
@@ -151,7 +151,7 @@ function AccountsTab({ openingDate }) {
         <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search account code or name…" className="pl-9" />
       </div>
 
-      <div className="bg-white border border-border rounded-xl overflow-hidden">
+      <div className="bg-card border border-border rounded-xl overflow-hidden">
         <div className="grid grid-cols-[120px_1fr_160px_140px_140px_100px] bg-muted/30 border-b border-border px-4 py-2.5">
           <span className="text-xs font-semibold text-muted-foreground">Account Code</span>
           <span className="text-xs font-semibold text-muted-foreground">Name of Ledger</span>
@@ -182,11 +182,11 @@ function AccountsTab({ openingDate }) {
                     const e = getEdit(acc);
                     const isDirty = !!edits[acc.id];
                     return (
-                      <div key={acc.id} className={cn('grid grid-cols-[120px_1fr_160px_140px_140px_100px] items-center px-4 py-2 border-b border-border/40 hover:bg-muted/10', isDirty && 'bg-amber-50/50')}>
+                      <div key={acc.id} className={cn('grid grid-cols-[120px_1fr_160px_140px_140px_100px] items-center px-4 py-2 border-b border-border/40 hover:bg-muted/10', isDirty && 'bg-amber-50 dark:bg-amber-500/10/50')}>
                         <span className="font-mono text-xs text-muted-foreground pr-2">{acc.account_code}</span>
                         <div className="pr-2">
                           <span className="text-sm font-medium">{acc.account_name}</span>
-                          {isDirty && <span className="ml-1.5 text-xs text-amber-600 font-medium">●</span>}
+                          {isDirty && <span className="ml-1.5 text-xs text-amber-600 dark:text-amber-400 font-medium">●</span>}
                         </div>
                         <span className="text-xs text-muted-foreground pr-2 truncate">{acc.account_group}</span>
                         <div className="pr-2">
@@ -216,8 +216,8 @@ function AccountsTab({ openingDate }) {
       </div>
 
       {dirtyCount > 0 && (
-        <div className="sticky bottom-0 bg-white border-t border-amber-300 shadow-lg rounded-xl p-4 flex items-center justify-between">
-          <span className="text-sm font-medium text-amber-700">{dirtyCount} account{dirtyCount > 1 ? 's' : ''} modified — unsaved changes</span>
+        <div className="sticky bottom-0 bg-card border-t border-amber-300 dark:border-amber-500/30 shadow-lg rounded-xl p-4 flex items-center justify-between">
+          <span className="text-sm font-medium text-amber-700 dark:text-amber-400">{dirtyCount} account{dirtyCount > 1 ? 's' : ''} modified — unsaved changes</span>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={fetchAll}>Discard</Button>
             <Button size="sm" onClick={handleSave} disabled={saving}>{saving ? 'Saving…' : 'Save All Changes'}</Button>
@@ -337,7 +337,7 @@ function PartnersTab({ mode, openingDate }) {
 
   return (
     <div className="space-y-4">
-      <div className="bg-white border border-border rounded-xl p-4">
+      <div className="bg-card border border-border rounded-xl p-4">
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
             <h3 className="font-semibold text-sm">{label} Opening Balances</h3>
@@ -355,7 +355,7 @@ function PartnersTab({ mode, openingDate }) {
           </div>
         </div>
         {saved && dirtyCount === 0 && (
-          <div className="flex items-center gap-2 mt-2 text-xs text-emerald-600"><CheckCircle className="w-3.5 h-3.5" />All changes saved</div>
+          <div className="flex items-center gap-2 mt-2 text-xs text-emerald-600 dark:text-emerald-400"><CheckCircle className="w-3.5 h-3.5" />All changes saved</div>
         )}
       </div>
 
@@ -364,7 +364,7 @@ function PartnersTab({ mode, openingDate }) {
         <Input value={search} onChange={e => setSearch(e.target.value)} placeholder={`Search ${label.toLowerCase()} name or code…`} className="pl-9" />
       </div>
 
-      <div className="bg-white border border-border rounded-xl overflow-hidden">
+      <div className="bg-card border border-border rounded-xl overflow-hidden">
         <div className="grid grid-cols-[120px_1fr_120px_140px_140px_100px] bg-muted/30 border-b border-border px-4 py-2.5">
           <span className="text-xs font-semibold text-muted-foreground">Code</span>
           <span className="text-xs font-semibold text-muted-foreground">Name</span>
@@ -383,11 +383,11 @@ function PartnersTab({ mode, openingDate }) {
               const e = getEdit(p);
               const isDirty = !!edits[p.id];
               return (
-                <div key={p.id} className={cn('grid grid-cols-[120px_1fr_120px_140px_140px_100px] items-center px-4 py-2 hover:bg-muted/10 transition-colors', isDirty && 'bg-amber-50/50')}>
+                <div key={p.id} className={cn('grid grid-cols-[120px_1fr_120px_140px_140px_100px] items-center px-4 py-2 hover:bg-muted/10 transition-colors', isDirty && 'bg-amber-50 dark:bg-amber-500/10/50')}>
                   <span className="font-mono text-xs text-muted-foreground pr-2">{p.partner_code || '—'}</span>
                   <div className="pr-2">
                     <span className="text-sm font-medium">{p.name}</span>
-                    {isDirty && <span className="ml-1.5 text-xs text-amber-600 font-medium">●</span>}
+                    {isDirty && <span className="ml-1.5 text-xs text-amber-600 dark:text-amber-400 font-medium">●</span>}
                   </div>
                   <span className="text-xs text-muted-foreground pr-2 truncate">{p.tax_id_number || '—'}</span>
                   <div className="pr-2">
@@ -413,13 +413,13 @@ function PartnersTab({ mode, openingDate }) {
         )}
       </div>
 
-      <div className="text-xs text-muted-foreground bg-blue-50 border border-blue-200 rounded-lg px-4 py-2.5">
+      <div className="text-xs text-muted-foreground bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 rounded-lg px-4 py-2.5">
         💡 On save, <strong>{controlLabel}</strong> in Chart of Accounts will be automatically updated to reflect the aggregate of all {label.toLowerCase()} opening balances.
       </div>
 
       {dirtyCount > 0 && (
-        <div className="sticky bottom-0 bg-white border-t border-amber-300 shadow-lg rounded-xl p-4 flex items-center justify-between">
-          <span className="text-sm font-medium text-amber-700">{dirtyCount} {label.toLowerCase()}{dirtyCount > 1 ? 's' : ''} modified — unsaved changes</span>
+        <div className="sticky bottom-0 bg-card border-t border-amber-300 dark:border-amber-500/30 shadow-lg rounded-xl p-4 flex items-center justify-between">
+          <span className="text-sm font-medium text-amber-700 dark:text-amber-400">{dirtyCount} {label.toLowerCase()}{dirtyCount > 1 ? 's' : ''} modified — unsaved changes</span>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={fetchAll}>Discard</Button>
             <Button size="sm" onClick={handleSave} disabled={saving}>{saving ? 'Saving…' : 'Save All Changes'}</Button>
@@ -446,8 +446,8 @@ export default function OpeningBalances() {
             className={cn(
               'px-6 py-2 text-sm font-semibold rounded-lg transition-all',
               activeTab === tab.id
-                ? 'bg-white text-primary shadow-sm border border-border'
-                : 'text-muted-foreground hover:text-foreground hover:bg-white/50'
+                ? 'bg-card text-primary shadow-sm border border-border'
+                : 'text-muted-foreground hover:text-foreground hover:bg-card/50'
             )}
           >
             {tab.label}

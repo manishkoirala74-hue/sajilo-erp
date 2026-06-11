@@ -108,17 +108,17 @@ export default function ItemTransactionHistory({ item }) {
     <div className="space-y-4">
       {/* Summary Cards */}
       <div className="grid grid-cols-3 gap-3">
-        <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3">
-          <p className="text-xs text-emerald-700 font-medium">Total Received (In)</p>
-          <p className="text-xl font-bold text-emerald-800 mt-0.5">{totalIn} <span className="text-sm font-normal">{item.unit_of_measure}</span></p>
+        <div className="bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 rounded-xl px-4 py-3">
+          <p className="text-xs text-emerald-700 dark:text-emerald-400 font-medium">Total Received (In)</p>
+          <p className="text-xl font-bold text-emerald-800 dark:text-emerald-300 mt-0.5">{totalIn} <span className="text-sm font-normal">{item.unit_of_measure}</span></p>
         </div>
-        <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3">
-          <p className="text-xs text-red-700 font-medium">Total Issued (Out)</p>
-          <p className="text-xl font-bold text-red-800 mt-0.5">{totalOut} <span className="text-sm font-normal">{item.unit_of_measure}</span></p>
+        <div className="bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-xl px-4 py-3">
+          <p className="text-xs text-red-700 dark:text-red-400 font-medium">Total Issued (Out)</p>
+          <p className="text-xl font-bold text-red-800 dark:text-red-300 mt-0.5">{totalOut} <span className="text-sm font-normal">{item.unit_of_measure}</span></p>
         </div>
-        <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3">
-          <p className="text-xs text-blue-700 font-medium">Current Stock</p>
-          <p className="text-xl font-bold text-blue-800 mt-0.5">{item.quantity_on_hand} <span className="text-sm font-normal">{item.unit_of_measure}</span></p>
+        <div className="bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 rounded-xl px-4 py-3">
+          <p className="text-xs text-blue-700 dark:text-blue-400 font-medium">Current Stock</p>
+          <p className="text-xl font-bold text-blue-800 dark:text-blue-300 mt-0.5">{item.quantity_on_hand} <span className="text-sm font-normal">{item.unit_of_measure}</span></p>
         </div>
       </div>
 
@@ -180,9 +180,9 @@ export default function ItemTransactionHistory({ item }) {
                 <td className="px-3 py-2.5">
                   <span className={cn(
                     'inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full',
-                    t.type === 'Purchase' ? 'bg-blue-50 text-blue-700' :
-                    t.type === 'Sale' ? 'bg-emerald-50 text-emerald-700' :
-                    'bg-amber-50 text-amber-700'
+                    t.type === 'Purchase' ? 'bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400' :
+                    t.type === 'Sale' ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400' :
+                    'bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400'
                   )}>
                     {t.direction === 'in'
                       ? <ArrowDownCircle className="w-3 h-3" />
@@ -194,7 +194,7 @@ export default function ItemTransactionHistory({ item }) {
                 <td className="px-3 py-2.5 text-xs">{t.partner || '—'}</td>
                 <td className={cn(
                   'px-3 py-2.5 text-right font-semibold text-sm',
-                  t.direction === 'in' ? 'text-emerald-700' : 'text-red-600'
+                  t.direction === 'in' ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'
                 )}>
                   {t.direction === 'in' ? '+' : '-'}{t.quantity}
                 </td>

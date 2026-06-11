@@ -79,12 +79,12 @@ export default function GLAccountSettings({ settings, onChange }) {
   return (
     <div className="space-y-6">
       {/* ── Restore Defaults ── */}
-      <div className="bg-orange-50 border border-orange-200 rounded-lg px-4 py-3 text-sm text-orange-800 flex justify-between items-center">
+      <div className="bg-orange-50 dark:bg-orange-500/10 border border-orange-200 dark:border-orange-500/20 rounded-lg px-4 py-3 text-sm text-orange-800 dark:text-orange-300 flex justify-between items-center">
         <div>
           <p className="font-semibold mb-0.5">Missing Accounts?</p>
           <p className="text-xs">If your Chart of Accounts is empty, you can restore the standard system accounts here.</p>
         </div>
-        <Button variant="outline" size="sm" onClick={handleRestoreDefaults} disabled={seeding} className="bg-white hover:bg-orange-100 text-orange-700 border-orange-300">
+        <Button variant="outline" size="sm" onClick={handleRestoreDefaults} disabled={seeding} className="bg-card hover:bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-400 border-orange-300 dark:border-orange-500/30">
           <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${seeding ? 'animate-spin' : ''}`} />
           {seeding ? 'Restoring...' : 'Restore Defaults'}
         </Button>
@@ -92,7 +92,7 @@ export default function GLAccountSettings({ settings, onChange }) {
 
       {/* ── Automated Ledger Generation — Group Parent Mapping ── */}
       <div className="space-y-3">
-        <div className="bg-indigo-50 border border-indigo-200 rounded-lg px-4 py-3 text-sm text-indigo-800">
+        <div className="bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-200 dark:border-indigo-500/20 rounded-lg px-4 py-3 text-sm text-indigo-800 dark:text-indigo-300">
           <p className="font-semibold mb-0.5">Automated Sub-Ledger Generation</p>
           Map each partner type to a <strong>Group Ledger</strong> parent. When a new Customer or Supplier is saved,
           the system automatically creates a sequential sub-ledger under the assigned group and links it to the partner
@@ -115,7 +115,7 @@ export default function GLAccountSettings({ settings, onChange }) {
                     value={settings[`${f.key}_id`] || ''}
                     onValueChange={v => handleGroupChange(f.key, v)}
                   >
-                    <SelectTrigger className="h-9 border-indigo-200 focus:ring-indigo-400">
+                    <SelectTrigger className="h-9 border-indigo-200 dark:border-indigo-500/20 focus:ring-indigo-400">
                       <SelectValue placeholder="— Select Group Ledger —" />
                     </SelectTrigger>
                     <SelectContent>
@@ -127,7 +127,7 @@ export default function GLAccountSettings({ settings, onChange }) {
                     </SelectContent>
                   </Select>
                   {settings[`${f.key}_name`] && (
-                    <p className="text-xs text-indigo-600 mt-0.5">✓ {settings[`${f.key}_name`]}</p>
+                    <p className="text-xs text-indigo-600 dark:text-indigo-400 mt-0.5">✓ {settings[`${f.key}_name`]}</p>
                   )}
                 </div>
               </div>
@@ -138,7 +138,7 @@ export default function GLAccountSettings({ settings, onChange }) {
 
       {/* ── Standard GL Posting Accounts ── */}
       <div className="space-y-3">
-        <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 text-sm text-blue-800 space-y-1">
+        <div className="bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 rounded-lg px-4 py-3 text-sm text-blue-800 dark:text-blue-300 space-y-1">
           <p>Map your Chart of Accounts to each GL posting role. Used automatically when posting transactions.</p>
           <p className="text-xs">
             <strong>Priority order:</strong> Transaction-level selection → Partner-dedicated ledger → These fallback defaults.
@@ -168,7 +168,7 @@ export default function GLAccountSettings({ settings, onChange }) {
                   </SelectContent>
                 </Select>
                 {settings[`${f.key}_name`] && (
-                  <p className="text-xs text-emerald-600 mt-0.5">✓ {settings[`${f.key}_name`]}</p>
+                  <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-0.5">✓ {settings[`${f.key}_name`]}</p>
                 )}
               </div>
             </div>

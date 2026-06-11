@@ -77,7 +77,7 @@ export default function PayrollRuns() {
     { key: 'total_gross', label: 'Gross Payroll', render: v => fmt(v) },
     { key: 'total_pf', label: 'Total PF', render: v => fmt(v) },
     { key: 'total_tds', label: 'Total TDS', render: v => fmt(v) },
-    { key: 'total_net', label: 'Net Payable', render: v => <span className="font-semibold text-emerald-600">{fmt(v)}</span> },
+    { key: 'total_net', label: 'Net Payable', render: v => <span className="font-semibold text-emerald-600 dark:text-emerald-400">{fmt(v)}</span> },
     { key: 'status', label: 'Status', render: v => <StatusBadge status={v} /> },
     { key: 'id', label: '', render: (_, row) => (
       <Button size="sm" variant="ghost" onClick={() => openView(row)}>
@@ -130,9 +130,9 @@ export default function PayrollRuns() {
               <div className="grid grid-cols-4 gap-3">
                 {[
                   { label: 'Gross Payroll', val: fmt(selected.total_gross), color: 'text-foreground' },
-                  { label: 'Total PF', val: fmt(selected.total_pf), color: 'text-amber-600' },
-                  { label: 'Total TDS', val: fmt(selected.total_tds), color: 'text-orange-600' },
-                  { label: 'Net Payable', val: fmt(selected.total_net), color: 'text-emerald-600' },
+                  { label: 'Total PF', val: fmt(selected.total_pf), color: 'text-amber-600 dark:text-amber-400' },
+                  { label: 'Total TDS', val: fmt(selected.total_tds), color: 'text-orange-600 dark:text-orange-400' },
+                  { label: 'Net Payable', val: fmt(selected.total_net), color: 'text-emerald-600 dark:text-emerald-400' },
                 ].map(s => (
                   <div key={s.label} className="bg-muted/30 rounded-lg p-3">
                     <p className="text-xs text-muted-foreground">{s.label}</p>
@@ -152,8 +152,8 @@ export default function PayrollRuns() {
                     <tr key={i} className="hover:bg-muted/20">
                       <td className="px-3 py-2 font-medium">{p.employee_name}</td>
                       <td className="px-3 py-2 text-right">{fmt(p.gross_pay)}</td>
-                      <td className="px-3 py-2 text-right text-orange-600">{fmt(p.total_deductions)}</td>
-                      <td className="px-3 py-2 text-right font-semibold text-emerald-600">{fmt(p.net_payable)}</td>
+                      <td className="px-3 py-2 text-right text-orange-600 dark:text-orange-400">{fmt(p.total_deductions)}</td>
+                      <td className="px-3 py-2 text-right font-semibold text-emerald-600 dark:text-emerald-400">{fmt(p.net_payable)}</td>
                     </tr>
                   ))}
                 </tbody>

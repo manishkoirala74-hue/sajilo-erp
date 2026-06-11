@@ -11,17 +11,17 @@ import { buildVisibleColumns, fmtNPR } from '@/lib/reports/reportColumnUtils';
 import { exportFinancialXLSX } from '@/lib/reports/reportExcelExport';
 
 const TYPE_BADGE = {
-  Asset:     'bg-blue-100 text-blue-700',
-  Liability: 'bg-red-100 text-red-700',
-  Equity:    'bg-purple-100 text-purple-700',
-  Revenue:   'bg-emerald-100 text-emerald-700',
-  COGS:      'bg-amber-100 text-amber-700',
-  OPEX:      'bg-orange-100 text-orange-700',
-  Expense:   'bg-orange-100 text-orange-700',
+  Asset:     'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400',
+  Liability: 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400',
+  Equity:    'bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-400',
+  Revenue:   'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400',
+  COGS:      'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400',
+  OPEX:      'bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-400',
+  Expense:   'bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-400',
 };
 
 function TypeBadge({ type }) {
-  const cls = TYPE_BADGE[type] || 'bg-slate-100 text-slate-600';
+  const cls = TYPE_BADGE[type] || 'bg-slate-100 dark:bg-slate-500/20 text-muted-foreground';
   return <span className={cn('text-xs px-1.5 py-0.5 rounded font-medium', cls)}>{type || '—'}</span>;
 }
 
@@ -94,7 +94,7 @@ function computeSubtreeTotals(node) {
 function LedgerRow({ account, columns, depth }) {
   const indent = depth * 20 + 8;
   return (
-    <tr className="hover:bg-slate-50 transition-colors print:hover:bg-transparent">
+    <tr className="hover:bg-muted/50 transition-colors print:hover:bg-transparent">
       {columns.map(col => {
         if (col.key === 'account_code') return (
           <td key={col.key} className="py-1.5 font-mono text-xs text-muted-foreground whitespace-nowrap print:text-[9px]"
@@ -163,14 +163,14 @@ function GroupRow({ node, columns, depth, expandedGroups, onToggle, showZeroBala
   const bgClass = depth === 0
     ? 'bg-slate-200/80 hover:bg-slate-200'
     : depth === 1
-    ? 'bg-slate-100/80 hover:bg-slate-100'
-    : 'bg-slate-50/80 hover:bg-slate-50';
+    ? 'bg-slate-100 dark:bg-slate-500/20/80 hover:bg-slate-100 dark:bg-slate-500/20'
+    : 'bg-muted/50/80 hover:bg-muted/50';
 
   const fontClass = depth === 0
-    ? 'font-bold text-slate-900'
+    ? 'font-bold text-foreground'
     : depth === 1
-    ? 'font-semibold text-slate-800'
-    : 'font-medium text-slate-700';
+    ? 'font-semibold text-foreground'
+    : 'font-medium text-muted-foreground';
 
   const handleToggle = useCallback((e) => {
     e.stopPropagation();
@@ -188,7 +188,7 @@ function GroupRow({ node, columns, depth, expandedGroups, onToggle, showZeroBala
       >
         {columns.map(col => {
           if (col.key === 'account_code') return (
-            <td key={col.key} className="py-2 font-mono text-xs font-bold text-slate-700 whitespace-nowrap print:text-[9px]"
+            <td key={col.key} className="py-2 font-mono text-xs font-bold text-muted-foreground whitespace-nowrap print:text-[9px]"
               style={{ paddingLeft: `${indent}px`, paddingRight: '8px' }}>
               <div className="flex items-center gap-1.5">
                 {hasChildren || isControlAccount
@@ -376,7 +376,7 @@ export default function FinancialReportTable({
       <div className="report-no-print flex justify-end">
         <button
           onClick={handleExportXLSX}
-          className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 border border-emerald-300 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 transition-colors"
+          className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 border border-emerald-300 dark:border-emerald-500/30 rounded-lg bg-emerald-50 dark:bg-emerald-500/10 hover:bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 transition-colors"
         >
           <FileSpreadsheet className="w-3.5 h-3.5" />
           Export Excel (.xlsx)
@@ -463,7 +463,7 @@ export default function FinancialReportTable({
               <tr>
                 {columns.map(col => {
                   if (col.key === 'account_code') return (
-                    <td key={col.key} className="px-3 py-2.5 font-bold text-xs text-white uppercase tracking-wider print:text-[9px] print:text-slate-900">
+                    <td key={col.key} className="px-3 py-2.5 font-bold text-xs text-white uppercase tracking-wider print:text-[9px] print:text-foreground">
                       GRAND TOTAL
                     </td>
                   );
@@ -471,7 +471,7 @@ export default function FinancialReportTable({
                     <td key={col.key} className={cn('px-3 py-2.5', col.key === 'account_type' && 'print:hidden')} />
                   );
                   return (
-                    <td key={col.key} className="px-3 py-2.5 text-right font-bold text-sm tabular-nums font-mono text-white print:text-[10px] print:text-slate-900">
+                    <td key={col.key} className="px-3 py-2.5 text-right font-bold text-sm tabular-nums font-mono text-white print:text-[10px] print:text-foreground">
                       {fmtNPR(grandTotals[col.key])}
                     </td>
                   );

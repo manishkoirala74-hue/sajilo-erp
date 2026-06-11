@@ -165,7 +165,7 @@ export default function DepreciationSchedules() {
       <PageHeader title="Depreciation Schedules" subtitle="Calculate, generate and post asset depreciation to General Ledger" />
 
       {/* Asset selector */}
-      <div className="bg-white border border-border rounded-xl p-5">
+      <div className="bg-card border border-border rounded-xl p-5">
         <div className="flex items-end gap-4">
           <div className="flex-1 max-w-sm">
             <label className="text-sm font-medium mb-1.5 block">Select Asset</label>
@@ -203,11 +203,11 @@ export default function DepreciationSchedules() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {[
               { label: 'Gross Value', value: fmt(selectedAsset.gross_purchase_value), color: '' },
-              { label: 'Accumulated Dep.', value: fmt(selectedAsset.accumulated_depreciation), color: 'text-amber-600' },
-              { label: 'Net Book Value', value: fmt(selectedAsset.net_book_value), color: 'text-emerald-700' },
-              { label: 'Monthly Charge', value: fmt(calcMonthlyDep(selectedAsset, settings)), color: 'text-blue-700' },
+              { label: 'Accumulated Dep.', value: fmt(selectedAsset.accumulated_depreciation), color: 'text-amber-600 dark:text-amber-400' },
+              { label: 'Net Book Value', value: fmt(selectedAsset.net_book_value), color: 'text-emerald-700 dark:text-emerald-400' },
+              { label: 'Monthly Charge', value: fmt(calcMonthlyDep(selectedAsset, settings)), color: 'text-blue-700 dark:text-blue-400' },
             ].map(c => (
-              <div key={c.label} className="bg-white border border-border rounded-xl p-4">
+              <div key={c.label} className="bg-card border border-border rounded-xl p-4">
                 <p className="text-xs text-muted-foreground mb-1">{c.label}</p>
                 <p className={cn('font-bold text-lg', c.color)}>{c.value}</p>
               </div>
@@ -215,40 +215,40 @@ export default function DepreciationSchedules() {
           </div>
 
           {/* Config strip */}
-          <div className="flex items-center gap-3 flex-wrap text-xs bg-blue-50 border border-blue-200 rounded-lg px-4 py-2.5">
-            <span className="font-semibold text-blue-800">Posting Config:</span>
-            <span className="bg-white border border-blue-200 px-2 py-0.5 rounded">{selectedAsset.depreciation_method || settings?.dep_default_method || 'Straight-Line'}</span>
-            <span className="bg-white border border-blue-200 px-2 py-0.5 rounded">{settings?.dep_posting_mode || 'Accumulated'} Mode</span>
-            {settings?.dep_use_rate_override && <span className="bg-white border border-blue-200 px-2 py-0.5 rounded">Rate: {settings.dep_default_rate_percent}% p.a.</span>}
+          <div className="flex items-center gap-3 flex-wrap text-xs bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 rounded-lg px-4 py-2.5">
+            <span className="font-semibold text-blue-800 dark:text-blue-300">Posting Config:</span>
+            <span className="bg-card border border-blue-200 dark:border-blue-500/20 px-2 py-0.5 rounded">{selectedAsset.depreciation_method || settings?.dep_default_method || 'Straight-Line'}</span>
+            <span className="bg-card border border-blue-200 dark:border-blue-500/20 px-2 py-0.5 rounded">{settings?.dep_posting_mode || 'Accumulated'} Mode</span>
+            {settings?.dep_use_rate_override && <span className="bg-card border border-blue-200 dark:border-blue-500/20 px-2 py-0.5 rounded">Rate: {settings.dep_default_rate_percent}% p.a.</span>}
             {(() => {
               const { expenseAccountName, creditAccountName } = resolveDepAccounts(selectedAsset, settings);
-              return <span className="ml-auto text-blue-700">Dr: {expenseAccountName} → Cr: {creditAccountName}</span>;
+              return <span className="ml-auto text-blue-700 dark:text-blue-400">Dr: {expenseAccountName} → Cr: {creditAccountName}</span>;
             })()}
           </div>
 
           {/* Period stats */}
           {schedule.length > 0 && (
             <div className="grid grid-cols-3 gap-4">
-              <div className="bg-white border border-border rounded-xl p-4 text-center">
+              <div className="bg-card border border-border rounded-xl p-4 text-center">
                 <p className="text-xs text-muted-foreground">Total Periods</p>
                 <p className="text-2xl font-bold">{schedule.length}</p>
               </div>
-              <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-center">
-                <p className="text-xs text-emerald-700">Posted</p>
-                <p className="text-2xl font-bold text-emerald-700">{fmt(totalPosted)}</p>
+              <div className="bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 rounded-xl p-4 text-center">
+                <p className="text-xs text-emerald-700 dark:text-emerald-400">Posted</p>
+                <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-400">{fmt(totalPosted)}</p>
               </div>
-              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-center">
-                <p className="text-xs text-amber-700">Pending</p>
-                <p className="text-2xl font-bold text-amber-700">{fmt(totalPending)}</p>
+              <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-xl p-4 text-center">
+                <p className="text-xs text-amber-700 dark:text-amber-400">Pending</p>
+                <p className="text-2xl font-bold text-amber-700 dark:text-amber-400">{fmt(totalPending)}</p>
               </div>
             </div>
           )}
 
           {/* Schedule table */}
-          <div className="bg-white border border-border rounded-xl overflow-hidden">
+          <div className="bg-card border border-border rounded-xl overflow-hidden">
             <div className="px-5 py-4 border-b border-border flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <TrendingDown className="w-4 h-4 text-amber-600" />
+                <TrendingDown className="w-4 h-4 text-amber-600 dark:text-amber-400" />
                 <span className="font-semibold text-sm">Monthly Schedule</span>
               </div>
               <span className="text-xs text-muted-foreground">{schedule.filter(s => !s.is_posted).length} pending · {schedule.filter(s => s.is_posted).length} posted</span>
@@ -272,17 +272,17 @@ export default function DepreciationSchedules() {
                 ) : schedule.map(s => {
                   const { expenseAccountName, creditAccountName } = resolveDepAccounts(selectedAsset, settings);
                   return (
-                    <tr key={s.id} className={cn('transition-colors', s.is_posted ? 'bg-emerald-50/40' : 'hover:bg-muted/20')}>
+                    <tr key={s.id} className={cn('transition-colors', s.is_posted ? 'bg-emerald-50 dark:bg-emerald-500/10/40' : 'hover:bg-muted/20')}>
                       <td className="px-4 py-2.5 font-mono">{s.period_label}</td>
-                      <td className="px-4 py-2.5 text-right font-mono font-semibold text-amber-700">{fmt(s.calculated_depreciation_amount)}</td>
+                      <td className="px-4 py-2.5 text-right font-mono font-semibold text-amber-700 dark:text-amber-400">{fmt(s.calculated_depreciation_amount)}</td>
                       <td className="px-4 py-2.5 text-xs text-muted-foreground">
-                        <div><span className="text-blue-600 font-mono">Dr</span> {expenseAccountName}</div>
-                        <div><span className="text-emerald-600 font-mono">Cr</span> {creditAccountName}</div>
+                        <div><span className="text-blue-600 dark:text-blue-400 font-mono">Dr</span> {expenseAccountName}</div>
+                        <div><span className="text-emerald-600 dark:text-emerald-400 font-mono">Cr</span> {creditAccountName}</div>
                       </td>
                       <td className="px-4 py-2.5 text-center">
                         {s.is_posted
-                          ? <span className="inline-flex items-center gap-1 text-xs text-emerald-700"><CheckCircle2 className="w-3.5 h-3.5" /> Posted</span>
-                          : <span className="inline-flex items-center gap-1 text-xs text-amber-600"><AlertCircle className="w-3.5 h-3.5" /> Pending</span>
+                          ? <span className="inline-flex items-center gap-1 text-xs text-emerald-700 dark:text-emerald-400"><CheckCircle2 className="w-3.5 h-3.5" /> Posted</span>
+                          : <span className="inline-flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400"><AlertCircle className="w-3.5 h-3.5" /> Pending</span>
                         }
                       </td>
                       <td className="px-4 py-2.5 text-xs text-muted-foreground">{s.posted_date || '—'}</td>
