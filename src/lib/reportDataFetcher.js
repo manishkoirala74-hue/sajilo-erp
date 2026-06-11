@@ -37,6 +37,7 @@ export async function fetchReportData(reportId, fromDate, toDate, extraParams = 
   switch (reportId) {
 
     case 'ledger_detail': {
+      if (!extraParams.accountId) return [];
       const p_company_id = sajilo.getCompanyId();
       const { data, error } = await supabase.rpc('get_stabilized_general_ledger_statement_rpc', {
         p_company_id,
