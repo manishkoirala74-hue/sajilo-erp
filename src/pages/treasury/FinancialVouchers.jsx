@@ -171,7 +171,28 @@ export default function FinancialVouchers() {
 
     // Reverse GL lines first if voucher is Posted
     if (selected.status === 'Posted') {
-      await reverseGLLines(selected, user, 'Delete');
+      const journals = await sajilo.entities.GeneralLedgerJournal.filter({ source_document_id: selected.id, source_document_type: 'FinancialVoucher' });
+      
+      // Update ChartOfAccount balances by reversing the entries' impact
+      for (const e of selected.entries) {
+        if (!e.account_id) continue;
+        const results = await sajilo.entities.ChartOfAccount.filter({ id: e.account_id }, 'account_code', 1);
+        const acc = results[0];
+        if (!acc) continue;
+        const delta = (e.debit || 0) - (e.credit || 0);
+        const debitNormal = ['Asset', 'COGS', 'Expense', 'OPEX', 'Cost of Goods Sold', 'Other Expense'].includes(acc.account_type);
+        const balanceChange = debitNormal ? delta : -delta;
+        await sajilo.entities.ChartOfAccount.update(acc.id, { current_balance: Math.round(((acc.current_balance || 0) - balanceChange) * 100) / 100 });
+      }
+
+      // Delete the original journal(s)
+      for (const j of journals) {
+        const lines = await sajilo.entities.GeneralLedgerLine.filter({ journal_id: j.id });
+        for (const l of lines) {
+           await sajilo.entities.GeneralLedgerLine.delete(l.id);
+        }
+        await sajilo.entities.GeneralLedgerJournal.delete(j.id);
+      }
     }
 
     // Log the deletion
