@@ -238,9 +238,9 @@ DECLARE
     v_normal_balance TEXT;
 BEGIN
     -- 1. Read strict account behavior dynamically
-    SELECT normal_balance INTO v_normal_balance
-    FROM "ChartOfAccount"
-    WHERE id = p_account_id;
+    SELECT c.normal_balance INTO v_normal_balance
+    FROM "ChartOfAccount" c
+    WHERE c.id = p_account_id;
 
     RETURN QUERY
     WITH historical_agg AS (
