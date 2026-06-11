@@ -1,3 +1,4 @@
+import { useSearchParams } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { sajilo } from '@/api/sajiloClient';
 import { Plus, Eye, XCircle, Pencil, CheckCircle2, RotateCcw } from 'lucide-react';
@@ -29,6 +30,8 @@ const emptyPI = {
 };
 
 export default function PurchaseInvoices() {
+  
+
   const [invoices, setInvoices] = useState([]);
   const [vendors, setVendors] = useState([]);
   const [approvedPOs, setApprovedPOs] = useState([]);
@@ -66,6 +69,15 @@ export default function PurchaseInvoices() {
   useEffect(() => {
     loadData();
   }, []);
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    if (searchParams.get('new') === '1') {
+      openNew();
+      searchParams.delete('new');
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
+
 
   useSajiloSync(['BusinessPartner', 'PurchaseOrder'], loadData);
 

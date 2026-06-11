@@ -1,3 +1,4 @@
+import { useSearchParams } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { sajilo } from '@/api/sajiloClient';
 import { Plus, Edit2, ToggleLeft, ToggleRight, Building2, User, Trash2, Camera, Loader2 } from 'lucide-react';
@@ -31,6 +32,8 @@ const formatBytes = (bytes) => {
 };
 
 export default function Customers() {
+  
+
   const [partners, setPartners]     = useState([]);
   const [loading, setLoading]       = useState(true);
   const [showForm, setShowForm]     = useState(false);
@@ -85,6 +88,15 @@ export default function Customers() {
       if (data && data.file_size_limit) setMaxFileSize(data.file_size_limit);
     }).catch(() => {});
   }, []);
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    if (searchParams.get('new') === '1') {
+      openNew();
+      searchParams.delete('new');
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
+
 
   const fetchPartners = async () => {
     const data = await sajilo.entities.BusinessPartner.filter({ is_customer: true }, '-created_date');

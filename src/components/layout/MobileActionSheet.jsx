@@ -6,14 +6,14 @@ import {
 } from 'lucide-react';
 
 const actions = [
-  { icon: FileText, label: 'Sales Invoice', path: '/sales/invoices/new', color: 'bg-blue-500/10 text-blue-500' },
-  { icon: Receipt, label: 'Purchase Bill', path: '/purchase/invoices/new', color: 'bg-green-500/10 text-green-500' },
-  { icon: Wallet, label: 'Receipt', path: '/treasury/vouchers/new?type=receipt', color: 'bg-emerald-500/10 text-emerald-500' },
-  { icon: Banknote, label: 'Payment', path: '/treasury/vouchers/new?type=payment', color: 'bg-rose-500/10 text-rose-500' },
-  { icon: BookOpen, label: 'Journal Voucher', path: '/accounting/general-ledger/new', color: 'bg-purple-500/10 text-purple-500' },
-  { icon: UserCheck, label: 'Customer', path: '/partners/customers/new', color: 'bg-indigo-500/10 text-indigo-500' },
-  { icon: Truck, label: 'Supplier', path: '/partners/suppliers/new', color: 'bg-orange-500/10 text-orange-500' },
-  { icon: Boxes, label: 'Item', path: '/inventory/items/new', color: 'bg-cyan-500/10 text-cyan-500' },
+  { icon: FileText, label: 'Sales Invoice', path: '/sales/invoices?new=1', color: 'bg-blue-500/10 text-blue-500' },
+  { icon: Receipt, label: 'Purchase Bill', path: '/purchase/invoices?new=1', color: 'bg-green-500/10 text-green-500' },
+  { icon: Wallet, label: 'Receipt', path: '/treasury/vouchers?new=1&type=Receipt', color: 'bg-emerald-500/10 text-emerald-500' },
+  { icon: Banknote, label: 'Payment', path: '/treasury/vouchers?new=1&type=Payment', color: 'bg-rose-500/10 text-rose-500' },
+  { icon: BookOpen, label: 'Journal Voucher', path: '/treasury/vouchers?new=1&type=Journal', color: 'bg-purple-500/10 text-purple-500' },
+  { icon: UserCheck, label: 'Customer', path: '/partners/customers?new=1', color: 'bg-indigo-500/10 text-indigo-500' },
+  { icon: Truck, label: 'Supplier', path: '/partners/suppliers?new=1', color: 'bg-orange-500/10 text-orange-500' },
+  { icon: Boxes, label: 'Item', path: '/inventory/items?new=1', color: 'bg-cyan-500/10 text-cyan-500' },
 ];
 
 export default function MobileActionSheet({ isOpen, onClose }) {

@@ -14,11 +14,11 @@ export default function QuickCreateModal({ isOpen, onClose }) {
   };
 
   const quickActions = [
-    { label: 'New Sales Invoice', path: '/sales/invoices/new', icon: Receipt },
+    { label: 'New Sales Invoice', path: '/sales/invoices?new=1', icon: Receipt },
     { label: 'New Cash/Bank Voucher', path: '/treasury/vouchers/new', icon: Banknote },
-    { label: 'New Journal Entry', path: '/accounting/general-ledger/new', icon: FileText },
-    { label: 'New Customer', path: '/partners/customers/new', icon: UserCheck },
-    { label: 'New Supplier', path: '/partners/suppliers/new', icon: UserCheck },
+    { label: 'New Journal Entry', path: '/treasury/vouchers?new=1&type=Journal', icon: FileText },
+    { label: 'New Customer', path: '/partners/customers?new=1', icon: UserCheck },
+    { label: 'New Supplier', path: '/partners/suppliers?new=1', icon: UserCheck },
     { label: 'New Stock Adjustment', path: '/inventory/adjustments/new', icon: SlidersHorizontal },
   ];
 

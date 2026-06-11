@@ -1,3 +1,4 @@
+import { useSearchParams } from 'react-router-dom';
 import { useState, useEffect, useMemo } from 'react';
 import { sajilo } from '@/api/sajiloClient';
 import { loadActiveTaxTypes } from '@/lib/taxService';
@@ -167,6 +168,8 @@ function BulkActionBar({ selectedIds, onClear, accounts, categories, onBulkUpdat
 
 // ── Main Component ─────────────────────────────────────────────────
 export default function Items() {
+  
+
   const [items, setItems] = useState([]);
   const [categories, setCategories] = useState([]);
   const [uoms, setUoms] = useState([]);
@@ -206,6 +209,15 @@ export default function Items() {
       setLoading(false);
     });
   }, []);
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    if (searchParams.get('new') === '1') {
+      openNew();
+      searchParams.delete('new');
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
+
 
   const fetchItems = async () => {
     const data = await sajilo.entities.Item.list('-created_date');

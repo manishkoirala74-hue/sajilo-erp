@@ -1,3 +1,4 @@
+import { useSearchParams } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { sajilo } from '@/api/sajiloClient';
 import { toast } from 'sonner';
@@ -21,6 +22,8 @@ const emptyVoucher = {
 const fmt = (n) => `NPR ${Number(n || 0).toLocaleString()}`;
 
 export default function FinancialVouchers() {
+  
+
   const [vouchers, setVouchers] = useState([]);
   const [allAccounts, setAllAccounts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -37,6 +40,15 @@ export default function FinancialVouchers() {
   const [actionProcessing, setActionProcessing] = useState(false);
 
   useEffect(() => { fetchData(); }, []);
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    if (searchParams.get('new') === '1') {
+      (() => { setForm({ ...emptyVoucher, voucher_type: searchParams.get("type") || "Receipt" }); setOpen(true); })();
+      searchParams.delete('new');
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
+
   useSajiloSync(['ChartOfAccount'], fetchData);
 
   async function fetchData() {
