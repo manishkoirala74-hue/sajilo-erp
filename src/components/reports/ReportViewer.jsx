@@ -1565,27 +1565,7 @@ export default function ReportViewer({ reportId, data, fromDate, toDate, columnS
             />
           )} />;
 
-      case 'ar_aging_summary':
-        return <SimpleReport title="Customer Ageing Summary" reportId={reportId} initialData={data} initialFromDate={fromDate} initialToDate={toDate}
-          renderFn={(rows, fd, td) => (
-            <ReportTable title="Customer Ageing Summary" fromDate={fd} toDate={td}
-              headers={['Customer', 'Current', '1-30 Days', '31-60 Days', '60+ Days', 'Total (NPR)']}
-              rows={rows.map(r => [r.customer, fmtNPR(r.current), fmtNPR(r['30d']), fmtNPR(r['60d']), fmtNPR(r['60d+']), fmtNPR(r.total)])}
-              footer={['TOTAL', fmtNPR(rows.reduce((s,r)=>s+r.current,0)), fmtNPR(rows.reduce((s,r)=>s+r['30d'],0)), fmtNPR(rows.reduce((s,r)=>s+r['60d'],0)), fmtNPR(rows.reduce((s,r)=>s+r['60d+'],0)), fmtNPR(rows.reduce((s,r)=>s+r.total,0))]}
-              onExport={() => downloadCSV('ar_aging_summary.csv',['Customer', 'Current', '1-30 Days', '31-60 Days', '60+ Days', 'Total'],rows.map(r=>[r.customer, r.current?.toFixed(2), r['30d']?.toFixed(2), r['60d']?.toFixed(2), r['60d+']?.toFixed(2), r.total?.toFixed(2)]))}
-            />
-          )} />;
 
-      case 'ap_aging_summary':
-        return <SimpleReport title="Supplier Ageing Summary" reportId={reportId} initialData={data} initialFromDate={fromDate} initialToDate={toDate}
-          renderFn={(rows, fd, td) => (
-            <ReportTable title="Supplier Ageing Summary" fromDate={fd} toDate={td}
-              headers={['Supplier', 'Current', '1-30 Days', '31-60 Days', '60+ Days', 'Total (NPR)']}
-              rows={rows.map(r => [r.vendor, fmtNPR(r.current), fmtNPR(r['30d']), fmtNPR(r['60d']), fmtNPR(r['60d+']), fmtNPR(r.total)])}
-              footer={['TOTAL', fmtNPR(rows.reduce((s,r)=>s+r.current,0)), fmtNPR(rows.reduce((s,r)=>s+r['30d'],0)), fmtNPR(rows.reduce((s,r)=>s+r['60d'],0)), fmtNPR(rows.reduce((s,r)=>s+r['60d+'],0)), fmtNPR(rows.reduce((s,r)=>s+r.total,0))]}
-              onExport={() => downloadCSV('ap_aging_summary.csv',['Supplier', 'Current', '1-30 Days', '31-60 Days', '60+ Days', 'Total'],rows.map(r=>[r.vendor, r.current?.toFixed(2), r['30d']?.toFixed(2), r['60d']?.toFixed(2), r['60d+']?.toFixed(2), r.total?.toFixed(2)]))}
-            />
-          )} />;
 
       // Simple table reports — each gets its own filter bar via SimpleReport
       case 'sales_summary':

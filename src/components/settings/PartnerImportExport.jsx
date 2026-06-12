@@ -317,9 +317,6 @@ export default function PartnerImportExport() {
               lGen += (ledgerUpdates.receivable_account_id && !ledgerUpdates.payable_account_id) || (ledgerUpdates.payable_account_id && !ledgerUpdates.receivable_account_id) ? 1 : (ledgerUpdates.receivable_account_id === ledgerUpdates.payable_account_id ? 1 : 2);
             }
           }
-
-          }
-
           if (obAmount > 0) {
             const offsetAccount = accounts.find(a => a.id === offsetAccountId);
             const posted = await postOpeningBalanceJournal({ partner, isCustomer, journalDate, obAmount, balType, offsetAccount });
