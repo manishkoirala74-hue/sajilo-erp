@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { sajilo } from '@/api/sajiloClient';
-import { createPartnerLedger } from '@/lib/partnerLedgerService';
+import { provisionPartnerLedgers } from '@/lib/partnerLedgerService';
 import { Upload, Download, CheckCircle2, XCircle, AlertTriangle, X, RefreshCw, Users, Truck, AlertCircle as AlertCircleIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
@@ -310,40 +310,14 @@ export default function PartnerImportExport() {
           let ledgerUpdates = {};
 
           if (groupId) {
-            if (isCustomer || crossOver) {
-              const arLedger = await createPartnerLedger({
-                partnerName,
-                parentGroupId: isCustomer ? settings.gl_customer_ledger_group_id : settings.gl_supplier_ledger_group_id,
-                accountType: 'Asset',
-                normalBalance: 'Debit',
-                accountSubtype: 'Current Asset',
-              });
-              ledgerUpdates.receivable_account_id = arLedger.id;
-              ledgerUpdates.receivable_account_name = arLedger.account_name;
-              ledgerUpdates.receivable_account_code = arLedger.account_code;
-              lGen++;
-            }
-            if (!isCustomer || crossOver) {
-              const apGroupId = crossOver && isCustomer ? settings.gl_supplier_ledger_group_id : groupId;
-              if (apGroupId) {
-                const apLedger = await createPartnerLedger({
-                  partnerName,
-                  parentGroupId: apGroupId,
-                  accountType: 'Liability',
-                  normalBalance: 'Credit',
-                  accountSubtype: 'Current Liability',
-                });
-                ledgerUpdates.payable_account_id = apLedger.id;
-                ledgerUpdates.payable_account_name = apLedger.account_name;
-                ledgerUpdates.payable_account_code = apLedger.account_code;
-                lGen++;
-              }
-            }
-
+            const ledgerUpdates = await provisionPartnerLedgers(basePayload, settings);
             if (Object.keys(ledgerUpdates).length > 0) {
               await sajilo.entities.BusinessPartner.update(partner.id, ledgerUpdates);
               Object.assign(partner, ledgerUpdates);
+              lGen += (ledgerUpdates.receivable_account_id && !ledgerUpdates.payable_account_id) || (ledgerUpdates.payable_account_id && !ledgerUpdates.receivable_account_id) ? 1 : (ledgerUpdates.receivable_account_id === ledgerUpdates.payable_account_id ? 1 : 2);
             }
+          }
+
           }
 
           if (obAmount > 0) {

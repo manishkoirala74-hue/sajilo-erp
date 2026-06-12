@@ -62,6 +62,14 @@ export default function Suppliers() {
             enriched.push({ ...p, payable_account_id: ledger.id, payable_account_code: ledger.account_code, payable_account_name: ledger.account_name });
           } catch { enriched.push(p); }
         } else { enriched.push(p); }
+      } else if (p.receivable_account_id) {
+        // Re-use AR ledger for AP if it exists
+        await sajilo.entities.BusinessPartner.update(p.id, {
+          payable_account_id: p.receivable_account_id,
+          payable_account_name: p.receivable_account_name,
+          payable_account_code: p.receivable_account_code
+        });
+        enriched.push({ ...p, payable_account_id: p.receivable_account_id, payable_account_code: p.receivable_account_code, payable_account_name: p.receivable_account_name });
       } else if (settingsData?.gl_supplier_ledger_group_id) {
         try {
           const ledger = await createPartnerLedger({ partnerName: p.name, parentGroupId: settingsData.gl_supplier_ledger_group_id, accountType: 'Liability', normalBalance: 'Credit', accountSubtype: 'Current Liability' });
@@ -121,6 +129,8 @@ export default function Suppliers() {
         await sajilo.entities.BusinessPartner.create(saveData);
         toast.success('Supplier created — sub-ledger auto-generated');
       } else {
+        const ledgerUpdates = await provisionPartnerLedgers(saveData, settings || {});
+        saveData = { ...saveData, ...ledgerUpdates };
         await sajilo.entities.BusinessPartner.update(editing.id, saveData);
         toast.success('Supplier updated');
       }

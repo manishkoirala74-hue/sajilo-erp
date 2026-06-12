@@ -62,6 +62,14 @@ export default function Customers() {
             enriched.push({ ...p, receivable_account_id: ledger.id, receivable_account_code: ledger.account_code, receivable_account_name: ledger.account_name });
           } catch { enriched.push(p); }
         } else { enriched.push(p); }
+      } else if (p.payable_account_id) {
+        // Re-use AP ledger for AR if it exists
+        await sajilo.entities.BusinessPartner.update(p.id, {
+          receivable_account_id: p.payable_account_id,
+          receivable_account_name: p.payable_account_name,
+          receivable_account_code: p.payable_account_code
+        });
+        enriched.push({ ...p, receivable_account_id: p.payable_account_id, receivable_account_code: p.payable_account_code, receivable_account_name: p.payable_account_name });
       } else if (settingsData?.gl_customer_ledger_group_id) {
         try {
           const ledger = await createPartnerLedger({ partnerName: p.name, parentGroupId: settingsData.gl_customer_ledger_group_id, accountType: 'Asset', normalBalance: 'Debit', accountSubtype: 'Current Asset' });
@@ -121,6 +129,8 @@ export default function Customers() {
         await sajilo.entities.BusinessPartner.create(saveData);
         toast.success('Customer created — sub-ledger auto-generated');
       } else {
+        const ledgerUpdates = await provisionPartnerLedgers(saveData, settings || {});
+        saveData = { ...saveData, ...ledgerUpdates };
         await sajilo.entities.BusinessPartner.update(editing.id, saveData);
         toast.success('Customer updated');
       }
