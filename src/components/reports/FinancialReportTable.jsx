@@ -140,24 +140,7 @@ function GroupRow({ node, columns, depth, expandedGroups, onToggle, showZeroBala
   // Totals computed from this subtree's leaves
   const totals = computeSubtreeTotals(node);
 
-  // For partner control accounts (AR/AP), inject partner rows
-  const isControlAccount = node._isControlAccount;
-  const loadedPartners = partnerRows?.[node.id];
-  const partnerTotalsOverride = (loadedPartners && loadedPartners.length > 0)
-    ? loadedPartners.reduce(
-        (acc, p) => ({
-          opening_debit:  acc.opening_debit  + (p.opening_debit  || 0),
-          opening_credit: acc.opening_credit + (p.opening_credit || 0),
-          current_debit:  acc.current_debit  + (p.current_debit  || 0),
-          current_credit: acc.current_credit + (p.current_credit || 0),
-          closing_debit:  acc.closing_debit  + (p.closing_debit  || 0),
-          closing_credit: acc.closing_credit + (p.closing_credit || 0),
-        }),
-        { opening_debit: 0, opening_credit: 0, current_debit: 0, current_credit: 0, closing_debit: 0, closing_credit: 0 }
-      )
-    : null;
-
-  const displayTotals = partnerTotalsOverride || totals;
+  const displayTotals = totals;
 
   // Determine depth-based styling
   const bgClass = depth === 0
@@ -256,22 +239,6 @@ function GroupRow({ node, columns, depth, expandedGroups, onToggle, showZeroBala
                   depth={depth + 1}
                 />
               ))
-          )}
-          {/* Partner rows for AR/AP control accounts */}
-          {loadedPartners && loadedPartners.map((p, i) => (
-            <LedgerRow
-              key={`partner-${i}`}
-              account={{ ...p, _isPartner: true }}
-              columns={columns}
-              depth={depth + 1}
-            />
-          ))}
-          {loadedPartners === null && (
-            <tr>
-              <td colSpan={columns.length} className="py-2 pl-16 text-xs text-muted-foreground italic">
-                Loading partners…
-              </td>
-            </tr>
           )}
         </>
       )}

@@ -216,66 +216,33 @@ function TrialBalanceReport({ initialData, initialFromDate, initialToDate, initi
         if (!date) return;
         
         if (!accountTotals[l.account_id]) {
-          accountTotals[l.account_id] = { cur_dr: 0, cur_cr: 0, future_dr: 0, future_cr: 0 };
+          accountTotals[l.account_id] = { cur_dr: 0, cur_cr: 0, ob_dr: 0, ob_cr: 0 };
         }
         
-        if (date > filters.toDate) {
-          accountTotals[l.account_id].future_dr += (l.debit_amount || 0);
-          accountTotals[l.account_id].future_cr += (l.credit_amount || 0);
+        if (date < filters.fromDate) {
+          accountTotals[l.account_id].ob_dr += (l.debit_amount || 0);
+          accountTotals[l.account_id].ob_cr += (l.credit_amount || 0);
         } else if (date >= filters.fromDate && date <= filters.toDate) {
           accountTotals[l.account_id].cur_dr += (l.debit_amount || 0);
           accountTotals[l.account_id].cur_cr += (l.credit_amount || 0);
         }
       });
 
-      // Collect IDs of accounts that partners reference as their AR/AP control account
-      // so we can promote them to Group Ledger in the hierarchy
-      // Collect the PARENT group account IDs (e.g. "Sundry Debtors" group)
-      // by finding group-ledger accounts whose children are partner sub-ledgers.
-      // Strategy: fetch partners, collect their receivable/payable account IDs (those are the
-      // individual sub-ledger accounts), then find THEIR parent_account_id — that parent is
-      // the true control group (e.g. "Sundry Debtors").
-      const [arPartners, apPartners] = await Promise.all([
-        sajilo.entities.BusinessPartner.filter({ is_customer: true }),
-        sajilo.entities.BusinessPartner.filter({ is_vendor: true }),
-      ]);
-
-      // IDs of the individual partner sub-ledger accounts (10200001, 10200002 etc.)
-      const partnerSubLedgerIds = new Set([
-        ...arPartners.map(p => p.receivable_account_id).filter(Boolean),
-        ...apPartners.map(p => p.payable_account_id).filter(Boolean),
-      ]);
-
-      // Find their parent group account IDs — these are the true control groups
-      const controlGroupIds = new Set();
-      all.forEach(a => {
-        if (partnerSubLedgerIds.has(a.id) && a.parent_account_id) {
-          controlGroupIds.add(a.parent_account_id);
-        }
-      });
-      // Also detect by AR/AP name keywords on Group Ledger accounts
-      all.forEach(a => {
-        if (a.ledger_type === 'Group Ledger' && (isARGroup(a) || isAPGroup(a))) {
-          controlGroupIds.add(a.id);
-        }
-      });
-
       setAccounts(all.map(a => {
-        const isControlAccount = a.ledger_type === 'Group Ledger' && controlGroupIds.has(a.id);
-        
-        const t = accountTotals[a.id] || { cur_dr: 0, cur_cr: 0, future_dr: 0, future_cr: 0 };
+        const t = accountTotals[a.id] || { cur_dr: 0, cur_cr: 0, ob_dr: 0, ob_cr: 0 };
         const isDebitNormal = ['Asset','COGS','Expense','OPEX','Cost of Goods Sold','Other Expense'].includes(a.account_type);
         
-        // Use current_balance as the absolute source of truth and work backward
-        let current_balance = Number(a.current_balance || 0);
-        let cb_net_dr = isDebitNormal ? current_balance : -current_balance;
+        // Start from opening_balance
+        const base_ob = Number(a.opening_balance || 0);
+        const isBaseObDr = (a.opening_balance_type || (isDebitNormal ? 'Dr' : 'Cr')) === 'Dr';
         
-        // Subtract future journals to find closing balance at toDate
-        cb_net_dr = cb_net_dr - ((t.future_dr || 0) - (t.future_cr || 0));
+        let base_ob_dr = 0, base_ob_cr = 0;
+        if (isBaseObDr) base_ob_dr = base_ob; else base_ob_cr = base_ob;
+
+        let total_ob_dr = base_ob_dr + (t.ob_dr || 0);
+        let total_ob_cr = base_ob_cr + (t.ob_cr || 0);
         
-        // Subtract current journals to find opening balance at fromDate
-        let ob_net_dr = cb_net_dr - ((t.cur_dr || 0) - (t.cur_cr || 0));
-        
+        let ob_net_dr = total_ob_dr - total_ob_cr;
         let net_ob_dr = 0, net_ob_cr = 0;
         if (ob_net_dr >= 0) {
           net_ob_dr = ob_net_dr;
@@ -286,6 +253,7 @@ function TrialBalanceReport({ initialData, initialFromDate, initialToDate, initi
         const cur_dr = t.cur_dr || 0;
         const cur_cr = t.cur_cr || 0;
         
+        let cb_net_dr = ob_net_dr + cur_dr - cur_cr;
         let net_cb_dr = 0, net_cb_cr = 0;
         if (cb_net_dr >= 0) {
           net_cb_dr = cb_net_dr;
@@ -295,7 +263,7 @@ function TrialBalanceReport({ initialData, initialFromDate, initialToDate, initi
 
         return {
           ...a,
-          _isControlAccount:  isControlAccount,
+          _isControlAccount:  false, // Disable partner drill-down since partners have native sub-ledgers
           opening_debit:  net_ob_dr,
           opening_credit: net_ob_cr,
           current_debit:  cur_dr,
@@ -310,150 +278,7 @@ function TrialBalanceReport({ initialData, initialFromDate, initialToDate, initi
     setLoading(false);
   }, []);
 
-  /**
-   * Lazy-load partner sub-ledger rows when an AR/AP group is first expanded.
-   *
-   * Resolution strategy (in priority order):
-   *   1. Partners explicitly linked via receivable_account_id / payable_account_id = group.id
-   *   2. Fallback: all customers (AR) or all vendors (AP) when the group name matches AR/AP keywords
-   *
-   * Balance sources (summed):
-   *   a. partner.opening_balance
-   *   b. GL lines posted against the partner's name within the selected date range (via GeneralLedgerLine)
-   */
-  const loadPartners = useCallback(async (group) => {
-    if (partnerRows[group.id] !== undefined) return; // already loaded
-    setPartnerRows(prev => ({ ...prev, [group.id]: null })); // mark loading
-
-    try {
-      const isAR = isARGroup(group);
-      const isAP = isAPGroup(group);
-
-      // Only expand partner rows for AR or AP control accounts
-      if (!isAR && !isAP) {
-        setPartnerRows(prev => ({ ...prev, [group.id]: [] }));
-        return;
-      }
-
-      // Fetch all partners of the relevant type.
-      // Then filter to those whose sub-ledger parent is this control group.
-      // E.g. partner.receivable_account_id points to "Bhajan Rai" sub-ledger whose
-      // parent_account_id === group.id ("Sundry Debtors").
-      const allByType = await sajilo.entities.BusinessPartner.filter(
-        isAR ? { is_customer: true } : { is_vendor: true }
-      );
-
-      // Fetch sub-ledger accounts that are children of this group
-      const childSubLedgers = await sajilo.entities.ChartOfAccount.filter(
-        { parent_account_id: group.id }, 'account_code', 500
-      );
-      const childSubLedgerIds = new Set(childSubLedgers.map(a => a.id));
-
-      // Partners whose AR/AP sub-ledger is a child of this group
-      const linkedPartners = allByType.filter(p => {
-        const subLedgerId = isAR ? p.receivable_account_id : p.payable_account_id;
-        return subLedgerId && childSubLedgerIds.has(subLedgerId);
-      });
-
-      // Fall back to all partners of the type if none are FK-linked to this group's children
-      const partners = linkedPartners.length > 0 ? linkedPartners : allByType;
-
-      // Fetch GL lines for this control account to build per-partner transaction totals
-      const [glLines, journals] = await Promise.all([
-        sajilo.entities.GeneralLedgerLine.filter({ account_id: group.id }, '', 5000),
-        sajilo.entities.GeneralLedgerJournal.filter({ status: 'Posted' }, 'entry_date', 10000)
-      ]);
-      
-      const journalMap = {};
-      journals.forEach(j => { 
-        journalMap[j.id] = j.entry_date ? j.entry_date.split('T')[0] : ''; 
-      });
-
-      // Build per-partner GL debit/credit totals by matching description to partner name
-      const glByPartner = {};
-      for (const line of glLines) {
-        const date = journalMap[line.journal_id];
-        if (!date) continue; // skip unposted or non-matching journals
-
-        const desc = (line.description || '').toLowerCase();
-        const match = partners.find(p => desc.includes(p.name.toLowerCase()));
-        if (!match) continue;
-        
-        if (!glByPartner[match.id]) glByPartner[match.id] = { ob_dr: 0, ob_cr: 0, cur_dr: 0, cur_cr: 0 };
-        
-        if (date < filters.fromDate) {
-          glByPartner[match.id].ob_dr += (line.debit_amount || 0);
-          glByPartner[match.id].ob_cr += (line.credit_amount || 0);
-        } else if (date >= filters.fromDate && date <= filters.toDate) {
-          glByPartner[match.id].cur_dr += (line.debit_amount || 0);
-          glByPartner[match.id].cur_cr += (line.credit_amount || 0);
-        }
-      }
-
-      // Build partner rows — include anyone with opening balance OR GL activity
-      const rows = partners
-        .map(p => {
-          const t = glByPartner[p.id] || { ob_dr: 0, ob_cr: 0, cur_dr: 0, cur_cr: 0 };
-          const ob     = Math.abs(p.opening_balance || 0);
-          const isObDr = (p.opening_balance_type || 'Dr') === 'Dr';
-
-          let base_ob_dr = 0, base_ob_cr = 0;
-          if (isObDr) {
-            base_ob_dr = ob;
-          } else {
-            base_ob_cr = ob;
-          }
-          
-          let total_ob_dr = base_ob_dr + t.ob_dr;
-          let total_ob_cr = base_ob_cr + t.ob_cr;
-
-          let net_ob_dr = 0, net_ob_cr = 0;
-          const net_ob = total_ob_dr - total_ob_cr;
-          if (isAR) {
-            if (net_ob >= 0) net_ob_dr = net_ob; else net_ob_cr = -net_ob;
-          } else {
-            if (net_ob <= 0) net_ob_cr = -net_ob; else net_ob_dr = net_ob;
-          }
-
-          const cur_dr = t.cur_dr;
-          const cur_cr = t.cur_cr;
-
-          const total_dr = net_ob_dr + cur_dr;
-          const total_cr = net_ob_cr + cur_cr;
-          
-          let net_cb_dr = 0, net_cb_cr = 0;
-          const net_cb = total_dr - total_cr;
-          if (isAR) {
-            if (net_cb >= 0) net_cb_dr = net_cb; else net_cb_cr = -net_cb;
-          } else {
-            if (net_cb <= 0) net_cb_cr = -net_cb; else net_cb_dr = net_cb;
-          }
-
-          // Skip partners with zero activity
-          if (net_ob_dr === 0 && net_ob_cr === 0 && cur_dr === 0 && cur_cr === 0 && net_cb_dr === 0 && net_cb_cr === 0) return null;
-
-          return {
-            id:              `partner-${p.id}`,
-            account_code:    p.partner_code || '',
-            account_name:    p.name,
-            account_type:    isAR ? 'Asset' : 'Liability',
-            opening_debit:   net_ob_dr,
-            opening_credit:  net_ob_cr,
-            current_debit:   cur_dr,
-            current_credit:  cur_cr,
-            closing_debit:   net_cb_dr,
-            closing_credit:  net_cb_cr,
-            _isPartner:      true,
-          };
-        })
-        .filter(Boolean);
-
-      setPartnerRows(prev => ({ ...prev, [group.id]: rows }));
-    } catch (err) {
-      console.error('[Partner drill-down error]', err);
-      setPartnerRows(prev => ({ ...prev, [group.id]: [] }));
-    }
-  }, [partnerRows, filters.fromDate, filters.toDate]);
+  // Partner drill-down disabled: partners are natively in the GL as Sub Ledgers.
 
   // Do NOT auto-load — wait for user to click Apply
   // useEffect(() => { load(); }, []);
@@ -482,8 +307,8 @@ function TrialBalanceReport({ initialData, initialFromDate, initialToDate, initi
             reportTitle="Trial Balance"
             fromDate={filters.fromDate}
             toDate={filters.toDate}
-            partnerRows={partnerRows}
-            onGroupExpand={loadPartners}
+            partnerRows={{}}
+            onGroupExpand={() => {}}
           />
         </>
       )}
