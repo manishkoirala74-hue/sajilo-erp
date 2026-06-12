@@ -162,7 +162,7 @@ export async function postPurchaseInvoice(invoice, itemsMap, settings, isReversa
   const lines = [];
 
   for (const line of (invoice.line_items || [])) {
-    lines.push({ account_category: 'inventory', item_id: line.item_id, debit_amount: line.line_total, credit_amount: 0, description: `Purchase: ${line.item_name}` });
+    lines.push({ account_category: 'inventory', item_id: line.item_id, debit_amount: line.line_total, credit_amount: 0, description: `Purchase: ${line.item_name}`, quantity: line.quantity, is_physical: true });
   }
 
   if (invoice.vat_amount > 0) {
@@ -273,7 +273,7 @@ export async function postPurchaseReturn(ret, itemsMap, settings) {
   lines.push({ account_id: apId, debit_amount: ret.grand_total, credit_amount: 0, entity_type: 'Vendor', entity_id: ret.vendor_id, due_date: ret.return_date });
 
   for (const line of (ret.line_items || [])) {
-    lines.push({ account_category: 'inventory', item_id: line.item_id, debit_amount: 0, credit_amount: line.line_total, description: `Return: ${line.item_name}` });
+    lines.push({ account_category: 'inventory', item_id: line.item_id, debit_amount: 0, credit_amount: line.line_total, description: `Return: ${line.item_name}`, quantity: line.quantity, is_physical: true });
   }
 
   if (ret.vat_amount > 0) {
