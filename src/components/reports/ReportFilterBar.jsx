@@ -6,6 +6,7 @@ import { useState, useEffect } from 'react';
 import { Filter, ChevronDown, ChevronUp, Eye, RefreshCw } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { adToBS, bsToAD, BS_MONTHS, isValidBSDate } from '@/lib/nepaliDate';
 
@@ -65,21 +66,30 @@ export function BSDatePicker({ label, adValue, onChange }) {
           placeholder="DD"
         />
         {/* Month */}
-        <select
-          value={month}
-          onChange={e => { const m = Number(e.target.value); setMonth(m); commit(year, m, day); }}
-          className="h-8 rounded-md border border-input bg-card px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+        {/* Month */}
+        <Select
+          value={String(month)}
+          onValueChange={v => { const m = Number(v); setMonth(m); commit(year, m, day); }}
         >
-          {BS_MONTHS.map((name, i) => <option key={i + 1} value={i + 1}>{name}</option>)}
-        </select>
+          <SelectTrigger className="h-8 w-28 bg-card px-2 text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {BS_MONTHS.map((name, i) => <SelectItem key={i + 1} value={String(i + 1)}>{name}</SelectItem>)}
+          </SelectContent>
+        </Select>
         {/* Year */}
-        <select
-          value={year}
-          onChange={e => { const y = Number(e.target.value); setYear(y); commit(y, month, day); }}
-          className="h-8 rounded-md border border-input bg-card px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+        <Select
+          value={String(year)}
+          onValueChange={v => { const y = Number(v); setYear(y); commit(y, month, day); }}
         >
-          {BS_YEARS.map(y => <option key={y} value={y}>{y}</option>)}
-        </select>
+          <SelectTrigger className="h-8 w-20 bg-card px-2 text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {BS_YEARS.map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
+          </SelectContent>
+        </Select>
       </div>
       {error
         ? <span className="text-xs text-destructive">{error}</span>

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { sajilo } from '@/api/sajiloClient';
 import { useSajiloSync } from '@/hooks/useSajiloSync';
 import { computeItemTaxes } from '@/lib/taxService';
@@ -124,14 +125,17 @@ export default function LineItemsEditor({ value = [], onChange, taxTypes = [] })
               return (
                 <tr key={idx}>
                   <td className="px-3 py-2">
-                    <select
+                    <Select
                       value={line.item_id}
-                      onChange={e => updateLine(idx, 'item_id', e.target.value)}
-                      className="w-full bg-card border border-input rounded-md px-2 py-1.5 text-sm outline-none focus:ring-1 focus:ring-ring"
+                      onValueChange={v => updateLine(idx, 'item_id', v)}
                     >
-                      <option value="">Select item...</option>
-                      {items.map(i => <option key={i.id} value={i.id}>{i.item_name} ({i.item_code || i.unit_of_measure})</option>)}
-                    </select>
+                      <SelectTrigger className="w-full h-8 text-xs bg-card">
+                        <SelectValue placeholder="Select item..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {items.map(i => <SelectItem key={i.id} value={i.id}>{i.item_name} ({i.item_code || i.unit_of_measure})</SelectItem>)}
+                      </SelectContent>
+                    </Select>
                     {!line.item_id && line.item_name && (
                       <Input
                         value={line.item_name}

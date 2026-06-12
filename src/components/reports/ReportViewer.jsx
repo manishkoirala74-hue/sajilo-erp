@@ -5,6 +5,7 @@
  */
 import { X, Printer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import BusinessHeader from '@/components/reports/BusinessHeader';
 import PartnerStatement from '@/components/reports/PartnerStatement';
 import FinancialReportTable from '@/components/reports/FinancialReportTable';
@@ -1338,13 +1339,16 @@ function GeneralLedgerDetailReport({ initialFromDate, initialToDate }) {
   const accPicker = (
     <div className="flex flex-col gap-1 min-w-[200px]">
       <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Select Account</label>
-      <select
-        value={filters.accountId}
-        onChange={e => setFilters(p => ({ ...p, accountId: e.target.value }))}
-        className="h-8 rounded-md border border-input bg-card px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
-      >
-        {accounts.map(a => <option key={a.id} value={a.id}>{a.account_name} ({a.account_code})</option>)}
-      </select>
+      <Select value={filters.accountId} onValueChange={val => setFilters(p => ({ ...p, accountId: val }))}>
+        <SelectTrigger className="h-8 bg-card px-2 text-xs">
+          <SelectValue placeholder="Select Account..." />
+        </SelectTrigger>
+        <SelectContent>
+          {accounts.map(a => (
+            <SelectItem key={a.id} value={a.id}>{a.account_name} ({a.account_code})</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
     </div>
   );
 
