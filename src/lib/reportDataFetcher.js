@@ -59,6 +59,67 @@ export async function fetchReportData(reportId, fromDate, toDate, extraParams = 
       if (error) throw error;
       return (data || []).map(a => ({
         ...a,
+import { sajilo, supabase } from '@/api/sajiloClient';
+
+async function injectPeriodicInventory(baseAccounts, companyId, fromDate, toDate) {
+  try {
+    const { data, error } = await supabase.rpc('get_periodic_inventory_balances_rpc', {
+      p_company_id: companyId,
+      p_from_date: fromDate,
+      p_to_date: toDate
+    });
+    
+    if (error) {
+      console.error('Virtual inventory calc failed:', error);
+      return baseAccounts;
+    }
+
+    if (data && data.length > 0) {
+      const { opening_stock, closing_stock, net_purchases } = data[0];
+      const accs = [...baseAccounts];
+      accs.push({ id: 'virt-ob', account_name: 'Opening Stock', account_code: '', account_type: 'Cost of Sales', current_balance: opening_stock, comparative_balance: 0, balance: opening_stock, is_group: false });
+      accs.push({ id: 'virt-pur', account_name: 'Purchases', account_code: '', account_type: 'Cost of Sales', current_balance: net_purchases, comparative_balance: 0, balance: net_purchases, is_group: false });
+      accs.push({ id: 'virt-cb', account_name: 'Closing Stock', account_code: '', account_type: 'Cost of Sales', current_balance: closing_stock, comparative_balance: 0, balance: closing_stock, is_group: false });
+      return accs;
+    }
+  } catch (e) {
+    console.error('Virtual inventory calc failed:', e);
+  }
+  return baseAccounts;
+}
+
+// Helper to check if a date string falls within range
+function inRange(dateStr, from, to) {
+  if (!dateStr) return false;
+  return dateStr >= from && dateStr <= to;
+}
+
+export async function fetchReportData(reportId, fromDate, toDate, extraParams = {}) {
+  switch (reportId) {
+
+    case 'ledger_detail': {
+      if (!extraParams.accountId) return [];
+      const p_company_id = sajilo.getCompanyId();
+      const { data, error } = await supabase.rpc('get_stabilized_general_ledger_statement_rpc', {
+        p_company_id,
+        p_account_id: extraParams.accountId,
+        p_from_date: fromDate,
+        p_to_date: toDate
+      });
+      if (error) throw error;
+      return data || [];
+    }
+
+    case 'trial_balance': {
+      const p_company_id = sajilo.getCompanyId();
+      const { data, error } = await supabase.rpc('get_trial_balance_rpc', {
+        p_company_id,
+        p_from_date: fromDate,
+        p_to_date: toDate
+      });
+      if (error) throw error;
+      return (data || []).map(a => ({
+        ...a,
         _isControlAccount: false
       }));
     }
@@ -71,61 +132,96 @@ export async function fetchReportData(reportId, fromDate, toDate, extraParams = 
       const compFromDate = new Date(fd.setFullYear(fd.getFullYear() - 1)).toISOString().slice(0, 10);
       const compToDate = new Date(td.setFullYear(td.getFullYear() - 1)).toISOString().slice(0, 10);
 
-      try {
-        const { data, error } = await supabase.rpc('get_comparative_profit_loss_rpc', {
-          p_company_id,
-          p_from_date: fromDate,
-          p_to_date: toDate,
-          p_comp_from_date: compFromDate,
-          p_comp_to_date: compToDate
-        });
-        if (error) throw error;
-        let result = data || [];
-        result = await injectPeriodicInventory(result, p_company_id, fromDate, toDate);
-        return { accounts: result };
-      } catch (err) {
-        console.warn('Comparative RPC not found or failed, falling back to standard RPC.', err);
-        // Fallback to standard profit_loss if the comparative RPC hasn't been migrated
-        const { data, error } = await supabase.rpc('get_profit_loss_rpc', {
-          p_company_id,
-          p_from_date: fromDate,
-          p_to_date: toDate
-        });
-        if (error) throw error;
-        // Map the old data structure to the new comparative structure
-        const mappedData = (data || []).map(a => ({
+      const [all, journals, lines] = await Promise.all([
+        sajilo.entities.ChartOfAccount.filter({ is_active: true }, 'account_code', 2000),
+        sajilo.entities.GeneralLedgerJournal.filter({ status: 'Posted' }, 'entry_date', 10000),
+        sajilo.entities.GeneralLedgerLine.list('', 50000)
+      ]);
+      
+      const journalMap = {};
+      journals.forEach(j => { journalMap[j.id] = j.entry_date?.split('T')[0]; });
+
+      const accountTotals = {};
+      all.forEach(a => { accountTotals[a.id] = { cur_dr: 0, cur_cr: 0, comp_dr: 0, comp_cr: 0 }; });
+
+      lines.forEach(l => {
+        const date = journalMap[l.journal_id];
+        if (!date || !accountTotals[l.account_id]) return;
+        
+        if (date >= fromDate && date <= toDate) {
+          accountTotals[l.account_id].cur_dr += (l.debit_amount || 0);
+          accountTotals[l.account_id].cur_cr += (l.credit_amount || 0);
+        }
+        if (date >= compFromDate && date <= compToDate) {
+          accountTotals[l.account_id].comp_dr += (l.debit_amount || 0);
+          accountTotals[l.account_id].comp_cr += (l.credit_amount || 0);
+        }
+      });
+
+      const mappedData = all.filter(a => ['Revenue', 'Income', 'Expense', 'Expenses', 'Cost of Sales', 'COGS', 'Operating Expense', 'OPEX', 'Other Income', 'Other Expense'].includes(a.account_type)).map(a => {
+        const t = accountTotals[a.id];
+        const isDebitNormal = ['Expense', 'Expenses', 'Cost of Sales', 'COGS', 'Operating Expense', 'OPEX', 'Other Expense'].includes(a.account_type);
+        const cur_bal = isDebitNormal ? (t.cur_dr - t.cur_cr) : (t.cur_cr - t.cur_dr);
+        const comp_bal = isDebitNormal ? (t.comp_dr - t.comp_cr) : (t.comp_cr - t.comp_dr);
+        return {
           ...a,
-          current_balance: a.balance,
-          comparative_balance: 0
-        }));
-        let result = mappedData || [];
-        result = await injectPeriodicInventory(result, p_company_id, fromDate, toDate);
-        return { accounts: result };
-      }
+          current_balance: cur_bal,
+          comparative_balance: comp_bal,
+          balance: cur_bal
+        };
+      });
+
+      let result = mappedData || [];
+      result = await injectPeriodicInventory(result, p_company_id, fromDate, toDate);
+      return { accounts: result };
     }
 
     case 'balance_sheet': {
-      // Re-use trial balance RPC for balance sheet up to toDate
       const p_company_id = sajilo.getCompanyId();
-      const { data, error } = await supabase.rpc('get_trial_balance_rpc', {
-        p_company_id,
-        p_from_date: '1900-01-01', // Get everything up to toDate
-        p_to_date: toDate || new Date().toISOString().slice(0,10)
-      });
-      if (error) throw error;
+      const safeToDate = toDate || new Date().toISOString().slice(0,10);
       
-      const allAccounts = (data || []).map(a => {
-        const isDebitNormal = ['Asset','COGS','Expense','OPEX','Cost of Goods Sold','Other Expense'].includes(a.account_type);
-        const bal = isDebitNormal ? (a.closing_debit - a.closing_credit) : (a.closing_credit - a.closing_debit);
+      const [all, journals, lines] = await Promise.all([
+        sajilo.entities.ChartOfAccount.filter({ is_active: true }, 'account_code', 2000),
+        sajilo.entities.GeneralLedgerJournal.filter({ status: 'Posted' }, 'entry_date', 10000),
+        sajilo.entities.GeneralLedgerLine.list('', 50000)
+      ]);
+
+      const journalMap = {};
+      journals.forEach(j => { journalMap[j.id] = j.entry_date?.split('T')[0]; });
+
+      const accountTotals = {};
+      all.forEach(a => { accountTotals[a.id] = { dr: 0, cr: 0 }; });
+
+      lines.forEach(l => {
+        const date = journalMap[l.journal_id];
+        if (!date || !accountTotals[l.account_id]) return;
+        if (date <= safeToDate) {
+          accountTotals[l.account_id].dr += (l.debit_amount || 0);
+          accountTotals[l.account_id].cr += (l.credit_amount || 0);
+        }
+      });
+
+      const allAccounts = all.map(a => {
+        const t = accountTotals[a.id];
+        const isDebitNormal = ['Asset', 'Cost of Sales', 'COGS', 'Expense', 'Expenses', 'OPEX', 'Operating Expense', 'Other Expense'].includes(a.account_type);
+        
+        const base_ob = Number(a.opening_balance || 0);
+        const isBaseObDr = (a.opening_balance_type || (isDebitNormal ? 'Dr' : 'Cr')) === 'Dr';
+        
+        let ob_dr = 0, ob_cr = 0;
+        if (isBaseObDr) ob_dr = base_ob; else ob_cr = base_ob;
+
+        const total_dr = ob_dr + t.dr;
+        const total_cr = ob_cr + t.cr;
+
+        const bal = isDebitNormal ? (total_dr - total_cr) : (total_cr - total_dr);
+
         return { ...a, balance: bal };
       });
 
-      // Calculate Net Income (Revenue - Expenses)
-      const isIncomeStatement = a => ['Revenue', 'Other Income', 'Expense', 'COGS', 'OPEX', 'Cost of Goods Sold', 'Other Expense'].includes(a.account_type);
+      const isIncomeStatement = a => ['Revenue', 'Income', 'Other Income', 'Expense', 'Expenses', 'COGS', 'Cost of Sales', 'OPEX', 'Operating Expense', 'Other Expense'].includes(a.account_type);
       const netIncome = allAccounts.filter(isIncomeStatement).reduce((sum, a) => {
-        // Revenue increases Net Income, Expenses decrease Net Income
-        const isExpense = ['Expense', 'COGS', 'OPEX', 'Cost of Goods Sold', 'Other Expense'].includes(a.account_type);
-        // bal for expenses is positive, so subtract. bal for revenue is positive (credit normal), so add.
+        const isExpense = ['Expense', 'Expenses', 'COGS', 'Cost of Sales', 'OPEX', 'Operating Expense', 'Other Expense'].includes(a.account_type);
         return isExpense ? sum - a.balance : sum + a.balance;
       }, 0);
 
@@ -135,7 +231,6 @@ export async function fetchReportData(reportId, fromDate, toDate, extraParams = 
       const liabilities = allAccounts.filter(a => a.account_type === 'Liability').map(toRow);
       const equity      = allAccounts.filter(a => a.account_type === 'Equity').map(toRow);
 
-      // Inject Current Year Earnings into Equity
       equity.push({
         id: 'virtual-current-year-earnings',
         account_code: '—',
@@ -146,7 +241,6 @@ export async function fetchReportData(reportId, fromDate, toDate, extraParams = 
         balance: netIncome
       });
 
-      // Return flat array of all BS accounts so the UI can build the tree
       const bsAccounts = [...assets, ...liabilities, ...equity];
 
       return {
