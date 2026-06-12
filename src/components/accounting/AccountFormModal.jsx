@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { sajilo } from '@/api/sajiloClient';
 import { toast } from 'sonner';
 import { Lock, Search, ChevronRight } from 'lucide-react';
@@ -61,11 +62,14 @@ function DatePickerWithToggle({ value, onChange, label }) {
       ) : (
         <div className="flex gap-1">
           <Input placeholder="YYYY" value={bsY} onChange={e => { setBsY(e.target.value); handleBSChange(e.target.value, bsM, bsD); }} className="w-20 font-mono text-sm" maxLength={4} />
-          <select value={bsM} onChange={e => { setBsM(e.target.value); handleBSChange(bsY, e.target.value, bsD); }}
-            className="flex-1 h-9 rounded-md border border-input bg-background px-2 text-sm">
-            <option value="">Month</option>
-            {BS_MONTHS.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
-          </select>
+          <Select value={bsM || undefined} onValueChange={v => { setBsM(v); handleBSChange(bsY, v, bsD); }}>
+            <SelectTrigger className="flex-1 h-9 bg-background px-2 text-sm">
+              <SelectValue placeholder="Month" />
+            </SelectTrigger>
+            <SelectContent>
+              {BS_MONTHS.map((m, i) => <SelectItem key={i} value={String(i + 1)}>{m}</SelectItem>)}
+            </SelectContent>
+          </Select>
           <Input placeholder="DD" value={bsD} onChange={e => { setBsD(e.target.value); handleBSChange(bsY, bsM, e.target.value); }} className="w-14 font-mono text-sm" maxLength={2} />
         </div>
       )}
@@ -334,13 +338,17 @@ export default function AccountFormModal({ open, onClose, account, parentAccount
               </div>
               <div>
                 <Label>Account Type *</Label>
-                <select
-                  className="mt-1 w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
-                  value={form.account_type || ''}
-                  onChange={e => { set('account_type', e.target.value); set('normal_balance', suggestNormalBalance(e.target.value)); }}
+                <Select
+                  value={form.account_type || undefined}
+                  onValueChange={v => { set('account_type', v); set('normal_balance', suggestNormalBalance(v)); }}
                 >
-                  {ACCOUNT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-                </select>
+                  <SelectTrigger className="mt-1 w-full h-9 bg-background text-sm">
+                    <SelectValue placeholder="Select type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ACCOUNT_TYPES.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
@@ -381,14 +389,18 @@ export default function AccountFormModal({ open, onClose, account, parentAccount
                     onChange={e => set('opening_balance', e.target.value === '' ? 0 : parseFloat(e.target.value) || 0)}
                     placeholder="0.00"
                   />
-                  <select
+                  <Select
                     value={form.opening_balance_type || 'Dr'}
-                    onChange={e => set('opening_balance_type', e.target.value)}
-                    className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+                    onValueChange={v => set('opening_balance_type', v)}
                   >
-                    <option value="Dr">Dr (Debit)</option>
-                    <option value="Cr">Credit</option>
-                  </select>
+                    <SelectTrigger className="h-9 bg-background px-3 text-sm w-28">
+                      <SelectValue placeholder="Type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Dr">Dr (Debit)</SelectItem>
+                      <SelectItem value="Cr">Credit</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">Set an opening balance for this ledger account.</p>
               </div>

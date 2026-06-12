@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { sajilo } from '@/api/sajiloClient';
 import ReportFilterBar from '@/components/reports/ReportFilterBar';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { adToBS } from '@/lib/nepaliDate';
 
 const DEFAULT_FILTERS = {
@@ -188,13 +189,14 @@ export default function PartnerStatement({ title, mode, initialFromDate, initial
     <div className="space-y-3">
       <div className="flex flex-col gap-1 min-w-[200px]">
         <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Select {isAR ? 'Customer' : 'Supplier'}</label>
-        <select 
-          className="h-8 rounded-md border border-input bg-card px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
-          value={selectedPartnerId}
-          onChange={e => setSelectedPartnerId(e.target.value)}
-        >
-          {partners.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-        </select>
+        <Select value={selectedPartnerId || undefined} onValueChange={setSelectedPartnerId}>
+          <SelectTrigger className="h-8 bg-card px-2 text-xs">
+            <SelectValue placeholder={`Select ${isAR ? 'Customer' : 'Supplier'}`} />
+          </SelectTrigger>
+          <SelectContent>
+            {partners.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+          </SelectContent>
+        </Select>
       </div>
       <div className="pt-2 border-t border-border">
         <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">Print Options</p>
@@ -208,14 +210,15 @@ export default function PartnerStatement({ title, mode, initialFromDate, initial
         </div>
         <div className="mt-3 flex items-center gap-2">
           <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Date Format</label>
-          <select 
-            className="h-7 rounded-md border border-input bg-card px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
-            value={printConfig.dateFormat}
-            onChange={e => setPrintConfig(p => ({ ...p, dateFormat: e.target.value }))}
-          >
-            <option value="AD">AD</option>
-            <option value="BS">BS</option>
-          </select>
+          <Select value={printConfig.dateFormat || 'AD'} onValueChange={v => setPrintConfig(p => ({ ...p, dateFormat: v }))}>
+            <SelectTrigger className="h-7 bg-card px-2 text-xs w-20">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="AD">AD</SelectItem>
+              <SelectItem value="BS">BS</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </div>
     </div>
