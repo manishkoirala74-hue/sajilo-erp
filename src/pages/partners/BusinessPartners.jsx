@@ -44,14 +44,27 @@ export default function BusinessPartners() {
     if (!form.name) { toast.error('Name is required'); return; }
     setSaving(true);
     try {
-  if (editing) {
+      if (editing) {
         await sajilo.entities.BusinessPartner.update(editing.id, form);
+
+        // Synchronize ChartOfAccount names if the partner name changed
+        if (editing.name !== form.name) {
+          if (editing.receivable_account_id) {
+            await sajilo.entities.ChartOfAccount.update(editing.receivable_account_id, { account_name: form.name });
+            await sajilo.entities.BusinessPartner.update(editing.id, { receivable_account_name: form.name });
+          }
+          if (editing.payable_account_id) {
+            await sajilo.entities.ChartOfAccount.update(editing.payable_account_id, { account_name: form.name });
+            await sajilo.entities.BusinessPartner.update(editing.id, { payable_account_name: form.name });
+          }
+        }
+
         toast.success('Partner updated');
       } else {
         await sajilo.entities.BusinessPartner.create(form);
         toast.success('Partner created');
       }
-        } catch (err) {
+    } catch (err) {
       toast.error(err.message || 'Error occurred while saving');
     } finally {
       setSaving(false);

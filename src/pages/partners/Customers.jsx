@@ -129,9 +129,25 @@ export default function Customers() {
         await sajilo.entities.BusinessPartner.create(saveData);
         toast.success('Customer created — sub-ledger auto-generated');
       } else {
-        const ledgerUpdates = await provisionPartnerLedgers(saveData, settings || {});
-        saveData = { ...saveData, ...ledgerUpdates };
+        // Edit Mode
+        const saveData = { ...form };
+        delete saveData.receivable_account_id; // don't mess with system ledgers here
+        delete saveData.payable_account_id;
+        
         await sajilo.entities.BusinessPartner.update(editing.id, saveData);
+
+        // Synchronize ChartOfAccount names if the customer name changed
+        if (editing.name !== form.name) {
+          if (editing.receivable_account_id) {
+            await sajilo.entities.ChartOfAccount.update(editing.receivable_account_id, { account_name: form.name });
+            await sajilo.entities.BusinessPartner.update(editing.id, { receivable_account_name: form.name });
+          }
+          if (editing.payable_account_id) {
+            await sajilo.entities.ChartOfAccount.update(editing.payable_account_id, { account_name: form.name });
+            await sajilo.entities.BusinessPartner.update(editing.id, { payable_account_name: form.name });
+          }
+        }
+
         toast.success('Customer updated');
       }
     } catch (err) {

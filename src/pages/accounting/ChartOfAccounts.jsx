@@ -73,7 +73,7 @@ function GroupLedgerRow({ grp, children, depth, expanded, onToggle, onEdit, onDe
       <div
         className={cn(
           'flex items-center gap-2 py-2.5 pr-4 border-t border-border/40 cursor-pointer transition-colors group',
-          depth === 0 ? 'bg-muted/50/80 hover:bg-slate-100 dark:bg-slate-500/20/80' : 'bg-card hover:bg-muted/50'
+          depth === 0 ? 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700' : 'bg-card hover:bg-muted/50'
         )}
         style={{ paddingLeft: `${indent}px` }}
         onClick={e => { e.stopPropagation(); onToggle(); }}

@@ -132,6 +132,19 @@ export default function Suppliers() {
         const ledgerUpdates = await provisionPartnerLedgers(saveData, settings || {});
         saveData = { ...saveData, ...ledgerUpdates };
         await sajilo.entities.BusinessPartner.update(editing.id, saveData);
+
+        // Synchronize ChartOfAccount names if the supplier name changed
+        if (editing.name !== form.name) {
+          if (editing.receivable_account_id) {
+            await sajilo.entities.ChartOfAccount.update(editing.receivable_account_id, { account_name: form.name });
+            await sajilo.entities.BusinessPartner.update(editing.id, { receivable_account_name: form.name });
+          }
+          if (editing.payable_account_id) {
+            await sajilo.entities.ChartOfAccount.update(editing.payable_account_id, { account_name: form.name });
+            await sajilo.entities.BusinessPartner.update(editing.id, { payable_account_name: form.name });
+          }
+        }
+
         toast.success('Supplier updated');
       }
     } catch (err) {

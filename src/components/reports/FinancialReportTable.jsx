@@ -144,10 +144,10 @@ function GroupRow({ node, columns, depth, expandedGroups, onToggle, showZeroBala
 
   // Determine depth-based styling
   const bgClass = depth === 0
-    ? 'bg-slate-200/80 hover:bg-slate-200'
+    ? 'bg-slate-200/80 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700'
     : depth === 1
-    ? 'bg-slate-100 dark:bg-slate-500/20/80 hover:bg-slate-100 dark:bg-slate-500/20'
-    : 'bg-muted/50/80 hover:bg-muted/50';
+    ? 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800/50 dark:hover:bg-slate-700/50'
+    : 'bg-muted/50 hover:bg-muted dark:bg-muted/10 dark:hover:bg-muted/20';
 
   const fontClass = depth === 0
     ? 'font-bold text-foreground'

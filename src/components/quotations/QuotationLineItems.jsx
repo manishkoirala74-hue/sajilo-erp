@@ -28,6 +28,12 @@ export default function QuotationLineItems({ value = [], onChange, items = [], v
   const selectItem = (idx, itemId) => {
     const item = items.find(it => it.id === itemId);
     if (!item) return;
+
+    // Auto-extract hybrid attributes
+    let appendedDesc = item.description || '';
+    if (item.attributes?.model) appendedDesc += `\nModel: ${item.attributes.model}`;
+    if (item.attributes?.specifications) appendedDesc += `\nSpecs: ${item.attributes.specifications}`;
+
     const lines = value.map((l, i) => i === idx ? {
       ...l,
       item_id: item.id,
@@ -36,7 +42,7 @@ export default function QuotationLineItems({ value = [], onChange, items = [], v
       hs_code: item.hs_code || '',
       unit_price: item.selling_price || 0,
       vat_applicable: item.is_vat_applicable || false,
-      description: item.description || '',
+      description: appendedDesc.trim(),
     } : l);
     onChange(recalc(lines));
   };

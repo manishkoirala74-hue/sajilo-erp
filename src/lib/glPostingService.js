@@ -22,16 +22,13 @@ function handleDBError(error) {
 // ─── Immutable Reversal Utility ──────────────────────────────────────────────
 export async function deleteExistingJournals(sourceId, sourceType) {
   if (!sourceId || !sourceType) return;
-  const { data: journals } = await supabase
-    .from('GeneralLedgerJournal')
-    .select('id')
-    .eq('source_document_id', sourceId)
-    .eq('source_document_type', sourceType);
-    
-  if (journals && journals.length > 0) {
-    const ids = journals.map(j => j.id);
-    await supabase.from('GeneralLedgerLine').delete().in('journal_id', ids);
-    await supabase.from('GeneralLedgerJournal').delete().in('id', ids);
+  const { error } = await supabase.rpc('rpc_delete_gl_journals', {
+    p_source_id: sourceId,
+    p_source_type: sourceType
+  });
+  if (error) {
+    console.error('Failed to delete existing journals:', error);
+    // Don't throw to prevent breaking the flow, but log the error
   }
 }
 

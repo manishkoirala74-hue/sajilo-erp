@@ -53,9 +53,16 @@ export default function JournalEntryModal({ open, onClose, accounts, onSaved }) 
 
     setSaving(true);
     try {
+      // Generate a manual voucher number: JV-YYYYMMDD-XXXX
+      const d = new Date();
+      const datePart = d.getFullYear().toString() + (d.getMonth() + 1).toString().padStart(2, '0') + d.getDate().toString().padStart(2, '0');
+      const randPart = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+      const manualVoucherNo = `JV-${datePart}-${randPart}`;
+
       const journal = await sajilo.entities.GeneralLedgerJournal.create({
         ...form, status, total_debit: totalDebit, total_credit: totalCredit, is_balanced: isBalanced,
-        posted_by: status === 'Posted' ? 'current_user' : ''
+        posted_by: status === 'Posted' ? 'current_user' : '',
+        voucher_no: manualVoucherNo
       });
 
       // Clean up lines for DB

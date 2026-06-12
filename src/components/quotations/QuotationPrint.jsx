@@ -1,11 +1,14 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { X, Printer } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
 
 const FONT_MAP = { inter: 'Inter, sans-serif', georgia: 'Georgia, serif', mono: 'monospace' };
 
 export default function QuotationPrint({ quotation: q, settings: s = {}, onClose }) {
   const printRef = useRef();
+  const [showSpecs, setShowSpecs] = useState(true);
+  const [showModel, setShowModel] = useState(true);
 
   const accent = s.quotation_accent_color || '#6366f1';
   const font = FONT_MAP[s.quotation_font] || FONT_MAP.inter;
@@ -52,13 +55,23 @@ export default function QuotationPrint({ quotation: q, settings: s = {}, onClose
     <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 overflow-y-auto py-8">
       <div className="bg-card rounded-2xl shadow-2xl w-full max-w-3xl mx-4">
         {/* Toolbar */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between px-6 py-4 border-b border-border gap-4 print:hidden">
           <h2 className="font-semibold text-base">Print Preview — {q.quotation_number}</h2>
-          <div className="flex items-center gap-2">
-            <Button size="sm" onClick={handlePrint} className="gap-1.5">
-              <Printer className="w-4 h-4" /> Print
-            </Button>
-            <Button size="sm" variant="outline" onClick={onClose}><X className="w-4 h-4" /></Button>
+          <div className="flex items-center gap-6">
+            <div className="flex items-center gap-4 text-sm text-muted-foreground">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <Checkbox checked={showModel} onCheckedChange={setShowModel} /> Show Model
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <Checkbox checked={showSpecs} onCheckedChange={setShowSpecs} /> Show Specs
+              </label>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button size="sm" onClick={handlePrint} className="gap-1.5">
+                <Printer className="w-4 h-4" /> Print
+              </Button>
+              <Button size="sm" variant="outline" onClick={onClose}><X className="w-4 h-4" /></Button>
+            </div>
           </div>
         </div>
 
@@ -127,7 +140,16 @@ export default function QuotationPrint({ quotation: q, settings: s = {}, onClose
                     {showItemCodes && <td style={{ padding: '8px 12px', fontSize: 12, fontFamily: 'monospace', color: '#666' }}>{l.item_code || '—'}</td>}
                     <td style={{ padding: '8px 12px', fontSize: 13 }}>
                       <div style={{ fontWeight: 600 }}>{l.item_name}</div>
-                      {l.description && <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>{l.description}</div>}
+                      {(() => {
+                        if (!l.description) return null;
+                        let desc = l.description;
+                        if (!showModel) desc = desc.replace(/\n?Model:.*(\n|$)/g, '\n').trim();
+                        if (!showSpecs) desc = desc.replace(/\n?Specs:.*(\n|$)/g, '\n').trim();
+                        if (!desc) return null;
+                        return (
+                          <div style={{ fontSize: 11, color: '#888', marginTop: 2, whiteSpace: 'pre-wrap' }}>{desc}</div>
+                        );
+                      })()}
                     </td>
                     <td style={{ padding: '8px 12px', fontSize: 13, textAlign: 'center' }}>{l.quantity}</td>
                     {showUnitPrice && <td style={{ padding: '8px 12px', fontSize: 13, textAlign: 'right' }}>NPR {Number(l.unit_price || 0).toLocaleString()}</td>}

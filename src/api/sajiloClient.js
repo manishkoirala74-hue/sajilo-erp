@@ -80,6 +80,13 @@ const validateFiscalYear = async (tableName, payload) => {
   }
 };
 
+const handleSupabaseError = (error) => {
+  if (error?.code === '23505') {
+    throw new Error('This document number is already in use. Please generate or enter a new number.');
+  }
+  throw error;
+};
+
 const buildEntityMethods = (tableName) => {
   const isGlobal = globalTables.includes(tableName);
   
@@ -164,7 +171,7 @@ const buildEntityMethods = (tableName) => {
       await validateFiscalYear(tableName, sanitized);
       const objWithCompany = injectCompanyId(sanitized);
       const { data, error } = await supabase.from(tableName).insert(objWithCompany).select().single();
-      if (error) throw error;
+      if (error) handleSupabaseError(error);
       invalidateCache(tableName);
       return data;
     },
@@ -175,7 +182,7 @@ const buildEntityMethods = (tableName) => {
       let query = supabase.from(tableName).update(sanitized).eq('id', id);
       query = applyCompanyFilter(query); // Ensure update is within company scope
       const { data, error } = await query.select().single();
-      if (error) throw error;
+      if (error) handleSupabaseError(error);
       invalidateCache(tableName);
       return data;
     },
@@ -185,7 +192,7 @@ const buildEntityMethods = (tableName) => {
       if (sanitizedArr.length > 0) await validateFiscalYear(tableName, sanitizedArr[0]); // Best effort for bulk
       const arrWithCompany = sanitizedArr.map(obj => injectCompanyId(obj));
       const { data, error } = await supabase.from(tableName).insert(arrWithCompany).select();
-      if (error) throw error;
+      if (error) handleSupabaseError(error);
       invalidateCache(tableName);
       return data;
     },

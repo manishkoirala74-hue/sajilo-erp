@@ -29,7 +29,8 @@ const emptyItem = {
   discount_scheme_id: '', discount_scheme_name: '',
   is_active: true, is_vat_applicable: false,
   tax_type_ids: [], // multi-tax: list of TaxType IDs applied to this item
-  description: '', barcode: '', hs_code: ''
+  description: '', barcode: '', hs_code: '',
+  attributes: { model: '', specifications: '', color: '', size: '', weight: '', custom_metadata: [] }
 };
 
 // ── Bulk Action Panel ──────────────────────────────────────────────
@@ -246,6 +247,7 @@ export default function Items() {
   const openEdit = (item) => {
     setForm({
       ...item,
+      attributes: item.attributes || { model: '', specifications: '', color: '', size: '', weight: '', custom_metadata: [] },
       image_urls: item.image_urls || (item.image_url ? [item.image_url] : []),
       tax_type_ids: Array.isArray(item.tax_type_ids) ? item.tax_type_ids : (item.tax_type_ids ? JSON.parse(item.tax_type_ids) : []),
     });
@@ -698,6 +700,54 @@ export default function Items() {
                 <div><Label>Barcode</Label><Input value={form.barcode || ''} onChange={e => sf('barcode', e.target.value)} placeholder="Barcode / SKU" /></div>
                 <div><Label>HS Code</Label><Input value={form.hs_code || ''} onChange={e => sf('hs_code', e.target.value)} placeholder="e.g. 8471.30" /></div>
                 <div className="col-span-2"><Label>Description</Label><Input value={form.description} onChange={e => sf('description', e.target.value)} placeholder="Optional" /></div>
+              </div>
+            </Section>
+
+            <Section title="Advanced Specifications / Additional Attributes">
+              <div className="grid grid-cols-2 gap-4">
+                <div><Label>Model</Label><Input value={form.attributes?.model || ''} onChange={e => setForm(p => ({ ...p, attributes: { ...p.attributes, model: e.target.value } }))} placeholder="Model number/name" /></div>
+                <div><Label>Color</Label><Input value={form.attributes?.color || ''} onChange={e => setForm(p => ({ ...p, attributes: { ...p.attributes, color: e.target.value } }))} placeholder="Color variant" /></div>
+                <div><Label>Size</Label><Input value={form.attributes?.size || ''} onChange={e => setForm(p => ({ ...p, attributes: { ...p.attributes, size: e.target.value } }))} placeholder="Size dimensions" /></div>
+                <div><Label>Weight</Label><Input value={form.attributes?.weight || ''} onChange={e => setForm(p => ({ ...p, attributes: { ...p.attributes, weight: e.target.value } }))} placeholder="Weight" /></div>
+                <div className="col-span-2"><Label>Specifications</Label><Input value={form.attributes?.specifications || ''} onChange={e => setForm(p => ({ ...p, attributes: { ...p.attributes, specifications: e.target.value } }))} placeholder="Detailed specs" /></div>
+                <div className="col-span-2">
+                  <div className="flex items-center justify-between mb-2">
+                    <Label>Custom Metadata</Label>
+                    <Button type="button" variant="outline" size="sm" className="h-7 text-xs" onClick={() => {
+                      const current = Array.isArray(form.attributes?.custom_metadata) ? form.attributes.custom_metadata : [];
+                      setForm(p => ({ ...p, attributes: { ...p.attributes, custom_metadata: [...current, { key: '', value: '' }] } }));
+                    }}>
+                      <Plus className="w-3 h-3 mr-1" /> Add Field
+                    </Button>
+                  </div>
+                  <div className="space-y-2">
+                    {Array.isArray(form.attributes?.custom_metadata) && form.attributes.custom_metadata.map((meta, i) => (
+                      <div key={i} className="flex items-center gap-2">
+                        <Input value={meta.key} onChange={e => {
+                          const newMeta = [...form.attributes.custom_metadata];
+                          newMeta[i].key = e.target.value;
+                          setForm(p => ({ ...p, attributes: { ...p.attributes, custom_metadata: newMeta } }));
+                        }} placeholder="Key (e.g. Warranty)" className="w-1/3" />
+                        <Input value={meta.value} onChange={e => {
+                          const newMeta = [...form.attributes.custom_metadata];
+                          newMeta[i].value = e.target.value;
+                          setForm(p => ({ ...p, attributes: { ...p.attributes, custom_metadata: newMeta } }));
+                        }} placeholder="Value (e.g. 1 Year)" className="flex-1" />
+                        <Button type="button" variant="ghost" size="icon" className="h-9 w-9 text-red-500 shrink-0" onClick={() => {
+                          const newMeta = form.attributes.custom_metadata.filter((_, idx) => idx !== i);
+                          setForm(p => ({ ...p, attributes: { ...p.attributes, custom_metadata: newMeta } }));
+                        }}>
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    ))}
+                    {(!form.attributes?.custom_metadata || form.attributes.custom_metadata.length === 0) && (
+                      <div className="text-sm text-muted-foreground italic bg-muted/30 p-3 rounded-md text-center">
+                        No custom metadata fields added.
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
             </Section>
 
