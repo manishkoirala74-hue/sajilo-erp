@@ -10,6 +10,7 @@ import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover
 export default function SearchableSelect({
   value,
   onValueChange,
+  onChange,
   options = [],
   groups = null,
   placeholder = 'Select…',
@@ -40,7 +41,8 @@ export default function SearchableSelect({
   const displayLabel = selected ? selected.label : null;
 
   const handleSelect = (val) => {
-    onValueChange(val);
+    if (onValueChange) onValueChange(val);
+    if (onChange) onChange(val);
     setOpen(false);
     setSearch('');
   };
