@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { toast } from 'sonner';
 import { invalidateTaxCache } from '@/lib/taxService';
 import { Plus, Pencil, Trash2, CheckCircle2, AlertCircle, Percent } from 'lucide-react';
+import SearchableSelect from '@/components/shared/SearchableSelect';
 
 /**
  * TaxSettings — Settings → Tax & VAT
@@ -322,14 +323,16 @@ export default function TaxSettings() {
             {form._create_ledger ? (
               <div>
                 <Label>Parent Liability Group *</Label>
-                <Select value={form._parent_group_id} onValueChange={v => sf('_parent_group_id', v)}>
-                  <SelectTrigger className="mt-1"><SelectValue placeholder="Select a Liability Group Ledger" /></SelectTrigger>
-                  <SelectContent>
-                    {groupAccounts.map(g => (
-                      <SelectItem key={g.id} value={g.id}>{g.account_code} — {g.account_name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <SearchableSelect 
+                  value={form._parent_group_id} 
+                  onChange={v => sf('_parent_group_id', v)}
+                  placeholder="Select a Liability Group Ledger"
+                  options={groupAccounts.map(g => ({
+                    value: g.id,
+                    label: `${g.account_code} — ${g.account_name}`
+                  }))}
+                  className="mt-1"
+                />
                 <p className="text-xs text-muted-foreground mt-1">
                   A new sub-ledger named "<strong>{form.tax_name || 'Tax Payable'}</strong>" will be created under this group.
                 </p>
@@ -337,16 +340,19 @@ export default function TaxSettings() {
             ) : (
               <div>
                 <Label>Link Existing Sub Ledger</Label>
-                <Select value={form.gl_account_id || ''} onValueChange={v => sf('gl_account_id', v)}>
-                  <SelectTrigger className="mt-1"><SelectValue placeholder="— Select existing account —" /></SelectTrigger>
-                  <SelectContent>
-                    {subAccounts
-                      .filter(a => a.account_type === 'Liability')
-                      .map(a => (
-                        <SelectItem key={a.id} value={a.id}>{a.account_code} — {a.account_name}</SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
+                <SearchableSelect 
+                  value={form.gl_account_id || ''} 
+                  onChange={v => sf('gl_account_id', v)}
+                  placeholder="— Select existing account —"
+                  options={subAccounts
+                    .filter(a => a.account_type === 'Liability')
+                    .map(a => ({
+                      value: a.id,
+                      label: `${a.account_code} — ${a.account_name}`
+                    }))
+                  }
+                  className="mt-1"
+                />
               </div>
             )}
           </div>

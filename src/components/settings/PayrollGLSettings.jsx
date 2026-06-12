@@ -4,6 +4,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Plus, Trash2, ShieldCheck } from 'lucide-react';
+import SearchableSelect from '@/components/shared/SearchableSelect';
 function SectionCard({ title, icon: CardIcon, children }) {
   return (
     <div className="bg-card border border-border rounded-xl overflow-hidden mb-6">
@@ -81,19 +82,14 @@ export default function PayrollGLSettings({ settings, onChange }) {
           This is the Liability account credited for the final Net Take-Home Pay. The ERP will automatically attach the Employee ID as the sub-ledger entity on these rows.
         </p>
         <div className="w-1/2">
-          <Select
+          <SearchableSelect
             value={settings.hr_salary_payable_account_id || ''}
-            onValueChange={v => onChange({ hr_salary_payable_account_id: v })}
-          >
-            <SelectTrigger className="h-9 bg-card">
-              <SelectValue placeholder="— Select Liability Account —" />
-            </SelectTrigger>
-            <SelectContent>
-              {accounts.filter(a => ['Liability', 'Current Liability'].includes(a.account_type)).map(a => (
-                <SelectItem key={a.id} value={a.id}>{a.account_code} — {a.account_name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            onChange={v => onChange({ hr_salary_payable_account_id: v })}
+            placeholder="— Select Liability Account —"
+            options={accounts
+              .filter(a => ['Liability', 'Current Liability'].includes(a.account_type))
+              .map(a => ({ value: a.id, label: `${a.account_code} — ${a.account_name}` }))}
+          />
         </div>
       </div>
 
@@ -118,16 +114,14 @@ export default function PayrollGLSettings({ settings, onChange }) {
                     onChange={ev => updateArray('earning', i, 'name', ev.target.value)}
                     className="h-9 mb-2"
                   />
-                  <Select value={e.account_id} onValueChange={v => updateArray('earning', i, 'account_id', v)}>
-                    <SelectTrigger className="h-9">
-                      <SelectValue placeholder="Select Expense Account" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {accounts.filter(a => ['Expense', 'Direct Expense', 'Indirect Expense'].includes(a.account_type)).map(a => (
-                        <SelectItem key={a.id} value={a.id}>{a.account_code} — {a.account_name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <SearchableSelect 
+                    value={e.account_id} 
+                    onChange={v => updateArray('earning', i, 'account_id', v)}
+                    placeholder="Select Expense Account"
+                    options={accounts
+                      .filter(a => ['Expense', 'Direct Expense', 'Indirect Expense'].includes(a.account_type))
+                      .map(a => ({ value: a.id, label: `${a.account_code} — ${a.account_name}` }))}
+                  />
                 </div>
                 <Button size="icon" variant="ghost" className="text-red-500 shrink-0" onClick={() => removeArray('earning', i)}>
                   <Trash2 className="w-4 h-4" />
@@ -158,16 +152,12 @@ export default function PayrollGLSettings({ settings, onChange }) {
                     onChange={ev => updateArray('deduction', i, 'name', ev.target.value)}
                     className="h-9 mb-2"
                   />
-                  <Select value={d.account_id} onValueChange={v => updateArray('deduction', i, 'account_id', v)}>
-                    <SelectTrigger className="h-9">
-                      <SelectValue placeholder="Select Liability/Asset Account" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {accounts.map(a => (
-                        <SelectItem key={a.id} value={a.id}>{a.account_code} — {a.account_name} ({a.account_type})</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <SearchableSelect 
+                    value={d.account_id} 
+                    onChange={v => updateArray('deduction', i, 'account_id', v)}
+                    placeholder="Select Liability/Asset Account"
+                    options={accounts.map(a => ({ value: a.id, label: `${a.account_code} — ${a.account_name} (${a.account_type})` }))}
+                  />
                 </div>
                 <Button size="icon" variant="ghost" className="text-red-500 shrink-0" onClick={() => removeArray('deduction', i)}>
                   <Trash2 className="w-4 h-4" />

@@ -3,6 +3,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { sajilo } from '@/api/sajiloClient';
 import { loadActiveTaxTypes } from '@/lib/taxService';
 import { Plus, Edit2, Package, AlertTriangle, Upload, X, History, CheckSquare, Square, Minus, Trash2 } from 'lucide-react';
+import SearchableSelect from '@/components/shared/SearchableSelect';
 import ItemTransactionHistory from '@/components/inventory/ItemTransactionHistory';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -740,52 +741,73 @@ export default function Items() {
 
             <Section title="Account Mapping">
               <p className="text-xs text-muted-foreground mb-3">Link this item to Chart of Accounts for automatic journal entries.</p>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-x-4 gap-y-6">
                 <div>
                   <Label>Purchase / COGS Account</Label>
-                  <Select value={form.purchase_account_id} onValueChange={v => {
-                    const a = accounts.find(a => a.id === v);
-                    setForm(prev => ({ ...prev, purchase_account_id: v, purchase_account_name: a?.account_name || '' }));
-                  }}>
-                    <SelectTrigger><SelectValue placeholder="Select account…" /></SelectTrigger>
-                    <SelectContent>{(cogsAccounts.length > 0 ? cogsAccounts : subAccounts).map(a => <SelectItem key={a.id} value={a.id}>{a.account_code ? `${a.account_code} — ` : ''}{a.account_name}</SelectItem>)}</SelectContent>
-                  </Select>
+                  <SearchableSelect 
+                    value={form.purchase_account_id} 
+                    onChange={v => {
+                      const a = accounts.find(a => a.id === v);
+                      setForm(prev => ({ ...prev, purchase_account_id: v, purchase_account_name: a?.account_name || '' }));
+                    }}
+                    options={(cogsAccounts.length > 0 ? cogsAccounts : subAccounts).map(a => ({
+                      value: a.id,
+                      label: a.account_code ? `${a.account_code} — ${a.account_name}` : a.account_name
+                    }))}
+                    placeholder="Select account…"
+                    className="mt-1"
+                  />
                   <p className="text-xs text-muted-foreground mt-1">Debited on purchase posting</p>
                 </div>
                 <div>
                   <Label>Sales / Revenue Account</Label>
-                  <Select value={form.sales_account_id} onValueChange={v => {
-                    const a = accounts.find(a => a.id === v);
-                    setForm(prev => ({ ...prev, sales_account_id: v, sales_account_name: a?.account_name || '' }));
-                  }}>
-                    <SelectTrigger><SelectValue placeholder="Select account…" /></SelectTrigger>
-                    <SelectContent>{(salesAccounts.length > 0 ? salesAccounts : subAccounts).map(a => <SelectItem key={a.id} value={a.id}>{a.account_code ? `${a.account_code} — ` : ''}{a.account_name}</SelectItem>)}</SelectContent>
-                  </Select>
+                  <SearchableSelect 
+                    value={form.sales_account_id} 
+                    onChange={v => {
+                      const a = accounts.find(a => a.id === v);
+                      setForm(prev => ({ ...prev, sales_account_id: v, sales_account_name: a?.account_name || '' }));
+                    }}
+                    options={(salesAccounts.length > 0 ? salesAccounts : subAccounts).map(a => ({
+                      value: a.id,
+                      label: a.account_code ? `${a.account_code} — ${a.account_name}` : a.account_name
+                    }))}
+                    placeholder="Select account…"
+                    className="mt-1"
+                  />
                   <p className="text-xs text-muted-foreground mt-1">Credited on sales posting</p>
                 </div>
                 <div>
                   <Label>Inventory Asset Account</Label>
-                  <Select value={form.inventory_account_id} onValueChange={v => {
-                    const a = accounts.find(a => a.id === v);
-                    setForm(prev => ({ ...prev, inventory_account_id: v, inventory_account_name: a?.account_name || '' }));
-                  }}>
-                    <SelectTrigger><SelectValue placeholder="Select account…" /></SelectTrigger>
-                    <SelectContent>{(assetAccounts.length > 0 ? assetAccounts : subAccounts).map(a => <SelectItem key={a.id} value={a.id}>{a.account_code ? `${a.account_code} — ` : ''}{a.account_name}</SelectItem>)}</SelectContent>
-                  </Select>
+                  <SearchableSelect 
+                    value={form.inventory_account_id} 
+                    onChange={v => {
+                      const a = accounts.find(a => a.id === v);
+                      setForm(prev => ({ ...prev, inventory_account_id: v, inventory_account_name: a?.account_name || '' }));
+                    }}
+                    options={(assetAccounts.length > 0 ? assetAccounts : subAccounts).map(a => ({
+                      value: a.id,
+                      label: a.account_code ? `${a.account_code} — ${a.account_name}` : a.account_name
+                    }))}
+                    placeholder="Select account…"
+                    className="mt-1"
+                  />
                   <p className="text-xs text-muted-foreground mt-1">Tracks stock value on balance sheet</p>
                 </div>
                 <div>
                   <Label>Discount Scheme</Label>
-                  <Select value={form.discount_scheme_id} onValueChange={v => {
-                    const d = discountSchemes.find(d => d.id === v);
-                    setForm(prev => ({ ...prev, discount_scheme_id: v, discount_scheme_name: d?.scheme_name || '' }));
-                  }}>
-                    <SelectTrigger><SelectValue placeholder="None" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={null}>None</SelectItem>
-                      {discountSchemes.map(d => <SelectItem key={d.id} value={d.id}>{d.scheme_name} ({d.discount_type === 'Percentage' ? `${d.discount_value}%` : `NPR ${d.discount_value}`})</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+                  <SearchableSelect 
+                    value={form.discount_scheme_id} 
+                    onChange={v => {
+                      const d = discountSchemes.find(d => d.id === v);
+                      setForm(prev => ({ ...prev, discount_scheme_id: v, discount_scheme_name: d?.scheme_name || '' }));
+                    }}
+                    options={discountSchemes.map(d => ({
+                      value: d.id,
+                      label: `${d.scheme_name} (${d.discount_type === 'Percentage' ? `${d.discount_value}%` : `NPR ${d.discount_value}`})`
+                    }))}
+                    placeholder="None"
+                    className="mt-1"
+                  />
                   <p className="text-xs text-muted-foreground mt-1">Applied automatically on sales</p>
                 </div>
               </div>

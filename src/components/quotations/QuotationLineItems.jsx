@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
+import SearchableSelect from '@/components/shared/SearchableSelect';
 
 const emptyLine = {
   item_id: '', item_name: '', item_code: '', hs_code: '', description: '',
@@ -63,14 +64,15 @@ export default function QuotationLineItems({ value = [], onChange, items = [], v
             {value.map((line, idx) => (
               <tr key={idx} className="hover:bg-muted/10">
                 <td className="px-2 py-1.5">
-                  <Select value={line.item_id || ''} onValueChange={v => selectItem(idx, v)}>
-                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Select item…" /></SelectTrigger>
-                    <SelectContent>
-                      {items.map(it => (
-                        <SelectItem key={it.id} value={it.id}>{it.item_name}{it.item_code ? ` (${it.item_code})` : ''}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <SearchableSelect 
+                    value={line.item_id || ''} 
+                    onChange={v => selectItem(idx, v)}
+                    placeholder="Select item…"
+                    options={items.map(it => ({
+                      value: it.id,
+                      label: `${it.item_name}${it.item_code ? ` (${it.item_code})` : ''}`
+                    }))}
+                  />
                 </td>
                 <td className="px-2 py-1.5">
                   <Input value={line.description || ''} onChange={e => update(idx, 'description', e.target.value)}

@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
+import SearchableSelect from '@/components/shared/SearchableSelect';
 
 const ACCOUNT_TYPES = ['Cash', 'Bank'];
 const CATEGORIES = {
@@ -189,15 +190,15 @@ export default function BankAccountFormModal({ account, onSave, onClose }) {
               {isEdit ? (
                 <Input value={form.ledger_group_name || '—'} disabled className="bg-muted/30" />
               ) : (
-                <Select value={form.ledger_group_id || ''} onValueChange={handleLedgerGroupSelect}>
-                  <SelectTrigger><SelectValue placeholder="Select ledger group…" /></SelectTrigger>
-                  <SelectContent>
-                    {ledgerGroups.length === 0 && <SelectItem value="__none__" disabled>No group ledgers found</SelectItem>}
-                    {ledgerGroups.map(g => (
-                      <SelectItem key={g.id} value={g.id}>{g.account_code} — {g.account_name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <SearchableSelect 
+                  value={form.ledger_group_id || ''} 
+                  onChange={handleLedgerGroupSelect}
+                  placeholder="Select ledger group…"
+                  options={ledgerGroups.length === 0 
+                    ? [{ value: '__none__', label: 'No group ledgers found', disabled: true }]
+                    : ledgerGroups.map(g => ({ value: g.id, label: `${g.account_code} — ${g.account_name}` }))
+                  }
+                />
               )}
             </div>
           </div>
