@@ -20,6 +20,21 @@ function handleDBError(error) {
 }
 
 // ─── Immutable Reversal Utility ──────────────────────────────────────────────
+export async function deleteExistingJournals(sourceId, sourceType) {
+  if (!sourceId || !sourceType) return;
+  const { data: journals } = await supabase
+    .from('GeneralLedgerJournal')
+    .select('id')
+    .eq('source_document_id', sourceId)
+    .eq('source_document_type', sourceType);
+    
+  if (journals && journals.length > 0) {
+    const ids = journals.map(j => j.id);
+    await supabase.from('GeneralLedgerLine').delete().in('journal_id', ids);
+    await supabase.from('GeneralLedgerJournal').delete().in('id', ids);
+  }
+}
+
 export async function reverseJournal(journalId, reversalDate, reason) {
   const { data, error } = await supabase.rpc('rpc_reverse_gl_transaction', {
     p_company_id: sajilo.getCompanyId(),
@@ -35,6 +50,8 @@ export async function reverseJournal(journalId, reversalDate, reason) {
 export async function postPOSSale(sale, itemsMap, settings, isReversal = false) {
   if (isReversal && sale.gl_journal_id) return reverseJournal(sale.gl_journal_id, sale.sale_date, 'POS Sale Cancelled');
   
+  if (!isReversal) await deleteExistingJournals(sale.id, 'POSSale');
+
   const lines = [];
   const s = settings || await sajilo.entities.CompanySettings.list().then(d => d[0] || {});
 
@@ -89,6 +106,8 @@ export async function postPOSSale(sale, itemsMap, settings, isReversal = false) 
 // ─── 2. SALES INVOICE ──────────────────────────────────────────────────────────
 export async function postSalesInvoice(invoice, itemsMap, settings, isReversal = false) {
   if (isReversal && invoice.gl_journal_id) return reverseJournal(invoice.gl_journal_id, invoice.invoice_date, 'Sales Invoice Cancelled');
+
+  if (!isReversal) await deleteExistingJournals(invoice.id, 'SalesInvoice');
 
   const s = settings || await sajilo.entities.CompanySettings.list().then(d => d[0] || {});
   const lines = [];
@@ -158,6 +177,8 @@ export async function postPurchaseInvoice(invoice, itemsMap, settings, isReversa
 
   if (isReversal && journalIdToReverse) return reverseJournal(journalIdToReverse, invoice.invoice_date, 'Purchase Invoice Cancelled');
   
+  if (!isReversal) await deleteExistingJournals(invoice.id, 'PurchaseInvoice');
+
   const s = settings || await sajilo.entities.CompanySettings.list().then(d => d[0] || {});
   const lines = [];
 
@@ -213,7 +234,11 @@ export async function postPurchaseInvoice(invoice, itemsMap, settings, isReversa
 }
 
 // ─── 4. SALES RETURN ──────────────────────────────────────────────────────────
-export async function postSalesReturn(ret, itemsMap, settings) {
+export async function postSalesReturn(ret, itemsMap, settings, isReversal = false) {
+  if (isReversal && ret.gl_journal_id) return reverseJournal(ret.gl_journal_id, ret.return_date, 'Sales Return Cancelled');
+
+  if (!isReversal) await deleteExistingJournals(ret.id, 'SalesReturn');
+
   const s = settings || await sajilo.entities.CompanySettings.list().then(d => d[0] || {});
   const lines = [];
 
@@ -258,7 +283,11 @@ export async function postSalesReturn(ret, itemsMap, settings) {
 }
 
 // ─── 5. PURCHASE RETURN ──────────────────────────────────────────────────────────
-export async function postPurchaseReturn(ret, itemsMap, settings) {
+export async function postPurchaseReturn(ret, itemsMap, settings, isReversal = false) {
+  if (isReversal && ret.gl_journal_id) return reverseJournal(ret.gl_journal_id, ret.return_date, 'Purchase Return Cancelled');
+
+  if (!isReversal) await deleteExistingJournals(ret.id, 'PurchaseReturn');
+
   const s = settings || await sajilo.entities.CompanySettings.list().then(d => d[0] || {});
   const lines = [];
 
