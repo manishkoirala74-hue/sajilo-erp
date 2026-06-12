@@ -59,67 +59,7 @@ export async function fetchReportData(reportId, fromDate, toDate, extraParams = 
       if (error) throw error;
       return (data || []).map(a => ({
         ...a,
-import { sajilo, supabase } from '@/api/sajiloClient';
 
-async function injectPeriodicInventory(baseAccounts, companyId, fromDate, toDate) {
-  try {
-    const { data, error } = await supabase.rpc('get_periodic_inventory_balances_rpc', {
-      p_company_id: companyId,
-      p_from_date: fromDate,
-      p_to_date: toDate
-    });
-    
-    if (error) {
-      console.error('Virtual inventory calc failed:', error);
-      return baseAccounts;
-    }
-
-    if (data && data.length > 0) {
-      const { opening_stock, closing_stock, net_purchases } = data[0];
-      const accs = [...baseAccounts];
-      accs.push({ id: 'virt-ob', account_name: 'Opening Stock', account_code: '', account_type: 'Cost of Sales', current_balance: opening_stock, comparative_balance: 0, balance: opening_stock, is_group: false });
-      accs.push({ id: 'virt-pur', account_name: 'Purchases', account_code: '', account_type: 'Cost of Sales', current_balance: net_purchases, comparative_balance: 0, balance: net_purchases, is_group: false });
-      accs.push({ id: 'virt-cb', account_name: 'Closing Stock', account_code: '', account_type: 'Cost of Sales', current_balance: closing_stock, comparative_balance: 0, balance: closing_stock, is_group: false });
-      return accs;
-    }
-  } catch (e) {
-    console.error('Virtual inventory calc failed:', e);
-  }
-  return baseAccounts;
-}
-
-// Helper to check if a date string falls within range
-function inRange(dateStr, from, to) {
-  if (!dateStr) return false;
-  return dateStr >= from && dateStr <= to;
-}
-
-export async function fetchReportData(reportId, fromDate, toDate, extraParams = {}) {
-  switch (reportId) {
-
-    case 'ledger_detail': {
-      if (!extraParams.accountId) return [];
-      const p_company_id = sajilo.getCompanyId();
-      const { data, error } = await supabase.rpc('get_stabilized_general_ledger_statement_rpc', {
-        p_company_id,
-        p_account_id: extraParams.accountId,
-        p_from_date: fromDate,
-        p_to_date: toDate
-      });
-      if (error) throw error;
-      return data || [];
-    }
-
-    case 'trial_balance': {
-      const p_company_id = sajilo.getCompanyId();
-      const { data, error } = await supabase.rpc('get_trial_balance_rpc', {
-        p_company_id,
-        p_from_date: fromDate,
-        p_to_date: toDate
-      });
-      if (error) throw error;
-      return (data || []).map(a => ({
-        ...a,
         _isControlAccount: false
       }));
     }
