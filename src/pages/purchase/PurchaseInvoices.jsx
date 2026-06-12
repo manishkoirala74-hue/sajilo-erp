@@ -17,6 +17,7 @@ import DateInput from '@/components/shared/DateInput';
 import { postPurchaseInvoice, loadItemsMap, loadSettings } from '@/lib/glPostingService';
 import { computeTotalTax } from '@/lib/taxService';
 import { useSajiloSync } from '@/hooks/useSajiloSync';
+import SearchableSelect from '@/components/shared/SearchableSelect';
 
 const emptyPI = {
   invoice_number: '', vendor_invoice_no: '', po_reference_id: '',
@@ -175,7 +176,6 @@ export default function PurchaseInvoices() {
           try {
             const [itemsMap, glSettings] = await Promise.all([loadItemsMap(form.line_items.map(l => l.item_id)), loadSettings()]);
             const journalId = await postPurchaseInvoice(data, itemsMap, glSettings);
-            await sajilo.entities.PurchaseInvoice.update(form.id, { gl_journal_id: journalId });
             toast.success('Invoice updated and posted — stock, WAC & GL updated');
           } catch (postErr) {
             await sajilo.entities.PurchaseInvoice.update(form.id, { status: 'Draft' });
@@ -191,7 +191,6 @@ export default function PurchaseInvoices() {
           try {
             const [itemsMap, glSettings] = await Promise.all([loadItemsMap(form.line_items.map(l => l.item_id)), loadSettings()]);
             const journalId = await postPurchaseInvoice({ ...data, id: created.id }, itemsMap, glSettings);
-            await sajilo.entities.PurchaseInvoice.update(created.id, { gl_journal_id: journalId });
             toast.success('Invoice posted — stock, WAC & GL updated');
           } catch (postErr) {
             await sajilo.entities.PurchaseInvoice.update(created.id, { status: 'Draft' });
@@ -364,31 +363,33 @@ export default function PurchaseInvoices() {
             {form.payment_mode === 'Credit' ? (
               <div>
                 <Label>Vendor *</Label>
-                <Select value={form.vendor_id} onValueChange={v => {
-                  const vendor = vendors.find(vn => vn.id === v);
-                  setForm(f => ({ ...f, vendor_id: v, vendor_name: vendor?.name || '' }));
-                }}>
-                  <SelectTrigger className="mt-1"><SelectValue placeholder="Select vendor" /></SelectTrigger>
-                  <SelectContent>
-                    {vendors.map(v => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <SearchableSelect
+                  options={vendors.map(v => ({ value: v.id, label: v.name }))}
+                  value={form.vendor_id}
+                  onChange={v => {
+                    const vendor = vendors.find(vn => vn.id === v);
+                    setForm(f => ({ ...f, vendor_id: v, vendor_name: vendor?.name || '' }));
+                  }}
+                  placeholder="Select vendor"
+                  className="mt-1"
+                />
               </div>
             ) : (
               <>
                 <div>
                   <Label>{form.payment_mode} Account (Ledger) *</Label>
-                  <Select value={form.cash_bank_account_id} onValueChange={v => {
-                    const acc = accounts.find(x => x.id === v);
-                    setForm(f => ({ ...f, cash_bank_account_id: v, cash_bank_account_name: acc?.account_name || '' }));
-                  }}>
-                    <SelectTrigger className="mt-1"><SelectValue placeholder={`Select ${form.payment_mode} account`} /></SelectTrigger>
-                    <SelectContent>
-                      {accounts
-                        .filter(a => a.ledger_type === 'Sub Ledger' && (form.payment_mode === 'Cash' ? a.account_name.toLowerCase().includes('cash') : (a.parent_account_name?.toLowerCase().includes('bank') || a.account_name.toLowerCase().includes('bank'))))
-                        .map(a => <SelectItem key={a.id} value={a.id}>{a.account_name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+                  <SearchableSelect
+                    options={accounts
+                      .filter(a => a.ledger_type === 'Sub Ledger' && (form.payment_mode === 'Cash' ? a.account_name.toLowerCase().includes('cash') : (a.parent_account_name?.toLowerCase().includes('bank') || a.account_name.toLowerCase().includes('bank'))))
+                      .map(a => ({ value: a.id, label: a.account_name }))}
+                    value={form.cash_bank_account_id}
+                    onChange={v => {
+                      const acc = accounts.find(x => x.id === v);
+                      setForm(f => ({ ...f, cash_bank_account_id: v, cash_bank_account_name: acc?.account_name || '' }));
+                    }}
+                    placeholder={`Select ${form.payment_mode} account`}
+                    className="mt-1"
+                  />
                 </div>
                 <div>
                   <Label>Vendor Name (Optional)</Label>

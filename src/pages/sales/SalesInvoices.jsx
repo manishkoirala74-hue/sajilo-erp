@@ -18,6 +18,7 @@ import { postSalesInvoice, loadItemsMap, loadSettings } from '@/lib/glPostingSer
 import { loadActiveTaxTypes, computeTotalTax } from '@/lib/taxService';
 import { useSajiloSync } from '@/hooks/useSajiloSync';
 import { usePermissions } from '@/lib/AuthContext';
+import SearchableSelect from '@/components/shared/SearchableSelect';
 
 const emptySI = {
   invoice_number: '', customer_id: '', customer_name: '', sales_order_id: '',
@@ -466,31 +467,33 @@ export default function SalesInvoices() {
             {form.payment_mode === 'Credit' ? (
               <div>
                 <Label>Customer *</Label>
-                <Select value={form.customer_id} onValueChange={v => {
-                  const c = customers.find(x => x.id === v);
-                  setForm(f => ({ ...f, customer_id: v, customer_name: c?.name || '' }));
-                }}>
-                  <SelectTrigger className="mt-1"><SelectValue placeholder="Select customer" /></SelectTrigger>
-                  <SelectContent>
-                    {customers.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <SearchableSelect
+                  options={customers.map(c => ({ value: c.id, label: c.name }))}
+                  value={form.customer_id}
+                  onChange={v => {
+                    const c = customers.find(x => x.id === v);
+                    setForm(f => ({ ...f, customer_id: v, customer_name: c?.name || '' }));
+                  }}
+                  placeholder="Select customer"
+                  className="mt-1"
+                />
               </div>
             ) : (
               <>
                 <div>
                   <Label>{form.payment_mode} Account (Ledger) *</Label>
-                  <Select value={form.cash_bank_account_id} onValueChange={v => {
-                    const acc = accounts.find(x => x.id === v);
-                    setForm(f => ({ ...f, cash_bank_account_id: v, cash_bank_account_name: acc?.account_name || '' }));
-                  }}>
-                    <SelectTrigger className="mt-1"><SelectValue placeholder={`Select ${form.payment_mode} account`} /></SelectTrigger>
-                    <SelectContent>
-                      {accounts
-                        .filter(a => a.ledger_type === 'Sub Ledger' && (form.payment_mode === 'Cash' ? a.account_name.toLowerCase().includes('cash') : (a.parent_account_name?.toLowerCase().includes('bank') || a.account_name.toLowerCase().includes('bank'))))
-                        .map(a => <SelectItem key={a.id} value={a.id}>{a.account_name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+                  <SearchableSelect
+                    options={accounts
+                      .filter(a => a.ledger_type === 'Sub Ledger' && (form.payment_mode === 'Cash' ? a.account_name.toLowerCase().includes('cash') : (a.parent_account_name?.toLowerCase().includes('bank') || a.account_name.toLowerCase().includes('bank'))))
+                      .map(a => ({ value: a.id, label: a.account_name }))}
+                    value={form.cash_bank_account_id}
+                    onChange={v => {
+                      const acc = accounts.find(x => x.id === v);
+                      setForm(f => ({ ...f, cash_bank_account_id: v, cash_bank_account_name: acc?.account_name || '' }));
+                    }}
+                    placeholder={`Select ${form.payment_mode} account`}
+                    className="mt-1"
+                  />
                 </div>
                 <div>
                   <Label>Customer Name (Optional)</Label>

@@ -14,6 +14,7 @@ import { exportFlatXLSX } from '@/lib/reports/reportExcelExport';
 import { sajilo } from '@/api/sajiloClient';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { format } from 'date-fns';
+import SearchableSelect from '@/components/shared/SearchableSelect';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function fmtNPR(n) {
@@ -1339,16 +1340,13 @@ function GeneralLedgerDetailReport({ initialFromDate, initialToDate }) {
   const accPicker = (
     <div className="flex flex-col gap-1 min-w-[200px]">
       <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Select Account</label>
-      <Select value={filters.accountId} onValueChange={val => setFilters(p => ({ ...p, accountId: val }))}>
-        <SelectTrigger className="h-8 bg-card px-2 text-xs">
-          <SelectValue placeholder="Select Account..." />
-        </SelectTrigger>
-        <SelectContent>
-          {accounts.map(a => (
-            <SelectItem key={a.id} value={a.id}>{a.account_name} ({a.account_code})</SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      <SearchableSelect
+        options={accounts.map(a => ({ value: a.id, label: `${a.account_name} (${a.account_code})` }))}
+        value={filters.accountId}
+        onChange={val => setFilters(p => ({ ...p, accountId: val }))}
+        placeholder="Select Account..."
+        className="h-8 bg-card text-xs"
+      />
     </div>
   );
 
