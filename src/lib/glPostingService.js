@@ -102,7 +102,21 @@ export async function postPOSSale(sale, itemsMap, settings, isReversal = false) 
 
 // ─── 2. SALES INVOICE ──────────────────────────────────────────────────────────
 export async function postSalesInvoice(invoice, itemsMap, settings, isReversal = false) {
-  if (isReversal && invoice.gl_journal_id) return reverseJournal(invoice.gl_journal_id, invoice.invoice_date, 'Sales Invoice Cancelled');
+  let journalIdToReverse = invoice.gl_journal_id;
+  if (isReversal && !journalIdToReverse) {
+    const { data: journalData } = await supabase
+      .from('GeneralLedgerJournal')
+      .select('id')
+      .eq('source_document_id', invoice.id)
+      .eq('source_document_type', 'SalesInvoice')
+      .order('created_at', { ascending: false })
+      .limit(1);
+    if (journalData && journalData.length > 0) {
+      journalIdToReverse = journalData[0].id;
+    }
+  }
+
+  if (isReversal && journalIdToReverse) return reverseJournal(journalIdToReverse, invoice.invoice_date, 'Sales Invoice Cancelled');
 
   if (!isReversal) await deleteExistingJournals(invoice.id, 'SalesInvoice');
 
@@ -232,7 +246,21 @@ export async function postPurchaseInvoice(invoice, itemsMap, settings, isReversa
 
 // ─── 4. SALES RETURN ──────────────────────────────────────────────────────────
 export async function postSalesReturn(ret, itemsMap, settings, isReversal = false) {
-  if (isReversal && ret.gl_journal_id) return reverseJournal(ret.gl_journal_id, ret.return_date, 'Sales Return Cancelled');
+  let journalIdToReverse = ret.gl_journal_id;
+  if (isReversal && !journalIdToReverse) {
+    const { data: journalData } = await supabase
+      .from('GeneralLedgerJournal')
+      .select('id')
+      .eq('source_document_id', ret.id)
+      .eq('source_document_type', 'SalesReturn')
+      .order('created_at', { ascending: false })
+      .limit(1);
+    if (journalData && journalData.length > 0) {
+      journalIdToReverse = journalData[0].id;
+    }
+  }
+
+  if (isReversal && journalIdToReverse) return reverseJournal(journalIdToReverse, ret.return_date, 'Sales Return Cancelled');
 
   if (!isReversal) await deleteExistingJournals(ret.id, 'SalesReturn');
 

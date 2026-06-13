@@ -19,12 +19,22 @@ export default function SearchableSelect({
 }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
+  const [activeIndex, setActiveIndex] = useState(-1);
   const inputRef = useRef(null);
+  const listRef = useRef(null);
 
   // Focus search input when opened
   useEffect(() => {
-    if (open) setTimeout(() => inputRef.current?.focus(), 30);
+    if (open) {
+      setTimeout(() => inputRef.current?.focus(), 30);
+      setActiveIndex(-1);
+    }
   }, [open]);
+
+  // Reset active index when search changes
+  useEffect(() => {
+    setActiveIndex(-1);
+  }, [search]);
 
   const filterOpts = (opts) =>
     opts.filter(o =>
@@ -32,6 +42,36 @@ export default function SearchableSelect({
       o.label?.toLowerCase().includes(search.toLowerCase()) ||
       o.sub?.toLowerCase().includes(search.toLowerCase())
     );
+
+  // Flat array of currently visible options for keyboard navigation
+  const flatVisibleOptions = groups
+    ? groups.flatMap(g => filterOpts(g.options))
+    : filterOpts(options);
+
+  // Scroll active item into view
+  useEffect(() => {
+    if (activeIndex >= 0 && listRef.current) {
+      const activeEl = listRef.current.querySelector(`[data-index="${activeIndex}"]`);
+      if (activeEl) {
+        activeEl.scrollIntoView({ block: 'nearest' });
+      }
+    }
+  }, [activeIndex]);
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setActiveIndex(prev => (prev < flatVisibleOptions.length - 1 ? prev + 1 : prev));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setActiveIndex(prev => (prev > 0 ? prev - 1 : prev));
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (activeIndex >= 0 && activeIndex < flatVisibleOptions.length) {
+        handleSelect(flatVisibleOptions[activeIndex].value);
+      }
+    }
+  };
 
   // Resolve display label
   const allFlat = groups
@@ -47,21 +87,31 @@ export default function SearchableSelect({
     setSearch('');
   };
 
-  const renderOption = (opt) => (
-    <button
-      key={opt.value}
-      type="button"
-      onClick={() => handleSelect(opt.value)}
-      className={cn(
-        'w-full flex items-center gap-2 px-3 py-1.5 text-sm text-left rounded-md transition-colors hover:bg-accent',
-        opt.value === value && 'bg-accent font-medium'
-      )}
-    >
-      <Check className={cn('w-3.5 h-3.5 shrink-0', opt.value === value ? 'opacity-100 text-primary' : 'opacity-0')} />
-      <span className="flex-1 truncate">{opt.label}</span>
-      {opt.sub && <span className="text-xs text-muted-foreground font-mono shrink-0">{opt.sub}</span>}
-    </button>
-  );
+  let currentIndex = 0;
+  const renderOption = (opt) => {
+    const isMatched = opt.value === value;
+    const isHighlighted = currentIndex === activeIndex;
+    const itemIndex = currentIndex++;
+    
+    return (
+      <button
+        key={opt.value}
+        data-index={itemIndex}
+        type="button"
+        onClick={() => handleSelect(opt.value)}
+        onMouseEnter={() => setActiveIndex(itemIndex)}
+        className={cn(
+          'w-full flex items-center gap-2 px-3 py-1.5 text-sm text-left rounded-md transition-colors hover:bg-accent',
+          isMatched && 'bg-accent font-medium',
+          isHighlighted && 'bg-accent outline-none ring-1 ring-ring/50'
+        )}
+      >
+        <Check className={cn('w-3.5 h-3.5 shrink-0', isMatched ? 'opacity-100 text-primary' : 'opacity-0')} />
+        <span className="flex-1 truncate">{opt.label}</span>
+        {opt.sub && <span className="text-xs text-muted-foreground font-mono shrink-0">{opt.sub}</span>}
+      </button>
+    );
+  };
 
   return (
     <Popover open={open} onOpenChange={o => { setOpen(o); if (!o) setSearch(''); }}>
@@ -94,13 +144,14 @@ export default function SearchableSelect({
             ref={inputRef}
             value={search}
             onChange={e => setSearch(e.target.value)}
+            onKeyDown={handleKeyDown}
             placeholder="Type to filter…"
             className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
           />
         </div>
 
         {/* Options list */}
-        <div className="overflow-y-auto max-h-72 p-1">
+        <div className="overflow-y-auto max-h-72 p-1" ref={listRef}>
           {groups ? (
             groups.map(g => {
               const filtered = filterOpts(g.options);
@@ -113,7 +164,7 @@ export default function SearchableSelect({
               );
             })
           ) : (
-            filterOpts(options).length === 0
+            flatVisibleOptions.length === 0
               ? <p className="px-3 py-4 text-sm text-center text-muted-foreground">No results</p>
               : filterOpts(options).map(renderOption)
           )}

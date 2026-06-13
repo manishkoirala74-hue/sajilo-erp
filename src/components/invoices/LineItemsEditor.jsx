@@ -70,7 +70,7 @@ export default function LineItemsEditor({ value = [], onChange, taxTypes = [] })
         updated[idx].unit_price     = found.selling_price || found.purchase_price || 0;
         updated[idx].vat_applicable = found.is_vat_applicable || taxIds.length > 0;
         updated[idx].tax_type_ids   = taxIds;
-        updated[idx].line_total     = (updated[idx].quantity || 1) * (found.selling_price || 0);
+        updated[idx].line_total     = (updated[idx].quantity || 1) * updated[idx].unit_price;
       }
     }
 

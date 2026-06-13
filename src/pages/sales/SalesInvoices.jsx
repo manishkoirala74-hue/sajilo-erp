@@ -239,6 +239,13 @@ export default function SalesInvoices() {
       } else {
         const created = await sajilo.entities.SalesInvoice.create(payload);
 
+        // Auto-increment the next invoice number in settings
+        if (settings && settings.invoice_numbering_method !== 'Manual') {
+          const next = (settings.invoice_next_number || 1) + 1;
+          await sajilo.entities.CompanySettings.update(settings.id, { invoice_next_number: next });
+          setSettings(s => ({ ...s, invoice_next_number: next }));
+        }
+
         if (postStatus === 'Posted') {
           for (const line of form.line_items) {
             if (line.item_id) {
@@ -567,6 +574,7 @@ export default function SalesInvoices() {
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <div><span className="text-muted-foreground">Customer:</span> <span className="font-medium">{viewDetail.customer_name}</span></div>
                 <div><span className="text-muted-foreground">Date:</span> <span className="font-medium">{viewDetail.invoice_date}</span></div>
+                <div><span className="text-muted-foreground">Created:</span> <span className="font-medium">{viewDetail.created_at ? new Date(viewDetail.created_at).toLocaleString() : '-'}</span></div>
                 <div><span className="text-muted-foreground">Due Date:</span> <span className="font-medium">{viewDetail.due_date}</span></div>
                 <div><span className="text-muted-foreground">Payment:</span> <StatusBadge status={viewDetail.payment_status} /></div>
                 <div><span className="text-muted-foreground">Subtotal:</span> <span className="font-medium">NPR {Number(viewDetail.goods_subtotal).toLocaleString()}</span></div>

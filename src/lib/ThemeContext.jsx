@@ -20,19 +20,35 @@ export function ThemeProvider({
   useEffect(() => {
     const root = window.document.documentElement;
 
+    const css = document.createElement('style');
+    css.appendChild(
+      document.createTextNode(
+        `* {
+          -webkit-transition: none !important;
+          -moz-transition: none !important;
+          -o-transition: none !important;
+          -ms-transition: none !important;
+          transition: none !important;
+        }`
+      )
+    );
+    document.head.appendChild(css);
+
     root.classList.remove("light", "dark");
 
     if (theme === "system") {
-      const systemTheme = window.matchMedia("(prefers-color-scheme: dark)")
-        .matches
-        ? "dark"
-        : "light";
-
+      const systemTheme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
       root.classList.add(systemTheme);
-      return;
+    } else {
+      root.classList.add(theme);
     }
 
-    root.classList.add(theme);
+    // Force restyle before removing the transition-blocking style
+    (() => window.getComputedStyle(document.body))();
+    setTimeout(() => {
+      document.head.removeChild(css);
+    }, 1);
+
   }, [theme]);
 
   const value = {

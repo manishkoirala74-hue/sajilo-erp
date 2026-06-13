@@ -40,7 +40,7 @@ export default function QuotationLineItems({ value = [], onChange, items = [], v
       item_name: item.item_name,
       item_code: item.item_code || '',
       hs_code: item.hs_code || '',
-      unit_price: item.selling_price || 0,
+      unit_price: item.selling_price || item.purchase_price || 0,
       vat_applicable: item.is_vat_applicable || false,
       description: appendedDesc.trim(),
     } : l);
