@@ -1,4 +1,4 @@
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useLocation, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { sajilo } from '@/api/sajiloClient';
 import { toast } from 'sonner';
@@ -13,6 +13,8 @@ import DataTable from '@/components/shared/DataTable';
 import StatusBadge from '@/components/shared/StatusBadge';
 import { useSajiloSync } from '@/hooks/useSajiloSync';
 import { postFinancialVoucher } from '@/lib/glPostingService';
+import VoucherLink from '@/components/shared/VoucherLink';
+
 const emptyVoucher = {
   voucher_type: 'Receipt', voucher_date: new Date().toISOString().split('T')[0],
   contact_name: '', payment_mode: 'Cash', reference_no: '', narration: '',
@@ -42,13 +44,39 @@ export default function FinancialVouchers() {
 
   useEffect(() => { fetchData(); }, []);
   const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
+  const navigate = useNavigate();
+
   useEffect(() => {
-    if (searchParams.get('new') === '1') {
+    const viewId = searchParams.get('view');
+    if (viewId) {
+      if (!viewOpen || selected?.voucher_number !== viewId) {
+        sajilo.entities.FinancialVoucher.filter({ voucher_number: viewId }).then(res => {
+          if (res.length > 0) {
+            setSelected({ ...res[0], _isViewMode: true });
+            setViewOpen(true);
+          }
+        });
+      }
+    } else if (searchParams.get('new') === '1') {
       (() => { setForm({ ...emptyVoucher, voucher_type: searchParams.get("type") || "Receipt" }); setOpen(true); })();
       searchParams.delete('new');
       setSearchParams(searchParams, { replace: true });
     }
-  }, [searchParams, setSearchParams]);
+  }, [searchParams]);
+
+  const closeViewDetail = () => {
+    setViewOpen(false);
+    setSelected(null);
+    if (searchParams.get('view')) {
+      if (location.state?.from) {
+        navigate(location.state.from);
+      } else {
+        searchParams.delete('view');
+        setSearchParams(searchParams, { replace: true });
+      }
+    }
+  };
 
   useSajiloSync(['ChartOfAccount'], fetchData);
 
@@ -277,7 +305,11 @@ export default function FinancialVouchers() {
   const filtered = filter === 'All' ? vouchers : vouchers.filter(v => v.voucher_type === filter || v.status === filter);
 
   const columns = [
-    { key: 'voucher_number', label: 'Voucher #' },
+    { key: 'voucher_number', label: 'Voucher #', render: (val) => (
+      <VoucherLink voucherNumber={val}>
+        <span className="font-mono font-medium text-primary cursor-pointer">{val}</span>
+      </VoucherLink>
+    ) },
     { key: 'voucher_type', label: 'Type', render: v => <StatusBadge status={v} /> },
     { key: 'voucher_date', label: 'Date', isDate: true },
     { key: 'contact_name', label: 'Contact' },
@@ -301,10 +333,10 @@ export default function FinancialVouchers() {
         actionIcon={Plus}
       />
 
-      <div className="flex gap-2 mb-4 flex-wrap">
-        {['All', 'Receipt', 'Payment', 'Journal', 'Contra', 'Draft', 'Posted'].map(f => (
-          <button key={f} onClick={() => setFilter(f)}
-            className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${filter === f ? 'bg-primary text-white' : 'bg-muted text-muted-foreground hover:bg-muted/80'}`}>
+      {/* Filter Tabs */}
+      <div className="flex gap-2 mb-4">
+        {['All', 'Receipt', 'Payment', 'Journal', 'Contra', 'Cancelled'].map(f => (
+          <button key={f} onClick={() => setFilter(f)} className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${filter === f ? 'bg-primary text-white' : 'bg-card border border-border text-muted-foreground hover:bg-muted'}`}>
             {f}
           </button>
         ))}
@@ -312,91 +344,131 @@ export default function FinancialVouchers() {
 
       <DataTable columns={columns} data={filtered} searchKey="contact_name" loading={loading} />
 
-      {/* Create Dialog */}
+      {/* Form Dialog */}
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>New Financial Voucher</DialogTitle></DialogHeader>
-          <div className="space-y-4">
+          <div className="space-y-4 mt-2">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label>Voucher Type</Label>
-                <SearchableSelect
-                  value={form.voucher_type}
-                  onValueChange={v => setForm({ ...form, voucher_type: v })}
-                  options={['Receipt', 'Payment', 'Journal', 'Contra'].map(t => ({ value: t, label: t }))}
-                />
+                <Label>Voucher Type *</Label>
+                <Select value={form.voucher_type} onValueChange={v => setForm({ ...emptyVoucher, voucher_type: v, voucher_date: form.voucher_date })}>
+                  <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Receipt">Receipt (Inflow)</SelectItem>
+                    <SelectItem value="Payment">Payment (Outflow)</SelectItem>
+                    <SelectItem value="Contra">Contra (Bank Transfer/Cash Dep)</SelectItem>
+                    <SelectItem value="Journal">Journal (Adjustment)</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div>
-                <Label>Date</Label>
-                <Input type="date" value={form.voucher_date} onChange={e => setForm({ ...form, voucher_date: e.target.value })} />
-              </div>
-              <div>
-                <Label>Contact Name</Label>
-                <Input value={form.contact_name} onChange={e => setForm({ ...form, contact_name: e.target.value })} />
-              </div>
-              <div>
-                <Label>Payment Mode</Label>
-                <SearchableSelect
-                  value={form.payment_mode}
-                  onValueChange={v => setForm({ ...form, payment_mode: v })}
-                  options={['Cash', 'Bank Transfer', 'Cheque', 'Digital Wallet'].map(m => ({ value: m, label: m }))}
-                />
-              </div>
-              <div>
-                <Label>Reference No</Label>
-                <Input value={form.reference_no} onChange={e => setForm({ ...form, reference_no: e.target.value })} />
-              </div>
-              <div>
-                <Label>Narration</Label>
-                <Input value={form.narration} onChange={e => setForm({ ...form, narration: e.target.value })} />
+                <Label>Date *</Label>
+                <Input type="date" value={form.voucher_date} onChange={e => setForm({ ...form, voucher_date: e.target.value })} className="mt-1" />
               </div>
             </div>
 
-            {/* Entries */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <Label>Ledger Entries</Label>
-                <Button size="sm" variant="outline" onClick={addEntry}>+ Add Row</Button>
+            {isPaymentType && (
+              <div className="grid grid-cols-2 gap-4 bg-muted/30 p-3 rounded-lg border border-border">
+                <div>
+                  <Label>Payment Source / Dest *</Label>
+                  <SearchableSelect
+                    options={paymentSourceAccounts.map(a => ({ value: a.id, label: `${a.account_name} (${a.account_type})` }))}
+                    value={form.entries[0]?.account_id}
+                    onChange={v => {
+                      const a = allAccounts.find(x => x.id === v);
+                      handleEntry(0, 'account_id', v);
+                      handleEntry(0, 'account_name', a?.account_name);
+                      handleEntry(0, 'account_code', a?.account_code);
+                      handleEntry(0, 'account_type', a?.account_type);
+                    }}
+                    placeholder="Select Cash/Bank account"
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label>Payment Mode</Label>
+                  <Select value={form.payment_mode} onValueChange={v => setForm({ ...form, payment_mode: v })}>
+                    <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Cash">Cash</SelectItem>
+                      <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
+                      <SelectItem value="Cheque">Cheque</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-              {isPaymentType && cashAccounts.length > 0 && (
-                <p className="text-xs text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 rounded px-3 py-1.5 mb-2">
-                  Row 1 (payment source) is restricted to <strong>Cash & Cash Equivalents</strong> accounts only.
-                </p>
-              )}
-              <div className="border rounded-lg">
+            )}
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Contact Name</Label>
+                <Input value={form.contact_name} onChange={e => setForm({ ...form, contact_name: e.target.value })} placeholder="Vendor, Customer, or Employee" className="mt-1" />
+              </div>
+              <div>
+                <Label>Reference No / Cheque No</Label>
+                <Input value={form.reference_no} onChange={e => setForm({ ...form, reference_no: e.target.value })} placeholder="Optional" className="mt-1" />
+              </div>
+              <div className="col-span-2">
+                <Label>Narration / Memo</Label>
+                <Input value={form.narration} onChange={e => setForm({ ...form, narration: e.target.value })} placeholder="Overall voucher description" className="mt-1" />
+              </div>
+            </div>
+
+            {/* Entries table */}
+            <div>
+              <div className="flex justify-between items-end mb-2">
+                <Label>Ledger Entries *</Label>
+                <Button variant="outline" size="sm" onClick={addEntry}><Plus className="w-4 h-4 mr-1" /> Add Row</Button>
+              </div>
+              <div className="border border-border rounded-lg overflow-hidden">
                 <table className="table-fluid-grid text-sm">
-                  <thead className="cell-density bg-muted/50">
-                    <tr>
-                      <th className="cell-density text-left font-medium text-muted-foreground">Account</th>
-                      <th className="cell-density text-left font-medium text-muted-foreground">Debit</th>
-                      <th className="cell-density text-left font-medium text-muted-foreground">Credit</th>
-                      <th className="cell-density "></th>
-                    </tr>
-                  </thead>
+                  <thead className="cell-density bg-muted/50"><tr>
+                    <th className="cell-density text-left w-2/5">Account</th>
+                    {form.voucher_type === 'Journal' && <th className="cell-density text-right w-1/6">Debit</th>}
+                    {form.voucher_type === 'Journal' && <th className="cell-density text-right w-1/6">Credit</th>}
+                    {form.voucher_type !== 'Journal' && <th className="cell-density text-right w-1/5">Amount</th>}
+                    <th className="cell-density text-left">Line Narration</th>
+                    <th className="cell-density w-10"></th>
+                  </tr></thead>
                   <tbody className="divide-y divide-border">
-                    {form.entries.map((e, idx) => {
-                      const accountOptions = idx === 0 && isPaymentType ? paymentSourceAccounts : ledgerAccounts;
+                    {form.entries.map((e, i) => {
+                      const isLocked = isPaymentType && i === 0;
                       return (
-                        <tr key={idx}>
+                        <tr key={i} className={isLocked ? "bg-muted/10" : ""}>
                           <td className="cell-density ">
                             <SearchableSelect
-                                value={e.account_id || ''}
-                                onValueChange={v => {
-                                  const acc = allAccounts.find(a => a.id === v);
-                                  handleEntry(idx, 'account_id', v);
-                                  handleEntry(idx, 'account_code', acc?.account_code || '');
-                                  handleEntry(idx, 'account_name', acc?.account_name || '');
-                                  handleEntry(idx, 'account_type', acc?.account_type || '');
-                                }}
-                                placeholder="Select account…"
-                                options={accountOptions.map(a => ({ value: a.id, label: a.account_name, sub: a.account_code }))}
-                              />
+                              options={ledgerAccounts.map(a => ({ value: a.id, label: `${a.account_name} (${a.account_type})` }))}
+                              value={e.account_id}
+                              onChange={v => {
+                                const a = allAccounts.find(x => x.id === v);
+                                handleEntry(i, 'account_id', v);
+                                handleEntry(i, 'account_name', a?.account_name);
+                                handleEntry(i, 'account_code', a?.account_code);
+                                handleEntry(i, 'account_type', a?.account_type);
+                              }}
+                              placeholder={isLocked ? "Source account..." : "Select account"}
+                              disabled={isLocked}
+                            />
                           </td>
-                          <td className="cell-density w-28"><Input type="number" value={e.debit} onChange={ev => handleEntry(idx, 'debit', ev.target.value)} className="h-8" /></td>
-                          <td className="cell-density w-28"><Input type="number" value={e.credit} onChange={ev => handleEntry(idx, 'credit', ev.target.value)} className="h-8" /></td>
-                          <td className="cell-density "><button onClick={() => removeEntry(idx)} className="text-red-500 hover:text-red-700 dark:text-red-400 px-2">×</button></td>
+                          {form.voucher_type === 'Journal' ? (
+                            <>
+                              <td className="cell-density "><Input type="number" min={0} value={e.debit || ''} onChange={ev => handleEntry(i, 'debit', ev.target.value)} disabled={e.credit > 0} className="text-right h-8" placeholder="0" /></td>
+                              <td className="cell-density "><Input type="number" min={0} value={e.credit || ''} onChange={ev => handleEntry(i, 'credit', ev.target.value)} disabled={e.debit > 0} className="text-right h-8" placeholder="0" /></td>
+                            </>
+                          ) : (
+                            <td className="cell-density ">
+                              <Input type="number" min={0} value={e.debit || ''} onChange={ev => handleEntry(i, 'debit', ev.target.value)} className="text-right h-8 font-medium" placeholder="Amount" disabled={isLocked} />
+                            </td>
+                          )}
+                          <td className="cell-density ">
+                            <Input value={e.narration || ''} onChange={ev => handleEntry(i, 'narration', ev.target.value)} className="h-8" placeholder="Line note" />
+                          </td>
+                          <td className="cell-density text-center">
+                            {!isLocked && <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => removeEntry(i)}><Trash2 className="w-4 h-4" /></Button>}
+                          </td>
                         </tr>
-                      );
+                      )
                     })}
                   </tbody>
                 </table>
@@ -416,9 +488,18 @@ export default function FinancialVouchers() {
       </Dialog>
 
       {/* View Dialog */}
-      <Dialog open={viewOpen} onOpenChange={v => { if (!v) { setViewOpen(false); setSelected(null); } }}>
+      <Dialog open={viewOpen} onOpenChange={closeViewDetail}>
         <DialogContent className="max-w-2xl">
-          <DialogHeader><DialogTitle>Voucher — {selected?.voucher_number}</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle className="flex items-center justify-between">
+              <div>Voucher — {selected?.voucher_number}</div>
+              {selected?._isViewMode && (
+                <span className="text-xs font-semibold bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 px-2 py-1 rounded border border-blue-200 dark:border-blue-800">
+                  View Mode
+                </span>
+              )}
+            </DialogTitle>
+          </DialogHeader>
           {selected && (
             <div className="space-y-4 text-sm">
               <div id="voucher-content" className="space-y-4 p-4 bg-card">
@@ -483,7 +564,7 @@ export default function FinancialVouchers() {
                 >
                   Download PDF
                 </Button>
-                {selected.status !== 'Cancelled' && (
+                {selected.status !== 'Cancelled' && !selected._isViewMode && (
                   <div className="flex justify-end gap-2">
                     <Button
                       variant="outline"

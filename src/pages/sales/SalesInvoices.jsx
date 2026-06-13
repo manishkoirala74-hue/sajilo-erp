@@ -1,4 +1,4 @@
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useLocation, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { sajilo } from '@/api/sajiloClient';
 import { Plus, Eye, CheckCircle2, XCircle, Ban, AlertTriangle, Pencil, RotateCcw } from 'lucide-react';
@@ -19,6 +19,8 @@ import { loadActiveTaxTypes, computeTotalTax } from '@/lib/taxService';
 import { useSajiloSync } from '@/hooks/useSajiloSync';
 import { usePermissions } from '@/lib/AuthContext';
 import SearchableSelect from '@/components/shared/SearchableSelect';
+import QuickPartnerCreate from '@/components/shared/QuickPartnerCreate';
+import VoucherLink from '@/components/shared/VoucherLink';
 
 const emptySI = {
   invoice_number: '', customer_id: '', customer_name: '', sales_order_id: '',
@@ -44,6 +46,7 @@ export default function SalesInvoices() {
   const [taxTypes, setTaxTypes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [showCustomerCreate, setShowCustomerCreate] = useState(false);
   const [viewDetail, setViewDetail] = useState(null);
   const [form, setForm] = useState(emptySI);
   const [saving, setSaving] = useState(false);
@@ -86,13 +89,35 @@ export default function SalesInvoices() {
     loadData();
   }, []);
   const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
+  const navigate = useNavigate();
+
   useEffect(() => {
-    if (searchParams.get('new') === '1') {
+    const viewId = searchParams.get('view');
+    if (viewId) {
+      if (!viewDetail || viewDetail.invoice_number !== viewId) {
+        sajilo.entities.SalesInvoice.filter({ invoice_number: viewId }).then(res => {
+          if (res.length > 0) setViewDetail({ ...res[0], _isViewMode: true });
+        });
+      }
+    } else if (searchParams.get('new') === '1') {
       openNew();
       searchParams.delete('new');
       setSearchParams(searchParams, { replace: true });
     }
-  }, [searchParams, setSearchParams]);
+  }, [searchParams]);
+
+  const closeViewDetail = () => {
+    setViewDetail(null);
+    if (searchParams.get('view')) {
+      if (location.state?.from) {
+        navigate(location.state.from);
+      } else {
+        searchParams.delete('view');
+        setSearchParams(searchParams, { replace: true });
+      }
+    }
+  };
 
 
   useSajiloSync(['BusinessPartner', 'SalesOrder', 'CompanySettings'], loadData);
@@ -313,11 +338,18 @@ export default function SalesInvoices() {
 
   const columns = [
     { key: 'invoice_number', label: 'Invoice #', render: (val, row) => (
-      <span className={`font-mono font-semibold ${row.status === 'Cancelled' ? 'line-through text-muted-foreground' : row.status === 'Rejected' ? 'text-orange-500 line-through' : 'text-primary'}`}>{val}</span>
+      <VoucherLink voucherNumber={val}>
+        <span className={`cursor-pointer font-mono font-semibold ${row.status === 'Cancelled' ? 'line-through text-muted-foreground' : row.status === 'Rejected' ? 'text-orange-500 line-through' : 'text-primary'}`}>{val}</span>
+      </VoucherLink>
     )},
-    { key: 'customer_name', label: 'Customer', render: (val, row) => (
-      <span className={row.status === 'Cancelled' || row.status === 'Rejected' ? 'text-muted-foreground' : ''}>{val || '—'}</span>
-    )},
+    { key: 'customer_name', label: 'Customer', render: (val, row) => {
+      let displayName = val;
+      if (!displayName && row.notes) {
+        const match = row.notes.match(/Payment Mode: (?:Cash|Bank) \((.+?)\)/);
+        if (match) displayName = match[1];
+      }
+      return <span className={row.status === 'Cancelled' || row.status === 'Rejected' ? 'text-muted-foreground' : ''}>{displayName || '—'}</span>;
+    }},
     { key: 'invoice_date', label: 'Date', isDate: true },
     { key: 'grand_total', label: 'Total', render: (val, row) => (
       <span className={`font-semibold ${row.status === 'Cancelled' ? 'line-through text-muted-foreground' : ''}`}>NPR {Number(val).toLocaleString()}</span>
@@ -451,6 +483,8 @@ export default function SalesInvoices() {
                   }}
                   placeholder="Select customer"
                   className="mt-1"
+                  onCreateNew={() => setShowCustomerCreate(true)}
+                  createNewText="New Customer"
                 />
               </div>
             ) : (
@@ -529,12 +563,19 @@ export default function SalesInvoices() {
       </Dialog>
 
       {/* ── VIEW DETAIL ── */}
-      <Dialog open={!!viewDetail} onOpenChange={() => setViewDetail(null)}>
+      <Dialog open={!!viewDetail} onOpenChange={closeViewDetail}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              Invoice {viewDetail?.invoice_number}
-              <StatusBadge status={viewDetail?.status} />
+            <DialogTitle className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                Invoice {viewDetail?.invoice_number}
+                <StatusBadge status={viewDetail?.status} />
+              </div>
+              {viewDetail?._isViewMode && (
+                <span className="text-xs font-semibold bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 px-2 py-1 rounded border border-blue-200 dark:border-blue-800">
+                  View Mode
+                </span>
+              )}
             </DialogTitle>
           </DialogHeader>
           {viewDetail && (
@@ -678,6 +719,16 @@ export default function SalesInvoices() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      
+      <QuickPartnerCreate
+        open={showCustomerCreate}
+        onOpenChange={setShowCustomerCreate}
+        type="customer"
+        onCreated={(customer) => {
+          setCustomers(prev => [...prev, customer]);
+          setForm(f => ({ ...f, customer_id: customer.id, customer_name: customer.name }));
+        }}
+      />
     </div>
   );
 }

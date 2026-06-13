@@ -15,6 +15,7 @@ import { sajilo } from '@/api/sajiloClient';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { format } from 'date-fns';
 import SearchableSelect from '@/components/shared/SearchableSelect';
+import VoucherLink from '@/components/shared/VoucherLink';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function fmtNPR(n) {
@@ -48,6 +49,20 @@ const DEFAULT_FILTERS = {
   showClosingBalance: true,
   showTransactions:   true,
 };
+
+const filterCache = {};
+export function useCachedFilters(key, defaultFilters) {
+  const [filters, setFilters] = useState(() => filterCache[key] || defaultFilters);
+  useEffect(() => { filterCache[key] = filters; }, [filters, key]);
+  return [filters, setFilters];
+}
+
+const stateCache = {};
+export function useCachedState(key, defaultState) {
+  const [state, setState] = useState(() => (stateCache[key] !== undefined ? stateCache[key] : defaultState));
+  useEffect(() => { stateCache[key] = state; }, [state, key]);
+  return [state, setState];
+}
 
 // ── Print Stylesheet ──────────────────────────────────────────────────────────
 const PRINT_STYLE = `
@@ -172,7 +187,7 @@ function ReportTable({ title, subtitle, headers, rows, footer, onExport, fromDat
 
 // ── Trial Balance (hierarchical, decentralized filters + partner drill-down) ───
 function TrialBalanceReport({ initialData, initialFromDate, initialToDate, initialColumnState }) {
-  const [filters, setFilters] = useState({
+  const [filters, setFilters] = useCachedFilters('trial_balance', {
     ...DEFAULT_FILTERS,
     fromDate: initialFromDate,
     toDate:   initialToDate,
@@ -325,7 +340,7 @@ function TrialBalanceReport({ initialData, initialFromDate, initialToDate, initi
 // ── Generic partner report (AR / AP) with metadata column picker ──────────────
 
 function CashFlowReport({ initialFromDate, initialToDate }) {
-  const [filters, setFilters] = useState({ ...DEFAULT_FILTERS, fromDate: initialFromDate, toDate: initialToDate });
+  const [filters, setFilters] = useCachedFilters('cash_flow', { ...DEFAULT_FILTERS, fromDate: initialFromDate, toDate: initialToDate });
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
 
@@ -382,7 +397,13 @@ function CashFlowReport({ initialFromDate, initialToDate }) {
         fromDate={filters.fromDate}
         toDate={filters.toDate}
         headers={['Date', 'Type', 'Voucher #', 'Description', 'Amount (NPR)']}
-        rows={data.details.map(d => [d.date, d.type, d.ref, d.desc, fmtNPR(d.amount)])}
+        rows={data.details.map(d => [
+          d.date, 
+          d.type, 
+          <VoucherLink voucherNumber={d.ref}><span className="cursor-pointer text-primary">{d.ref}</span></VoucherLink>, 
+          d.desc, 
+          fmtNPR(d.amount)
+        ])}
         footer={['', '', '', 'NET CASH FLOW', fmtNPR(data.netCashFlow)]}
         onExport={() => {}}
       />
@@ -392,11 +413,11 @@ function CashFlowReport({ initialFromDate, initialToDate }) {
 
 
 function PartnerSummaryReport({ title, mode, reportId, initialFromDate, initialToDate }) {
-  const [filters, setFilters] = useState({ ...DEFAULT_FILTERS, fromDate: initialFromDate, toDate: initialToDate });
-  const [data, setData] = useState([]);
-  const [partners, setPartners] = useState([]);
+  const [filters, setFilters] = useCachedFilters(`partner_summary_${reportId}`, { ...DEFAULT_FILTERS, fromDate: initialFromDate, toDate: initialToDate });
+  const [data, setData] = useCachedState(`partner_summary_data_${reportId}`, []);
+  const [partners, setPartners] = useCachedState(`partner_summary_partners_${reportId}`, []);
   const [loading, setLoading] = useState(false);
-  const [hasLoaded, setHasLoaded] = useState(false);
+  const [hasLoaded, setHasLoaded] = useCachedState(`partner_summary_hasLoaded_${reportId}`, false);
   const [metaCols, setMetaCols] = useState({ phone: false, tax_id: false, address: false });
 
   const isAR = mode === 'ar';
@@ -500,11 +521,11 @@ function PartnerSummaryReport({ title, mode, reportId, initialFromDate, initialT
 }
 
 function PartnerReport({ title, mode, initialFromDate, initialToDate }) {
-  const [filters,   setFilters]   = useState({ ...DEFAULT_FILTERS, fromDate: initialFromDate, toDate: initialToDate });
-  const [partners,  setPartners]  = useState([]);
-  const [invoices,  setInvoices]  = useState([]);
+  const [filters,   setFilters]   = useCachedFilters(`partner_report_${mode}`, { ...DEFAULT_FILTERS, fromDate: initialFromDate, toDate: initialToDate });
+  const [partners,  setPartners]  = useCachedState(`partner_report_partners_${mode}`, []);
+  const [invoices,  setInvoices]  = useCachedState(`partner_report_invoices_${mode}`, []);
   const [loading,   setLoading]   = useState(false);
-  const [hasLoaded, setHasLoaded] = useState(false);
+  const [hasLoaded, setHasLoaded] = useCachedState(`partner_report_hasLoaded_${mode}`, false);
   const [metaCols,  setMetaCols]  = useState({ phone: false, tax_id: false, address: false });
 
   const isAR = mode === 'ar';
@@ -615,10 +636,10 @@ function PartnerReport({ title, mode, initialFromDate, initialToDate }) {
 
 // ── Profit & Loss (Multi-Step Enterprise Format) ────────────────────────────────
 function ProfitLossReport({ initialData, initialFromDate, initialToDate }) {
-  const [filters,   setFilters]   = useState({ ...DEFAULT_FILTERS, fromDate: initialFromDate, toDate: initialToDate, expandAll: true });
-  const [data,      setData]      = useState(initialData);
+  const [filters,   setFilters]   = useCachedFilters('profit_loss', { ...DEFAULT_FILTERS, fromDate: initialFromDate, toDate: initialToDate, expandAll: true });
+  const [data,      setData]      = useCachedState('profit_loss_data', initialData);
   const [loading,   setLoading]   = useState(false);
-  const [hasLoaded, setHasLoaded] = useState(!!initialData);
+  const [hasLoaded, setHasLoaded] = useCachedState('profit_loss_hasLoaded', !!initialData);
   const [expanded,  setExpanded]  = useState({});
 
   const load = useCallback(async () => {
@@ -994,10 +1015,10 @@ function ProfitLossReport({ initialData, initialFromDate, initialToDate }) {
 
 // ── Balance Sheet (with decentralized filters) ────────────────────────────────
 function BalanceSheetReport({ initialData, initialFromDate, initialToDate }) {
-  const [filters, setFilters] = useState({ ...DEFAULT_FILTERS, fromDate: initialFromDate, toDate: initialToDate, reportType: 'balance_sheet' });
-  const [accounts, setAccounts] = useState([]);
+  const [filters, setFilters] = useCachedFilters('balance_sheet', { ...DEFAULT_FILTERS, fromDate: initialFromDate, toDate: initialToDate, reportType: 'balance_sheet' });
+  const [accounts, setAccounts] = useCachedState('balance_sheet_accounts', []);
   const [loading, setLoading] = useState(false);
-  const [hasLoaded, setHasLoaded] = useState(false);
+  const [hasLoaded, setHasLoaded] = useCachedState('balance_sheet_hasLoaded', false);
 
   const load = useCallback(async () => {
     setHasLoaded(true);
@@ -1069,10 +1090,10 @@ function BalanceSheetReport({ initialData, initialFromDate, initialToDate }) {
 
 // ── Simple flat report with local filter ──────────────────────────────────────
 function SimpleReport({ title, reportId, initialData, initialFromDate, initialToDate, renderFn }) {
-  const [filters,   setFilters]   = useState({ ...DEFAULT_FILTERS, fromDate: initialFromDate, toDate: initialToDate });
-  const [data,      setData]      = useState(initialData);
+  const [filters,   setFilters]   = useCachedFilters(`simple_report_${reportId}`, { ...DEFAULT_FILTERS, fromDate: initialFromDate, toDate: initialToDate });
+  const [data,      setData]      = useCachedState(`simple_report_data_${reportId}`, initialData);
   const [loading,   setLoading]   = useState(false);
-  const [hasLoaded, setHasLoaded] = useState(!!initialData);
+  const [hasLoaded, setHasLoaded] = useCachedState(`simple_report_hasLoaded_${reportId}`, !!initialData);
 
   const load = useCallback(async () => {
     setHasLoaded(true);
@@ -1103,12 +1124,12 @@ function SimpleReport({ title, reportId, initialData, initialFromDate, initialTo
 }
 // ── Detail General Ledger (with Account Picker) ───────────────────────────────
 function GeneralLedgerDetailReport({ initialFromDate, initialToDate }) {
-  const [filters,   setFilters]   = useState({ ...DEFAULT_FILTERS, fromDate: initialFromDate, toDate: initialToDate, accountId: '' });
+  const [filters,   setFilters]   = useCachedFilters('general_ledger_detail', { ...DEFAULT_FILTERS, fromDate: initialFromDate, toDate: initialToDate, accountId: '' });
   const [accounts,  setAccounts]  = useState([]);
-  const [lines,     setLines]     = useState([]);
-  const [summary,   setSummary]   = useState({ ob: 0, cb: 0, obIsDr: true, cbIsDr: true });
+  const [lines,     setLines]     = useCachedState('general_ledger_detail_lines', []);
+  const [summary,   setSummary]   = useCachedState('general_ledger_detail_summary', { ob: 0, cb: 0, obIsDr: true, cbIsDr: true });
   const [loading,   setLoading]   = useState(false);
-  const [hasLoaded, setHasLoaded] = useState(false);
+  const [hasLoaded, setHasLoaded] = useCachedState('general_ledger_detail_hasLoaded', false);
 
   useEffect(() => {
     sajilo.entities.ChartOfAccount.filter({ is_active: true, ledger_type: 'Sub Ledger' }, 'account_name', 1000).then(res => {
@@ -1189,7 +1210,7 @@ function GeneralLedgerDetailReport({ initialFromDate, initialToDate }) {
     ['', '', 'Opening Balance', '', '', fmtNPR(summary.ob) + (summary.obIsDr ? ' Dr' : ' Cr')],
     ...lines.map(l => [
       l.date,
-      l.voucher_no,
+      l.voucher_no ? <VoucherLink voucherNumber={l.voucher_no}><span className="cursor-pointer text-primary">{l.voucher_no}</span></VoucherLink> : '',
       l.description,
       fmtNPR(l.dr),
       fmtNPR(l.cr),
@@ -1199,7 +1220,17 @@ function GeneralLedgerDetailReport({ initialFromDate, initialToDate }) {
 
   const handleExport = () => downloadCSV('general_ledger_detail.csv',
     ['Date', 'Voucher #', 'Description', 'Debit', 'Credit', 'Balance'],
-    tableRows
+    [
+      ['', '', 'Opening Balance', '', '', fmtNPR(summary.ob) + (summary.obIsDr ? ' Dr' : ' Cr')],
+      ...lines.map(l => [
+        l.date,
+        l.voucher_no,
+        l.description,
+        fmtNPR(l.dr),
+        fmtNPR(l.cr),
+        fmtNPR(l.bal) + (l.balIsDr ? ' Dr' : ' Cr')
+      ])
+    ]
   );
 
   return (
@@ -1350,7 +1381,13 @@ export default function ReportViewer({ reportId, data, fromDate, toDate, columnS
           renderFn={(rows, fd, td) => (
             <ReportTable title="Journal Report" fromDate={fd} toDate={td}
               headers={['Date', 'Voucher #', 'Memo', 'Lines', 'Total Amount (NPR)']}
-              rows={rows.map(r => [r.entry_date?.split('T')[0], r.voucher_no, r.memo, r.lines?.length || 0, fmtNPR(r.total_amount)])}
+              rows={rows.map(r => [
+                r.entry_date?.split('T')[0], 
+                <VoucherLink voucherNumber={r.voucher_no}><span className="cursor-pointer text-primary">{r.voucher_no}</span></VoucherLink>, 
+                r.memo, 
+                r.lines?.length || 0, 
+                fmtNPR(r.total_amount)
+              ])}
               onExport={() => downloadCSV('journal_report.csv', ['Date','Voucher #','Memo','Lines','Total Amount'], rows.map(r=>[r.entry_date?.split('T')[0], r.voucher_no, r.memo, r.lines?.length || 0, r.total_amount?.toFixed(2)]))}
             />
           )} />;
@@ -1360,7 +1397,14 @@ export default function ReportViewer({ reportId, data, fromDate, toDate, columnS
           renderFn={(rows, fd, td) => (
             <ReportTable title="Transaction List" fromDate={fd} toDate={td}
               headers={['Date', 'Voucher #', 'Account', 'Description', 'Debit (NPR)', 'Credit (NPR)']}
-              rows={rows.map(r => [r.entry_date, r.voucher_no, r.account_name, r.description || r.journal_memo, fmtNPR(r.debit_amount), fmtNPR(r.credit_amount)])}
+              rows={rows.map(r => [
+                r.entry_date, 
+                <VoucherLink voucherNumber={r.voucher_no}><span className="cursor-pointer text-primary">{r.voucher_no}</span></VoucherLink>, 
+                r.account_name, 
+                r.description || r.journal_memo, 
+                fmtNPR(r.debit_amount), 
+                fmtNPR(r.credit_amount)
+              ])}
               footer={['', '', '', 'TOTAL', fmtNPR(rows.reduce((s,r)=>s+(r.debit_amount||0),0)), fmtNPR(rows.reduce((s,r)=>s+(r.credit_amount||0),0))]}
               onExport={() => downloadCSV('txn_list.csv', ['Date','Voucher','Account','Description','Debit','Credit'], rows.map(r=>[r.entry_date, r.voucher_no, r.account_name, r.description || r.journal_memo, r.debit_amount?.toFixed(2), r.credit_amount?.toFixed(2)]))}
             />

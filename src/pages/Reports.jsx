@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   BarChart2, TrendingUp, Users, CreditCard, Receipt,
   FileText, ChevronRight, RefreshCw, History, ShoppingCart, Warehouse, Settings2
@@ -106,14 +107,21 @@ const CM = {
   teal:    { bg: 'bg-teal-50 dark:bg-teal-500/10',    border: 'border-teal-200 dark:border-teal-500/20',   icon: 'text-teal-600 dark:text-teal-400',    badge: 'bg-teal-100 dark:bg-teal-500/20 text-teal-700 dark:text-teal-400',      btn: 'bg-teal-600 hover:bg-teal-700',     dot: 'bg-teal-500'    },
 };
 
-import { useNavigate } from 'react-router-dom';
+
+// ── Module-level cache for soft-navigation state restoration ──
+let cachedActiveCategory = 'accounting';
+let cachedViewer = null;
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function Reports() {
   const navigate = useNavigate();
-  const [activeCategory, setActiveCategory] = useState('accounting');
+  const [activeCategory, setActiveCategory] = useState(cachedActiveCategory);
   const [generating, setGenerating]         = useState(null);
-  const [viewer, setViewer]                 = useState(null);
+  const [viewer, setViewer]                 = useState(cachedViewer);
+
+  // Update cache whenever these states change
+  useEffect(() => { cachedActiveCategory = activeCategory; }, [activeCategory]);
+  useEffect(() => { cachedViewer = viewer; }, [viewer]);
   const fromDate = format(new Date(new Date().getFullYear(), 0, 1), 'yyyy-MM-dd');
   const toDate   = format(new Date(), 'yyyy-MM-dd');
 

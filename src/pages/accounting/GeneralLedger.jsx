@@ -9,6 +9,7 @@ import DateInput from '@/components/shared/DateInput';
 import { cn } from '@/lib/utils';
 import JournalEntryModal from '@/components/accounting/JournalEntryModal';
 import JournalDetailDrawer from '@/components/accounting/JournalDetailDrawer';
+import { VoucherTextLinkifier } from '@/components/shared/VoucherLink';
 
 const MODULE_COLORS = {
   Manufacturing: 'bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-400',
@@ -149,8 +150,8 @@ export default function GeneralLedger() {
                   <tr key={j.id} className="hover:bg-muted/20 cursor-pointer transition-colors" onClick={() => setSelectedJournal(j)}>
                     <td className="cell-density text-xs font-mono text-muted-foreground">{formatDate(j.entry_date)}</td>
                     <td className="cell-density font-medium max-w-xs">
-                      <p className="truncate">{j.description}</p>
-                      {j.notes && <p className="text-xs text-muted-foreground truncate">{j.notes}</p>}
+                      <p className="truncate" onClick={e => e.stopPropagation()}><VoucherTextLinkifier text={j.description} /></p>
+                      {j.notes && <p className="text-xs text-muted-foreground truncate" onClick={e => e.stopPropagation()}><VoucherTextLinkifier text={j.notes} /></p>}
                     </td>
                     <td className="cell-density ">
                       <span className={cn('inline-flex px-2 py-0.5 rounded text-xs font-medium', MODULE_COLORS[j.reference_module] || MODULE_COLORS.General)}>{j.reference_module}</span>

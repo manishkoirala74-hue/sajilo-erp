@@ -15,6 +15,7 @@ import { format } from 'date-fns';
 import DateInput from '@/components/shared/DateInput';
 import { postSalesReturn, loadItemsMap, loadSettings } from '@/lib/glPostingService';
 import { loadActiveTaxTypes, computeTotalTax } from '@/lib/taxService';
+import VoucherLink from '@/components/shared/VoucherLink';
 
 const emptyReturn = {
   return_number: '', sales_invoice_id: '', sales_invoice_number: '',
@@ -113,7 +114,7 @@ export default function SalesReturns() {
   };
 
   const columns = [
-    { key: 'return_number', label: 'Return #', render: v => <span className="font-mono font-semibold text-primary">{v}</span> },
+    { key: 'return_number', label: 'Return #', render: v => <VoucherLink voucherNumber={v}><span className="font-mono font-semibold text-primary cursor-pointer">{v}</span></VoucherLink> },
     { key: 'customer_name', label: 'Customer' },
     { key: 'return_source', label: 'Source', render: (v, row) => (
       <span className={cn('text-xs font-medium px-2 py-0.5 rounded-full border',

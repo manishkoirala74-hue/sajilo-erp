@@ -14,6 +14,7 @@ import { format } from 'date-fns';
 import DateInput from '@/components/shared/DateInput';
 import { postPurchaseReturn, loadItemsMap, loadSettings } from '@/lib/glPostingService';
 import { loadActiveTaxTypes, computeTotalTax } from '@/lib/taxService';
+import VoucherLink from '@/components/shared/VoucherLink';
 
 const emptyReturn = {
   return_number: '', purchase_invoice_id: '', purchase_invoice_number: '',
@@ -113,7 +114,7 @@ export default function PurchaseReturns() {
   };
 
   const columns = [
-    { key: 'return_number', label: 'Return #', render: v => <span className="font-mono font-semibold text-primary">{v}</span> },
+    { key: 'return_number', label: 'Return #', render: v => <VoucherLink voucherNumber={v}><span className="font-mono font-semibold text-primary cursor-pointer">{v}</span></VoucherLink> },
     { key: 'vendor_name', label: 'Vendor' },
     { key: 'purchase_invoice_number', label: 'Against Invoice', render: v => v || '—' },
     { key: 'return_date', label: 'Date', isDate: true },

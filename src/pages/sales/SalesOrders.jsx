@@ -1,3 +1,4 @@
+import { useSearchParams, useLocation, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { sajilo } from '@/api/sajiloClient';
 import { Plus, Eye, ArrowRight } from 'lucide-react';
@@ -15,6 +16,9 @@ import { format } from 'date-fns';
 import DateInput from '@/components/shared/DateInput';
 import { useSajiloSync } from '@/hooks/useSajiloSync';
 import { loadActiveTaxTypes, computeTotalTax } from '@/lib/taxService';
+import SearchableSelect from '@/components/shared/SearchableSelect';
+import QuickPartnerCreate from '@/components/shared/QuickPartnerCreate';
+import VoucherLink from '@/components/shared/VoucherLink';
 
 const FULFILLMENT_STATUSES = ['Draft', 'Confirmed', 'Preparing', 'Ready', 'Dispatched', 'Delivered'];
 
@@ -30,6 +34,7 @@ export default function SalesOrders() {
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [showCustomerCreate, setShowCustomerCreate] = useState(false);
   const [viewDetail, setViewDetail] = useState(null);
   const [form, setForm] = useState(emptySO);
   const [saving, setSaving] = useState(false);
@@ -52,6 +57,37 @@ export default function SalesOrders() {
   useEffect(() => {
     loadData();
   }, []);
+
+  const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const viewId = searchParams.get('view');
+    if (viewId) {
+      if (!viewDetail || viewDetail.order_number !== viewId) {
+        sajilo.entities.SalesOrder.filter({ order_number: viewId }).then(res => {
+          if (res.length > 0) setViewDetail({ ...res[0], _isViewMode: true });
+        });
+      }
+    } else if (searchParams.get('new') === '1') {
+      openNew();
+      searchParams.delete('new');
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, [searchParams]);
+
+  const closeViewDetail = () => {
+    setViewDetail(null);
+    if (searchParams.get('view')) {
+      if (location.state?.from) {
+        navigate(location.state.from);
+      } else {
+        searchParams.delete('view');
+        setSearchParams(searchParams, { replace: true });
+      }
+    }
+  };
 
   useSajiloSync(['BusinessPartner'], loadData);
 
@@ -105,7 +141,11 @@ export default function SalesOrders() {
   const filtered = filterStatus === 'all' ? orders : orders.filter(o => o.fulfillment_status === filterStatus);
 
   const columns = [
-    { key: 'order_number', label: 'Order #', render: (val) => <span className="font-mono font-semibold text-primary">{val}</span> },
+    { key: 'order_number', label: 'Order #', render: (val) => (
+      <VoucherLink voucherNumber={val}>
+        <span className="font-mono font-semibold text-primary cursor-pointer">{val}</span>
+      </VoucherLink>
+    ) },
     { key: 'customer_name', label: 'Customer' },
     { key: 'order_date', label: 'Date', isDate: true },
     { key: 'total_amount', label: 'Total', render: (val) => <span className="font-semibold">NPR {Number(val).toLocaleString()}</span> },
@@ -161,15 +201,18 @@ export default function SalesOrders() {
           <div className="grid grid-cols-2 gap-4 mt-4">
             <div>
               <Label>Customer *</Label>
-              <Select value={form.customer_id} onValueChange={v => {
-                const customer = customers.find(c => c.id === v);
-                setForm(f => ({ ...f, customer_id: v, customer_name: customer?.name || '' }));
-              }}>
-                <SelectTrigger className="mt-1"><SelectValue placeholder="Select customer" /></SelectTrigger>
-                <SelectContent>
-                  {customers.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <SearchableSelect
+                options={customers.map(c => ({ value: c.id, label: c.name }))}
+                value={form.customer_id}
+                onChange={v => {
+                  const c = customers.find(x => x.id === v);
+                  setForm(f => ({ ...f, customer_id: v, customer_name: c?.name || '' }));
+                }}
+                placeholder="Select customer"
+                className="mt-1"
+                onCreateNew={() => setShowCustomerCreate(true)}
+                createNewText="New Customer"
+              />
             </div>
             <div>
               <DateInput label="Order Date" value={form.order_date} onChange={v => setForm(f => ({...f, order_date: v}))} className="mt-1" />
@@ -190,6 +233,66 @@ export default function SalesOrders() {
             <Button variant="outline" onClick={() => setShowForm(false)}>Cancel</Button>
             <Button onClick={handleSave} disabled={saving}>{saving ? 'Saving...' : 'Create Order'}</Button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      <QuickPartnerCreate
+        open={showCustomerCreate}
+        onOpenChange={setShowCustomerCreate}
+        type="customer"
+        onCreated={(customer) => {
+          setCustomers(prev => [...prev, customer]);
+          setForm(f => ({ ...f, customer_id: customer.id, customer_name: customer.name }));
+        }}
+      />
+
+      {/* ── VIEW DETAIL ── */}
+      <Dialog open={!!viewDetail} onOpenChange={closeViewDetail}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                Sales Order {viewDetail?.order_number}
+                <StatusBadge status={viewDetail?.fulfillment_status} />
+              </div>
+              {viewDetail?._isViewMode && (
+                <span className="text-xs font-semibold bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 px-2 py-1 rounded border border-blue-200 dark:border-blue-800">
+                  View Mode
+                </span>
+              )}
+            </DialogTitle>
+          </DialogHeader>
+          {viewDetail && (
+            <div className="space-y-4 mt-2">
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div><span className="text-muted-foreground">Customer:</span> <span className="font-medium">{viewDetail.customer_name}</span></div>
+                <div><span className="text-muted-foreground">Date:</span> <span className="font-medium">{viewDetail.order_date}</span></div>
+                <div><span className="text-muted-foreground">Expected Delivery:</span> <span className="font-medium">{viewDetail.expected_delivery_date || '-'}</span></div>
+                <div><span className="text-muted-foreground">Subtotal:</span> <span className="font-medium">NPR {Number(viewDetail.subtotal).toLocaleString()}</span></div>
+                <div><span className="text-muted-foreground">Tax:</span> <span className="font-medium">NPR {Number(viewDetail.vat_amount).toLocaleString()}</span></div>
+                <div className="col-span-2"><span className="text-muted-foreground">Grand Total:</span> <span className="font-bold text-primary text-base"> NPR {Number(viewDetail.total_amount).toLocaleString()}</span></div>
+              </div>
+              {viewDetail.notes && <p className="text-sm text-muted-foreground border-t pt-3">{viewDetail.notes}</p>}
+              {(viewDetail.line_items || []).length > 0 && (
+                <div className="border-t pt-3">
+                  <p className="text-sm font-semibold mb-2">Line Items</p>
+                  <table className="table-fluid-grid text-xs">
+                    <thead><tr className="border-b text-muted-foreground"><th className="cell-density text-left py-1">Item</th><th className="cell-density text-right py-1">Qty</th><th className="cell-density text-right py-1">Price</th><th className="cell-density text-right py-1">Total</th></tr></thead>
+                    <tbody>
+                      {viewDetail.line_items.map((l, i) => (
+                        <tr key={i} className="border-b last:border-0">
+                          <td className="cell-density py-1">{l.item_name}</td>
+                          <td className="cell-density text-right py-1">{l.quantity}</td>
+                          <td className="cell-density text-right py-1">NPR {Number(l.unit_price).toLocaleString()}</td>
+                          <td className="cell-density text-right py-1 font-medium">NPR {Number(l.line_total).toLocaleString()}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

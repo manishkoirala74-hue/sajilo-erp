@@ -56,7 +56,14 @@ export default function QuotationPrint({ quotation: q, settings: s = {}, onClose
       <div className="bg-card rounded-2xl shadow-2xl w-full max-w-3xl mx-4">
         {/* Toolbar */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between px-6 py-4 border-b border-border gap-4 print:hidden">
-          <h2 className="font-semibold text-base">Print Preview — {q.quotation_number}</h2>
+          <div className="flex items-center gap-3">
+            <h2 className="font-semibold text-base">Print Preview — {q.quotation_number}</h2>
+            {q._isViewMode && (
+              <span className="text-xs font-semibold bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 px-2 py-1 rounded border border-blue-200 dark:border-blue-800">
+                View Mode
+              </span>
+            )}
+          </div>
           <div className="flex items-center gap-6">
             <div className="flex items-center gap-4 text-sm text-muted-foreground">
               <label className="flex items-center gap-2 cursor-pointer">

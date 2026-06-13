@@ -1,4 +1,4 @@
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useLocation, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { sajilo } from '@/api/sajiloClient';
 import { Plus, Eye, XCircle, Pencil, CheckCircle2, RotateCcw } from 'lucide-react';
@@ -18,6 +18,8 @@ import { postPurchaseInvoice, loadItemsMap, loadSettings } from '@/lib/glPosting
 import { computeTotalTax } from '@/lib/taxService';
 import { useSajiloSync } from '@/hooks/useSajiloSync';
 import SearchableSelect from '@/components/shared/SearchableSelect';
+import QuickPartnerCreate from '@/components/shared/QuickPartnerCreate';
+import VoucherLink from '@/components/shared/VoucherLink';
 
 const emptyPI = {
   invoice_number: '', vendor_invoice_no: '', po_reference_id: '',
@@ -41,6 +43,7 @@ export default function PurchaseInvoices() {
   const [taxTypes, setTaxTypes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [showVendorCreate, setShowVendorCreate] = useState(false);
   const [viewDetail, setViewDetail] = useState(null);
   const [form, setForm] = useState(emptyPI);
   const [saving, setSaving] = useState(false);
@@ -71,13 +74,35 @@ export default function PurchaseInvoices() {
     loadData();
   }, []);
   const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
+  const navigate = useNavigate();
+
   useEffect(() => {
-    if (searchParams.get('new') === '1') {
+    const viewId = searchParams.get('view');
+    if (viewId) {
+      if (!viewDetail || viewDetail.invoice_number !== viewId) {
+        sajilo.entities.PurchaseInvoice.filter({ invoice_number: viewId }).then(res => {
+          if (res.length > 0) setViewDetail({ ...res[0], _isViewMode: true });
+        });
+      }
+    } else if (searchParams.get('new') === '1') {
       openNew();
       searchParams.delete('new');
       setSearchParams(searchParams, { replace: true });
     }
-  }, [searchParams, setSearchParams]);
+  }, [searchParams]);
+
+  const closeViewDetail = () => {
+    setViewDetail(null);
+    if (searchParams.get('view')) {
+      if (location.state?.from) {
+        navigate(location.state.from);
+      } else {
+        searchParams.delete('view');
+        setSearchParams(searchParams, { replace: true });
+      }
+    }
+  };
 
 
   useSajiloSync(['BusinessPartner', 'PurchaseOrder'], loadData);
@@ -252,11 +277,18 @@ export default function PurchaseInvoices() {
 
   const columns = [
     { key: 'invoice_number', label: 'Invoice #', render: (val, row) => (
-      <span className={`font-mono font-semibold ${row.status === 'Cancelled' ? 'line-through text-muted-foreground' : 'text-primary'}`}>{val}</span>
+      <VoucherLink voucherNumber={val}>
+        <span className={`cursor-pointer font-mono font-semibold ${row.status === 'Cancelled' ? 'line-through text-muted-foreground' : 'text-primary'}`}>{val}</span>
+      </VoucherLink>
     )},
-    { key: 'vendor_name', label: 'Vendor', render: (val, row) => (
-      <span className={row.status === 'Cancelled' ? 'text-muted-foreground' : ''}>{val}</span>
-    )},
+    { key: 'vendor_name', label: 'Vendor', render: (val, row) => {
+      let displayName = val;
+      if (!displayName && row.notes) {
+        const match = row.notes.match(/Payment Mode: (?:Cash|Bank) \((.+?)\)/);
+        if (match) displayName = match[1];
+      }
+      return <span className={row.status === 'Cancelled' ? 'text-muted-foreground' : ''}>{displayName || '—'}</span>;
+    }},
     { key: 'vendor_invoice_no', label: "Vendor's Ref" },
     { key: 'invoice_date', label: 'Date', isDate: true },
     { key: 'grand_total', label: 'Total', render: (val, row) => (
@@ -361,6 +393,8 @@ export default function PurchaseInvoices() {
                   }}
                   placeholder="Select vendor"
                   className="mt-1"
+                  onCreateNew={() => setShowVendorCreate(true)}
+                  createNewText="New Vendor"
                 />
               </div>
             ) : (
@@ -439,12 +473,19 @@ export default function PurchaseInvoices() {
       </Dialog>
 
       {/* ── VIEW DETAIL ── */}
-      <Dialog open={!!viewDetail} onOpenChange={() => setViewDetail(null)}>
+      <Dialog open={!!viewDetail} onOpenChange={closeViewDetail}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              Purchase Invoice {viewDetail?.invoice_number}
-              <StatusBadge status={viewDetail?.status} />
+            <DialogTitle className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                Purchase Invoice {viewDetail?.invoice_number}
+                <StatusBadge status={viewDetail?.status} />
+              </div>
+              {viewDetail?._isViewMode && (
+                <span className="text-xs font-semibold bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 px-2 py-1 rounded border border-blue-200 dark:border-blue-800">
+                  View Mode
+                </span>
+              )}
             </DialogTitle>
           </DialogHeader>
           {viewDetail && (
@@ -524,6 +565,16 @@ export default function PurchaseInvoices() {
           </div>
         </DialogContent>
       </Dialog>
+      
+      <QuickPartnerCreate
+        open={showVendorCreate}
+        onOpenChange={setShowVendorCreate}
+        type="vendor"
+        onCreated={(vendor) => {
+          setVendors(prev => [...prev, vendor]);
+          setForm(f => ({ ...f, vendor_id: vendor.id, vendor_name: vendor.name }));
+        }}
+      />
     </div>
   );
 }

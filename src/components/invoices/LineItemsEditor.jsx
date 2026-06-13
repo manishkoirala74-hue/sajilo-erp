@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import SearchableSelect from '@/components/shared/SearchableSelect';
+import QuickItemCreate from '@/components/shared/QuickItemCreate';
 import { sajilo } from '@/api/sajiloClient';
 import { useSajiloSync } from '@/hooks/useSajiloSync';
 import { computeItemTaxes } from '@/lib/taxService';
@@ -27,6 +28,8 @@ const emptyLine = {
  */
 export default function LineItemsEditor({ value = [], onChange, taxTypes = [] }) {
   const [items, setItems] = useState([]);
+  const [showItemCreate, setShowItemCreate] = useState(false);
+  const [activeLineIdx, setActiveLineIdx] = useState(null);
 
   const loadItems = () => {
     sajilo.entities.Item.filter({ is_active: true }).then(setItems);
@@ -133,6 +136,11 @@ export default function LineItemsEditor({ value = [], onChange, taxTypes = [] })
                       options={items.map(i => ({ value: i.id, label: i.item_name, sub: i.item_code || i.unit_of_measure }))}
                       placeholder="Select item..."
                       className="w-full h-8 text-xs bg-card"
+                      onCreateNew={() => {
+                        setActiveLineIdx(idx);
+                        setShowItemCreate(true);
+                      }}
+                      createNewText="New Item"
                     />
                     {!line.item_id && line.item_name && (
                       <Input
@@ -223,6 +231,22 @@ export default function LineItemsEditor({ value = [], onChange, taxTypes = [] })
           </div>
         </div>
       </div>
+      
+      <QuickItemCreate 
+        open={showItemCreate} 
+        onOpenChange={setShowItemCreate}
+        onCreated={(newItem) => {
+          if (activeLineIdx !== null) {
+            // Need to update the items list first to ensure the select shows it
+            setItems(prev => [...prev, newItem]);
+            // Then wait a tick and update the line to use this new item
+            setTimeout(() => {
+              updateLine(activeLineIdx, 'item_id', newItem.id);
+              setActiveLineIdx(null);
+            }, 0);
+          }
+        }}
+      />
     </div>
   );
 }

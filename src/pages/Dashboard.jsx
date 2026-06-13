@@ -10,6 +10,7 @@ import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import StatCard from '@/components/shared/StatCard';
 import StatusBadge from '@/components/shared/StatusBadge';
+import VoucherLink from '@/components/shared/VoucherLink';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   BarChart, Bar, Legend
@@ -282,7 +283,13 @@ export default function Dashboard() {
               {recentSales.map(inv => (
                 <div key={inv.id} className="flex items-center justify-between px-4 py-3 hover:bg-muted/30">
                   <div>
-                    <p className="text-sm font-medium text-foreground">{inv.invoice_number || '—'}</p>
+                    <p className="text-sm font-medium text-foreground">
+                      {inv.invoice_number ? (
+                        <VoucherLink voucherNumber={inv.invoice_number}>
+                          <span className="cursor-pointer text-primary">{inv.invoice_number}</span>
+                        </VoucherLink>
+                      ) : '—'}
+                    </p>
                     <p className="text-xs text-muted-foreground">{inv.customer_name}</p>
                   </div>
                   <div className="text-right">

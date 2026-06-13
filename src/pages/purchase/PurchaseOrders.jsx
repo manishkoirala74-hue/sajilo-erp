@@ -1,3 +1,4 @@
+import { useSearchParams, useLocation, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { sajilo } from '@/api/sajiloClient';
 import { Plus, Eye, CheckCircle2, XCircle, Clock } from 'lucide-react';
@@ -16,6 +17,9 @@ import ItemPurchaseHistory from '@/components/purchase/ItemPurchaseHistory';
 import DateInput from '@/components/shared/DateInput';
 import { useSajiloSync } from '@/hooks/useSajiloSync';
 import { loadActiveTaxTypes, computeTotalTax } from '@/lib/taxService';
+import SearchableSelect from '@/components/shared/SearchableSelect';
+import QuickPartnerCreate from '@/components/shared/QuickPartnerCreate';
+import VoucherLink from '@/components/shared/VoucherLink';
 
 const emptyPO = {
   po_number: '', vendor_id: '', vendor_name: '', status: 'Draft',
@@ -29,6 +33,7 @@ export default function PurchaseOrders() {
   const [vendors, setVendors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [showVendorCreate, setShowVendorCreate] = useState(false);
   const [viewDetail, setViewDetail] = useState(null);
   const [form, setForm] = useState(emptyPO);
   const [saving, setSaving] = useState(false);
@@ -51,6 +56,37 @@ export default function PurchaseOrders() {
   useEffect(() => {
     loadData();
   }, []);
+
+  const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const viewId = searchParams.get('view');
+    if (viewId) {
+      if (!viewDetail || viewDetail.po_number !== viewId) {
+        sajilo.entities.PurchaseOrder.filter({ po_number: viewId }).then(res => {
+          if (res.length > 0) setViewDetail({ ...res[0], _isViewMode: true });
+        });
+      }
+    } else if (searchParams.get('new') === '1') {
+      openNew();
+      searchParams.delete('new');
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, [searchParams]);
+
+  const closeViewDetail = () => {
+    setViewDetail(null);
+    if (searchParams.get('view')) {
+      if (location.state?.from) {
+        navigate(location.state.from);
+      } else {
+        searchParams.delete('view');
+        setSearchParams(searchParams, { replace: true });
+      }
+    }
+  };
 
   useSajiloSync(['BusinessPartner'], loadData);
 
@@ -109,7 +145,11 @@ export default function PurchaseOrders() {
   const statuses = ['all', 'Draft', 'Pending Approval', 'Approved', 'Billed', 'Cancelled'];
 
   const columns = [
-    { key: 'po_number', label: 'PO Number', render: (val) => <span className="font-mono font-semibold text-primary">{val}</span> },
+    { key: 'po_number', label: 'PO Number', render: (val) => (
+      <VoucherLink voucherNumber={val}>
+        <span className="font-mono font-semibold text-primary cursor-pointer">{val}</span>
+      </VoucherLink>
+    ) },
     { key: 'vendor_name', label: 'Vendor' },
     { key: 'order_date', label: 'Date', isDate: true },
     {
@@ -188,15 +228,18 @@ export default function PurchaseOrders() {
           <div className="grid grid-cols-2 gap-4 mt-4">
             <div>
               <Label>Vendor *</Label>
-              <Select value={form.vendor_id} onValueChange={v => {
-                const vendor = vendors.find(vn => vn.id === v);
-                setForm(f => ({ ...f, vendor_id: v, vendor_name: vendor?.name || '' }));
-              }}>
-                <SelectTrigger className="mt-1"><SelectValue placeholder="Select vendor" /></SelectTrigger>
-                <SelectContent>
-                  {vendors.map(v => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <SearchableSelect
+                options={vendors.map(v => ({ value: v.id, label: v.name }))}
+                value={form.vendor_id}
+                onChange={v => {
+                  const vendor = vendors.find(x => x.id === v);
+                  setForm(f => ({ ...f, vendor_id: v, vendor_name: vendor?.name || '' }));
+                }}
+                placeholder="Select vendor"
+                className="mt-1"
+                onCreateNew={() => setShowVendorCreate(true)}
+                createNewText="New Vendor"
+              />
             </div>
             <div>
               <Label>Order Date</Label>
@@ -235,10 +278,17 @@ export default function PurchaseOrders() {
 
       {/* Detail Dialog */}
       {viewDetail && (
-        <Dialog open={!!viewDetail} onOpenChange={() => setViewDetail(null)}>
+        <Dialog open={!!viewDetail} onOpenChange={closeViewDetail}>
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Purchase Order — {viewDetail.po_number}</DialogTitle>
+              <DialogTitle className="flex items-center justify-between">
+                <div>Purchase Order — {viewDetail.po_number}</div>
+                {viewDetail?._isViewMode && (
+                  <span className="text-xs font-semibold bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 px-2 py-1 rounded border border-blue-200 dark:border-blue-800">
+                    View Mode
+                  </span>
+                )}
+              </DialogTitle>
             </DialogHeader>
             <div className="space-y-4 mt-4">
               <div className="grid grid-cols-2 gap-4 bg-muted/30 rounded-lg p-4">
@@ -279,6 +329,16 @@ export default function PurchaseOrders() {
           </DialogContent>
         </Dialog>
       )}
+
+      <QuickPartnerCreate
+        open={showVendorCreate}
+        onOpenChange={setShowVendorCreate}
+        type="vendor"
+        onCreated={(vendor) => {
+          setVendors(prev => [...prev, vendor]);
+          setForm(f => ({ ...f, vendor_id: vendor.id, vendor_name: vendor.name }));
+        }}
+      />
     </div>
   );
 }

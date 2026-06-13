@@ -184,19 +184,25 @@ const AuthenticatedApp = () => {
   );
 };
 
+import { GlobalVoucherDrawerProvider } from '@/lib/GlobalVoucherContext';
+import GlobalVoucherDrawer from '@/components/shared/GlobalVoucherDrawer';
+
 function App() {
   return (
-    <AuthProvider>
-      <DateFormatProvider>
-        <QueryClientProvider client={queryClientInstance}>
-          <Router>
-            <AuthenticatedApp />
-          </Router>
-          <Toaster />
-          <SonnerToaster position="top-right" richColors />
-        </QueryClientProvider>
-      </DateFormatProvider>
-    </AuthProvider>
+    <GlobalVoucherDrawerProvider>
+      <AuthProvider>
+        <DateFormatProvider>
+          <QueryClientProvider client={queryClientInstance}>
+            <Router>
+              <AuthenticatedApp />
+              <GlobalVoucherDrawer />
+            </Router>
+            <Toaster />
+            <SonnerToaster position="top-right" richColors />
+          </QueryClientProvider>
+        </DateFormatProvider>
+      </AuthProvider>
+    </GlobalVoucherDrawerProvider>
   );
 }
 

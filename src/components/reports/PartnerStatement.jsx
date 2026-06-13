@@ -3,6 +3,9 @@ import { sajilo } from '@/api/sajiloClient';
 import ReportFilterBar from '@/components/reports/ReportFilterBar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { adToBS } from '@/lib/nepaliDate';
+import VoucherLink from '@/components/shared/VoucherLink';
+
+import { useCachedFilters, useCachedState } from './ReportViewer';
 
 const DEFAULT_FILTERS = {
   showZeroBalance: false,
@@ -18,17 +21,17 @@ function fmtNPR(n) {
 }
 
 export default function PartnerStatement({ title, mode, initialFromDate, initialToDate }) {
-  const [filters, setFilters] = useState({ ...DEFAULT_FILTERS, fromDate: initialFromDate, toDate: initialToDate });
-  const [partners, setPartners] = useState([]);
-  const [selectedPartnerId, setSelectedPartnerId] = useState('');
+  const [filters, setFilters] = useCachedFilters(`partner_statement_${mode}_filters`, { ...DEFAULT_FILTERS, fromDate: initialFromDate, toDate: initialToDate });
+  const [partners, setPartners] = useCachedState(`partner_statement_${mode}_partners`, []);
+  const [selectedPartnerId, setSelectedPartnerId] = useCachedState(`partner_statement_${mode}_selectedId`, '');
   
-  const [company, setCompany] = useState(null);
-  const [partner, setPartner] = useState(null);
-  const [transactions, setTransactions] = useState([]);
-  const [summary, setSummary] = useState({ opening: 0, debit: 0, credit: 0, closing: 0 });
+  const [company, setCompany] = useCachedState(`partner_statement_${mode}_company`, null);
+  const [partner, setPartner] = useCachedState(`partner_statement_${mode}_partner`, null);
+  const [transactions, setTransactions] = useCachedState(`partner_statement_${mode}_txns`, []);
+  const [summary, setSummary] = useCachedState(`partner_statement_${mode}_summary`, { opening: 0, debit: 0, credit: 0, closing: 0 });
   
   const [loading, setLoading] = useState(false);
-  const [hasLoaded, setHasLoaded] = useState(false);
+  const [hasLoaded, setHasLoaded] = useCachedState(`partner_statement_${mode}_hasLoaded`, false);
 
   // Print configuration toggles
   const [printConfig, setPrintConfig] = useState({
@@ -333,7 +336,11 @@ export default function PartnerStatement({ title, mode, initialFromDate, initial
               {transactions.map((t, i) => (
                 <tr key={i} className="hover:bg-muted/50/50">
                   <td className="cell-density py-2.5 px-2 whitespace-nowrap text-muted-foreground">{displayDate(t.date)}</td>
-                  <td className="cell-density py-2.5 px-2 font-mono text-sm text-primary">{t.voucher}</td>
+                  <td className="cell-density py-2.5 px-2 font-mono text-sm text-primary">
+                    <VoucherLink voucherNumber={t.voucher}>
+                      <span className="cursor-pointer">{t.voucher}</span>
+                    </VoucherLink>
+                  </td>
                   <td className="cell-density py-2.5 px-2 text-muted-foreground">{t.description} {t.reference && <span className="text-slate-400 text-xs ml-1">(Ref: {t.reference})</span>}</td>
                   <td className="cell-density py-2.5 px-2 text-right tabular-nums font-mono">{t.debit > 0 ? fmtNPR(t.debit) : ''}</td>
                   <td className="cell-density py-2.5 px-2 text-right tabular-nums font-mono">{t.credit > 0 ? fmtNPR(t.credit) : ''}</td>

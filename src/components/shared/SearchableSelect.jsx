@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { ChevronDown, Check, Search } from 'lucide-react';
+import { ChevronDown, Check, Search, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 
@@ -16,6 +16,8 @@ export default function SearchableSelect({
   placeholder = 'Select…',
   className,
   disabled = false,
+  onCreateNew,
+  createNewText = "Create New",
 }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
@@ -169,6 +171,21 @@ export default function SearchableSelect({
               : filterOpts(options).map(renderOption)
           )}
         </div>
+        {onCreateNew && (
+          <div className="p-1 border-t bg-muted/10">
+            <button
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                onCreateNew();
+              }}
+              className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-primary font-medium rounded-md hover:bg-primary hover:text-primary-foreground transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              {createNewText}
+            </button>
+          </div>
+        )}
       </PopoverContent>
     </Popover>
   );

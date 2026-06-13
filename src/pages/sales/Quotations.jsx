@@ -1,3 +1,4 @@
+import { useSearchParams, useLocation, useNavigate } from 'react-router-dom';
 import { useState, useEffect, useRef } from 'react';
 import { sajilo } from '@/api/sajiloClient';
 import { Plus, Edit2, Printer, Copy, CheckCircle, XCircle, ArrowRight, FileText, Send } from 'lucide-react';
@@ -14,6 +15,9 @@ import QuotationPrint from '@/components/quotations/QuotationPrint';
 import QuotationLineItems from '@/components/quotations/QuotationLineItems';
 import { useSajiloSync } from '@/hooks/useSajiloSync';
 import { loadActiveTaxTypes, computeTotalTax } from '@/lib/taxService';
+import SearchableSelect from '@/components/shared/SearchableSelect';
+import QuickPartnerCreate from '@/components/shared/QuickPartnerCreate';
+import VoucherLink from '@/components/shared/VoucherLink';
 
 const STATUS_COLORS = {
   Draft: 'bg-gray-100 text-gray-700',
@@ -34,6 +38,7 @@ export default function Quotations() {
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState('all');
   const [showForm, setShowForm] = useState(false);
+  const [showCustomerCreate, setShowCustomerCreate] = useState(false);
   const [editing, setEditing] = useState(null);
   const [printTarget, setPrintTarget] = useState(null);
   const [form, setForm] = useState({});
@@ -61,6 +66,37 @@ export default function Quotations() {
   useEffect(() => {
     loadData();
   }, []);
+
+  const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const viewId = searchParams.get('view');
+    if (viewId) {
+      if (!printTarget || printTarget.quotation_number !== viewId) {
+        sajilo.entities.Quotation.filter({ quotation_number: viewId }).then(res => {
+          if (res.length > 0) setPrintTarget({ ...res[0], _isViewMode: true });
+        });
+      }
+    } else if (searchParams.get('new') === '1') {
+      openNew();
+      searchParams.delete('new');
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, [searchParams]);
+
+  const closePrintTarget = () => {
+    setPrintTarget(null);
+    if (searchParams.get('view')) {
+      if (location.state?.from) {
+        navigate(location.state.from);
+      } else {
+        searchParams.delete('view');
+        setSearchParams(searchParams, { replace: true });
+      }
+    }
+  };
 
   useSajiloSync(['BusinessPartner', 'Item', 'CompanySettings'], loadData);
 
@@ -232,7 +268,9 @@ export default function Quotations() {
               {filtered.map(q => (
                 <tr key={q.id} className="hover:bg-muted/20 transition-colors">
                   <td className="cell-density ">
-                    <span className="font-mono font-semibold text-primary">{q.quotation_number}</span>
+                    <VoucherLink voucherNumber={q.quotation_number}>
+                      <span className="font-mono font-semibold text-primary cursor-pointer">{q.quotation_number}</span>
+                    </VoucherLink>
                   </td>
                   <td className="cell-density ">
                     <p className="font-medium">{q.customer_name}</p>
@@ -309,12 +347,15 @@ export default function Quotations() {
             <div className="grid grid-cols-3 gap-4">
               <div className="col-span-2">
                 <Label>Customer *</Label>
-                <Select value={form.customer_id} onValueChange={handleCustomerSelect}>
-                  <SelectTrigger className="mt-1"><SelectValue placeholder="Select customer…" /></SelectTrigger>
-                  <SelectContent>
-                    {customers.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <SearchableSelect
+                  options={customers.map(c => ({ value: c.id, label: c.name }))}
+                  value={form.customer_id}
+                  onChange={handleCustomerSelect}
+                  placeholder="Select customer…"
+                  className="mt-1"
+                  onCreateNew={() => setShowCustomerCreate(true)}
+                  createNewText="New Customer"
+                />
               </div>
               <div>
                 <Label>Quotation Number</Label>
@@ -439,9 +480,19 @@ export default function Quotations() {
         <QuotationPrint
           quotation={printTarget}
           settings={settings}
-          onClose={() => setPrintTarget(null)}
+          onClose={closePrintTarget}
         />
       )}
+
+      <QuickPartnerCreate
+        open={showCustomerCreate}
+        onOpenChange={setShowCustomerCreate}
+        type="customer"
+        onCreated={(customer) => {
+          setCustomers(prev => [...prev, customer]);
+          setForm(f => ({ ...f, customer_id: customer.id, customer_name: customer.name }));
+        }}
+      />
     </div>
   );
 }
