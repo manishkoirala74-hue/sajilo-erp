@@ -53,23 +53,23 @@ export default function QuotationLineItems({ value = [], onChange, items = [], v
   return (
     <div className="space-y-2">
       <div className="overflow-x-auto rounded-lg border border-border">
-        <table className="w-full text-sm">
-          <thead className="bg-muted/30">
+        <table className="table-fluid-grid text-sm">
+          <thead className="cell-density bg-muted/30">
             <tr>
-              <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground w-52">Item</th>
-              <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground">Description</th>
-              <th className="text-center px-3 py-2 text-xs font-semibold text-muted-foreground w-20">Qty</th>
-              <th className="text-center px-3 py-2 text-xs font-semibold text-muted-foreground w-28">Unit Price</th>
-              <th className="text-center px-3 py-2 text-xs font-semibold text-muted-foreground w-20">Disc %</th>
-              <th className="text-center px-3 py-2 text-xs font-semibold text-muted-foreground w-16">VAT</th>
-              <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground w-28">Total</th>
-              <th className="w-8" />
+              <th className="cell-density text-left  text-xs font-semibold text-muted-foreground w-52">Item</th>
+              <th className="cell-density text-left  text-xs font-semibold text-muted-foreground">Description</th>
+              <th className="cell-density text-center  text-xs font-semibold text-muted-foreground w-20">Qty</th>
+              <th className="cell-density text-center  text-xs font-semibold text-muted-foreground w-28">Unit Price</th>
+              <th className="cell-density text-center  text-xs font-semibold text-muted-foreground w-20">Disc %</th>
+              <th className="cell-density text-center  text-xs font-semibold text-muted-foreground w-16">VAT</th>
+              <th className="cell-density text-right  text-xs font-semibold text-muted-foreground w-28">Total</th>
+              <th className="cell-density w-8" />
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
             {value.map((line, idx) => (
               <tr key={idx} className="hover:bg-muted/10">
-                <td className="px-2 py-1.5">
+                <td className="cell-density ">
                   <SearchableSelect 
                     value={line.item_id || ''} 
                     onChange={v => selectItem(idx, v)}
@@ -80,35 +80,35 @@ export default function QuotationLineItems({ value = [], onChange, items = [], v
                     }))}
                   />
                 </td>
-                <td className="px-2 py-1.5">
+                <td className="cell-density ">
                   <Input value={line.description || ''} onChange={e => update(idx, 'description', e.target.value)}
                     className="h-8 text-xs" placeholder="Optional description" />
                 </td>
-                <td className="px-2 py-1.5">
+                <td className="cell-density ">
                   <Input type="number" min={0} value={line.quantity}
                     onChange={e => update(idx, 'quantity', Number(e.target.value))}
                     onBlur={() => onChange(recalc(value))}
                     className="h-8 text-xs text-center" />
                 </td>
-                <td className="px-2 py-1.5">
+                <td className="cell-density ">
                   <Input type="number" min={0} value={line.unit_price}
                     onChange={e => update(idx, 'unit_price', Number(e.target.value))}
                     onBlur={() => onChange(recalc(value))}
                     className="h-8 text-xs text-right" />
                 </td>
-                <td className="px-2 py-1.5">
+                <td className="cell-density ">
                   <Input type="number" min={0} max={100} value={line.discount_percent || 0}
                     onChange={e => update(idx, 'discount_percent', Number(e.target.value))}
                     onBlur={() => onChange(recalc(value))}
                     className="h-8 text-xs text-center" />
                 </td>
-                <td className="px-2 py-1.5 text-center">
+                <td className="cell-density text-center">
                   <Switch checked={!!line.vat_applicable} onCheckedChange={v => update(idx, 'vat_applicable', v)} />
                 </td>
-                <td className="px-2 py-1.5 text-right font-semibold text-sm">
+                <td className="cell-density text-right font-semibold text-sm">
                   {Number(line.line_total || 0).toLocaleString()}
                 </td>
-                <td className="px-1 py-1.5">
+                <td className="cell-density ">
                   <Button variant="ghost" size="icon" className="h-7 w-7 text-red-400 hover:text-red-600 dark:text-red-400" onClick={() => removeLine(idx)}>
                     <Trash2 className="w-3.5 h-3.5" />
                   </Button>

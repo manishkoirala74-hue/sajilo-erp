@@ -102,26 +102,33 @@ SelectValue.displayName = "SelectValue"
 const SelectContent = React.forwardRef(({ className, children, position = "popper", searchable = true, ...props }, ref) => {
   const { open } = React.useContext(SelectContext)
 
-  if (!open) return null;
-
   return (
-    <PopoverContent
-      ref={ref}
-      className={cn(
-        "relative z-50 max-h-96 min-w-[8rem] overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-md p-0",
-        position === "popper" && "w-[var(--radix-popover-trigger-width)]",
-        className
+    <>
+      {!open && (
+        <div className="hidden" style={{ display: 'none' }} aria-hidden="true">
+          <CommandList>{children}</CommandList>
+        </div>
       )}
-      align="start"
-      sideOffset={4}
-      onOpenAutoFocus={(e) => e.preventDefault()}
-      {...props}
-    >
-      <CommandList className="max-h-[300px] overflow-y-auto overflow-x-hidden p-1">
-        <CommandEmpty>No results found.</CommandEmpty>
-        {children}
-      </CommandList>
-    </PopoverContent>
+      {open && (
+        <PopoverContent
+          ref={ref}
+          className={cn(
+            "relative z-50 max-h-96 min-w-[8rem] overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-md p-0",
+            position === "popper" && "w-[var(--radix-popover-trigger-width)]",
+            className
+          )}
+          align="start"
+          sideOffset={4}
+          onOpenAutoFocus={(e) => e.preventDefault()}
+          {...props}
+        >
+          <CommandList className="max-h-[300px] overflow-y-auto overflow-x-hidden p-1">
+            <CommandEmpty>No results found.</CommandEmpty>
+            {children}
+          </CommandList>
+        </PopoverContent>
+      )}
+    </>
   )
 })
 SelectContent.displayName = "SelectContent"

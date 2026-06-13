@@ -153,14 +153,14 @@ export default function DepreciationSettings({ settings, onChange }) {
         <div className="bg-muted/30 rounded-lg p-3 text-xs mb-5">
           <p className="font-semibold mb-2">Journal Entry Preview ({postingMode}):</p>
           {postingMode === 'Accumulated' ? (
-            <table className="w-full text-xs"><tbody>
-              <tr><td className="py-0.5 text-blue-700 dark:text-blue-400 font-mono">Dr</td><td className="py-0.5">Depreciation Expense (OPEX/COGS)</td><td className="py-0.5 text-right font-mono">X</td></tr>
-              <tr><td className="py-0.5 pl-4 text-emerald-700 dark:text-emerald-400 font-mono">Cr</td><td className="py-0.5 pl-4">Accumulated Depreciation (Contra-Asset)</td><td className="py-0.5 text-right font-mono">X</td></tr>
+            <table className="table-fluid-grid text-xs"><tbody>
+              <tr><td className="cell-density py-0.5 text-blue-700 dark:text-blue-400 font-mono">Dr</td><td className="cell-density py-0.5">Depreciation Expense (OPEX/COGS)</td><td className="cell-density py-0.5 text-right font-mono">X</td></tr>
+              <tr><td className="cell-density py-0.5 pl-4 text-emerald-700 dark:text-emerald-400 font-mono">Cr</td><td className="cell-density py-0.5 pl-4">Accumulated Depreciation (Contra-Asset)</td><td className="cell-density py-0.5 text-right font-mono">X</td></tr>
             </tbody></table>
           ) : (
-            <table className="w-full text-xs"><tbody>
-              <tr><td className="py-0.5 text-blue-700 dark:text-blue-400 font-mono">Dr</td><td className="py-0.5">Depreciation Expense (OPEX/COGS)</td><td className="py-0.5 text-right font-mono">X</td></tr>
-              <tr><td className="py-0.5 pl-4 text-emerald-700 dark:text-emerald-400 font-mono">Cr</td><td className="py-0.5 pl-4">Asset Account (Cost) — Direct reduction</td><td className="py-0.5 text-right font-mono">X</td></tr>
+            <table className="table-fluid-grid text-xs"><tbody>
+              <tr><td className="cell-density py-0.5 text-blue-700 dark:text-blue-400 font-mono">Dr</td><td className="cell-density py-0.5">Depreciation Expense (OPEX/COGS)</td><td className="cell-density py-0.5 text-right font-mono">X</td></tr>
+              <tr><td className="cell-density py-0.5 pl-4 text-emerald-700 dark:text-emerald-400 font-mono">Cr</td><td className="cell-density py-0.5 pl-4">Asset Account (Cost) — Direct reduction</td><td className="cell-density py-0.5 text-right font-mono">X</td></tr>
             </tbody></table>
           )}
         </div>

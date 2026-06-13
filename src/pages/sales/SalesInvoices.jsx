@@ -202,36 +202,14 @@ export default function SalesInvoices() {
 
       if (form.id) {
         const oldInv = invoices.find(i => i.id === form.id);
-        if (oldInv && oldInv.status === 'Posted') {
-          for (const line of (oldInv.line_items || [])) {
-            if (line.item_id) {
-              const items = await sajilo.entities.Item.filter({ id: line.item_id });
-              if (items.length > 0) {
-                const item = items[0];
-                const restoredQty = (item.quantity_on_hand || 0) + (line.quantity || 0);
-                await sajilo.entities.Item.update(item.id, { quantity_on_hand: restoredQty });
-              }
-            }
-          }
-          const [itemsMap, glSettings] = await Promise.all([loadItemsMap((oldInv.line_items || []).map(l => l.item_id)), loadSettings()]);
-          await postSalesInvoice(oldInv, itemsMap, glSettings, true);
-        }
+        const isReversal = oldInv && oldInv.status === 'Posted';
 
         await sajilo.entities.SalesInvoice.update(form.id, payload);
 
         if (postStatus === 'Posted') {
-          for (const line of form.line_items) {
-            if (line.item_id) {
-              const items = await sajilo.entities.Item.filter({ id: line.item_id });
-              if (items.length > 0) {
-                const item = items[0];
-                const newQty = Math.max(0, (item.quantity_on_hand || 0) - (line.quantity || 0));
-                await sajilo.entities.Item.update(item.id, { quantity_on_hand: newQty });
-              }
-            }
-          }
           const [itemsMap, glSettings] = await Promise.all([loadItemsMap(form.line_items.map(l => l.item_id)), loadSettings()]);
-          await postSalesInvoice(data, itemsMap, glSettings);
+          const idempotencyKey = crypto.randomUUID();
+          await postSalesInvoice({ ...data, id: form.id }, itemsMap, glSettings, isReversal, idempotencyKey);
           toast.success('Invoice updated and posted — stock deducted & GL updated');
         } else {
           toast.success('Invoice updated as draft');
@@ -239,7 +217,6 @@ export default function SalesInvoices() {
       } else {
         const created = await sajilo.entities.SalesInvoice.create(payload);
 
-        // Auto-increment the next invoice number in settings
         if (settings && settings.invoice_numbering_method !== 'Manual') {
           const next = (settings.invoice_next_number || 1) + 1;
           await sajilo.entities.CompanySettings.update(settings.id, { invoice_next_number: next });
@@ -247,18 +224,9 @@ export default function SalesInvoices() {
         }
 
         if (postStatus === 'Posted') {
-          for (const line of form.line_items) {
-            if (line.item_id) {
-              const items = await sajilo.entities.Item.filter({ id: line.item_id });
-              if (items.length > 0) {
-                const item = items[0];
-                const newQty = Math.max(0, (item.quantity_on_hand || 0) - (line.quantity || 0));
-                await sajilo.entities.Item.update(item.id, { quantity_on_hand: newQty });
-              }
-            }
-          }
           const [itemsMap, glSettings] = await Promise.all([loadItemsMap(form.line_items.map(l => l.item_id)), loadSettings()]);
-          await postSalesInvoice({ ...data, id: created.id }, itemsMap, glSettings);
+          const idempotencyKey = crypto.randomUUID();
+          await postSalesInvoice({ ...data, id: created.id }, itemsMap, glSettings, false, idempotencyKey);
           toast.success('Invoice posted — stock deducted & GL updated');
         } else {
           toast.success('Invoice saved as draft');
@@ -599,15 +567,15 @@ export default function SalesInvoices() {
               {(viewDetail.line_items || []).length > 0 && (
                 <div className="border-t pt-3">
                   <p className="text-sm font-semibold mb-2">Line Items</p>
-                  <table className="w-full text-xs">
-                    <thead><tr className="border-b text-muted-foreground"><th className="text-left py-1">Item</th><th className="text-right py-1">Qty</th><th className="text-right py-1">Price</th><th className="text-right py-1">Total</th></tr></thead>
+                  <table className="table-fluid-grid text-xs">
+                    <thead><tr className="border-b text-muted-foreground"><th className="cell-density text-left py-1">Item</th><th className="cell-density text-right py-1">Qty</th><th className="cell-density text-right py-1">Price</th><th className="cell-density text-right py-1">Total</th></tr></thead>
                     <tbody>
                       {viewDetail.line_items.map((l, i) => (
                         <tr key={i} className="border-b last:border-0">
-                          <td className="py-1">{l.item_name}</td>
-                          <td className="text-right py-1">{l.quantity}</td>
-                          <td className="text-right py-1">NPR {Number(l.unit_price).toLocaleString()}</td>
-                          <td className="text-right py-1 font-medium">NPR {Number(l.line_total).toLocaleString()}</td>
+                          <td className="cell-density py-1">{l.item_name}</td>
+                          <td className="cell-density text-right py-1">{l.quantity}</td>
+                          <td className="cell-density text-right py-1">NPR {Number(l.unit_price).toLocaleString()}</td>
+                          <td className="cell-density text-right py-1 font-medium">NPR {Number(l.line_total).toLocaleString()}</td>
                         </tr>
                       ))}
                     </tbody>

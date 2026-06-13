@@ -216,43 +216,43 @@ export default function Quotations() {
             <Button className="mt-4" onClick={openNew}><Plus className="w-4 h-4 mr-1" /> New Quotation</Button>
           </div>
         ) : (
-          <table className="w-full text-sm">
-            <thead className="bg-muted/30 border-b border-border">
+          <table className="table-fluid-grid text-sm">
+            <thead className="cell-density bg-muted/30 border-b border-border">
               <tr>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground">Quotation #</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground">Customer</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground">Date</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground">Valid Until</th>
-                <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground">Amount</th>
-                <th className="text-center px-4 py-3 text-xs font-semibold text-muted-foreground">Status</th>
-                <th className="px-4 py-3 text-xs font-semibold text-muted-foreground text-right">Actions</th>
+                <th className="cell-density text-left  text-xs font-semibold text-muted-foreground">Quotation #</th>
+                <th className="cell-density text-left  text-xs font-semibold text-muted-foreground">Customer</th>
+                <th className="cell-density text-left  text-xs font-semibold text-muted-foreground">Date</th>
+                <th className="cell-density text-left  text-xs font-semibold text-muted-foreground">Valid Until</th>
+                <th className="cell-density text-right  text-xs font-semibold text-muted-foreground">Amount</th>
+                <th className="cell-density text-center  text-xs font-semibold text-muted-foreground">Status</th>
+                <th className="cell-density text-xs font-semibold text-muted-foreground text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
               {filtered.map(q => (
                 <tr key={q.id} className="hover:bg-muted/20 transition-colors">
-                  <td className="px-4 py-3">
+                  <td className="cell-density ">
                     <span className="font-mono font-semibold text-primary">{q.quotation_number}</span>
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="cell-density ">
                     <p className="font-medium">{q.customer_name}</p>
                     {q.customer_email && <p className="text-xs text-muted-foreground">{q.customer_email}</p>}
                   </td>
-                  <td className="px-4 py-3 text-muted-foreground">{q.quotation_date}</td>
-                  <td className="px-4 py-3">
+                  <td className="cell-density text-muted-foreground">{q.quotation_date}</td>
+                  <td className="cell-density ">
                     {q.valid_until ? (
                       <span className={new Date(q.valid_until) < new Date() && q.status === 'Sent' ? 'text-red-500 font-medium' : 'text-muted-foreground'}>
                         {q.valid_until}
                       </span>
                     ) : '—'}
                   </td>
-                  <td className="px-4 py-3 text-right font-semibold">NPR {Number(q.grand_total).toLocaleString()}</td>
-                  <td className="px-4 py-3 text-center">
+                  <td className="cell-density text-right font-semibold">NPR {Number(q.grand_total).toLocaleString()}</td>
+                  <td className="cell-density text-center">
                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[q.status] || 'bg-gray-100 text-gray-700'}`}>
                       {q.status}
                     </span>
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="cell-density ">
                     <div className="flex items-center justify-end gap-1">
                       <Button variant="ghost" size="icon" className="h-7 w-7" title="Print / Preview" onClick={() => openPrint(q)}>
                         <Printer className="w-3.5 h-3.5 text-muted-foreground" />

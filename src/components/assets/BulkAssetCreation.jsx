@@ -418,10 +418,10 @@ export default function BulkAssetCreation({ open, onClose, accounts, assets, onS
 
         {/* ── Grid ── */}
         <div className="overflow-auto flex-1">
-          <table className="w-full text-xs border-collapse">
-            <thead className="sticky top-0 z-10">
+          <table className="table-fluid-grid text-xs border-collapse">
+            <thead className="cell-density sticky top-0 z-10">
               <tr className="bg-primary text-primary-foreground">
-                <th className="px-2 py-2.5 text-left font-semibold border-r border-primary/20 w-8">#</th>
+                <th className="cell-density text-left font-semibold border-r border-primary/20 w-8">#</th>
                 {COLS.map(c => (
                   <th key={c.key} className={cn('px-2 py-2.5 text-left font-semibold border-r border-primary/20 whitespace-nowrap', c.width)}>
                     {c.label}
@@ -440,7 +440,7 @@ export default function BulkAssetCreation({ open, onClose, accounts, assets, onS
                       isValid ? 'bg-card' : 'bg-muted/10'
                     )}
                   >
-                    <td className="px-2 py-1.5 text-center text-muted-foreground border-r border-border font-mono w-8">
+                    <td className="cell-density text-center text-muted-foreground border-r border-border font-mono w-8">
                       {idx + 1}
                     </td>
 
@@ -551,7 +551,7 @@ export default function BulkAssetCreation({ open, onClose, accounts, assets, onS
                     </td>
 
                     {/* Delete row */}
-                    <td className="px-1.5 py-1 w-10">
+                    <td className="cell-density px-1.5 py-1 w-10">
                       <button
                         type="button"
                         onClick={() => deleteRow(idx)}

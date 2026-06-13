@@ -215,14 +215,14 @@ export default function CompanyManagement() {
       )}
 
       <div className="bg-card border border-border rounded-lg overflow-hidden">
-        <table className="w-full text-sm text-left">
-          <thead className="bg-muted/50 border-b border-border">
+        <table className="table-fluid-grid text-sm text-left">
+          <thead className="cell-density bg-muted/50 border-b border-border">
             <tr>
-              <th className="px-4 py-3 font-medium">Company Name</th>
-              <th className="px-4 py-3 font-medium">Tax ID</th>
-              <th className="px-4 py-3 font-medium">Contact</th>
-              <th className="px-4 py-3 font-medium">Status</th>
-              <th className="px-4 py-3 font-medium text-right">Actions</th>
+              <th className="cell-density font-medium">Company Name</th>
+              <th className="cell-density font-medium">Tax ID</th>
+              <th className="cell-density font-medium">Contact</th>
+              <th className="cell-density font-medium">Status</th>
+              <th className="cell-density font-medium text-right">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -230,21 +230,21 @@ export default function CompanyManagement() {
               const isDefault = userCompanies.find(uc => uc.company_id === c.id)?.is_default;
               return (
               <tr key={c.id} className="border-b border-border last:border-0 hover:bg-muted/20">
-                <td className="px-4 py-3 font-medium">
+                <td className="cell-density font-medium">
                   {c.name}
                   {isDefault && <span className="ml-2 text-xs bg-primary text-primary-foreground px-2 py-0.5 rounded-full">Default</span>}
                 </td>
-                <td className="px-4 py-3 text-muted-foreground">{c.tax_id || '-'}</td>
-                <td className="px-4 py-3 text-muted-foreground">
+                <td className="cell-density text-muted-foreground">{c.tax_id || '-'}</td>
+                <td className="cell-density text-muted-foreground">
                   <div>{c.email}</div>
                   <div className="text-xs">{c.phone}</div>
                 </td>
-                <td className="px-4 py-3">
+                <td className="cell-density ">
                   <span className={`px-2 py-1 rounded-full text-xs ${c.is_active ? 'bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400' : 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400'}`}>
                     {c.is_active ? 'Active' : 'Inactive'}
                   </span>
                 </td>
-                <td className="px-4 py-3 text-right">
+                <td className="cell-density text-right">
                   {!isDefault && (
                     <Button variant="outline" size="sm" onClick={() => handleSetDefault(c.id)} className="mr-2">
                       Set Default
@@ -258,7 +258,7 @@ export default function CompanyManagement() {
             )})}
             {companies.length === 0 && (
               <tr>
-                <td colSpan={4} className="px-4 py-8 text-center text-muted-foreground">No companies found</td>
+                <td colSpan={4} className="cell-density text-center text-muted-foreground">No companies found</td>
               </tr>
             )}
           </tbody>

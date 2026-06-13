@@ -33,7 +33,7 @@ export default function SearchableSelect({
 
   // Reset active index when search changes
   useEffect(() => {
-    setActiveIndex(-1);
+    setActiveIndex(0);
   }, [search]);
 
   const filterOpts = (opts) =>

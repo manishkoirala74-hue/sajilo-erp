@@ -262,48 +262,48 @@ export default function Customers() {
 
       {/* Table */}
       <div className="bg-card border border-border rounded-xl overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-muted/30 border-b border-border">
+        <table className="table-fluid-grid text-sm">
+          <thead className="cell-density bg-muted/30 border-b border-border">
             <tr>
-              <th className="w-10 px-3 py-2.5">
+              <th className="cell-density w-10">
                 <Checkbox
                   checked={allChecked}
                   onCheckedChange={toggleAll}
                   aria-label="Select all"
                 />
               </th>
-              <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">Customer</th>
-              <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">VAT/PAN</th>
-              <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">City</th>
-              <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">Dual Role</th>
-              <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">AR Ledger</th>
-              <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">Status</th>
-              <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground"></th>
+              <th className="cell-density text-left  text-xs font-semibold text-muted-foreground">Customer</th>
+              <th className="cell-density text-left  text-xs font-semibold text-muted-foreground">VAT/PAN</th>
+              <th className="cell-density text-left  text-xs font-semibold text-muted-foreground">City</th>
+              <th className="cell-density text-left  text-xs font-semibold text-muted-foreground">Dual Role</th>
+              <th className="cell-density text-left  text-xs font-semibold text-muted-foreground">AR Ledger</th>
+              <th className="cell-density text-left  text-xs font-semibold text-muted-foreground">Status</th>
+              <th className="cell-density text-left  text-xs font-semibold text-muted-foreground"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
             {loading ? (
               Array(5).fill(0).map((_, i) => (
                 <tr key={i}>
-                  <td colSpan={8} className="px-4 py-3"><div className="h-6 bg-muted rounded animate-pulse" /></td>
+                  <td colSpan={8} className="cell-density "><div className="h-6 bg-muted rounded animate-pulse" /></td>
                 </tr>
               ))
             ) : filteredPartners.length === 0 ? (
-              <tr><td colSpan={8} className="text-center py-12 text-muted-foreground text-sm">No customers found</td></tr>
+              <tr><td colSpan={8} className="cell-density text-center py-12 text-muted-foreground text-sm">No customers found</td></tr>
             ) : filteredPartners.map(row => (
               <tr
                 key={row.id}
                 className={`hover:bg-muted/20 transition-colors cursor-pointer ${selected.has(row.id) ? 'bg-primary/5' : ''}`}
                 onClick={() => openEdit(row)}
               >
-                <td className="w-10 px-3 py-2.5" onClick={e => e.stopPropagation()}>
+                <td className="cell-density w-10" onClick={e => e.stopPropagation()}>
                   <Checkbox
                     checked={selected.has(row.id)}
                     onCheckedChange={() => toggleRow(row.id)}
                     aria-label={`Select ${row.name}`}
                   />
                 </td>
-                <td className="px-4 py-2.5" onClick={e => e.stopPropagation()}>
+                <td className="cell-density " onClick={e => e.stopPropagation()}>
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-500/20 flex items-center justify-center overflow-hidden">
                       {row.profile_picture_url ? (
@@ -318,18 +318,18 @@ export default function Customers() {
                     </div>
                   </div>
                 </td>
-                <td className="px-4 py-2.5 text-sm text-muted-foreground">{row.tax_id_number || '—'}</td>
-                <td className="px-4 py-2.5 text-sm text-muted-foreground">{row.city || '—'}</td>
-                <td className="px-4 py-2.5">
+                <td className="cell-density text-sm text-muted-foreground">{row.tax_id_number || '—'}</td>
+                <td className="cell-density text-sm text-muted-foreground">{row.city || '—'}</td>
+                <td className="cell-density ">
                   {row.treated_as_vendor ? <span className="px-2 py-0.5 rounded-full text-xs bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-400 font-medium">Also Vendor</span> : null}
                 </td>
-                <td className="px-4 py-2.5">
+                <td className="cell-density ">
                   {row.receivable_account_name
                     ? <div><span className="text-xs font-mono font-semibold text-emerald-700 dark:text-emerald-400">{row.receivable_account_code || ''}</span>{row.receivable_account_code && <span className="text-xs text-muted-foreground mx-1">—</span>}<span className="text-xs text-emerald-700 dark:text-emerald-400">{row.receivable_account_name}</span></div>
                     : <span className="text-xs text-muted-foreground">—</span>}
                 </td>
-                <td className="px-4 py-2.5"><StatusBadge status={row.is_active ? 'Active' : 'Inactive'} /></td>
-                <td className="px-4 py-2.5" onClick={e => e.stopPropagation()}>
+                <td className="cell-density "><StatusBadge status={row.is_active ? 'Active' : 'Inactive'} /></td>
+                <td className="cell-density " onClick={e => e.stopPropagation()}>
                   <div className="flex items-center gap-1">
                     <Button variant="ghost" size="icon" onClick={() => openEdit(row)}><Edit2 className="w-4 h-4" /></Button>
                     <Button variant="ghost" size="icon" onClick={() => toggleActive(row)}>

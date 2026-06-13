@@ -253,40 +253,40 @@ export default function DepreciationSchedules() {
               </div>
               <span className="text-xs text-muted-foreground">{schedule.filter(s => !s.is_posted).length} pending · {schedule.filter(s => s.is_posted).length} posted</span>
             </div>
-            <table className="w-full text-sm">
-              <thead className="bg-muted/40 border-b border-border">
+            <table className="table-fluid-grid text-sm">
+              <thead className="cell-density bg-muted/40 border-b border-border">
                 <tr>
-                  <th className="px-4 py-2.5 text-left text-xs font-semibold text-muted-foreground">Period</th>
-                  <th className="px-4 py-2.5 text-right text-xs font-semibold text-muted-foreground">Amount</th>
-                  <th className="px-4 py-2.5 text-left text-xs font-semibold text-muted-foreground">Journal Entry</th>
-                  <th className="px-4 py-2.5 text-center text-xs font-semibold text-muted-foreground">Status</th>
-                  <th className="px-4 py-2.5 text-xs font-semibold text-muted-foreground">Posted Date</th>
-                  <th className="px-4 py-2.5" />
+                  <th className="cell-density text-left text-xs font-semibold text-muted-foreground">Period</th>
+                  <th className="cell-density text-right text-xs font-semibold text-muted-foreground">Amount</th>
+                  <th className="cell-density text-left text-xs font-semibold text-muted-foreground">Journal Entry</th>
+                  <th className="cell-density text-center text-xs font-semibold text-muted-foreground">Status</th>
+                  <th className="cell-density text-xs font-semibold text-muted-foreground">Posted Date</th>
+                  <th className="cell-density " />
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
                 {schedLoading ? (
-                  <tr><td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">Loading schedule…</td></tr>
+                  <tr><td colSpan={6} className="cell-density text-center text-muted-foreground">Loading schedule…</td></tr>
                 ) : schedule.length === 0 ? (
-                  <tr><td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">No schedule yet. Click "Generate 12 Months".</td></tr>
+                  <tr><td colSpan={6} className="cell-density text-center text-muted-foreground">No schedule yet. Click "Generate 12 Months".</td></tr>
                 ) : schedule.map(s => {
                   const { expenseAccountName, creditAccountName } = resolveDepAccounts(selectedAsset, settings);
                   return (
                     <tr key={s.id} className={cn('transition-colors', s.is_posted ? 'bg-emerald-50 dark:bg-emerald-500/10/40' : 'hover:bg-muted/20')}>
-                      <td className="px-4 py-2.5 font-mono">{s.period_label}</td>
-                      <td className="px-4 py-2.5 text-right font-mono font-semibold text-amber-700 dark:text-amber-400">{fmt(s.calculated_depreciation_amount)}</td>
-                      <td className="px-4 py-2.5 text-xs text-muted-foreground">
+                      <td className="cell-density font-mono">{s.period_label}</td>
+                      <td className="cell-density text-right font-mono font-semibold text-amber-700 dark:text-amber-400">{fmt(s.calculated_depreciation_amount)}</td>
+                      <td className="cell-density text-xs text-muted-foreground">
                         <div><span className="text-blue-600 dark:text-blue-400 font-mono">Dr</span> {expenseAccountName}</div>
                         <div><span className="text-emerald-600 dark:text-emerald-400 font-mono">Cr</span> {creditAccountName}</div>
                       </td>
-                      <td className="px-4 py-2.5 text-center">
+                      <td className="cell-density text-center">
                         {s.is_posted
                           ? <span className="inline-flex items-center gap-1 text-xs text-emerald-700 dark:text-emerald-400"><CheckCircle2 className="w-3.5 h-3.5" /> Posted</span>
                           : <span className="inline-flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400"><AlertCircle className="w-3.5 h-3.5" /> Pending</span>
                         }
                       </td>
-                      <td className="px-4 py-2.5 text-xs text-muted-foreground">{s.posted_date || '—'}</td>
-                      <td className="px-4 py-2.5">
+                      <td className="cell-density text-xs text-muted-foreground">{s.posted_date || '—'}</td>
+                      <td className="cell-density ">
                         {!s.is_posted && (
                           <Button size="sm" variant="outline" disabled={posting === s.id} onClick={() => postEntry(s)}>
                             <BookOpen className="w-3 h-3 mr-1" />

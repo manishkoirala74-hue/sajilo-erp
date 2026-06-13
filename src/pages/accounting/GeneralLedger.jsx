@@ -121,54 +121,54 @@ export default function GeneralLedger() {
           <span className="font-semibold text-sm">General Ledger Journal</span>
           <span className="text-xs bg-muted px-2 py-0.5 rounded-full text-muted-foreground">{filtered.length} entries</span>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-muted/30 border-b border-border">
+        <div className="table-scroll-container">
+          <table className="table-fluid-grid text-sm">
+            <thead className="cell-density bg-muted/30 border-b border-border">
               <tr>
-                <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground w-28">Date</th>
-                <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">Description</th>
-                <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground w-32">Module</th>
-                <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground w-40">Source Document</th>
-                <th className="text-right px-4 py-2.5 text-xs font-semibold text-muted-foreground w-32">Total Dr</th>
-                <th className="text-right px-4 py-2.5 text-xs font-semibold text-muted-foreground w-32">Total Cr</th>
-                <th className="text-center px-4 py-2.5 text-xs font-semibold text-muted-foreground w-24">Balance</th>
-                <th className="text-center px-4 py-2.5 text-xs font-semibold text-muted-foreground w-24">Status</th>
-                <th className="px-4 py-2.5 w-16" />
+                <th className="cell-density text-left  text-xs font-semibold text-muted-foreground w-28">Date</th>
+                <th className="cell-density text-left  text-xs font-semibold text-muted-foreground">Description</th>
+                <th className="cell-density text-left  text-xs font-semibold text-muted-foreground w-32">Module</th>
+                <th className="cell-density text-left  text-xs font-semibold text-muted-foreground w-40">Source Document</th>
+                <th className="cell-density text-right  text-xs font-semibold text-muted-foreground w-32">Total Dr</th>
+                <th className="cell-density text-right  text-xs font-semibold text-muted-foreground w-32">Total Cr</th>
+                <th className="cell-density text-center  text-xs font-semibold text-muted-foreground w-24">Balance</th>
+                <th className="cell-density text-center  text-xs font-semibold text-muted-foreground w-24">Status</th>
+                <th className="cell-density w-16" />
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
               {loading ? (
                 Array(6).fill(0).map((_, i) => (
-                  <tr key={i}>{Array(9).fill(0).map((__, j) => <td key={j} className="px-4 py-3"><div className="h-4 bg-muted rounded animate-pulse" /></td>)}</tr>
+                  <tr key={i}>{Array(9).fill(0).map((__, j) => <td key={j} className="cell-density "><div className="h-4 bg-muted rounded animate-pulse" /></td>)}</tr>
                 ))
               ) : filtered.length === 0 ? (
-                <tr><td colSpan={9} className="text-center py-12 text-muted-foreground">No journal entries found</td></tr>
+                <tr><td colSpan={9} className="cell-density text-center py-12 text-muted-foreground">No journal entries found</td></tr>
               ) : filtered.map(j => {
                 const balanced = Math.abs((j.total_debit || 0) - (j.total_credit || 0)) < 0.001;
                 return (
                   <tr key={j.id} className="hover:bg-muted/20 cursor-pointer transition-colors" onClick={() => setSelectedJournal(j)}>
-                    <td className="px-4 py-3 text-xs font-mono text-muted-foreground">{formatDate(j.entry_date)}</td>
-                    <td className="px-4 py-3 font-medium max-w-xs">
+                    <td className="cell-density text-xs font-mono text-muted-foreground">{formatDate(j.entry_date)}</td>
+                    <td className="cell-density font-medium max-w-xs">
                       <p className="truncate">{j.description}</p>
                       {j.notes && <p className="text-xs text-muted-foreground truncate">{j.notes}</p>}
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="cell-density ">
                       <span className={cn('inline-flex px-2 py-0.5 rounded text-xs font-medium', MODULE_COLORS[j.reference_module] || MODULE_COLORS.General)}>{j.reference_module}</span>
                     </td>
-                    <td className="px-4 py-3 text-xs text-muted-foreground">{j.source_document_type || '—'}</td>
-                    <td className="px-4 py-3 text-right font-mono text-blue-700 dark:text-blue-400 font-semibold">{(j.total_debit || 0).toLocaleString()}</td>
-                    <td className="px-4 py-3 text-right font-mono text-emerald-700 dark:text-emerald-400 font-semibold">{(j.total_credit || 0).toLocaleString()}</td>
-                    <td className="px-4 py-3 text-center">
+                    <td className="cell-density text-xs text-muted-foreground">{j.source_document_type || '—'}</td>
+                    <td className="cell-density text-right font-mono text-blue-700 dark:text-blue-400 font-semibold">{(j.total_debit || 0).toLocaleString()}</td>
+                    <td className="cell-density text-right font-mono text-emerald-700 dark:text-emerald-400 font-semibold">{(j.total_credit || 0).toLocaleString()}</td>
+                    <td className="cell-density text-center">
                       {balanced
                         ? <CheckCircle2 className="w-4 h-4 text-emerald-500 mx-auto" />
                         : <AlertCircle className="w-4 h-4 text-amber-500 mx-auto" />}
                     </td>
-                    <td className="px-4 py-3 text-center">
+                    <td className="cell-density text-center">
                       <span className={cn('inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border', STATUS_COLORS[j.status] || STATUS_COLORS.Draft)}>
                         {STATUS_ICON[j.status]}{j.status}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-center">
+                    <td className="cell-density text-center">
                       <Button variant="ghost" size="icon" className="h-7 w-7" onClick={e => { e.stopPropagation(); setSelectedJournal(j); }}>
                         <Eye className="w-3.5 h-3.5" />
                       </Button>

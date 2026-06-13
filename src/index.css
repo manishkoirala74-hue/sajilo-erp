@@ -73,6 +73,37 @@
   .touch-target {
     @apply min-h-[48px] min-w-[48px];
   }
+
+  /* Structural Form Classes */
+  .form-section-fluid {
+    @apply flex flex-col h-auto w-full justify-start items-stretch gap-1;
+  }
+
+  /* Table Grid Defense Constraints */
+  .table-scroll-container {
+    @apply w-full overflow-x-auto block clear-both scroll-smooth;
+  }
+  
+  .table-fluid-grid {
+    @apply w-full min-w-max;
+  }
+  
+  .cell-density {
+    @apply whitespace-nowrap px-4 py-3;
+  }
+
+  /* Standard Typography Formatting */
+  .text-align-left {
+    @apply text-left;
+  }
+  
+  .text-align-center {
+    @apply text-center;
+  }
+  
+  .amount-cell {
+    @apply text-right font-mono tracking-tight;
+  }
 }
 
 @media print {

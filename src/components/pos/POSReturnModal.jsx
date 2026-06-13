@@ -145,16 +145,16 @@ export default function POSReturnModal({ sale, onClose, onPosted }) {
           <Label className="text-base font-semibold">Select Items to Return</Label>
           <p className="text-xs text-muted-foreground mb-2">Uncheck items that are NOT being returned. Adjust quantity if partial return.</p>
           <div className="border rounded-lg overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="bg-muted/50">
+            <table className="table-fluid-grid text-sm">
+              <thead className="cell-density bg-muted/50">
                 <tr>
-                  <th className="px-3 py-2 w-8"></th>
-                  <th className="px-3 py-2 text-left">Item</th>
-                  <th className="px-3 py-2 text-center">Sold Qty</th>
-                  <th className="px-3 py-2 text-center w-28">Return Qty</th>
-                  <th className="px-3 py-2 text-right">Unit Price</th>
-                  <th className="px-3 py-2 text-center">VAT</th>
-                  <th className="px-3 py-2 text-right">Refund</th>
+                  <th className="cell-density w-8"></th>
+                  <th className="cell-density text-left">Item</th>
+                  <th className="cell-density text-center">Sold Qty</th>
+                  <th className="cell-density text-center w-28">Return Qty</th>
+                  <th className="cell-density text-right">Unit Price</th>
+                  <th className="cell-density text-center">VAT</th>
+                  <th className="cell-density text-right">Refund</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -164,25 +164,25 @@ export default function POSReturnModal({ sale, onClose, onPosted }) {
                     : 0;
                   return (
                     <tr key={i} className={!l.selected ? 'opacity-40' : ''}>
-                      <td className="px-3 py-2 text-center">
+                      <td className="cell-density text-center">
                         <input type="checkbox" checked={l.selected}
                           onChange={e => updateLine(i, 'selected', e.target.checked)}
                           className="w-4 h-4 accent-primary" />
                       </td>
-                      <td className="px-3 py-2">
+                      <td className="cell-density ">
                         <p className="font-medium">{l.item_name}</p>
                         {l.item_code && <p className="text-xs text-muted-foreground">{l.item_code}</p>}
                       </td>
-                      <td className="px-3 py-2 text-center text-muted-foreground">{l.quantity}</td>
-                      <td className="px-3 py-2">
+                      <td className="cell-density text-center text-muted-foreground">{l.quantity}</td>
+                      <td className="cell-density ">
                         <Input type="number" min={0} max={l.quantity} value={l.return_qty}
                           disabled={!l.selected}
                           onChange={e => updateLine(i, 'return_qty', e.target.value)}
                           className="h-8 text-center" />
                       </td>
-                      <td className="px-3 py-2 text-right">{fmt(l.unit_price)}</td>
-                      <td className="px-3 py-2 text-center">{l.vat_applicable ? '13%' : '—'}</td>
-                      <td className="px-3 py-2 text-right font-semibold text-orange-600 dark:text-orange-400">{l.selected ? fmt(lineRefund) : '—'}</td>
+                      <td className="cell-density text-right">{fmt(l.unit_price)}</td>
+                      <td className="cell-density text-center">{l.vat_applicable ? '13%' : '—'}</td>
+                      <td className="cell-density text-right font-semibold text-orange-600 dark:text-orange-400">{l.selected ? fmt(lineRefund) : '—'}</td>
                     </tr>
                   );
                 })}

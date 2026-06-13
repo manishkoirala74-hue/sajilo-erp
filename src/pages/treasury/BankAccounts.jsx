@@ -189,38 +189,38 @@ export default function BankAccounts() {
                         <button onClick={() => { setEditing(null); setModalOpen(true); }} className="text-primary hover:underline">Add one</button>.
                       </div>
                     ) : (
-                      <table className="w-full text-sm">
-                        <thead className="border-b border-border bg-muted/10">
+                      <table className="table-fluid-grid text-sm">
+                        <thead className="cell-density border-b border-border bg-muted/10">
                           <tr>
-                            <th className="text-left px-5 py-2.5 text-xs font-semibold text-muted-foreground">Account Name</th>
-                            {type === 'Bank' && <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">Bank / Branch</th>}
-                            {type === 'Bank' && <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">Account No.</th>}
-                            <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">Ledger Group</th>
-                            <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">GL Account</th>
-                            <th className="text-right px-4 py-2.5 text-xs font-semibold text-muted-foreground">Current Bal.</th>
-                            <th className="text-center px-4 py-2.5 text-xs font-semibold text-muted-foreground">Status</th>
-                            <th className="px-4 py-2.5" />
+                            <th className="cell-density text-left  text-xs font-semibold text-muted-foreground">Account Name</th>
+                            {type === 'Bank' && <th className="cell-density text-left  text-xs font-semibold text-muted-foreground">Bank / Branch</th>}
+                            {type === 'Bank' && <th className="cell-density text-left  text-xs font-semibold text-muted-foreground">Account No.</th>}
+                            <th className="cell-density text-left  text-xs font-semibold text-muted-foreground">Ledger Group</th>
+                            <th className="cell-density text-left  text-xs font-semibold text-muted-foreground">GL Account</th>
+                            <th className="cell-density text-right  text-xs font-semibold text-muted-foreground">Current Bal.</th>
+                            <th className="cell-density text-center  text-xs font-semibold text-muted-foreground">Status</th>
+                            <th className="cell-density " />
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-border">
                           {items.map(acc => (
                             <tr key={acc.id} className="hover:bg-muted/20 transition-colors">
-                              <td className="px-5 py-3">
+                              <td className="cell-density ">
                                 <button className="text-left hover:underline" onClick={() => setDetailAccount(acc)}>
                                   <p className="font-medium text-primary">{acc.account_name}</p>
                                   {acc.account_holder_name && <p className="text-xs text-muted-foreground">{acc.account_holder_name}</p>}
                                 </button>
                               </td>
                               {type === 'Bank' && (
-                                <td className="px-4 py-3">
+                                <td className="cell-density ">
                                   <p className="text-foreground">{acc.bank_name || '—'}</p>
                                   {acc.branch_name && <p className="text-xs text-muted-foreground">{acc.branch_name}</p>}
                                 </td>
                               )}
                               {type === 'Bank' && (
-                                <td className="px-4 py-3 font-mono text-sm text-foreground">{acc.account_number || '—'}</td>
+                                <td className="cell-density font-mono text-sm text-foreground">{acc.account_number || '—'}</td>
                               )}
-                              <td className="px-4 py-3">
+                              <td className="cell-density ">
                                 <div>
                                   <span className={cn('px-2 py-0.5 rounded-full text-xs font-medium', categoryStyle[acc.account_category] || 'bg-muted text-muted-foreground')}>
                                     {acc.account_category || '—'}
@@ -230,14 +230,14 @@ export default function BankAccounts() {
                                   )}
                                 </div>
                               </td>
-                              <td className="px-4 py-3 text-xs text-muted-foreground">{acc.gl_account_name || '—'}</td>
-                              <td className="px-4 py-3 text-right font-mono text-sm font-semibold text-foreground">{formatNPR(getLiveBalance(acc))}</td>
-                              <td className="px-4 py-3 text-center">
+                              <td className="cell-density text-xs text-muted-foreground">{acc.gl_account_name || '—'}</td>
+                              <td className="cell-density text-right font-mono text-sm font-semibold text-foreground">{formatNPR(getLiveBalance(acc))}</td>
+                              <td className="cell-density text-center">
                                 <span className={cn('px-2 py-0.5 rounded-full text-xs font-medium', acc.is_active !== false ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400' : 'bg-muted text-muted-foreground')}>
                                   {acc.is_active !== false ? 'Active' : 'Inactive'}
                                 </span>
                               </td>
-                              <td className="px-4 py-3">
+                              <td className="cell-density ">
                                 <div className="flex items-center gap-1 justify-end">
                                   <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setEditing(acc); setModalOpen(true); }}>
                                     <Pencil className="w-3.5 h-3.5" />
@@ -252,8 +252,8 @@ export default function BankAccounts() {
                         </tbody>
                         <tfoot className="border-t border-border bg-muted/10">
                           <tr>
-                            <td colSpan={type === 'Bank' ? 5 : 3} className="px-5 py-2 text-xs font-semibold text-muted-foreground">Total</td>
-                            <td className="px-4 py-2 text-right font-bold text-sm text-foreground font-mono">
+                            <td colSpan={type === 'Bank' ? 5 : 3} className="cell-density text-xs font-semibold text-muted-foreground">Total</td>
+                            <td className="cell-density text-right font-bold text-sm text-foreground font-mono">
                               {formatNPR(items.reduce((s, a) => s + getLiveBalance(a), 0))}
                             </td>
                             <td colSpan={2} />

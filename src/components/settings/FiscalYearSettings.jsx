@@ -126,30 +126,30 @@ export default function FiscalYearSettings() {
       </div>
 
       <div className="p-0">
-        <table className="w-full text-sm">
-          <thead className="bg-muted/10 border-b border-border">
+        <table className="table-fluid-grid text-sm">
+          <thead className="cell-density bg-muted/10 border-b border-border">
             <tr>
-              <th className="text-left px-5 py-3 font-semibold text-muted-foreground">Fiscal Year</th>
-              <th className="text-left px-5 py-3 font-semibold text-muted-foreground">Period</th>
-              <th className="text-center px-5 py-3 font-semibold text-muted-foreground">Active</th>
-              <th className="text-center px-5 py-3 font-semibold text-muted-foreground">Locked</th>
+              <th className="cell-density text-left  font-semibold text-muted-foreground">Fiscal Year</th>
+              <th className="cell-density text-left  font-semibold text-muted-foreground">Period</th>
+              <th className="cell-density text-center  font-semibold text-muted-foreground">Active</th>
+              <th className="cell-density text-center  font-semibold text-muted-foreground">Locked</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
             {fiscalYears.length === 0 ? (
               <tr>
-                <td colSpan={4} className="px-5 py-8 text-center text-muted-foreground">
+                <td colSpan={4} className="cell-density text-center text-muted-foreground">
                   No Fiscal Years defined. Create one to begin validating transactions.
                 </td>
               </tr>
             ) : (
               fiscalYears.map(fy => (
                 <tr key={fy.id} className="hover:bg-muted/5">
-                  <td className="px-5 py-3 font-medium">{fy.fiscal_year_name}</td>
-                  <td className="px-5 py-3 text-muted-foreground">
+                  <td className="cell-density font-medium">{fy.fiscal_year_name}</td>
+                  <td className="cell-density text-muted-foreground">
                     {fy.start_date} to {fy.end_date}
                   </td>
-                  <td className="px-5 py-3">
+                  <td className="cell-density ">
                     <div className="flex justify-center">
                       <button 
                         onClick={() => toggleActive(fy.id, fy.is_active)}
@@ -160,7 +160,7 @@ export default function FiscalYearSettings() {
                       </button>
                     </div>
                   </td>
-                  <td className="px-5 py-3">
+                  <td className="cell-density ">
                     <div className="flex justify-center">
                       <button 
                         onClick={() => {

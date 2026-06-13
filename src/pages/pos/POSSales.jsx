@@ -135,6 +135,7 @@ export default function POSSales() {
   const processSale = async () => {
     if (cart.length === 0) return toast.error('Cart is empty');
     setProcessing(true);
+    const idempotencyKey = crypto.randomUUID();
     const saleNum = `POS-${new Date().getFullYear()}-${String(saleCount + 1).padStart(4, '0')}`;
     const sale = {
       sale_number: saleNum,
@@ -142,8 +143,7 @@ export default function POSSales() {
       customer_name: customerName || 'Walk-in Customer',
       customer_id: customerId || null,
       payment_method: paymentMethod,
-      // Phase 3: per-drawer account — GL posting uses this as Priority 1
-      cash_bank_account_id:   !isCredit ? (selectedCashAccountId   || null) : null,
+      cash_bank_account_id: !isCredit ? (selectedCashAccountId || null) : null,
       cash_bank_account_name: !isCredit ? (selectedCashAccountName || null) : null,
       subtotal: parseFloat(subtotal.toFixed(2)),
       discount_amount: parseFloat(globalDiscount.toFixed(2)),
@@ -152,20 +152,10 @@ export default function POSSales() {
       amount_tendered: amountTendered,
       change_amount: parseFloat(change.toFixed(2)),
       status: 'Completed',
-      line_items: cart
+      line_items: cart,
+      idempotency_key: idempotencyKey
     };
     const createdSale = await sajilo.entities.POSSale.create(sale);
-    // Deduct physical stock
-    for (const line of cart) {
-      if (!line.is_service && line.item_id) {
-        const its = await sajilo.entities.Item.filter({ id: line.item_id });
-        if (its[0]) {
-          const newQty = Math.max(0, (its[0].quantity_on_hand || 0) - line.quantity);
-          await sajilo.entities.Item.update(its[0].id, { quantity_on_hand: newQty });
-        }
-      }
-    }
-    // GL Posting
     const [itemsMap, settings] = await Promise.all([loadItemsMap(cart.map(c => c.item_id)), loadSettings()]);
     await postPOSSale({ ...sale, id: createdSale.id }, itemsMap, settings);
     setLastReceipt(sale);
@@ -358,9 +348,9 @@ export default function POSSales() {
                 <p>{lastReceipt.sale_date} • {lastReceipt.payment_method}</p>
                 <p>{lastReceipt.customer_name}</p>
               </div>
-              <table className="w-full text-xs">
+              <table className="table-fluid-grid text-xs">
                 <tbody>{(lastReceipt.line_items || []).map((l, i) => (
-                  <tr key={i}><td>{l.quantity}× {l.item_name}</td><td className="text-right">{fmt(l.line_total)}</td></tr>
+                  <tr key={i}><td>{l.quantity}× {l.item_name}</td><td className="cell-density text-right">{fmt(l.line_total)}</td></tr>
                 ))}</tbody>
               </table>
               <div className="border-t pt-2 space-y-0.5">
@@ -388,33 +378,33 @@ export default function POSSales() {
       <Dialog open={showHistory} onOpenChange={setShowHistory}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Recent POS Sales</DialogTitle></DialogHeader>
-          <table className="w-full text-sm">
-            <thead className="bg-muted/50"><tr>
-              <th className="px-3 py-2 text-left">Sale #</th>
-              <th className="px-3 py-2 text-left">Date</th>
-              <th className="px-3 py-2 text-left">Customer</th>
-              <th className="px-3 py-2 text-left">Payment</th>
-              <th className="px-3 py-2 text-right">Total</th>
-              <th className="px-3 py-2 text-center">Status</th>
-              <th className="px-3 py-2 w-10"></th>
+          <table className="table-fluid-grid text-sm">
+            <thead className="cell-density bg-muted/50"><tr>
+              <th className="cell-density text-left">Sale #</th>
+              <th className="cell-density text-left">Date</th>
+              <th className="cell-density text-left">Customer</th>
+              <th className="cell-density text-left">Payment</th>
+              <th className="cell-density text-right">Total</th>
+              <th className="cell-density text-center">Status</th>
+              <th className="cell-density w-10"></th>
             </tr></thead>
             <tbody className="divide-y divide-border">
               {history.map(s => (
                 <tr key={s.id} className="hover:bg-muted/20">
-                  <td className="px-3 py-2 font-mono text-primary font-semibold">{s.sale_number}</td>
-                  <td className="px-3 py-2">{formatDate(s.sale_date)}</td>
-                  <td className="px-3 py-2">{s.customer_name}</td>
-                  <td className="px-3 py-2">{s.payment_method}</td>
-                  <td className="px-3 py-2 text-right font-semibold">{fmt(s.grand_total)}</td>
-                  <td className="px-3 py-2 text-center"><StatusBadge status={s.status} /></td>
-                  <td className="px-3 py-2">
+                  <td className="cell-density font-mono text-primary font-semibold">{s.sale_number}</td>
+                  <td className="cell-density ">{formatDate(s.sale_date)}</td>
+                  <td className="cell-density ">{s.customer_name}</td>
+                  <td className="cell-density ">{s.payment_method}</td>
+                  <td className="cell-density text-right font-semibold">{fmt(s.grand_total)}</td>
+                  <td className="cell-density text-center"><StatusBadge status={s.status} /></td>
+                  <td className="cell-density ">
                     <Button variant="ghost" size="icon" onClick={() => { setSelectedSale(s); setShowHistory(false); }}>
                       <Eye className="w-4 h-4" />
                     </Button>
                   </td>
                 </tr>
               ))}
-              {history.length === 0 && <tr><td colSpan={7} className="px-3 py-8 text-center text-muted-foreground">No sales yet</td></tr>}
+              {history.length === 0 && <tr><td colSpan={7} className="cell-density text-center text-muted-foreground">No sales yet</td></tr>}
             </tbody>
           </table>
         </DialogContent>

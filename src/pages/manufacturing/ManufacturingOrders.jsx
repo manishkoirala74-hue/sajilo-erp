@@ -163,34 +163,34 @@ export default function ManufacturingOrders() {
                 <Button size="sm" variant="outline" onClick={addComp}>+ Add Component</Button>
               </div>
               <div className="border rounded-lg overflow-hidden">
-                <table className="w-full text-xs">
-                  <thead className="bg-muted/50"><tr>
-                    <th className="px-2 py-2 text-left">Type</th>
-                    <th className="px-2 py-2 text-left">Item</th>
-                    <th className="px-2 py-2 text-left">Qty</th>
-                    <th className="px-2 py-2 text-left">Unit Cost</th>
-                    <th className="px-2 py-2 text-left">Line Cost</th>
-                    <th className="px-2 py-2"></th>
+                <table className="table-fluid-grid text-xs">
+                  <thead className="cell-density bg-muted/50"><tr>
+                    <th className="cell-density text-left">Type</th>
+                    <th className="cell-density text-left">Item</th>
+                    <th className="cell-density text-left">Qty</th>
+                    <th className="cell-density text-left">Unit Cost</th>
+                    <th className="cell-density text-left">Line Cost</th>
+                    <th className="cell-density "></th>
                   </tr></thead>
                   <tbody className="divide-y divide-border">
                     {form.bom_components.map((c, idx) => (
                       <tr key={idx}>
-                        <td className="px-1 py-1 w-36">
+                        <td className="cell-density w-36">
                           <Select value={c.component_type} onValueChange={v => handleComp(idx, 'component_type', v)}>
                             <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
                             <SelectContent>{['Material','Labor Overhead','Machine Overhead'].map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
                           </Select>
                         </td>
-                        <td className="px-1 py-1">
+                        <td className="cell-density ">
                           <Select value={c.item_id} onValueChange={v => handleComp(idx, 'item_id', v)}>
                             <SelectTrigger className="h-7 text-xs"><SelectValue placeholder="Select..." /></SelectTrigger>
                             <SelectContent>{items.map(i => <SelectItem key={i.id} value={i.id}>{i.item_name}</SelectItem>)}</SelectContent>
                           </Select>
                         </td>
-                        <td className="px-1 py-1 w-20"><Input type="number" value={c.quantity_required} onChange={e => handleComp(idx, 'quantity_required', parseFloat(e.target.value) || 0)} className="h-7 text-xs" /></td>
-                        <td className="px-1 py-1 w-24"><Input type="number" value={c.unit_cost} onChange={e => handleComp(idx, 'unit_cost', parseFloat(e.target.value) || 0)} className="h-7 text-xs" /></td>
-                        <td className="px-1 py-1 w-24 text-right font-medium">{fmt(c.line_cost)}</td>
-                        <td className="px-1 py-1"><button onClick={() => removeComp(idx)} className="text-red-500 px-2">×</button></td>
+                        <td className="cell-density w-20"><Input type="number" value={c.quantity_required} onChange={e => handleComp(idx, 'quantity_required', parseFloat(e.target.value) || 0)} className="h-7 text-xs" /></td>
+                        <td className="cell-density w-24"><Input type="number" value={c.unit_cost} onChange={e => handleComp(idx, 'unit_cost', parseFloat(e.target.value) || 0)} className="h-7 text-xs" /></td>
+                        <td className="cell-density w-24 text-right font-medium">{fmt(c.line_cost)}</td>
+                        <td className="cell-density "><button onClick={() => removeComp(idx)} className="text-red-500 px-2">×</button></td>
                       </tr>
                     ))}
                   </tbody>
@@ -226,22 +226,22 @@ export default function ManufacturingOrders() {
                 <div><span className="text-muted-foreground">Material Cost:</span> <strong>{fmt(selected.total_material_cost)}</strong></div>
                 <div><span className="text-muted-foreground">Unit Cost:</span> <strong className="text-primary">{fmt(selected.final_unit_cost)}</strong></div>
               </div>
-              <table className="w-full text-xs border rounded-lg overflow-hidden">
-                <thead className="bg-muted/50"><tr>
-                  <th className="px-3 py-2 text-left">Component</th>
-                  <th className="px-3 py-2 text-left">Type</th>
-                  <th className="px-3 py-2 text-right">Qty</th>
-                  <th className="px-3 py-2 text-right">Unit Cost</th>
-                  <th className="px-3 py-2 text-right">Line Cost</th>
+              <table className="table-fluid-grid text-xs border rounded-lg overflow-hidden">
+                <thead className="cell-density bg-muted/50"><tr>
+                  <th className="cell-density text-left">Component</th>
+                  <th className="cell-density text-left">Type</th>
+                  <th className="cell-density text-right">Qty</th>
+                  <th className="cell-density text-right">Unit Cost</th>
+                  <th className="cell-density text-right">Line Cost</th>
                 </tr></thead>
                 <tbody className="divide-y divide-border">
                   {(selected.bom_components || []).map((c, i) => (
                     <tr key={i}>
-                      <td className="px-3 py-2">{c.item_name}</td>
-                      <td className="px-3 py-2">{c.component_type}</td>
-                      <td className="px-3 py-2 text-right">{c.quantity_required}</td>
-                      <td className="px-3 py-2 text-right">{fmt(c.unit_cost)}</td>
-                      <td className="px-3 py-2 text-right">{fmt(c.line_cost)}</td>
+                      <td className="cell-density ">{c.item_name}</td>
+                      <td className="cell-density ">{c.component_type}</td>
+                      <td className="cell-density text-right">{c.quantity_required}</td>
+                      <td className="cell-density text-right">{fmt(c.unit_cost)}</td>
+                      <td className="cell-density text-right">{fmt(c.line_cost)}</td>
                     </tr>
                   ))}
                 </tbody>

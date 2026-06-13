@@ -93,25 +93,17 @@ export default function PurchaseReturns() {
     if (!form.vendor_name) { toast.error('Select a vendor'); return; }
     setSaving(true);
     try {
-  const created = await sajilo.entities.PurchaseReturn.create({ ...form, status });
+      const idempotencyKey = crypto.randomUUID();
+      const created = await sajilo.entities.PurchaseReturn.create({ ...form, status, idempotency_key: idempotencyKey });
       if (status === 'Posted') {
-        for (const line of form.line_items) {
-          if (line.item_id && line.quantity > 0) {
-            const its = await sajilo.entities.Item.filter({ id: line.item_id });
-            if (its[0]) {
-              const newQty = Math.max(0, (its[0].quantity_on_hand || 0) - line.quantity);
-              await sajilo.entities.Item.update(its[0].id, { quantity_on_hand: newQty });
-            }
-          }
-        }
-        // GL Posting
+        // GL Posting & Atomic Stock Update via RPC
         const [itemsMap, glSettings] = await Promise.all([loadItemsMap(form.line_items.map(l => l.item_id)), loadSettings()]);
-        await postPurchaseReturn({ ...form, id: created.id }, itemsMap, glSettings);
+        await postPurchaseReturn({ ...form, id: created.id, idempotency_key: idempotencyKey }, itemsMap, glSettings);
         toast.success('Purchase return posted — stock reduced & GL updated');
       } else {
         toast.success('Saved as draft');
       }
-        } catch (err) {
+    } catch (err) {
       toast.error(err.message || 'Error occurred while saving');
     } finally {
       setSaving(false);
@@ -174,18 +166,18 @@ export default function PurchaseReturns() {
               <Button size="sm" variant="outline" onClick={addLine}>+ Add Row</Button>
             </div>
             <div className="border rounded-lg overflow-hidden">
-              <table className="w-full text-sm">
-                <thead className="bg-muted/50"><tr>
-                  <th className="px-3 py-2 text-left">Item</th>
-                  <th className="px-3 py-2 text-left w-24">Qty to Return</th>
-                  <th className="px-3 py-2 text-left w-28">Unit Price</th>
-                  <th className="px-3 py-2 text-right w-28">Total</th>
-                  <th className="px-3 py-2 w-10"></th>
+              <table className="table-fluid-grid text-sm">
+                <thead className="cell-density bg-muted/50"><tr>
+                  <th className="cell-density text-left">Item</th>
+                  <th className="cell-density text-left w-24">Qty to Return</th>
+                  <th className="cell-density text-left w-28">Unit Price</th>
+                  <th className="cell-density text-right w-28">Total</th>
+                  <th className="cell-density w-10"></th>
                 </tr></thead>
                 <tbody className="divide-y divide-border">
                   {form.line_items.map((line, idx) => (
                     <tr key={idx}>
-                      <td className="px-2 py-1">
+                      <td className="cell-density ">
                         <Select value={line.item_id} onValueChange={v => {
                           const it = items.find(i => i.id === v);
                           updateLine(idx, 'item_id', v);
@@ -200,13 +192,13 @@ export default function PurchaseReturns() {
                           <SelectContent>{items.map(i => <SelectItem key={i.id} value={i.id}>{i.item_name}</SelectItem>)}</SelectContent>
                         </Select>
                       </td>
-                      <td className="px-2 py-1"><Input type="number" min={0} value={line.quantity} onChange={e => updateLine(idx, 'quantity', parseFloat(e.target.value) || 0)} className="h-8" /></td>
-                      <td className="px-2 py-1"><Input type="number" min={0} value={line.unit_price} onChange={e => updateLine(idx, 'unit_price', parseFloat(e.target.value) || 0)} className="h-8" /></td>
-                      <td className="px-2 py-1 text-right font-medium">NPR {Number(line.line_total || 0).toLocaleString()}</td>
-                      <td className="px-2 py-1"><button onClick={() => removeLine(idx)} className="text-red-500 px-2">×</button></td>
+                      <td className="cell-density "><Input type="number" min={0} value={line.quantity} onChange={e => updateLine(idx, 'quantity', parseFloat(e.target.value) || 0)} className="h-8" /></td>
+                      <td className="cell-density "><Input type="number" min={0} value={line.unit_price} onChange={e => updateLine(idx, 'unit_price', parseFloat(e.target.value) || 0)} className="h-8" /></td>
+                      <td className="cell-density text-right font-medium">NPR {Number(line.line_total || 0).toLocaleString()}</td>
+                      <td className="cell-density "><button onClick={() => removeLine(idx)} className="text-red-500 px-2">×</button></td>
                     </tr>
                   ))}
-                  {form.line_items.length === 0 && <tr><td colSpan={5} className="px-3 py-6 text-center text-muted-foreground text-sm">No items — load from invoice or add manually</td></tr>}
+                  {form.line_items.length === 0 && <tr><td colSpan={5} className="cell-density text-center text-muted-foreground text-sm">No items — load from invoice or add manually</td></tr>}
                 </tbody>
               </table>
             </div>
@@ -233,20 +225,20 @@ export default function PurchaseReturns() {
                 <div><span className="text-muted-foreground">Total:</span> <strong>NPR {Number(viewDetail.grand_total).toLocaleString()}</strong></div>
                 {viewDetail.reason && <div className="col-span-2"><span className="text-muted-foreground">Reason:</span> {viewDetail.reason}</div>}
               </div>
-              <table className="w-full text-sm border rounded-lg overflow-hidden">
-                <thead className="bg-muted/50"><tr>
-                  <th className="px-3 py-2 text-left">Item</th>
-                  <th className="px-3 py-2 text-right">Qty</th>
-                  <th className="px-3 py-2 text-right">Price</th>
-                  <th className="px-3 py-2 text-right">Total</th>
+              <table className="table-fluid-grid text-sm border rounded-lg overflow-hidden">
+                <thead className="cell-density bg-muted/50"><tr>
+                  <th className="cell-density text-left">Item</th>
+                  <th className="cell-density text-right">Qty</th>
+                  <th className="cell-density text-right">Price</th>
+                  <th className="cell-density text-right">Total</th>
                 </tr></thead>
                 <tbody className="divide-y divide-border">
                   {(viewDetail.line_items || []).map((l, i) => (
                     <tr key={i}>
-                      <td className="px-3 py-2">{l.item_name}</td>
-                      <td className="px-3 py-2 text-right">{l.quantity}</td>
-                      <td className="px-3 py-2 text-right">NPR {Number(l.unit_price).toLocaleString()}</td>
-                      <td className="px-3 py-2 text-right font-medium">NPR {Number(l.line_total).toLocaleString()}</td>
+                      <td className="cell-density ">{l.item_name}</td>
+                      <td className="cell-density text-right">{l.quantity}</td>
+                      <td className="cell-density text-right">NPR {Number(l.unit_price).toLocaleString()}</td>
+                      <td className="cell-density text-right font-medium">NPR {Number(l.line_total).toLocaleString()}</td>
                     </tr>
                   ))}
                 </tbody>

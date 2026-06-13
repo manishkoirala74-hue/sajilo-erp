@@ -145,16 +145,16 @@ export default function ItemTransactionHistory({ item }) {
 
       {/* Transaction Table */}
       <div className="border border-border rounded-xl overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-muted/40 border-b border-border">
+        <table className="table-fluid-grid text-sm">
+          <thead className="cell-density bg-muted/40 border-b border-border">
             <tr>
-              <th className="px-3 py-2.5 text-left text-xs font-semibold text-muted-foreground">Date</th>
-              <th className="px-3 py-2.5 text-left text-xs font-semibold text-muted-foreground">Type</th>
-              <th className="px-3 py-2.5 text-left text-xs font-semibold text-muted-foreground">Document</th>
-              <th className="px-3 py-2.5 text-left text-xs font-semibold text-muted-foreground">Party</th>
-              <th className="px-3 py-2.5 text-right text-xs font-semibold text-muted-foreground">Qty</th>
-              <th className="px-3 py-2.5 text-right text-xs font-semibold text-muted-foreground">Unit Price</th>
-              <th className="px-3 py-2.5 text-right text-xs font-semibold text-muted-foreground">Amount</th>
+              <th className="cell-density text-left text-xs font-semibold text-muted-foreground">Date</th>
+              <th className="cell-density text-left text-xs font-semibold text-muted-foreground">Type</th>
+              <th className="cell-density text-left text-xs font-semibold text-muted-foreground">Document</th>
+              <th className="cell-density text-left text-xs font-semibold text-muted-foreground">Party</th>
+              <th className="cell-density text-right text-xs font-semibold text-muted-foreground">Qty</th>
+              <th className="cell-density text-right text-xs font-semibold text-muted-foreground">Unit Price</th>
+              <th className="cell-density text-right text-xs font-semibold text-muted-foreground">Amount</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
@@ -162,7 +162,7 @@ export default function ItemTransactionHistory({ item }) {
               Array(4).fill(0).map((_, i) => (
                 <tr key={i}>
                   {Array(7).fill(0).map((__, j) => (
-                    <td key={j} className="px-3 py-2.5">
+                    <td key={j} className="cell-density ">
                       <div className="h-3.5 bg-muted rounded animate-pulse" />
                     </td>
                   ))}
@@ -170,14 +170,14 @@ export default function ItemTransactionHistory({ item }) {
               ))
             ) : filtered.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-3 py-10 text-center text-muted-foreground text-sm">
+                <td colSpan={7} className="cell-density text-center text-muted-foreground text-sm">
                   No transactions found for this item
                 </td>
               </tr>
             ) : filtered.map(t => (
               <tr key={t.id} className="hover:bg-muted/20 transition-colors">
-                <td className="px-3 py-2.5 text-xs text-muted-foreground font-mono">{formatDate(t.date)}</td>
-                <td className="px-3 py-2.5">
+                <td className="cell-density text-xs text-muted-foreground font-mono">{formatDate(t.date)}</td>
+                <td className="cell-density ">
                   <span className={cn(
                     'inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full',
                     t.type === 'Purchase' ? 'bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400' :
@@ -190,16 +190,16 @@ export default function ItemTransactionHistory({ item }) {
                     {t.type}
                   </span>
                 </td>
-                <td className="px-3 py-2.5 text-xs font-mono text-primary">{t.document}</td>
-                <td className="px-3 py-2.5 text-xs">{t.partner || '—'}</td>
+                <td className="cell-density text-xs font-mono text-primary">{t.document}</td>
+                <td className="cell-density text-xs">{t.partner || '—'}</td>
                 <td className={cn(
                   'px-3 py-2.5 text-right font-semibold text-sm',
                   t.direction === 'in' ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'
                 )}>
                   {t.direction === 'in' ? '+' : '-'}{t.quantity}
                 </td>
-                <td className="px-3 py-2.5 text-right text-xs text-muted-foreground">{fmt(t.unit_price)}</td>
-                <td className="px-3 py-2.5 text-right font-medium text-xs">{fmt(t.line_total)}</td>
+                <td className="cell-density text-right text-xs text-muted-foreground">{fmt(t.unit_price)}</td>
+                <td className="cell-density text-right font-medium text-xs">{fmt(t.line_total)}</td>
               </tr>
             ))}
           </tbody>

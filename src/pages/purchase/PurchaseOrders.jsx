@@ -245,28 +245,29 @@ export default function PurchaseOrders() {
                 <div><p className="text-xs text-muted-foreground">Vendor</p><p className="font-medium">{viewDetail.vendor_name}</p></div>
                 <div><p className="text-xs text-muted-foreground">Status</p><StatusBadge status={viewDetail.status} /></div>
                 <div><p className="text-xs text-muted-foreground">Order Date</p><p className="font-medium">{viewDetail.order_date}</p></div>
+                <div><p className="text-xs text-muted-foreground">Created</p><p className="font-medium">{viewDetail.created_at ? new Date(viewDetail.created_at).toLocaleString() : '—'}</p></div>
                 <div><p className="text-xs text-muted-foreground">Grand Total</p><p className="font-bold text-lg">NPR {Number(viewDetail.total_amount).toLocaleString()}</p></div>
               </div>
               {viewDetail.line_items?.length > 0 && (
                 <div>
                   <p className="font-semibold mb-2">Line Items</p>
                   <div className="border border-border rounded-lg overflow-hidden">
-                    <table className="w-full text-sm">
-                      <thead className="bg-muted/50">
+                    <table className="table-fluid-grid text-sm">
+                      <thead className="cell-density bg-muted/50">
                         <tr>
-                          <th className="px-3 py-2 text-left">Item</th>
-                          <th className="px-3 py-2 text-right">Qty</th>
-                          <th className="px-3 py-2 text-right">Price</th>
-                          <th className="px-3 py-2 text-right">Total</th>
+                          <th className="cell-density text-left">Item</th>
+                          <th className="cell-density text-right">Qty</th>
+                          <th className="cell-density text-right">Price</th>
+                          <th className="cell-density text-right">Total</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-border">
                         {viewDetail.line_items.map((line, i) => (
                           <tr key={i}>
-                            <td className="px-3 py-2">{line.item_name}</td>
-                            <td className="px-3 py-2 text-right">{line.quantity}</td>
-                            <td className="px-3 py-2 text-right">NPR {Number(line.unit_price).toLocaleString()}</td>
-                            <td className="px-3 py-2 text-right font-medium">NPR {Number(line.line_total).toLocaleString()}</td>
+                            <td className="cell-density ">{line.item_name}</td>
+                            <td className="cell-density text-right">{line.quantity}</td>
+                            <td className="cell-density text-right">NPR {Number(line.unit_price).toLocaleString()}</td>
+                            <td className="cell-density text-right font-medium">NPR {Number(line.line_total).toLocaleString()}</td>
                           </tr>
                         ))}
                       </tbody>

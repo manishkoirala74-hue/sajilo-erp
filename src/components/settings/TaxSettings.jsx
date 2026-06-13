@@ -176,53 +176,53 @@ export default function TaxSettings() {
         </div>
       ) : (
         <div className="border border-border rounded-xl overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-muted/40 border-b border-border">
+          <table className="table-fluid-grid text-sm">
+            <thead className="cell-density bg-muted/40 border-b border-border">
               <tr>
-                <th className="px-4 py-3 text-left font-semibold">Name</th>
-                <th className="px-4 py-3 text-left font-semibold">Code</th>
-                <th className="px-4 py-3 text-right font-semibold">Rate (%)</th>
-                <th className="px-4 py-3 text-center font-semibold">Order</th>
-                <th className="px-4 py-3 text-center font-semibold">Compound?</th>
-                <th className="px-4 py-3 text-left font-semibold">Method</th>
-                <th className="px-4 py-3 text-left font-semibold">Applies To</th>
-                <th className="px-4 py-3 text-left font-semibold">GL Ledger</th>
-                <th className="px-4 py-3 text-center font-semibold">Default</th>
-                <th className="px-4 py-3 w-20" />
+                <th className="cell-density text-left font-semibold">Name</th>
+                <th className="cell-density text-left font-semibold">Code</th>
+                <th className="cell-density text-right font-semibold">Rate (%)</th>
+                <th className="cell-density text-center font-semibold">Order</th>
+                <th className="cell-density text-center font-semibold">Compound?</th>
+                <th className="cell-density text-left font-semibold">Method</th>
+                <th className="cell-density text-left font-semibold">Applies To</th>
+                <th className="cell-density text-left font-semibold">GL Ledger</th>
+                <th className="cell-density text-center font-semibold">Default</th>
+                <th className="cell-density w-20" />
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
               {[...taxTypes].sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0)).map(t => (
                 <tr key={t.id} className="hover:bg-muted/20 transition-colors">
-                  <td className="px-4 py-3 font-medium">{t.tax_name}</td>
-                  <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{t.tax_code || '—'}</td>
-                  <td className="px-4 py-3 text-right font-semibold tabular-nums">{t.tax_rate}%</td>
-                  <td className="px-4 py-3 text-center tabular-nums text-muted-foreground">{t.sort_order ?? 0}</td>
-                  <td className="px-4 py-3 text-center">
+                  <td className="cell-density font-medium">{t.tax_name}</td>
+                  <td className="cell-density font-mono text-xs text-muted-foreground">{t.tax_code || '—'}</td>
+                  <td className="cell-density text-right font-semibold tabular-nums">{t.tax_rate}%</td>
+                  <td className="cell-density text-center tabular-nums text-muted-foreground">{t.sort_order ?? 0}</td>
+                  <td className="cell-density text-center">
                     {t.is_compound
                       ? <span className="text-xs font-semibold text-purple-700 dark:text-purple-400 bg-purple-50 dark:bg-purple-500/10 px-2 py-0.5 rounded-full">Compound</span>
                       : <span className="text-xs text-muted-foreground">Simple</span>}
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="cell-density ">
                     <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
                       t.tax_type === 'Exclusive' ? 'bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400' : 'bg-purple-50 dark:bg-purple-500/10 text-purple-700 dark:text-purple-400'
                     }`}>{t.tax_type}</span>
                   </td>
-                  <td className="px-4 py-3 text-xs text-muted-foreground">{t.applies_to}</td>
-                  <td className="px-4 py-3 text-xs">
+                  <td className="cell-density text-xs text-muted-foreground">{t.applies_to}</td>
+                  <td className="cell-density text-xs">
                     {t.gl_account_name
                       ? <span className="text-emerald-700 dark:text-emerald-400 flex items-center gap-1"><CheckCircle2 className="w-3.5 h-3.5" />{t.gl_account_name}</span>
                       : <span className="text-amber-600 dark:text-amber-400 flex items-center gap-1"><AlertCircle className="w-3.5 h-3.5" />Not linked</span>
                     }
                   </td>
-                  <td className="px-4 py-3 text-center">
+                  <td className="cell-density text-center">
                     {t.is_default && (
                       <span className="inline-flex items-center gap-1 text-xs font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full">
                         <CheckCircle2 className="w-3 h-3" /> Default
                       </span>
                     )}
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="cell-density ">
                     <div className="flex items-center gap-1">
                       <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(t)}>
                         <Pencil className="w-3.5 h-3.5" />

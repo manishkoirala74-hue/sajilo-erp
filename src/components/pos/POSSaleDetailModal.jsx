@@ -79,29 +79,29 @@ export default function POSSaleDetailModal({ sale, onClose, onVoided }) {
 
           {/* Line Items */}
           <div className="border rounded-lg overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="bg-muted/50">
+            <table className="table-fluid-grid text-sm">
+              <thead className="cell-density bg-muted/50">
                 <tr>
-                  <th className="px-3 py-2 text-left">Item</th>
-                  <th className="px-3 py-2 text-center">Qty</th>
-                  <th className="px-3 py-2 text-right">Unit Price</th>
-                  <th className="px-3 py-2 text-right">Disc%</th>
-                  <th className="px-3 py-2 text-right">VAT</th>
-                  <th className="px-3 py-2 text-right">Total</th>
+                  <th className="cell-density text-left">Item</th>
+                  <th className="cell-density text-center">Qty</th>
+                  <th className="cell-density text-right">Unit Price</th>
+                  <th className="cell-density text-right">Disc%</th>
+                  <th className="cell-density text-right">VAT</th>
+                  <th className="cell-density text-right">Total</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
                 {(sale.line_items || []).map((l, i) => (
                   <tr key={i}>
-                    <td className="px-3 py-2">
+                    <td className="cell-density ">
                       <p className="font-medium">{l.item_name}</p>
                       {l.item_code && <p className="text-xs text-muted-foreground">{l.item_code}</p>}
                     </td>
-                    <td className="px-3 py-2 text-center">{l.quantity} {l.unit_of_measure || ''}</td>
-                    <td className="px-3 py-2 text-right">{fmt(l.unit_price)}</td>
-                    <td className="px-3 py-2 text-right">{l.discount_percent > 0 ? `${l.discount_percent}%` : '—'}</td>
-                    <td className="px-3 py-2 text-center">{l.vat_applicable ? <Badge variant="outline" className="text-xs">13%</Badge> : '—'}</td>
-                    <td className="px-3 py-2 text-right font-semibold">{fmt(l.line_total)}</td>
+                    <td className="cell-density text-center">{l.quantity} {l.unit_of_measure || ''}</td>
+                    <td className="cell-density text-right">{fmt(l.unit_price)}</td>
+                    <td className="cell-density text-right">{l.discount_percent > 0 ? `${l.discount_percent}%` : '—'}</td>
+                    <td className="cell-density text-center">{l.vat_applicable ? <Badge variant="outline" className="text-xs">13%</Badge> : '—'}</td>
+                    <td className="cell-density text-right font-semibold">{fmt(l.line_total)}</td>
                   </tr>
                 ))}
               </tbody>

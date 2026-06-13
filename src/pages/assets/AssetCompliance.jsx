@@ -349,36 +349,36 @@ export default function AssetCompliance() {
 
       {/* Table */}
       <div className="border border-border rounded-xl overflow-hidden bg-card">
-        <table className="w-full text-sm">
-          <thead className="bg-muted/40 border-b border-border">
+        <table className="table-fluid-grid text-sm">
+          <thead className="cell-density bg-muted/40 border-b border-border">
             <tr>
-              <th className="px-4 py-2.5 text-left text-xs font-semibold text-muted-foreground">Asset</th>
-              <th className="px-4 py-2.5 text-left text-xs font-semibold text-muted-foreground">Event</th>
-              <th className="px-4 py-2.5 text-left text-xs font-semibold text-muted-foreground">Type</th>
-              <th className="px-4 py-2.5 text-left text-xs font-semibold text-muted-foreground">Frequency</th>
-              <th className="px-4 py-2.5 text-left text-xs font-semibold text-muted-foreground">Last Done</th>
-              <th className="px-4 py-2.5 text-left text-xs font-semibold text-muted-foreground">Next Due</th>
-              <th className="px-4 py-2.5 text-left text-xs font-semibold text-muted-foreground">Assigned To</th>
-              <th className="px-4 py-2.5 text-center text-xs font-semibold text-muted-foreground">Status</th>
-              <th className="px-4 py-2.5 text-xs font-semibold text-muted-foreground" />
+              <th className="cell-density text-left text-xs font-semibold text-muted-foreground">Asset</th>
+              <th className="cell-density text-left text-xs font-semibold text-muted-foreground">Event</th>
+              <th className="cell-density text-left text-xs font-semibold text-muted-foreground">Type</th>
+              <th className="cell-density text-left text-xs font-semibold text-muted-foreground">Frequency</th>
+              <th className="cell-density text-left text-xs font-semibold text-muted-foreground">Last Done</th>
+              <th className="cell-density text-left text-xs font-semibold text-muted-foreground">Next Due</th>
+              <th className="cell-density text-left text-xs font-semibold text-muted-foreground">Assigned To</th>
+              <th className="cell-density text-center text-xs font-semibold text-muted-foreground">Status</th>
+              <th className="cell-density text-xs font-semibold text-muted-foreground" />
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
             {loading ? (
               Array.from({ length: 5 }).map((_, i) => (
                 <tr key={i}>{Array.from({ length: 9 }).map((_, j) => (
-                  <td key={j} className="px-4 py-3"><div className="h-4 bg-muted animate-pulse rounded" /></td>
+                  <td key={j} className="cell-density "><div className="h-4 bg-muted animate-pulse rounded" /></td>
                 ))}</tr>
               ))
             ) : filtered.length === 0 ? (
-              <tr><td colSpan={9} className="px-4 py-12 text-center text-muted-foreground">No compliance records found.</td></tr>
+              <tr><td colSpan={9} className="cell-density text-center text-muted-foreground">No compliance records found.</td></tr>
             ) : filtered.map(item => {
               const daysUntil = item.next_due_date
                 ? Math.ceil((new Date(item.next_due_date) - new Date()) / (1000 * 60 * 60 * 24))
                 : null;
               return (
                 <tr key={item.id} className="hover:bg-muted/20 transition-colors">
-                  <td className="px-4 py-2.5">
+                  <td className="cell-density ">
                     <button
                       className="font-medium text-primary hover:underline text-left"
                       onClick={() => openHistory(item)}
@@ -386,13 +386,13 @@ export default function AssetCompliance() {
                       {item.asset_name}
                     </button>
                   </td>
-                  <td className="px-4 py-2.5 font-medium">{item.event_name}</td>
-                  <td className="px-4 py-2.5">
+                  <td className="cell-density font-medium">{item.event_name}</td>
+                  <td className="cell-density ">
                     {item.event_type && <Badge variant="outline" className="text-xs">{item.event_type}</Badge>}
                   </td>
-                  <td className="px-4 py-2.5 text-muted-foreground text-xs">{item.frequency_months}m</td>
-                  <td className="px-4 py-2.5 text-xs text-muted-foreground">{fmt(item.last_completed_date)}</td>
-                  <td className="px-4 py-2.5">
+                  <td className="cell-density text-muted-foreground text-xs">{item.frequency_months}m</td>
+                  <td className="cell-density text-xs text-muted-foreground">{fmt(item.last_completed_date)}</td>
+                  <td className="cell-density ">
                     <div className="text-xs">{fmt(item.next_due_date)}</div>
                     {daysUntil !== null && (
                       <div className={cn('text-xs mt-0.5', daysUntil < 0 ? 'text-red-600 dark:text-red-400' : daysUntil <= 30 ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground')}>
@@ -400,13 +400,13 @@ export default function AssetCompliance() {
                       </div>
                     )}
                   </td>
-                  <td className="px-4 py-2.5 text-xs text-muted-foreground">{item.assigned_user || '—'}</td>
-                  <td className="px-4 py-2.5 text-center">
+                  <td className="cell-density text-xs text-muted-foreground">{item.assigned_user || '—'}</td>
+                  <td className="cell-density text-center">
                     <span className={cn('inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border', statusColor[item.status] || statusColor.Safe)}>
                       {item.status}
                     </span>
                   </td>
-                  <td className="px-4 py-2.5">
+                  <td className="cell-density ">
                     <div className="flex gap-1">
                       <Button size="sm" variant="ghost" className="text-xs h-7 px-2"
                         onClick={() => { setForm(item); setEditing(item.id); setOpen(true); }}>

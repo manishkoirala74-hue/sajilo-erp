@@ -12,6 +12,7 @@ import PageHeader from '@/components/shared/PageHeader';
 import DataTable from '@/components/shared/DataTable';
 import StatusBadge from '@/components/shared/StatusBadge';
 import { useSajiloSync } from '@/hooks/useSajiloSync';
+import { postFinancialVoucher } from '@/lib/glPostingService';
 const emptyVoucher = {
   voucher_type: 'Receipt', voucher_date: new Date().toISOString().split('T')[0],
   contact_name: '', payment_mode: 'Cash', reference_no: '', narration: '',
@@ -94,54 +95,6 @@ export default function FinancialVouchers() {
     return `${prefix}-${new Date().getFullYear()}-${String(vouchers.length + 1).padStart(3, '0')}`;
   };
 
-  // ── Post new GL journal ───────────────────────────────────────────────────
-  async function postGLLines(voucher) {
-    const lines = (voucher.entries || [])
-      .filter(e => e.account_id)
-      .map(e => ({
-        account_id: e.account_id,
-        account_code: e.account_code || '',
-        account_name: e.account_name || '',
-        account_type: e.account_type || '',
-        debit_amount: e.debit || 0,
-        credit_amount: e.credit || 0,
-        description: voucher.narration || e.narration || `Financial Voucher ${voucher.voucher_number}`,
-      }));
-
-    if (lines.length === 0) return;
-
-    const today = voucher.voucher_date || new Date().toISOString().split('T')[0];
-    const totalDebit = lines.reduce((s, l) => s + (l.debit_amount || 0), 0);
-    const totalCredit = lines.reduce((s, l) => s + (l.credit_amount || 0), 0);
-
-    const journal = await sajilo.entities.GeneralLedgerJournal.create({
-      entry_date: today,
-      description: voucher.narration || `Financial Voucher ${voucher.voucher_number}`,
-      reference_module: 'Treasury',
-      source_document_id: voucher.id,
-      source_document_type: 'FinancialVoucher',
-      status: 'Posted',
-      total_debit: totalDebit,
-      total_credit: totalCredit,
-      is_balanced: Math.abs(totalDebit - totalCredit) < 0.01,
-    });
-
-    await sajilo.entities.GeneralLedgerLine.bulkCreate(
-      lines.map(l => ({ ...l, journal_id: journal.id }))
-    );
-
-    for (const l of lines) {
-      if (!l.account_id) continue;
-      const results = await sajilo.entities.ChartOfAccount.filter({ id: l.account_id }, 'account_code', 1);
-      const acc = results[0];
-      if (!acc) continue;
-      const delta = (l.debit_amount || 0) - (l.credit_amount || 0);
-      const debitNormal = ['Asset', 'COGS', 'Expense', 'OPEX', 'Cost of Goods Sold', 'Other Expense'].includes(acc.account_type);
-      const balanceChange = debitNormal ? delta : -delta;
-      await sajilo.entities.ChartOfAccount.update(acc.id, { current_balance: Math.round(((acc.current_balance || 0) + balanceChange) * 100) / 100 });
-    }
-  }
-
   const save = async (status) => {
     setSaving(true);
     try {
@@ -149,7 +102,14 @@ export default function FinancialVouchers() {
       const savedVoucher = await sajilo.entities.FinancialVoucher.create(payload);
       
       if (status === 'Posted') {
-        await postGLLines(savedVoucher);
+        const idempotencyKey = crypto.randomUUID();
+        const linesToPost = payload.entries.map(e => ({
+          account_id: e.account_id,
+          debit_amount: e.debit || 0,
+          credit_amount: e.credit || 0,
+          description: e.narration || payload.narration || `Financial Voucher ${payload.voucher_number}`
+        }));
+        await postFinancialVoucher({ ...savedVoucher, lines: linesToPost }, false, idempotencyKey);
       }
 
       toast.success(`Voucher ${status}`);
@@ -171,28 +131,8 @@ export default function FinancialVouchers() {
 
     // Reverse GL lines first if voucher is Posted
     if (selected.status === 'Posted') {
-      const journals = await sajilo.entities.GeneralLedgerJournal.filter({ source_document_id: selected.id, source_document_type: 'FinancialVoucher' });
-      
-      // Update ChartOfAccount balances by reversing the entries' impact
-      for (const e of selected.entries) {
-        if (!e.account_id) continue;
-        const results = await sajilo.entities.ChartOfAccount.filter({ id: e.account_id }, 'account_code', 1);
-        const acc = results[0];
-        if (!acc) continue;
-        const delta = (e.debit || 0) - (e.credit || 0);
-        const debitNormal = ['Asset', 'COGS', 'Expense', 'OPEX', 'Cost of Goods Sold', 'Other Expense'].includes(acc.account_type);
-        const balanceChange = debitNormal ? delta : -delta;
-        await sajilo.entities.ChartOfAccount.update(acc.id, { current_balance: Math.round(((acc.current_balance || 0) - balanceChange) * 100) / 100 });
-      }
-
-      // Delete the original journal(s)
-      for (const j of journals) {
-        const lines = await sajilo.entities.GeneralLedgerLine.filter({ journal_id: j.id });
-        for (const l of lines) {
-           await sajilo.entities.GeneralLedgerLine.delete(l.id);
-        }
-        await sajilo.entities.GeneralLedgerJournal.delete(j.id);
-      }
+      const idempotencyKey = crypto.randomUUID();
+      await postFinancialVoucher({ id: selected.id, company_id: selected.company_id }, true, idempotencyKey);
     }
 
     // Log the deletion
@@ -249,8 +189,14 @@ export default function FinancialVouchers() {
       entries: reversalEntries,
     });
 
-    // Post the reversal GL lines
-    await reverseGLLines(selected, user, 'Reverse');
+    const idempotencyKey = crypto.randomUUID();
+    const linesToPost = reversalEntries.map(e => ({
+      account_id: e.account_id,
+      debit_amount: e.debit || 0,
+      credit_amount: e.credit || 0,
+      description: e.narration || reversalVoucher.narration
+    }));
+    await postFinancialVoucher({ ...reversalVoucher, lines: linesToPost }, false, idempotencyKey);
 
     // Mark original as Cancelled
     await sajilo.entities.FinancialVoucher.update(selected.id, { status: 'Cancelled' });
@@ -418,13 +364,13 @@ export default function FinancialVouchers() {
                 </p>
               )}
               <div className="border rounded-lg">
-                <table className="w-full text-sm">
-                  <thead className="bg-muted/50">
+                <table className="table-fluid-grid text-sm">
+                  <thead className="cell-density bg-muted/50">
                     <tr>
-                      <th className="px-3 py-2 text-left font-medium text-muted-foreground">Account</th>
-                      <th className="px-3 py-2 text-left font-medium text-muted-foreground">Debit</th>
-                      <th className="px-3 py-2 text-left font-medium text-muted-foreground">Credit</th>
-                      <th className="px-3 py-2"></th>
+                      <th className="cell-density text-left font-medium text-muted-foreground">Account</th>
+                      <th className="cell-density text-left font-medium text-muted-foreground">Debit</th>
+                      <th className="cell-density text-left font-medium text-muted-foreground">Credit</th>
+                      <th className="cell-density "></th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
@@ -432,7 +378,7 @@ export default function FinancialVouchers() {
                       const accountOptions = idx === 0 && isPaymentType ? paymentSourceAccounts : ledgerAccounts;
                       return (
                         <tr key={idx}>
-                          <td className="px-2 py-1">
+                          <td className="cell-density ">
                             <SearchableSelect
                                 value={e.account_id || ''}
                                 onValueChange={v => {
@@ -446,9 +392,9 @@ export default function FinancialVouchers() {
                                 options={accountOptions.map(a => ({ value: a.id, label: a.account_name, sub: a.account_code }))}
                               />
                           </td>
-                          <td className="px-2 py-1 w-28"><Input type="number" value={e.debit} onChange={ev => handleEntry(idx, 'debit', ev.target.value)} className="h-8" /></td>
-                          <td className="px-2 py-1 w-28"><Input type="number" value={e.credit} onChange={ev => handleEntry(idx, 'credit', ev.target.value)} className="h-8" /></td>
-                          <td className="px-2 py-1"><button onClick={() => removeEntry(idx)} className="text-red-500 hover:text-red-700 dark:text-red-400 px-2">×</button></td>
+                          <td className="cell-density w-28"><Input type="number" value={e.debit} onChange={ev => handleEntry(idx, 'debit', ev.target.value)} className="h-8" /></td>
+                          <td className="cell-density w-28"><Input type="number" value={e.credit} onChange={ev => handleEntry(idx, 'credit', ev.target.value)} className="h-8" /></td>
+                          <td className="cell-density "><button onClick={() => removeEntry(idx)} className="text-red-500 hover:text-red-700 dark:text-red-400 px-2">×</button></td>
                         </tr>
                       );
                     })}
@@ -484,26 +430,27 @@ export default function FinancialVouchers() {
                   <div><span className="text-muted-foreground">Type:</span> <strong>{selected.voucher_type}</strong></div>
                   <div><span className="text-muted-foreground">Date:</span> <strong>{selected.voucher_date}</strong></div>
                   <div><span className="text-muted-foreground">Contact:</span> <strong>{selected.contact_name || '—'}</strong></div>
+                  <div><span className="text-muted-foreground">Created:</span> <strong>{selected.created_at ? new Date(selected.created_at).toLocaleString() : '—'}</strong></div>
                   <div><span className="text-muted-foreground">Mode:</span> <strong>{selected.payment_mode}</strong></div>
                   <div><span className="text-muted-foreground">Ref No:</span> <strong>{selected.reference_no || '—'}</strong></div>
                   <div><span className="text-muted-foreground">Status:</span> <strong>{selected.status}</strong></div>
                 </div>
                 <div>
                   <p className="font-medium mb-2">Ledger Entries</p>
-                  <table className="w-full border rounded-lg overflow-hidden text-xs">
-                    <thead className="bg-muted/50"><tr>
-                      <th className="px-3 py-2 text-left">Account</th>
-                      <th className="px-3 py-2 text-left">Type</th>
-                      <th className="px-3 py-2 text-right">Debit</th>
-                      <th className="px-3 py-2 text-right">Credit</th>
+                  <table className="table-fluid-grid border rounded-lg overflow-hidden text-xs">
+                    <thead className="cell-density bg-muted/50"><tr>
+                      <th className="cell-density text-left">Account</th>
+                      <th className="cell-density text-left">Type</th>
+                      <th className="cell-density text-right">Debit</th>
+                      <th className="cell-density text-right">Credit</th>
                     </tr></thead>
                     <tbody className="divide-y divide-border">
                       {(selected.entries || []).map((e, i) => (
                         <tr key={i}>
-                          <td className="px-3 py-2">{e.account_name}</td>
-                          <td className="px-3 py-2">{e.account_type}</td>
-                          <td className="px-3 py-2 text-right">{fmt(e.debit)}</td>
-                          <td className="px-3 py-2 text-right">{fmt(e.credit)}</td>
+                          <td className="cell-density ">{e.account_name}</td>
+                          <td className="cell-density ">{e.account_type}</td>
+                          <td className="cell-density text-right">{fmt(e.debit)}</td>
+                          <td className="cell-density text-right">{fmt(e.credit)}</td>
                         </tr>
                       ))}
                     </tbody>

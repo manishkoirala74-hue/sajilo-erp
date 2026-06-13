@@ -140,20 +140,20 @@ export default function PayrollRuns() {
                   </div>
                 ))}
               </div>
-              <table className="w-full text-xs border rounded-lg overflow-hidden">
-                <thead className="bg-muted/50"><tr>
-                  <th className="px-3 py-2 text-left">Employee</th>
-                  <th className="px-3 py-2 text-right">Gross</th>
-                  <th className="px-3 py-2 text-right">Deductions</th>
-                  <th className="px-3 py-2 text-right font-semibold">Net</th>
+              <table className="table-fluid-grid text-xs border rounded-lg overflow-hidden">
+                <thead className="cell-density bg-muted/50"><tr>
+                  <th className="cell-density text-left">Employee</th>
+                  <th className="cell-density text-right">Gross</th>
+                  <th className="cell-density text-right">Deductions</th>
+                  <th className="cell-density text-right font-semibold">Net</th>
                 </tr></thead>
                 <tbody className="divide-y divide-border">
                   {details.map((p, i) => (
                     <tr key={i} className="hover:bg-muted/20">
-                      <td className="px-3 py-2 font-medium">{p.employee_name}</td>
-                      <td className="px-3 py-2 text-right">{fmt(p.gross_pay)}</td>
-                      <td className="px-3 py-2 text-right text-orange-600 dark:text-orange-400">{fmt(p.total_deductions)}</td>
-                      <td className="px-3 py-2 text-right font-semibold text-emerald-600 dark:text-emerald-400">{fmt(p.net_payable)}</td>
+                      <td className="cell-density font-medium">{p.employee_name}</td>
+                      <td className="cell-density text-right">{fmt(p.gross_pay)}</td>
+                      <td className="cell-density text-right text-orange-600 dark:text-orange-400">{fmt(p.total_deductions)}</td>
+                      <td className="cell-density text-right font-semibold text-emerald-600 dark:text-emerald-400">{fmt(p.net_payable)}</td>
                     </tr>
                   ))}
                 </tbody>

@@ -88,21 +88,17 @@ export default function StockAdjustments() {
     if (form.line_items.length === 0) { toast.error('Add at least one item'); return; }
     setSaving(true);
     try {
-  const created = await sajilo.entities.StockAdjustment.create({ ...form, status });
+      const idempotencyKey = crypto.randomUUID();
+      const created = await sajilo.entities.StockAdjustment.create({ ...form, status, idempotency_key: idempotencyKey });
       if (status === 'Posted') {
-        for (const line of form.line_items) {
-          if (line.item_id) {
-            await sajilo.entities.Item.update(line.item_id, { quantity_on_hand: line.adjusted_qty });
-          }
-        }
-        // GL Posting
+        // GL Posting & Atomic Stock Update via RPC
         const [itemsMap, glSettings] = await Promise.all([loadItemsMap(form.line_items.map(l => l.item_id)), loadSettings()]);
-        await postStockAdjustment({ ...form, id: created.id }, itemsMap, glSettings);
+        await postStockAdjustment({ ...form, id: created.id, idempotency_key: idempotencyKey }, itemsMap, glSettings);
         toast.success(`Stock adjustment posted — ${form.line_items.length} items updated & GL posted`);
       } else {
         toast.success('Adjustment saved as draft');
       }
-        } catch (err) {
+    } catch (err) {
       toast.error(err.message || 'Error occurred while saving');
     } finally {
       setSaving(false);
@@ -182,25 +178,25 @@ export default function StockAdjustments() {
             </div>
 
             <div className="border rounded-lg overflow-hidden">
-              <table className="w-full text-sm">
-                <thead className="bg-muted/50"><tr>
-                  <th className="px-3 py-2 text-left">Item</th>
-                  <th className="px-3 py-2 text-right w-28">Current Qty</th>
-                  <th className="px-3 py-2 text-right w-28">{form.adjustment_type === 'Increase' ? 'New Qty' : 'Adjusted Qty'}</th>
-                  <th className="px-3 py-2 text-right w-24">Difference</th>
-                  <th className="px-3 py-2 text-right w-28">Cost/Unit (WAC)</th>
-                  <th className="px-3 py-2 text-right w-28">Cost Impact</th>
-                  <th className="px-3 py-2 w-10"></th>
+              <table className="table-fluid-grid text-sm">
+                <thead className="cell-density bg-muted/50"><tr>
+                  <th className="cell-density text-left">Item</th>
+                  <th className="cell-density text-right w-28">Current Qty</th>
+                  <th className="cell-density text-right w-28">{form.adjustment_type === 'Increase' ? 'New Qty' : 'Adjusted Qty'}</th>
+                  <th className="cell-density text-right w-24">Difference</th>
+                  <th className="cell-density text-right w-28">Cost/Unit (WAC)</th>
+                  <th className="cell-density text-right w-28">Cost Impact</th>
+                  <th className="cell-density w-10"></th>
                 </tr></thead>
                 <tbody className="divide-y divide-border">
                   {form.line_items.map((line, idx) => (
                     <tr key={idx} className={line.difference_qty > 0 ? 'bg-emerald-50 dark:bg-emerald-500/10/30' : line.difference_qty < 0 ? 'bg-red-50 dark:bg-red-500/10/30' : ''}>
-                      <td className="px-3 py-2">
+                      <td className="cell-density ">
                         <p className="font-medium">{line.item_name}</p>
                         <p className="text-xs text-muted-foreground">{line.item_code}</p>
                       </td>
-                      <td className="px-3 py-2 text-right font-mono">{line.current_qty}</td>
-                      <td className="px-2 py-1 text-right">
+                      <td className="cell-density text-right font-mono">{line.current_qty}</td>
+                      <td className="cell-density text-right">
                         <Input type="number" min={0} value={line.adjusted_qty}
                           onChange={e => updateLine(idx, 'adjusted_qty', e.target.value)}
                           className="h-8 text-right w-24 ml-auto" />
@@ -208,16 +204,16 @@ export default function StockAdjustments() {
                       <td className={cn('px-3 py-2 text-right font-semibold', line.difference_qty > 0 ? 'text-emerald-600 dark:text-emerald-400' : line.difference_qty < 0 ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground')}>
                         {line.difference_qty > 0 ? `+${line.difference_qty}` : line.difference_qty}
                       </td>
-                      <td className="px-2 py-1 text-right">
+                      <td className="cell-density text-right">
                         <Input type="number" min={0} value={line.cost_per_unit}
                           onChange={e => updateLine(idx, 'cost_per_unit', e.target.value)}
                           className="h-8 text-right w-28 ml-auto" />
                       </td>
-                      <td className="px-3 py-2 text-right font-medium">NPR {Number(line.cost_impact || 0).toLocaleString()}</td>
-                      <td className="px-2 py-1"><button onClick={() => removeLine(idx)} className="text-red-500 px-2">×</button></td>
+                      <td className="cell-density text-right font-medium">NPR {Number(line.cost_impact || 0).toLocaleString()}</td>
+                      <td className="cell-density "><button onClick={() => removeLine(idx)} className="text-red-500 px-2">×</button></td>
                     </tr>
                   ))}
-                  {form.line_items.length === 0 && <tr><td colSpan={7} className="px-3 py-6 text-center text-muted-foreground text-sm">Add items using the dropdown above</td></tr>}
+                  {form.line_items.length === 0 && <tr><td colSpan={7} className="cell-density text-center text-muted-foreground text-sm">Add items using the dropdown above</td></tr>}
                 </tbody>
               </table>
             </div>
@@ -247,24 +243,24 @@ export default function StockAdjustments() {
                 <div><span className="text-muted-foreground">Reason:</span> <strong>{viewDetail.reason}</strong></div>
                 <div><span className="text-muted-foreground">Status:</span> <StatusBadge status={viewDetail.status} /></div>
               </div>
-              <table className="w-full text-sm border rounded-lg overflow-hidden">
-                <thead className="bg-muted/50"><tr>
-                  <th className="px-3 py-2 text-left">Item</th>
-                  <th className="px-3 py-2 text-right">Before</th>
-                  <th className="px-3 py-2 text-right">After</th>
-                  <th className="px-3 py-2 text-right">Diff</th>
-                  <th className="px-3 py-2 text-right">Cost Impact</th>
+              <table className="table-fluid-grid text-sm border rounded-lg overflow-hidden">
+                <thead className="cell-density bg-muted/50"><tr>
+                  <th className="cell-density text-left">Item</th>
+                  <th className="cell-density text-right">Before</th>
+                  <th className="cell-density text-right">After</th>
+                  <th className="cell-density text-right">Diff</th>
+                  <th className="cell-density text-right">Cost Impact</th>
                 </tr></thead>
                 <tbody className="divide-y divide-border">
                   {(viewDetail.line_items || []).map((l, i) => (
                     <tr key={i}>
-                      <td className="px-3 py-2">{l.item_name}</td>
-                      <td className="px-3 py-2 text-right">{l.current_qty}</td>
-                      <td className="px-3 py-2 text-right">{l.adjusted_qty}</td>
+                      <td className="cell-density ">{l.item_name}</td>
+                      <td className="cell-density text-right">{l.current_qty}</td>
+                      <td className="cell-density text-right">{l.adjusted_qty}</td>
                       <td className={cn('px-3 py-2 text-right font-semibold', l.difference_qty > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>
                         {l.difference_qty > 0 ? `+${l.difference_qty}` : l.difference_qty}
                       </td>
-                      <td className="px-3 py-2 text-right">NPR {Number(l.cost_impact || 0).toLocaleString()}</td>
+                      <td className="cell-density text-right">NPR {Number(l.cost_impact || 0).toLocaleString()}</td>
                     </tr>
                   ))}
                 </tbody>

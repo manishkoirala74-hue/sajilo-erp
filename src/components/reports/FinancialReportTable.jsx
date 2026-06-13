@@ -97,7 +97,7 @@ function LedgerRow({ account, columns, depth }) {
     <tr className="hover:bg-muted/50 transition-colors print:hover:bg-transparent">
       {columns.map(col => {
         if (col.key === 'account_code') return (
-          <td key={col.key} className="py-1.5 font-mono text-xs text-muted-foreground whitespace-nowrap print:text-[9px]"
+          <td key={col.key} className="cell-density py-1.5 font-mono text-xs text-muted-foreground whitespace-nowrap print:text-[9px]"
             style={{ paddingLeft: `${indent}px`, paddingRight: '8px' }}>
             <div className="flex items-center gap-1.5">
               <span className="text-muted-foreground/30 text-xs select-none shrink-0">└</span>
@@ -107,13 +107,13 @@ function LedgerRow({ account, columns, depth }) {
           </td>
         );
         if (col.key === 'account_name') return (
-          <td key={col.key} className="px-2 py-1.5 text-sm text-foreground print:text-[10px]"
+          <td key={col.key} className="cell-density text-sm text-foreground print:text-[10px]"
             style={{ wordBreak: 'break-word' }}>
             {account.account_name}
           </td>
         );
         if (col.key === 'account_type') return (
-          <td key={col.key} className="px-2 py-1.5 print:hidden">
+          <td key={col.key} className="cell-density print:hidden">
             <TypeBadge type={account.account_type} />
           </td>
         );
@@ -171,7 +171,7 @@ function GroupRow({ node, columns, depth, expandedGroups, onToggle, showZeroBala
       >
         {columns.map(col => {
           if (col.key === 'account_code') return (
-            <td key={col.key} className="py-2 font-mono text-xs font-bold text-muted-foreground whitespace-nowrap print:text-[9px]"
+            <td key={col.key} className="cell-density py-2 font-mono text-xs font-bold text-muted-foreground whitespace-nowrap print:text-[9px]"
               style={{ paddingLeft: `${indent}px`, paddingRight: '8px' }}>
               <div className="flex items-center gap-1.5">
                 {hasChildren || isControlAccount
@@ -200,7 +200,7 @@ function GroupRow({ node, columns, depth, expandedGroups, onToggle, showZeroBala
             </td>
           );
           if (col.key === 'account_type') return (
-            <td key={col.key} className="px-2 py-2 print:hidden">
+            <td key={col.key} className="cell-density print:hidden">
               <TypeBadge type={node.account_type} />
             </td>
           );
@@ -351,8 +351,8 @@ export default function FinancialReportTable({
       </div>
 
       <div className="border border-border rounded-xl overflow-hidden print:border-0 print:rounded-none">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm border-collapse print:text-[10px]" style={{ tableLayout: 'fixed' }}>
+        <div className="table-scroll-container">
+          <table className="table-fluid-grid text-sm border-collapse print:text-[10px]">
             <colgroup>
               {columns.map(col => {
                 const widths = {
@@ -370,12 +370,12 @@ export default function FinancialReportTable({
               })}
             </colgroup>
 
-            <thead className="bg-slate-800 border-b-2 border-slate-600 sticky top-0 z-10">
+            <thead className="cell-density bg-slate-800 border-b-2 border-slate-600 sticky top-0 z-10">
               <tr>
                 {columns.map(col => {
-                  if (col.key === 'opening_debit') return <th key="opening_grp" colSpan={2} className="px-3 py-2 text-center text-[11px] font-bold text-slate-100 uppercase tracking-wider print:text-[9px] border-b border-slate-600">Opening Balance</th>;
-                  if (col.key === 'current_debit') return <th key="current_grp" colSpan={2} className="px-3 py-2 text-center text-[11px] font-bold text-slate-100 uppercase tracking-wider print:text-[9px] border-b border-slate-600 border-l border-slate-700">Current Period</th>;
-                  if (col.key === 'closing_debit') return <th key="closing_grp" colSpan={2} className="px-3 py-2 text-center text-[11px] font-bold text-slate-100 uppercase tracking-wider print:text-[9px] border-b border-slate-600 border-l border-slate-700">Closing Balance</th>;
+                  if (col.key === 'opening_debit') return <th key="opening_grp" colSpan={2} className="cell-density text-center text-[11px] font-bold text-slate-100 uppercase tracking-wider print:text-[9px] border-b border-slate-600">Opening Balance</th>;
+                  if (col.key === 'current_debit') return <th key="current_grp" colSpan={2} className="cell-density text-center text-[11px] font-bold text-slate-100 uppercase tracking-wider print:text-[9px] border-b border-slate-600 border-l border-slate-700">Current Period</th>;
+                  if (col.key === 'closing_debit') return <th key="closing_grp" colSpan={2} className="cell-density text-center text-[11px] font-bold text-slate-100 uppercase tracking-wider print:text-[9px] border-b border-slate-600 border-l border-slate-700">Closing Balance</th>;
                   if (col.key.endsWith('_credit')) return null;
                   
                   return <th key={col.key} rowSpan={2} className={cn(
@@ -430,7 +430,7 @@ export default function FinancialReportTable({
               <tr>
                 {columns.map(col => {
                   if (col.key === 'account_code') return (
-                    <td key={col.key} className="px-3 py-2.5 font-bold text-xs text-white uppercase tracking-wider print:text-[9px] print:text-foreground">
+                    <td key={col.key} className="cell-density font-bold text-xs text-white uppercase tracking-wider print:text-[9px] print:text-foreground">
                       GRAND TOTAL
                     </td>
                   );
@@ -438,7 +438,7 @@ export default function FinancialReportTable({
                     <td key={col.key} className={cn('px-3 py-2.5', col.key === 'account_type' && 'print:hidden')} />
                   );
                   return (
-                    <td key={col.key} className="px-3 py-2.5 text-right font-bold text-sm tabular-nums font-mono text-white print:text-[10px] print:text-foreground">
+                    <td key={col.key} className="cell-density text-right font-bold text-sm tabular-nums font-mono text-white print:text-[10px] print:text-foreground">
                       {fmtNPR(grandTotals[col.key])}
                     </td>
                   );

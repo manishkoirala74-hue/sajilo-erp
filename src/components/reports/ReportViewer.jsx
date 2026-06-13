@@ -73,13 +73,11 @@ const PRINT_STYLE = `
   /* ── Table layout ── */
   table {
     width: 100% !important;
-    table-layout: fixed !important;
     border-collapse: collapse !important;
   }
   th, td {
     padding: 3pt 5pt !important;
-    word-break: break-word !important;
-    overflow-wrap: break-word !important;
+    white-space: nowrap !important;
     vertical-align: middle !important;
     font-size: 8pt !important;
     font-family: 'Calibri', Arial, sans-serif !important;
@@ -120,39 +118,47 @@ function ReportTable({ title, subtitle, headers, rows, footer, onExport, fromDat
         )}
       </div>
       <div className="border border-border rounded-xl overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm print:text-[10pt]" style={{ tableLayout: 'auto' }}>
-            <thead className="bg-slate-100 dark:bg-slate-500/20 border-b-2 border-border">
+        <div className="table-scroll-container">
+          <table className="table-fluid-grid text-sm print:text-[10pt]">
+            <thead className="cell-density bg-slate-100 dark:bg-slate-500/20 border-b-2 border-border">
               <tr>
-                {headers.map((h, i) => (
-                  <th key={i} className={`px-3 py-2.5 text-xs font-bold text-muted-foreground uppercase tracking-wider whitespace-nowrap ${i >= headers.length - 2 ? 'text-right' : 'text-left'}`}>
-                    {h}
-                  </th>
-                ))}
+                {headers.map((h, i) => {
+                  const isNum = rightCols.has(i);
+                  return (
+                    <th key={i} className={`cell-density font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider ${isNum ? 'amount-cell' : 'text-align-left'}`}>
+                      {h}
+                    </th>
+                  );
+                })}
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
               {rows.length === 0
-                ? <tr><td colSpan={headers.length} className="px-3 py-8 text-center text-muted-foreground text-sm">No data found for the selected period.</td></tr>
+                ? <tr><td colSpan={headers.length} className="cell-density text-center text-muted-foreground text-sm">No data found for the selected period.</td></tr>
                 : rows.map((row, i) => (
                   <tr key={i} className="hover:bg-muted/20 print:hover:bg-transparent">
-                    {row.map((cell, j) => (
-                      <td key={j} className={`px-3 py-2 print:text-[10pt] ${j >= row.length - 2 ? 'text-right tabular-nums font-mono' : ''}`}
-                        style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}>
-                        {cell}
-                      </td>
-                    ))}
+                    {row.map((cell, j) => {
+                      const isNum = rightCols.has(j);
+                      return (
+                        <td key={j} className={`cell-density print:text-[10pt] ${isNum ? 'amount-cell' : 'text-align-left'}`}>
+                          {cell}
+                        </td>
+                      );
+                    })}
                   </tr>
                 ))}
             </tbody>
             {footer && (
               <tfoot className="bg-slate-100 dark:bg-slate-500/20 border-t-2 border-slate-400 font-semibold">
                 <tr>
-                  {footer.map((cell, j) => (
-                    <td key={j} className={`px-3 py-2.5 print:text-[10pt] font-bold ${j >= footer.length - 2 ? 'text-right tabular-nums font-mono' : ''}`}>
-                      {cell}
-                    </td>
-                  ))}
+                  {footer.map((cell, j) => {
+                    const isNum = rightCols.has(j);
+                    return (
+                      <td key={j} className={`cell-density print:text-[10pt] font-bold ${isNum ? 'amount-cell' : 'text-align-left'}`}>
+                        {cell}
+                      </td>
+                    );
+                  })}
                 </tr>
               </tfoot>
             )}
@@ -834,7 +840,7 @@ function ProfitLossReport({ initialData, initialFromDate, initialToDate }) {
             </Button>
           </div>
 
-          <table className='w-full text-sm'>
+          <table className="table-fluid-grid text-sm">
             <thead>
               <tr className='border-b border-border'>
                 <th className='px-3 py-2 text-left font-semibold text-foreground w-[50%]'>Financial Particulars</th>

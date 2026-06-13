@@ -17,48 +17,36 @@ export function ThemeProvider({
     () => localStorage.getItem(storageKey) || defaultTheme
   );
 
+  const [resolvedTheme, setResolvedTheme] = useState("light");
+
   useEffect(() => {
     const root = window.document.documentElement;
-
-    const css = document.createElement('style');
-    css.appendChild(
-      document.createTextNode(
-        `* {
-          -webkit-transition: none !important;
-          -moz-transition: none !important;
-          -o-transition: none !important;
-          -ms-transition: none !important;
-          transition: none !important;
-        }`
-      )
-    );
-    document.head.appendChild(css);
-
     root.classList.remove("light", "dark");
 
+    let activeTheme = theme;
     if (theme === "system") {
-      const systemTheme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-      root.classList.add(systemTheme);
-    } else {
-      root.classList.add(theme);
+      activeTheme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
     }
-
-    // Force restyle before removing the transition-blocking style
-    (() => window.getComputedStyle(document.body))();
-    setTimeout(() => {
-      document.head.removeChild(css);
-    }, 1);
-
+    
+    root.classList.add(activeTheme);
+    setResolvedTheme(activeTheme);
   }, [theme]);
 
   const value = {
     theme,
-    setTheme: (theme) => {
-      localStorage.setItem(storageKey, theme);
-      setTheme(theme);
+    resolvedTheme,
+    setTheme: (newTheme) => {
+      localStorage.setItem(storageKey, newTheme);
+      setTheme(newTheme);
     },
     toggleTheme: () => {
-      setTheme(theme === "dark" ? "light" : "dark");
+      let isDark = theme === "dark";
+      if (theme === "system") {
+        isDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+      }
+      const newTheme = isDark ? "light" : "dark";
+      localStorage.setItem(storageKey, newTheme);
+      setTheme(newTheme);
     }
   };
 

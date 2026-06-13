@@ -135,27 +135,27 @@ export default function JournalDetailDrawer({ journal, open, onClose, onRefresh 
               <div className="space-y-2">{Array(3).fill(0).map((_, i) => <div key={i} className="h-10 bg-muted rounded animate-pulse" />)}</div>
             ) : (
               <div className="border border-border rounded-xl overflow-hidden">
-                <table className="w-full text-sm">
-                  <thead className="bg-muted/40">
+                <table className="table-fluid-grid text-sm">
+                  <thead className="cell-density bg-muted/40">
                     <tr>
-                      <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground">Account</th>
-                      <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground">Narration</th>
-                      <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground">Debit (Dr)</th>
-                      <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground">Credit (Cr)</th>
+                      <th className="cell-density text-left  text-xs font-medium text-muted-foreground">Account</th>
+                      <th className="cell-density text-left  text-xs font-medium text-muted-foreground">Narration</th>
+                      <th className="cell-density text-right  text-xs font-medium text-muted-foreground">Debit (Dr)</th>
+                      <th className="cell-density text-right  text-xs font-medium text-muted-foreground">Credit (Cr)</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
                     {lines.map((line, i) => (
                       <tr key={i} className="hover:bg-muted/10">
-                        <td className="px-3 py-2.5">
+                        <td className="cell-density ">
                           <span className="font-mono text-xs text-muted-foreground mr-1.5">{line.account_code}</span>
                           <span className="font-medium">{line.account_name}</span>
                         </td>
-                        <td className="px-3 py-2.5 text-xs text-muted-foreground">{line.description || '—'}</td>
-                        <td className="px-3 py-2.5 text-right font-mono text-sm">
+                        <td className="cell-density text-xs text-muted-foreground">{line.description || '—'}</td>
+                        <td className="cell-density text-right font-mono text-sm">
                           {line.debit_amount > 0 ? <span className="text-blue-700 dark:text-blue-400 font-semibold">{line.debit_amount.toLocaleString()}</span> : <span className="text-muted-foreground">—</span>}
                         </td>
-                        <td className="px-3 py-2.5 text-right font-mono text-sm">
+                        <td className="cell-density text-right font-mono text-sm">
                           {line.credit_amount > 0 ? <span className="text-emerald-700 dark:text-emerald-400 font-semibold">{line.credit_amount.toLocaleString()}</span> : <span className="text-muted-foreground">—</span>}
                         </td>
                       </tr>
@@ -163,7 +163,7 @@ export default function JournalDetailDrawer({ journal, open, onClose, onRefresh 
                   </tbody>
                   <tfoot className="bg-muted/30 border-t-2 border-border">
                     <tr>
-                      <td colSpan={2} className="px-3 py-2.5 text-xs font-semibold">
+                      <td colSpan={2} className="cell-density text-xs font-semibold">
                         <div className="flex items-center gap-1.5">
                           {isBalanced
                             ? <><CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" /><span className="text-emerald-700 dark:text-emerald-400">Balanced</span></>
@@ -171,8 +171,8 @@ export default function JournalDetailDrawer({ journal, open, onClose, onRefresh 
                           }
                         </div>
                       </td>
-                      <td className="px-3 py-2.5 text-right font-mono font-bold text-blue-700 dark:text-blue-400">{totalDebit.toLocaleString()}</td>
-                      <td className="px-3 py-2.5 text-right font-mono font-bold text-emerald-700 dark:text-emerald-400">{totalCredit.toLocaleString()}</td>
+                      <td className="cell-density text-right font-mono font-bold text-blue-700 dark:text-blue-400">{totalDebit.toLocaleString()}</td>
+                      <td className="cell-density text-right font-mono font-bold text-emerald-700 dark:text-emerald-400">{totalCredit.toLocaleString()}</td>
                     </tr>
                   </tfoot>
                 </table>

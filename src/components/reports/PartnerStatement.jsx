@@ -305,58 +305,60 @@ export default function PartnerStatement({ title, mode, initialFromDate, initial
           )}
 
           {/* Transaction Table */}
-          <table className="w-full text-base text-left">
-            <thead>
-              <tr className="border-y-2 border-border bg-muted/50/50">
-                <th className="py-3 px-2 font-semibold text-slate-500">Date</th>
-                <th className="py-3 px-2 font-semibold text-slate-500">Voucher</th>
-                <th className="py-3 px-2 font-semibold text-slate-500 w-1/3">Description</th>
-                <th className="py-3 px-2 font-semibold text-slate-500 text-right">Debit</th>
-                <th className="py-3 px-2 font-semibold text-slate-500 text-right">Credit</th>
-                <th className="py-3 px-2 font-semibold text-slate-500 text-right">Balance</th>
-                {printConfig.showRemarks && <th className="py-3 px-2 font-semibold text-slate-500">Remarks</th>}
-              </tr>
-            </thead>
+          <div className="table-scroll-container">
+            <table className="table-fluid-grid text-base text-left">
+              <thead>
+                <tr className="border-y-2 border-border bg-muted/50/50">
+                  <th className="cell-density font-semibold text-slate-500 text-align-center">Date</th>
+                  <th className="cell-density font-semibold text-slate-500 text-align-center">Voucher</th>
+                  <th className="cell-density font-semibold text-slate-500 text-align-left w-1/3">Description</th>
+                  <th className="cell-density font-semibold text-slate-500 amount-cell uppercase">Debit</th>
+                  <th className="cell-density font-semibold text-slate-500 amount-cell uppercase">Credit</th>
+                  <th className="cell-density font-semibold text-slate-500 amount-cell uppercase">Balance</th>
+                  {printConfig.showRemarks && <th className="cell-density font-semibold text-slate-500 text-align-left">Remarks</th>}
+                </tr>
+              </thead>
             <tbody className="divide-y divide-slate-100">
               {/* Opening Balance Row */}
               <tr className="bg-muted/50/30">
-                <td className="py-2.5 px-2 text-slate-400 italic">{displayDate(filters.fromDate)}</td>
-                <td colSpan={2} className="py-2.5 px-2 font-semibold text-muted-foreground">*** Opening Balance ***</td>
-                <td className="py-2.5 px-2 text-right"></td>
-                <td className="py-2.5 px-2 text-right"></td>
-                <td className="py-2.5 px-2 text-right font-bold tabular-nums font-mono">{fmtNPR(summary.opening)}</td>
+                <td className="cell-density py-2.5 px-2 text-slate-400 italic">{displayDate(filters.fromDate)}</td>
+                <td colSpan={2} className="cell-density py-2.5 px-2 font-semibold text-muted-foreground">*** Opening Balance ***</td>
+                <td className="cell-density py-2.5 px-2 text-right"></td>
+                <td className="cell-density py-2.5 px-2 text-right"></td>
+                <td className="cell-density py-2.5 px-2 text-right font-bold tabular-nums font-mono">{fmtNPR(summary.opening)}</td>
                 {printConfig.showRemarks && <td></td>}
               </tr>
 
               {/* Transactions */}
               {transactions.map((t, i) => (
                 <tr key={i} className="hover:bg-muted/50/50">
-                  <td className="py-2.5 px-2 whitespace-nowrap text-muted-foreground">{displayDate(t.date)}</td>
-                  <td className="py-2.5 px-2 font-mono text-sm text-primary">{t.voucher}</td>
-                  <td className="py-2.5 px-2 text-muted-foreground">{t.description} {t.reference && <span className="text-slate-400 text-xs ml-1">(Ref: {t.reference})</span>}</td>
-                  <td className="py-2.5 px-2 text-right tabular-nums font-mono">{t.debit > 0 ? fmtNPR(t.debit) : ''}</td>
-                  <td className="py-2.5 px-2 text-right tabular-nums font-mono">{t.credit > 0 ? fmtNPR(t.credit) : ''}</td>
-                  <td className="py-2.5 px-2 text-right font-semibold tabular-nums font-mono">{fmtNPR(t.balance)}</td>
-                  {printConfig.showRemarks && <td className="py-2.5 px-2 text-slate-400 text-xs line-clamp-1 border-b-0"></td>}
+                  <td className="cell-density py-2.5 px-2 whitespace-nowrap text-muted-foreground">{displayDate(t.date)}</td>
+                  <td className="cell-density py-2.5 px-2 font-mono text-sm text-primary">{t.voucher}</td>
+                  <td className="cell-density py-2.5 px-2 text-muted-foreground">{t.description} {t.reference && <span className="text-slate-400 text-xs ml-1">(Ref: {t.reference})</span>}</td>
+                  <td className="cell-density py-2.5 px-2 text-right tabular-nums font-mono">{t.debit > 0 ? fmtNPR(t.debit) : ''}</td>
+                  <td className="cell-density py-2.5 px-2 text-right tabular-nums font-mono">{t.credit > 0 ? fmtNPR(t.credit) : ''}</td>
+                  <td className="cell-density py-2.5 px-2 text-right font-semibold tabular-nums font-mono">{fmtNPR(t.balance)}</td>
+                  {printConfig.showRemarks && <td className="cell-density py-2.5 px-2 text-slate-400 text-xs line-clamp-1 border-b-0"></td>}
                 </tr>
               ))}
               
               {transactions.length === 0 && (
                 <tr>
-                  <td colSpan={printConfig.showRemarks ? 7 : 6} className="py-8 text-center text-slate-400 italic">No transactions found for this period.</td>
+                  <td colSpan={printConfig.showRemarks ? 7 : 6} className="cell-density py-8 text-center text-slate-400 italic">No transactions found for this period.</td>
                 </tr>
               )}
             </tbody>
             <tfoot>
               <tr className="border-t-2 border-border bg-muted/50 font-bold">
-                <td colSpan={3} className="py-3 px-2 text-muted-foreground text-right">Closing Balance as of {displayDate(filters.toDate)}:</td>
-                <td className="py-3 px-2 text-right tabular-nums font-mono text-emerald-700 dark:text-emerald-400">{fmtNPR(summary.debit)}</td>
-                <td className="py-3 px-2 text-right tabular-nums font-mono text-red-700 dark:text-red-400">{fmtNPR(summary.credit)}</td>
-                <td className="py-3 px-2 text-right tabular-nums font-mono text-primary text-base">{fmtNPR(summary.closing)}</td>
+                <td colSpan={3} className="cell-density py-3 px-2 text-muted-foreground text-right">Closing Balance as of {displayDate(filters.toDate)}:</td>
+                <td className="cell-density py-3 px-2 text-right tabular-nums font-mono text-emerald-700 dark:text-emerald-400">{fmtNPR(summary.debit)}</td>
+                <td className="cell-density py-3 px-2 text-right tabular-nums font-mono text-red-700 dark:text-red-400">{fmtNPR(summary.credit)}</td>
+                <td className="cell-density py-3 px-2 text-right tabular-nums font-mono text-primary text-base">{fmtNPR(summary.closing)}</td>
                 {printConfig.showRemarks && <td></td>}
               </tr>
             </tfoot>
           </table>
+          </div>
 
           {/* Footer Note */}
           <div className="mt-12 pt-6 border-t border-border text-center text-sm text-slate-500 flex justify-between px-4 print:mt-auto">

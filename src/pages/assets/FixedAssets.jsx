@@ -598,26 +598,26 @@ export default function FixedAssets() {
 
       {/* ── Table ─────────────────────────────────────────────────────────── */}
       <div className="border border-border rounded-xl overflow-hidden bg-card">
-        <table className="w-full text-sm">
-          <thead className="bg-muted/40 border-b border-border">
+        <table className="table-fluid-grid text-sm">
+          <thead className="cell-density bg-muted/40 border-b border-border">
             <tr>
-              <th className="px-3 py-2.5 w-10">
+              <th className="cell-density w-10">
                 <Checkbox
                   checked={allChecked}
                   ref={el => { if (el) el.indeterminate = someChecked; }}
                   onCheckedChange={toggleSelectAll}
                 />
               </th>
-              <th className="px-3 py-2.5 text-left text-xs font-semibold text-muted-foreground">Code</th>
-              <th className="px-3 py-2.5 text-left text-xs font-semibold text-muted-foreground">Asset Name</th>
-              <th className="px-3 py-2.5 text-left text-xs font-semibold text-muted-foreground">Assets Ledger</th>
-              <th className="px-3 py-2.5 text-left text-xs font-semibold text-muted-foreground">Method</th>
-              <th className="px-3 py-2.5 text-right text-xs font-semibold text-muted-foreground">Gross Value</th>
-              <th className="px-3 py-2.5 text-right text-xs font-semibold text-muted-foreground">Accum. Dep.</th>
-              <th className="px-3 py-2.5 text-right text-xs font-semibold text-muted-foreground">NBV</th>
-              <th className="px-3 py-2.5 text-center text-xs font-semibold text-muted-foreground">GL</th>
-              <th className="px-3 py-2.5 text-center text-xs font-semibold text-muted-foreground">Status</th>
-              <th className="px-3 py-2.5" />
+              <th className="cell-density text-left text-xs font-semibold text-muted-foreground">Code</th>
+              <th className="cell-density text-left text-xs font-semibold text-muted-foreground">Asset Name</th>
+              <th className="cell-density text-left text-xs font-semibold text-muted-foreground">Assets Ledger</th>
+              <th className="cell-density text-left text-xs font-semibold text-muted-foreground">Method</th>
+              <th className="cell-density text-right text-xs font-semibold text-muted-foreground">Gross Value</th>
+              <th className="cell-density text-right text-xs font-semibold text-muted-foreground">Accum. Dep.</th>
+              <th className="cell-density text-right text-xs font-semibold text-muted-foreground">NBV</th>
+              <th className="cell-density text-center text-xs font-semibold text-muted-foreground">GL</th>
+              <th className="cell-density text-center text-xs font-semibold text-muted-foreground">Status</th>
+              <th className="cell-density " />
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
@@ -625,20 +625,20 @@ export default function FixedAssets() {
               Array.from({ length: 5 }).map((_, i) => (
                 <tr key={i}>
                   {Array.from({ length: 11 }).map((_, j) => (
-                    <td key={j} className="px-3 py-3"><div className="h-4 bg-muted animate-pulse rounded" /></td>
+                    <td key={j} className="cell-density "><div className="h-4 bg-muted animate-pulse rounded" /></td>
                   ))}
                 </tr>
               ))
             ) : filteredAssets.length === 0 ? (
-              <tr><td colSpan={11} className="px-3 py-12 text-center text-muted-foreground">No assets found.</td></tr>
+              <tr><td colSpan={11} className="cell-density text-center text-muted-foreground">No assets found.</td></tr>
             ) : filteredAssets.map(a => (
               <tr key={a.id} className={cn('hover:bg-muted/20 transition-colors', a.status === 'Deleted' && 'opacity-50')}>
-                <td className="px-3 py-2.5">
+                <td className="cell-density ">
                   <Checkbox checked={selectedIds.includes(a.id)} onCheckedChange={() => toggleSelectOne(a.id)} />
                 </td>
-                <td className="px-3 py-2.5 font-mono text-xs text-muted-foreground">{a.asset_code}</td>
-                <td className="px-3 py-2.5 font-medium">{a.asset_name}</td>
-                <td className="px-3 py-2.5 text-xs max-w-[160px]" title={a.asset_ledger_name}>
+                <td className="cell-density font-mono text-xs text-muted-foreground">{a.asset_code}</td>
+                <td className="cell-density font-medium">{a.asset_name}</td>
+                <td className="cell-density text-xs max-w-[160px]" title={a.asset_ledger_name}>
                   {!a.asset_ledger_id
                     ? <span className="text-amber-500 italic">Not mapped</span>
                     : (() => {
@@ -649,20 +649,20 @@ export default function FixedAssets() {
                       })()
                   }
                 </td>
-                <td className="px-3 py-2.5">
+                <td className="cell-density ">
                   <span className="text-xs bg-muted px-2 py-0.5 rounded">{a.depreciation_method}</span>
                 </td>
-                <td className="px-3 py-2.5 text-right font-mono text-xs">{fmt(a.gross_purchase_value)}</td>
-                <td className="px-3 py-2.5 text-right font-mono text-xs text-amber-600 dark:text-amber-400">{fmt(a.accumulated_depreciation)}</td>
-                <td className="px-3 py-2.5 text-right font-mono text-xs text-emerald-700 dark:text-emerald-400 font-semibold">{fmt(a.net_book_value)}</td>
-                <td className="px-3 py-2.5 text-center">
+                <td className="cell-density text-right font-mono text-xs">{fmt(a.gross_purchase_value)}</td>
+                <td className="cell-density text-right font-mono text-xs text-amber-600 dark:text-amber-400">{fmt(a.accumulated_depreciation)}</td>
+                <td className="cell-density text-right font-mono text-xs text-emerald-700 dark:text-emerald-400 font-semibold">{fmt(a.net_book_value)}</td>
+                <td className="cell-density text-center">
                   {a.gl_posted
                     ? <span title="Purchase journal posted"><CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 mx-auto" /></span>
                     : <span title="Purchase journal not yet posted"><AlertCircle className="w-4 h-4 text-amber-400 mx-auto" /></span>
                   }
                 </td>
-                <td className="px-3 py-2.5 text-center"><StatusBadge status={a.status} /></td>
-                <td className="px-3 py-2.5">
+                <td className="cell-density text-center"><StatusBadge status={a.status} /></td>
+                <td className="cell-density ">
                   <div className="flex gap-1">
                     <Button size="sm" variant="ghost" onClick={() => openEdit(a)} title="Edit"><Wrench className="w-3 h-3" /></Button>
                     <Button size="sm" variant="ghost" onClick={() => viewDepreciation(a)} title="Depreciation Schedule"><TrendingDown className="w-3 h-3" /></Button>
@@ -890,36 +890,36 @@ export default function FixedAssets() {
               </div>
 
               <div className="border border-border rounded-xl overflow-hidden">
-                <table className="w-full text-sm">
-                  <thead className="bg-muted/40 border-b border-border">
+                <table className="table-fluid-grid text-sm">
+                  <thead className="cell-density bg-muted/40 border-b border-border">
                     <tr>
-                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-muted-foreground">Period</th>
-                      <th className="px-3 py-2.5 text-right text-xs font-semibold text-muted-foreground">Dep. Amount</th>
-                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-muted-foreground">Accounts</th>
-                      <th className="px-3 py-2.5 text-center text-xs font-semibold text-muted-foreground">Status</th>
-                      <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground">Posted</th>
-                      <th className="px-3 py-2.5" />
+                      <th className="cell-density text-left text-xs font-semibold text-muted-foreground">Period</th>
+                      <th className="cell-density text-right text-xs font-semibold text-muted-foreground">Dep. Amount</th>
+                      <th className="cell-density text-left text-xs font-semibold text-muted-foreground">Accounts</th>
+                      <th className="cell-density text-center text-xs font-semibold text-muted-foreground">Status</th>
+                      <th className="cell-density text-xs font-semibold text-muted-foreground">Posted</th>
+                      <th className="cell-density " />
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
                     {depSchedule.length === 0 ? (
-                      <tr><td colSpan={6} className="px-3 py-8 text-center text-muted-foreground text-sm">No schedule yet. Click "Generate 12 Months".</td></tr>
+                      <tr><td colSpan={6} className="cell-density text-center text-muted-foreground text-sm">No schedule yet. Click "Generate 12 Months".</td></tr>
                     ) : depSchedule.map(s => (
                       <tr key={s.id} className={cn('transition-colors', s.is_posted ? 'bg-emerald-50 dark:bg-emerald-500/10/40' : 'hover:bg-muted/20')}>
-                        <td className="px-3 py-2.5 font-mono text-sm">{s.period_label}</td>
-                        <td className="px-3 py-2.5 text-right font-mono font-semibold text-amber-700 dark:text-amber-400">{fmt(s.calculated_depreciation_amount)}</td>
-                        <td className="px-3 py-2.5 text-xs text-muted-foreground">
+                        <td className="cell-density font-mono text-sm">{s.period_label}</td>
+                        <td className="cell-density text-right font-mono font-semibold text-amber-700 dark:text-amber-400">{fmt(s.calculated_depreciation_amount)}</td>
+                        <td className="cell-density text-xs text-muted-foreground">
                           <div><span className="text-blue-600 dark:text-blue-400">Dr</span> {selected.dep_expense_ledger_name || 'Dep. Expense'}</div>
                           <div><span className="text-emerald-600 dark:text-emerald-400">Cr</span> {selected.accumulated_dep_ledger_name || 'Accum. Dep.'}</div>
                         </td>
-                        <td className="px-3 py-2.5 text-center">
+                        <td className="cell-density text-center">
                           {s.is_posted
                             ? <span className="inline-flex items-center gap-1 text-xs text-emerald-700 dark:text-emerald-400"><CheckCircle2 className="w-3.5 h-3.5" /> Posted</span>
                             : <span className="inline-flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400"><AlertCircle className="w-3.5 h-3.5" /> Pending</span>
                           }
                         </td>
-                        <td className="px-3 py-2.5 text-xs text-muted-foreground">{s.posted_date || '—'}</td>
-                        <td className="px-3 py-2.5">
+                        <td className="cell-density text-xs text-muted-foreground">{s.posted_date || '—'}</td>
+                        <td className="cell-density ">
                           {!s.is_posted && (
                             <Button size="sm" variant="outline" disabled={posting === s.id} onClick={() => postDepreciation(s)}>
                               <BookOpen className="w-3 h-3 mr-1" />

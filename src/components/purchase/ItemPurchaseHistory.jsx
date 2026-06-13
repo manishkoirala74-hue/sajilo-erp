@@ -51,24 +51,24 @@ export default function ItemPurchaseHistory({ vendorId }) {
           ) : (
             <>
               <p className="text-xs text-muted-foreground mb-2">Last {history.length} posted invoice(s) — {allLines.length} line items</p>
-              <table className="w-full text-xs">
-                <thead className="bg-muted/50">
+              <table className="table-fluid-grid text-xs">
+                <thead className="cell-density bg-muted/50">
                   <tr>
-                    <th className="px-3 py-2 text-left">Item</th>
-                    <th className="px-3 py-2 text-left">Last Invoice</th>
-                    <th className="px-3 py-2 text-right">Last Qty</th>
-                    <th className="px-3 py-2 text-right">Last Price</th>
-                    <th className="px-3 py-2 text-right">Times Bought</th>
+                    <th className="cell-density text-left">Item</th>
+                    <th className="cell-density text-left">Last Invoice</th>
+                    <th className="cell-density text-right">Last Qty</th>
+                    <th className="cell-density text-right">Last Price</th>
+                    <th className="cell-density text-right">Times Bought</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
                   {byItem.map((l, i) => (
                     <tr key={i} className="hover:bg-muted/20">
-                      <td className="px-3 py-2 font-medium">{l.item_name}</td>
-                      <td className="px-3 py-2 text-muted-foreground">{l.invoice_date} ({l.invoice_number})</td>
-                      <td className="px-3 py-2 text-right">{l.quantity}</td>
-                      <td className="px-3 py-2 text-right font-semibold text-primary">NPR {Number(l.unit_price).toLocaleString()}</td>
-                      <td className="px-3 py-2 text-right">{l.occurrences}×</td>
+                      <td className="cell-density font-medium">{l.item_name}</td>
+                      <td className="cell-density text-muted-foreground">{l.invoice_date} ({l.invoice_number})</td>
+                      <td className="cell-density text-right">{l.quantity}</td>
+                      <td className="cell-density text-right font-semibold text-primary">NPR {Number(l.unit_price).toLocaleString()}</td>
+                      <td className="cell-density text-right">{l.occurrences}×</td>
                     </tr>
                   ))}
                 </tbody>

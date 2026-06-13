@@ -3,6 +3,7 @@ import { Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
+import SearchableSelect from '@/components/shared/SearchableSelect';
 import { sajilo } from '@/api/sajiloClient';
 import { useSajiloSync } from '@/hooks/useSajiloSync';
 import { computeItemTaxes } from '@/lib/taxService';
@@ -67,10 +68,11 @@ export default function LineItemsEditor({ value = [], onChange, taxTypes = [] })
         updated[idx].item_name      = found.item_name;
         updated[idx].item_code      = found.item_code || '';
         updated[idx].hs_code        = found.hs_code || '';
+        updated[idx].quantity       = updated[idx].quantity || 1;
         updated[idx].unit_price     = found.selling_price || found.purchase_price || 0;
         updated[idx].vat_applicable = found.is_vat_applicable || taxIds.length > 0;
         updated[idx].tax_type_ids   = taxIds;
-        updated[idx].line_total     = (updated[idx].quantity || 1) * updated[idx].unit_price;
+        updated[idx].line_total     = updated[idx].quantity * updated[idx].unit_price;
       }
     }
 
@@ -104,15 +106,15 @@ export default function LineItemsEditor({ value = [], onChange, taxTypes = [] })
   return (
     <div className="space-y-3">
       <div className="bg-muted/30 rounded-lg overflow-hidden border border-border">
-        <table className="w-full text-sm">
+        <table className="table-fluid-grid text-sm">
           <thead>
             <tr className="bg-muted/70 border-b border-border">
-              <th className="px-3 py-2 text-left font-medium text-muted-foreground">Item</th>
-              <th className="px-3 py-2 text-left font-medium text-muted-foreground w-20">Qty</th>
-              <th className="px-3 py-2 text-left font-medium text-muted-foreground w-32">Unit Price</th>
-              <th className="px-3 py-2 text-center font-medium text-muted-foreground w-20">Tax</th>
-              <th className="px-3 py-2 text-right font-medium text-muted-foreground w-28">Net Total</th>
-              <th className="w-10" />
+              <th className="cell-density text-left font-medium text-muted-foreground">Item</th>
+              <th className="cell-density text-left font-medium text-muted-foreground w-20">Qty</th>
+              <th className="cell-density text-left font-medium text-muted-foreground w-32">Unit Price</th>
+              <th className="cell-density text-center font-medium text-muted-foreground w-20">Tax</th>
+              <th className="cell-density text-right font-medium text-muted-foreground w-28">Net Total</th>
+              <th className="cell-density w-10" />
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
@@ -124,18 +126,14 @@ export default function LineItemsEditor({ value = [], onChange, taxTypes = [] })
 
               return (
                 <tr key={idx}>
-                  <td className="px-3 py-2">
-                    <Select
+                  <td className="cell-density ">
+                    <SearchableSelect
                       value={line.item_id}
                       onValueChange={v => updateLine(idx, 'item_id', v)}
-                    >
-                      <SelectTrigger className="w-full h-8 text-xs bg-card">
-                        <SelectValue placeholder="Select item..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {items.map(i => <SelectItem key={i.id} value={i.id}>{i.item_name} ({i.item_code || i.unit_of_measure})</SelectItem>)}
-                      </SelectContent>
-                    </Select>
+                      options={items.map(i => ({ value: i.id, label: i.item_name, sub: i.item_code || i.unit_of_measure }))}
+                      placeholder="Select item..."
+                      className="w-full h-8 text-xs bg-card"
+                    />
                     {!line.item_id && line.item_name && (
                       <Input
                         value={line.item_name}
@@ -145,7 +143,7 @@ export default function LineItemsEditor({ value = [], onChange, taxTypes = [] })
                       />
                     )}
                   </td>
-                  <td className="px-3 py-2">
+                  <td className="cell-density ">
                     <Input
                       type="number" min="0"
                       value={line.quantity}
@@ -153,7 +151,7 @@ export default function LineItemsEditor({ value = [], onChange, taxTypes = [] })
                       className="h-8 text-sm"
                     />
                   </td>
-                  <td className="px-3 py-2">
+                  <td className="cell-density ">
                     <Input
                       type="number" min="0" step="0.01"
                       value={line.unit_price}
@@ -161,7 +159,7 @@ export default function LineItemsEditor({ value = [], onChange, taxTypes = [] })
                       className="h-8 text-sm"
                     />
                   </td>
-                  <td className="px-3 py-2 text-center">
+                  <td className="cell-density text-center">
                     {appliedTaxes.length > 0 ? (
                       <div className="flex flex-col items-center gap-0.5">
                         {appliedTaxes.map(tt => (
@@ -182,10 +180,10 @@ export default function LineItemsEditor({ value = [], onChange, taxTypes = [] })
                       <span className="text-xs text-muted-foreground">—</span>
                     )}
                   </td>
-                  <td className="px-3 py-2 text-right font-medium">
+                  <td className="cell-density text-right font-medium">
                     NPR {Number(line.line_total || 0).toLocaleString()}
                   </td>
-                  <td className="px-3 py-2">
+                  <td className="cell-density ">
                     <Button variant="ghost" size="icon" className="h-7 w-7 text-red-400 hover:text-red-600 dark:text-red-400" onClick={() => removeLine(idx)}>
                       <Trash2 className="w-3.5 h-3.5" />
                     </Button>
@@ -195,7 +193,7 @@ export default function LineItemsEditor({ value = [], onChange, taxTypes = [] })
             })}
             {value.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-3 py-6 text-center text-muted-foreground text-sm">
+                <td colSpan={6} className="cell-density text-center text-muted-foreground text-sm">
                   No items added yet. Click "Add Line" below.
                 </td>
               </tr>

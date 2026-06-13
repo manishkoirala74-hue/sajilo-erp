@@ -13,10 +13,10 @@ import GlobalSearch from './GlobalSearch';
 export default function Topbar({ pageTitle, onMenuClick }) {
   const { user, logout } = useAuth();
   const { dateFormat, toggleDateFormat } = useDateFormat();
-  const { theme, toggleTheme } = useTheme();
+  const { theme, resolvedTheme, toggleTheme } = useTheme();
 
   return (
-    <header className="sticky top-0 z-30 h-16 bg-card border-b border-border flex items-center justify-between px-4 md:px-6 shrink-0">
+    <header className="sticky top-0 z-30 h-16 bg-card border-b border-border flex items-center justify-between px-4 md:px-6 shrink-0 transition-colors duration-200">
       <div className="flex items-center gap-3 md:gap-4">
         <button onClick={onMenuClick} className="md:hidden p-2 -ml-2 text-muted-foreground hover:bg-muted rounded-full touch-target">
           <Menu className="w-5 h-5" />
@@ -43,7 +43,7 @@ export default function Topbar({ pageTitle, onMenuClick }) {
 
         {/* Theme Toggle */}
         <Button variant="ghost" size="icon" onClick={toggleTheme} className="relative">
-          {theme === 'dark' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
+          {(resolvedTheme || theme) === 'dark' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
         </Button>
 
         {/* Notifications */}

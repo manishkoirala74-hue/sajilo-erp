@@ -558,21 +558,21 @@ export default function Items() {
           ) : filtered.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground text-sm">No items found</div>
           ) : (
-            <table className="w-full text-sm">
-              <thead className="bg-muted/30 border-b border-border">
+            <table className="table-fluid-grid text-sm">
+              <thead className="cell-density bg-muted/30 border-b border-border">
                 <tr>
-                  <th className="w-10 px-3 py-2.5" />
-                  <th className="text-left px-3 py-2.5 text-xs font-semibold text-muted-foreground">Item</th>
-                  <th className="text-left px-3 py-2.5 text-xs font-semibold text-muted-foreground">Category</th>
-                  <th className="text-left px-3 py-2.5 text-xs font-semibold text-muted-foreground">Type</th>
-                  <th className="text-left px-3 py-2.5 text-xs font-semibold text-muted-foreground">UOM</th>
-                  <th className="text-right px-3 py-2.5 text-xs font-semibold text-muted-foreground">Stock</th>
-                  <th className="text-right px-3 py-2.5 text-xs font-semibold text-muted-foreground">Sell Price</th>
-                  <th className="text-left px-3 py-2.5 text-xs font-semibold text-muted-foreground">Sales A/c</th>
-                  <th className="text-left px-3 py-2.5 text-xs font-semibold text-muted-foreground">Purchase A/c</th>
-                  <th className="text-left px-3 py-2.5 text-xs font-semibold text-muted-foreground">HS Code</th>
-                  <th className="text-center px-3 py-2.5 text-xs font-semibold text-muted-foreground">Status</th>
-                  <th className="px-3 py-2.5 w-20" />
+                  <th className="cell-density w-10" />
+                  <th className="cell-density text-left  text-xs font-semibold text-muted-foreground">Item</th>
+                  <th className="cell-density text-left  text-xs font-semibold text-muted-foreground">Category</th>
+                  <th className="cell-density text-left  text-xs font-semibold text-muted-foreground">Type</th>
+                  <th className="cell-density text-left  text-xs font-semibold text-muted-foreground">UOM</th>
+                  <th className="cell-density text-right  text-xs font-semibold text-muted-foreground">Stock</th>
+                  <th className="cell-density text-right  text-xs font-semibold text-muted-foreground">Sell Price</th>
+                  <th className="cell-density text-left  text-xs font-semibold text-muted-foreground">Sales A/c</th>
+                  <th className="cell-density text-left  text-xs font-semibold text-muted-foreground">Purchase A/c</th>
+                  <th className="cell-density text-left  text-xs font-semibold text-muted-foreground">HS Code</th>
+                  <th className="cell-density text-center  text-xs font-semibold text-muted-foreground">Status</th>
+                  <th className="cell-density w-20" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -583,7 +583,7 @@ export default function Items() {
                       className={cn('transition-colors hover:bg-muted/20', isSelected && 'bg-primary/5')}
                     >
                       {/* Checkbox */}
-                      <td className="px-3 py-2.5">
+                      <td className="cell-density ">
                         <button onClick={() => toggleSelectItem(item.id)} className="flex items-center justify-center">
                           {isSelected
                             ? <CheckSquare className="w-4 h-4 text-primary" />
@@ -592,7 +592,7 @@ export default function Items() {
                         </button>
                       </td>
                       {/* Item */}
-                      <td className="px-3 py-2.5">
+                      <td className="cell-density ">
                         <div className="flex items-center gap-3">
                           {(item.image_url || (item.image_urls && item.image_urls[0])) ? (
                             <img src={item.image_url || item.image_urls[0]} alt={item.item_name} className="w-8 h-8 rounded-lg object-cover border border-border shrink-0" />
@@ -607,10 +607,10 @@ export default function Items() {
                           </div>
                         </div>
                       </td>
-                      <td className="px-3 py-2.5 text-sm text-muted-foreground">{item.category_name || '—'}</td>
-                      <td className="px-3 py-2.5 text-sm">{item.item_type}</td>
-                      <td className="px-3 py-2.5 text-sm text-muted-foreground">{item.unit_of_measure}</td>
-                      <td className="px-3 py-2.5 text-right">
+                      <td className="cell-density text-sm text-muted-foreground">{item.category_name || '—'}</td>
+                      <td className="cell-density text-sm">{item.item_type}</td>
+                      <td className="cell-density text-sm text-muted-foreground">{item.unit_of_measure}</td>
+                      <td className="cell-density text-right">
                         {item.item_type === 'Service'
                           ? <span className="text-xs text-blue-500 italic">N/A</span>
                           : <div className="flex items-center justify-end gap-1">
@@ -621,24 +621,24 @@ export default function Items() {
                             </div>
                         }
                       </td>
-                      <td className="px-3 py-2.5 text-right font-mono text-sm">NPR {Number(item.selling_price).toLocaleString()}</td>
-                      <td className="px-3 py-2.5 text-xs">
+                      <td className="cell-density text-right font-mono text-sm">NPR {Number(item.selling_price).toLocaleString()}</td>
+                      <td className="cell-density text-xs">
                         {item.sales_account_name
                           ? <span className="text-muted-foreground">{item.sales_account_name}</span>
                           : <span className="text-red-400">Not mapped</span>
                         }
                       </td>
-                      <td className="px-3 py-2.5 text-xs">
+                      <td className="cell-density text-xs">
                         {item.purchase_account_name
                           ? <span className="text-muted-foreground">{item.purchase_account_name}</span>
                           : <span className="text-red-400">Not mapped</span>
                         }
                       </td>
-                      <td className="px-3 py-2.5 text-xs font-mono text-muted-foreground">{item.hs_code || '—'}</td>
-                      <td className="px-3 py-2.5 text-center">
+                      <td className="cell-density text-xs font-mono text-muted-foreground">{item.hs_code || '—'}</td>
+                      <td className="cell-density text-center">
                         <StatusBadge status={item.is_active ? 'Active' : 'Inactive'} />
                       </td>
-                      <td className="px-3 py-2.5">
+                      <td className="cell-density ">
                         <div className="flex items-center justify-end gap-1">
                           <Button variant="ghost" size="icon" className="h-7 w-7" title="Transaction History" onClick={() => setHistoryItem(item)}>
                             <History className="w-3.5 h-3.5 text-muted-foreground" />

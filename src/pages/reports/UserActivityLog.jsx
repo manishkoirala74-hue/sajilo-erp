@@ -132,27 +132,27 @@ export default function UserActivityLog() {
           </div>
 
           <div className="bg-card border border-border rounded-xl overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="bg-muted/30 border-b border-border">
+            <table className="table-fluid-grid text-sm">
+              <thead className="cell-density bg-muted/30 border-b border-border">
                 <tr>
-                  <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">File Name</th>
-                  <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">Imported By</th>
-                  <th className="text-center px-4 py-2.5 text-xs font-semibold text-muted-foreground">Status</th>
-                  <th className="text-right px-4 py-2.5 text-xs font-semibold text-muted-foreground">Total Rows</th>
-                  <th className="text-right px-4 py-2.5 text-xs font-semibold text-muted-foreground">Created</th>
-                  <th className="text-right px-4 py-2.5 text-xs font-semibold text-muted-foreground">Updated</th>
-                  <th className="text-right px-4 py-2.5 text-xs font-semibold text-muted-foreground">Skipped</th>
-                  <th className="text-right px-4 py-2.5 text-xs font-semibold text-muted-foreground">Failed</th>
-                  <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">Date / Time</th>
+                  <th className="cell-density text-left  text-xs font-semibold text-muted-foreground">File Name</th>
+                  <th className="cell-density text-left  text-xs font-semibold text-muted-foreground">Imported By</th>
+                  <th className="cell-density text-center  text-xs font-semibold text-muted-foreground">Status</th>
+                  <th className="cell-density text-right  text-xs font-semibold text-muted-foreground">Total Rows</th>
+                  <th className="cell-density text-right  text-xs font-semibold text-muted-foreground">Created</th>
+                  <th className="cell-density text-right  text-xs font-semibold text-muted-foreground">Updated</th>
+                  <th className="cell-density text-right  text-xs font-semibold text-muted-foreground">Skipped</th>
+                  <th className="cell-density text-right  text-xs font-semibold text-muted-foreground">Failed</th>
+                  <th className="cell-density text-left  text-xs font-semibold text-muted-foreground">Date / Time</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
                 {loading ? (
                   Array(4).fill(0).map((_, i) => (
-                    <tr key={i}><td colSpan={9} className="px-4 py-2.5"><div className="h-6 bg-muted rounded animate-pulse" /></td></tr>
+                    <tr key={i}><td colSpan={9} className="cell-density "><div className="h-6 bg-muted rounded animate-pulse" /></td></tr>
                   ))
                 ) : importLogs.filter(l => !search || l.file_name?.toLowerCase().includes(search.toLowerCase()) || l.imported_by?.toLowerCase().includes(search.toLowerCase())).length === 0 ? (
-                  <tr><td colSpan={9} className="text-center py-12 text-muted-foreground text-sm">
+                  <tr><td colSpan={9} className="cell-density text-center py-12 text-muted-foreground text-sm">
                     <History className="w-8 h-8 mx-auto mb-2 opacity-20" />
                     No item imports recorded yet
                   </td></tr>
@@ -160,9 +160,9 @@ export default function UserActivityLog() {
                     .filter(l => !search || l.file_name?.toLowerCase().includes(search.toLowerCase()) || l.imported_by?.toLowerCase().includes(search.toLowerCase()))
                     .map((log, i) => (
                   <tr key={log.id || i} className="hover:bg-muted/20 transition-colors">
-                    <td className="px-4 py-2.5 text-xs font-mono text-primary max-w-[160px] truncate">{log.file_name}</td>
-                    <td className="px-4 py-2.5 text-xs text-muted-foreground">{log.imported_by}</td>
-                    <td className="px-4 py-2.5 text-center">
+                    <td className="cell-density text-xs font-mono text-primary max-w-[160px] truncate">{log.file_name}</td>
+                    <td className="cell-density text-xs text-muted-foreground">{log.imported_by}</td>
+                    <td className="cell-density text-center">
                       <span className={cn('inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold',
                         log.status === 'Success' ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400'
                         : log.status === 'Partial' ? 'bg-yellow-100 dark:bg-yellow-500/20 text-yellow-700 dark:text-yellow-400'
@@ -171,12 +171,12 @@ export default function UserActivityLog() {
                         {log.status}
                       </span>
                     </td>
-                    <td className="px-4 py-2.5 text-right text-sm font-mono">{log.total_rows ?? 0}</td>
-                    <td className="px-4 py-2.5 text-right text-sm font-mono text-emerald-600 dark:text-emerald-400 font-semibold">{log.items_created ?? 0}</td>
-                    <td className="px-4 py-2.5 text-right text-sm font-mono text-blue-600 dark:text-blue-400 font-semibold">{log.items_updated ?? 0}</td>
-                    <td className="px-4 py-2.5 text-right text-sm font-mono text-yellow-600 dark:text-yellow-400">{log.items_skipped ?? 0}</td>
-                    <td className="px-4 py-2.5 text-right text-sm font-mono text-red-600 dark:text-red-400">{log.items_failed ?? 0}</td>
-                    <td className="px-4 py-2.5 text-xs text-muted-foreground">
+                    <td className="cell-density text-right text-sm font-mono">{log.total_rows ?? 0}</td>
+                    <td className="cell-density text-right text-sm font-mono text-emerald-600 dark:text-emerald-400 font-semibold">{log.items_created ?? 0}</td>
+                    <td className="cell-density text-right text-sm font-mono text-blue-600 dark:text-blue-400 font-semibold">{log.items_updated ?? 0}</td>
+                    <td className="cell-density text-right text-sm font-mono text-yellow-600 dark:text-yellow-400">{log.items_skipped ?? 0}</td>
+                    <td className="cell-density text-right text-sm font-mono text-red-600 dark:text-red-400">{log.items_failed ?? 0}</td>
+                    <td className="cell-density text-xs text-muted-foreground">
                       {log.import_date ? new Date(log.import_date).toLocaleString() : log.created_date ? new Date(log.created_date).toLocaleString() : '—'}
                     </td>
                   </tr>
@@ -205,27 +205,27 @@ export default function UserActivityLog() {
           </div>
 
           <div className="bg-card border border-border rounded-xl overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="bg-muted/30 border-b border-border">
+            <table className="table-fluid-grid text-sm">
+              <thead className="cell-density bg-muted/30 border-b border-border">
                 <tr>
-                  <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">Item Code</th>
-                  <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">Item Name</th>
-                  <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">Type</th>
-                  <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">Category</th>
-                  <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">HS Code</th>
-                  <th className="text-right px-4 py-2.5 text-xs font-semibold text-muted-foreground">Selling Price</th>
-                  <th className="text-right px-4 py-2.5 text-xs font-semibold text-muted-foreground">Qty on Hand</th>
-                  <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">Deleted By</th>
-                  <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">Date / Time</th>
+                  <th className="cell-density text-left  text-xs font-semibold text-muted-foreground">Item Code</th>
+                  <th className="cell-density text-left  text-xs font-semibold text-muted-foreground">Item Name</th>
+                  <th className="cell-density text-left  text-xs font-semibold text-muted-foreground">Type</th>
+                  <th className="cell-density text-left  text-xs font-semibold text-muted-foreground">Category</th>
+                  <th className="cell-density text-left  text-xs font-semibold text-muted-foreground">HS Code</th>
+                  <th className="cell-density text-right  text-xs font-semibold text-muted-foreground">Selling Price</th>
+                  <th className="cell-density text-right  text-xs font-semibold text-muted-foreground">Qty on Hand</th>
+                  <th className="cell-density text-left  text-xs font-semibold text-muted-foreground">Deleted By</th>
+                  <th className="cell-density text-left  text-xs font-semibold text-muted-foreground">Date / Time</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
                 {loading ? (
                   Array(4).fill(0).map((_, i) => (
-                    <tr key={i}><td colSpan={9} className="px-4 py-2.5"><div className="h-6 bg-muted rounded animate-pulse" /></td></tr>
+                    <tr key={i}><td colSpan={9} className="cell-density "><div className="h-6 bg-muted rounded animate-pulse" /></td></tr>
                   ))
                 ) : deletionLogs.filter(l => !search || l.item_name?.toLowerCase().includes(search.toLowerCase()) || l.item_code?.toLowerCase().includes(search.toLowerCase()) || l.deleted_by?.toLowerCase().includes(search.toLowerCase())).length === 0 ? (
-                  <tr><td colSpan={9} className="text-center py-12 text-muted-foreground text-sm">
+                  <tr><td colSpan={9} className="cell-density text-center py-12 text-muted-foreground text-sm">
                     <History className="w-8 h-8 mx-auto mb-2 opacity-20" />
                     No item deletions recorded yet
                   </td></tr>
@@ -233,15 +233,15 @@ export default function UserActivityLog() {
                     .filter(l => !search || l.item_name?.toLowerCase().includes(search.toLowerCase()) || l.item_code?.toLowerCase().includes(search.toLowerCase()) || l.deleted_by?.toLowerCase().includes(search.toLowerCase()))
                     .map((log, i) => (
                   <tr key={log.id || i} className="hover:bg-muted/20 transition-colors">
-                    <td className="px-4 py-2.5 font-mono text-xs text-primary">{log.item_code || '—'}</td>
-                    <td className="px-4 py-2.5 font-medium text-sm">{log.item_name}</td>
-                    <td className="px-4 py-2.5 text-xs text-muted-foreground">{log.item_type || '—'}</td>
-                    <td className="px-4 py-2.5 text-xs text-muted-foreground">{log.category_name || '—'}</td>
-                    <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground">{log.hs_code || '—'}</td>
-                    <td className="px-4 py-2.5 text-right text-sm font-mono">NPR {Number(log.selling_price || 0).toLocaleString()}</td>
-                    <td className="px-4 py-2.5 text-right text-sm font-mono">{log.quantity_on_hand ?? 0}</td>
-                    <td className="px-4 py-2.5 text-xs text-muted-foreground">{log.deleted_by || '—'}</td>
-                    <td className="px-4 py-2.5 text-xs text-muted-foreground">
+                    <td className="cell-density font-mono text-xs text-primary">{log.item_code || '—'}</td>
+                    <td className="cell-density font-medium text-sm">{log.item_name}</td>
+                    <td className="cell-density text-xs text-muted-foreground">{log.item_type || '—'}</td>
+                    <td className="cell-density text-xs text-muted-foreground">{log.category_name || '—'}</td>
+                    <td className="cell-density font-mono text-xs text-muted-foreground">{log.hs_code || '—'}</td>
+                    <td className="cell-density text-right text-sm font-mono">NPR {Number(log.selling_price || 0).toLocaleString()}</td>
+                    <td className="cell-density text-right text-sm font-mono">{log.quantity_on_hand ?? 0}</td>
+                    <td className="cell-density text-xs text-muted-foreground">{log.deleted_by || '—'}</td>
+                    <td className="cell-density text-xs text-muted-foreground">
                       {log.created_date ? new Date(log.created_date).toLocaleString() : '—'}
                     </td>
                   </tr>
@@ -270,29 +270,29 @@ export default function UserActivityLog() {
           </div>
 
           <div className="bg-card border border-border rounded-xl overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="bg-muted/30 border-b border-border">
+            <table className="table-fluid-grid text-sm">
+              <thead className="cell-density bg-muted/30 border-b border-border">
                 <tr>
-                  <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">File Name</th>
-                  <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">Type</th>
-                  <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">Imported By</th>
-                  <th className="text-center px-4 py-2.5 text-xs font-semibold text-muted-foreground">Status</th>
-                  <th className="text-right px-4 py-2.5 text-xs font-semibold text-muted-foreground">Rows</th>
-                  <th className="text-right px-4 py-2.5 text-xs font-semibold text-muted-foreground">Created</th>
-                  <th className="text-right px-4 py-2.5 text-xs font-semibold text-muted-foreground">Updated</th>
-                  <th className="text-right px-4 py-2.5 text-xs font-semibold text-muted-foreground">Failed</th>
-                  <th className="text-right px-4 py-2.5 text-xs font-semibold text-muted-foreground">Ledgers</th>
-                  <th className="text-right px-4 py-2.5 text-xs font-semibold text-muted-foreground">Journals</th>
-                  <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">Date / Time</th>
+                  <th className="cell-density text-left  text-xs font-semibold text-muted-foreground">File Name</th>
+                  <th className="cell-density text-left  text-xs font-semibold text-muted-foreground">Type</th>
+                  <th className="cell-density text-left  text-xs font-semibold text-muted-foreground">Imported By</th>
+                  <th className="cell-density text-center  text-xs font-semibold text-muted-foreground">Status</th>
+                  <th className="cell-density text-right  text-xs font-semibold text-muted-foreground">Rows</th>
+                  <th className="cell-density text-right  text-xs font-semibold text-muted-foreground">Created</th>
+                  <th className="cell-density text-right  text-xs font-semibold text-muted-foreground">Updated</th>
+                  <th className="cell-density text-right  text-xs font-semibold text-muted-foreground">Failed</th>
+                  <th className="cell-density text-right  text-xs font-semibold text-muted-foreground">Ledgers</th>
+                  <th className="cell-density text-right  text-xs font-semibold text-muted-foreground">Journals</th>
+                  <th className="cell-density text-left  text-xs font-semibold text-muted-foreground">Date / Time</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
                 {loading ? (
                   Array(4).fill(0).map((_, i) => (
-                    <tr key={i}><td colSpan={11} className="px-4 py-2.5"><div className="h-6 bg-muted rounded animate-pulse" /></td></tr>
+                    <tr key={i}><td colSpan={11} className="cell-density "><div className="h-6 bg-muted rounded animate-pulse" /></td></tr>
                   ))
                 ) : partnerImportLogs.filter(l => !search || l.file_name?.toLowerCase().includes(search.toLowerCase()) || l.imported_by?.toLowerCase().includes(search.toLowerCase()) || l.import_type?.toLowerCase().includes(search.toLowerCase())).length === 0 ? (
-                  <tr><td colSpan={11} className="text-center py-12 text-muted-foreground text-sm">
+                  <tr><td colSpan={11} className="cell-density text-center py-12 text-muted-foreground text-sm">
                     <History className="w-8 h-8 mx-auto mb-2 opacity-20" />
                     No partner imports recorded yet
                   </td></tr>
@@ -300,15 +300,15 @@ export default function UserActivityLog() {
                     .filter(l => !search || l.file_name?.toLowerCase().includes(search.toLowerCase()) || l.imported_by?.toLowerCase().includes(search.toLowerCase()) || l.import_type?.toLowerCase().includes(search.toLowerCase()))
                     .map((log, i) => (
                   <tr key={log.id || i} className="hover:bg-muted/20 transition-colors">
-                    <td className="px-4 py-2.5 text-xs font-mono text-primary max-w-[140px] truncate">{log.file_name}</td>
-                    <td className="px-4 py-2.5">
+                    <td className="cell-density text-xs font-mono text-primary max-w-[140px] truncate">{log.file_name}</td>
+                    <td className="cell-density ">
                       <span className={cn('text-xs font-semibold px-2 py-0.5 rounded-full',
                         log.import_type === 'Customers' ? 'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400' : 'bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-400')}>
                         {log.import_type}
                       </span>
                     </td>
-                    <td className="px-4 py-2.5 text-xs text-muted-foreground">{log.imported_by}</td>
-                    <td className="px-4 py-2.5 text-center">
+                    <td className="cell-density text-xs text-muted-foreground">{log.imported_by}</td>
+                    <td className="cell-density text-center">
                       <span className={cn('inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold',
                         log.status === 'Success' ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400'
                         : log.status === 'Partial' ? 'bg-yellow-100 dark:bg-yellow-500/20 text-yellow-700 dark:text-yellow-400'
@@ -317,13 +317,13 @@ export default function UserActivityLog() {
                         {log.status}
                       </span>
                     </td>
-                    <td className="px-4 py-2.5 text-right text-sm font-mono">{log.total_rows ?? 0}</td>
-                    <td className="px-4 py-2.5 text-right text-sm font-mono text-emerald-600 dark:text-emerald-400 font-semibold">{log.created_count ?? 0}</td>
-                    <td className="px-4 py-2.5 text-right text-sm font-mono text-blue-600 dark:text-blue-400 font-semibold">{log.updated_count ?? 0}</td>
-                    <td className="px-4 py-2.5 text-right text-sm font-mono text-red-600 dark:text-red-400">{log.failed_count ?? 0}</td>
-                    <td className="px-4 py-2.5 text-right text-sm font-mono text-purple-600 dark:text-purple-400">{log.ledgers_generated ?? 0}</td>
-                    <td className="px-4 py-2.5 text-right text-sm font-mono text-indigo-600 dark:text-indigo-400">{log.journals_posted ?? 0}</td>
-                    <td className="px-4 py-2.5 text-xs text-muted-foreground">
+                    <td className="cell-density text-right text-sm font-mono">{log.total_rows ?? 0}</td>
+                    <td className="cell-density text-right text-sm font-mono text-emerald-600 dark:text-emerald-400 font-semibold">{log.created_count ?? 0}</td>
+                    <td className="cell-density text-right text-sm font-mono text-blue-600 dark:text-blue-400 font-semibold">{log.updated_count ?? 0}</td>
+                    <td className="cell-density text-right text-sm font-mono text-red-600 dark:text-red-400">{log.failed_count ?? 0}</td>
+                    <td className="cell-density text-right text-sm font-mono text-purple-600 dark:text-purple-400">{log.ledgers_generated ?? 0}</td>
+                    <td className="cell-density text-right text-sm font-mono text-indigo-600 dark:text-indigo-400">{log.journals_posted ?? 0}</td>
+                    <td className="cell-density text-xs text-muted-foreground">
                       {log.import_date ? new Date(log.import_date).toLocaleString() : log.created_date ? new Date(log.created_date).toLocaleString() : '—'}
                     </td>
                   </tr>
@@ -358,29 +358,29 @@ export default function UserActivityLog() {
           </div>
 
           <div className="bg-card border border-border rounded-xl overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="bg-muted/30 border-b border-border">
+            <table className="table-fluid-grid text-sm">
+              <thead className="cell-density bg-muted/30 border-b border-border">
                 <tr>
-                  <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">Partner Name</th>
-                  <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">Type</th>
-                  <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">VAT/PAN</th>
-                  <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">Action Type</th>
-                  <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">Deleted By</th>
-                  <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">Audit Payload</th>
-                  <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">Date / Time</th>
+                  <th className="cell-density text-left  text-xs font-semibold text-muted-foreground">Partner Name</th>
+                  <th className="cell-density text-left  text-xs font-semibold text-muted-foreground">Type</th>
+                  <th className="cell-density text-left  text-xs font-semibold text-muted-foreground">VAT/PAN</th>
+                  <th className="cell-density text-left  text-xs font-semibold text-muted-foreground">Action Type</th>
+                  <th className="cell-density text-left  text-xs font-semibold text-muted-foreground">Deleted By</th>
+                  <th className="cell-density text-left  text-xs font-semibold text-muted-foreground">Audit Payload</th>
+                  <th className="cell-density text-left  text-xs font-semibold text-muted-foreground">Date / Time</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
                 {loading ? (
                   Array(4).fill(0).map((_, i) => (
-                    <tr key={i}><td colSpan={7} className="px-4 py-2.5"><div className="h-6 bg-muted rounded animate-pulse" /></td></tr>
+                    <tr key={i}><td colSpan={7} className="cell-density "><div className="h-6 bg-muted rounded animate-pulse" /></td></tr>
                   ))
                 ) : partnerDeleteLogs.filter(l => !search ||
                     l.partner_name?.toLowerCase().includes(search.toLowerCase()) ||
                     l.deleted_by?.toLowerCase().includes(search.toLowerCase()) ||
                     l.partner_type?.toLowerCase().includes(search.toLowerCase())
                   ).length === 0 ? (
-                  <tr><td colSpan={7} className="text-center py-12 text-muted-foreground text-sm">
+                  <tr><td colSpan={7} className="cell-density text-center py-12 text-muted-foreground text-sm">
                     <History className="w-8 h-8 mx-auto mb-2 opacity-20" />
                     No partner deletions recorded yet
                   </td></tr>
@@ -392,24 +392,24 @@ export default function UserActivityLog() {
                     )
                     .map((log, i) => (
                   <tr key={log.id || i} className="hover:bg-muted/20 transition-colors">
-                    <td className="px-4 py-2.5 font-medium text-sm">{log.partner_name}</td>
-                    <td className="px-4 py-2.5">
+                    <td className="cell-density font-medium text-sm">{log.partner_name}</td>
+                    <td className="cell-density ">
                       <span className={cn('text-xs font-semibold px-2 py-0.5 rounded-full',
                         log.partner_type === 'Customer' ? 'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400' : 'bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-400')}>
                         {log.partner_type}
                       </span>
                     </td>
-                    <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground">{log.tax_id_number || '—'}</td>
-                    <td className="px-4 py-2.5">
+                    <td className="cell-density font-mono text-xs text-muted-foreground">{log.tax_id_number || '—'}</td>
+                    <td className="cell-density ">
                       <span className={cn('inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold',
                         log.action_type === 'Bulk Delete' ? 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400' : 'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400')}>
                         {log.action_type === 'Bulk Delete' ? <XCircle className="w-3 h-3" /> : <CheckCircle2 className="w-3 h-3" />}
                         {log.action_type}
                       </span>
                     </td>
-                    <td className="px-4 py-2.5 text-xs text-muted-foreground">{log.deleted_by || '—'}</td>
-                    <td className="px-4 py-2.5 text-xs text-muted-foreground max-w-xs truncate" title={log.log_payload}>{log.log_payload || '—'}</td>
-                    <td className="px-4 py-2.5 text-xs text-muted-foreground">
+                    <td className="cell-density text-xs text-muted-foreground">{log.deleted_by || '—'}</td>
+                    <td className="cell-density text-xs text-muted-foreground max-w-xs truncate" title={log.log_payload}>{log.log_payload || '—'}</td>
+                    <td className="cell-density text-xs text-muted-foreground">
                       {log.created_date ? new Date(log.created_date).toLocaleString() : '—'}
                     </td>
                   </tr>
@@ -438,26 +438,26 @@ export default function UserActivityLog() {
           </div>
 
           <div className="bg-card border border-border rounded-xl overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="bg-muted/30 border-b border-border">
+            <table className="table-fluid-grid text-sm">
+              <thead className="cell-density bg-muted/30 border-b border-border">
                 <tr>
-                  <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">Voucher #</th>
-                  <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">Type</th>
-                  <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">Action</th>
-                  <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">Reversal #</th>
-                  <th className="text-right px-4 py-2.5 text-xs font-semibold text-muted-foreground">Amount</th>
-                  <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">Performed By</th>
-                  <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">Reason</th>
-                  <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">Date / Time</th>
+                  <th className="cell-density text-left  text-xs font-semibold text-muted-foreground">Voucher #</th>
+                  <th className="cell-density text-left  text-xs font-semibold text-muted-foreground">Type</th>
+                  <th className="cell-density text-left  text-xs font-semibold text-muted-foreground">Action</th>
+                  <th className="cell-density text-left  text-xs font-semibold text-muted-foreground">Reversal #</th>
+                  <th className="cell-density text-right  text-xs font-semibold text-muted-foreground">Amount</th>
+                  <th className="cell-density text-left  text-xs font-semibold text-muted-foreground">Performed By</th>
+                  <th className="cell-density text-left  text-xs font-semibold text-muted-foreground">Reason</th>
+                  <th className="cell-density text-left  text-xs font-semibold text-muted-foreground">Date / Time</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
                 {loading ? (
                   Array(4).fill(0).map((_, i) => (
-                    <tr key={i}><td colSpan={8} className="px-4 py-2.5"><div className="h-6 bg-muted rounded animate-pulse" /></td></tr>
+                    <tr key={i}><td colSpan={8} className="cell-density "><div className="h-6 bg-muted rounded animate-pulse" /></td></tr>
                   ))
                 ) : voucherActionLogs.filter(l => !search || l.voucher_number?.toLowerCase().includes(search.toLowerCase()) || l.performed_by?.toLowerCase().includes(search.toLowerCase())).length === 0 ? (
-                  <tr><td colSpan={8} className="text-center py-12 text-muted-foreground text-sm">
+                  <tr><td colSpan={8} className="cell-density text-center py-12 text-muted-foreground text-sm">
                     <History className="w-8 h-8 mx-auto mb-2 opacity-20" />
                     No voucher deletions or reversals recorded yet
                   </td></tr>
@@ -465,20 +465,20 @@ export default function UserActivityLog() {
                     .filter(l => !search || l.voucher_number?.toLowerCase().includes(search.toLowerCase()) || l.performed_by?.toLowerCase().includes(search.toLowerCase()))
                     .map((log, i) => (
                   <tr key={log.id || i} className="hover:bg-muted/20 transition-colors">
-                    <td className="px-4 py-2.5 font-mono text-xs text-primary">{log.voucher_number}</td>
-                    <td className="px-4 py-2.5 text-xs text-muted-foreground">{log.voucher_type || '—'}</td>
-                    <td className="px-4 py-2.5">
+                    <td className="cell-density font-mono text-xs text-primary">{log.voucher_number}</td>
+                    <td className="cell-density text-xs text-muted-foreground">{log.voucher_type || '—'}</td>
+                    <td className="cell-density ">
                       <span className={cn('inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold',
                         log.action_type === 'Delete' ? 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400' : 'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400')}>
                         {log.action_type === 'Delete' ? <XCircle className="w-3 h-3" /> : <CheckCircle2 className="w-3 h-3" />}
                         {log.action_type}
                       </span>
                     </td>
-                    <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground">{log.reversal_voucher_number || '—'}</td>
-                    <td className="px-4 py-2.5 text-right font-mono text-sm">NPR {Number(log.total_amount || 0).toLocaleString()}</td>
-                    <td className="px-4 py-2.5 text-xs text-muted-foreground">{log.performed_by || '—'}</td>
-                    <td className="px-4 py-2.5 text-xs text-muted-foreground max-w-xs truncate" title={log.reason}>{log.reason || '—'}</td>
-                    <td className="px-4 py-2.5 text-xs text-muted-foreground">
+                    <td className="cell-density font-mono text-xs text-muted-foreground">{log.reversal_voucher_number || '—'}</td>
+                    <td className="cell-density text-right font-mono text-sm">NPR {Number(log.total_amount || 0).toLocaleString()}</td>
+                    <td className="cell-density text-xs text-muted-foreground">{log.performed_by || '—'}</td>
+                    <td className="cell-density text-xs text-muted-foreground max-w-xs truncate" title={log.reason}>{log.reason || '—'}</td>
+                    <td className="cell-density text-xs text-muted-foreground">
                       {log.created_date ? new Date(log.created_date).toLocaleString() : '—'}
                     </td>
                   </tr>
@@ -507,39 +507,39 @@ export default function UserActivityLog() {
           </div>
 
           <div className="bg-card border border-border rounded-xl overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="bg-muted/30 border-b border-border">
+            <table className="table-fluid-grid text-sm">
+              <thead className="cell-density bg-muted/30 border-b border-border">
                 <tr>
-                  <th className="text-left px-4 py-2.5">
+                  <th className="cell-density text-left">
                     <button onClick={() => handleSort('account_code')} className="flex items-center text-xs font-semibold text-muted-foreground">
                       Account Code <SortIcon field="account_code" />
                     </button>
                   </th>
-                  <th className="text-left px-4 py-2.5">
+                  <th className="cell-density text-left">
                     <button onClick={() => handleSort('account_name')} className="flex items-center text-xs font-semibold text-muted-foreground">
                       Name of Ledger <SortIcon field="account_name" />
                     </button>
                   </th>
-                  <th className="text-left px-4 py-2.5">
+                  <th className="cell-density text-left">
                     <button onClick={() => handleSort('account_group')} className="flex items-center text-xs font-semibold text-muted-foreground">
                       Account Group <SortIcon field="account_group" />
                     </button>
                   </th>
-                  <th className="text-left px-4 py-2.5">
+                  <th className="cell-density text-left">
                     <button onClick={() => handleSort('opening_date')} className="flex items-center text-xs font-semibold text-muted-foreground">
                       Opening Date <SortIcon field="opening_date" />
                     </button>
                   </th>
-                  <th className="text-right px-4 py-2.5 text-xs font-semibold text-muted-foreground">Previous Balance</th>
-                  <th className="text-right px-4 py-2.5 text-xs font-semibold text-muted-foreground">New Balance</th>
-                  <th className="text-right px-4 py-2.5 text-xs font-semibold text-muted-foreground">Change</th>
-                  <th className="text-center px-4 py-2.5 text-xs font-semibold text-muted-foreground">Dr/Cr</th>
-                  <th className="text-left px-4 py-2.5">
+                  <th className="cell-density text-right  text-xs font-semibold text-muted-foreground">Previous Balance</th>
+                  <th className="cell-density text-right  text-xs font-semibold text-muted-foreground">New Balance</th>
+                  <th className="cell-density text-right  text-xs font-semibold text-muted-foreground">Change</th>
+                  <th className="cell-density text-center  text-xs font-semibold text-muted-foreground">Dr/Cr</th>
+                  <th className="cell-density text-left">
                     <button onClick={() => handleSort('changed_by')} className="flex items-center text-xs font-semibold text-muted-foreground">
                       Changed By <SortIcon field="changed_by" />
                     </button>
                   </th>
-                  <th className="text-left px-4 py-2.5">
+                  <th className="cell-density text-left">
                     <button onClick={() => handleSort('created_date')} className="flex items-center text-xs font-semibold text-muted-foreground">
                       Date/Time <SortIcon field="created_date" />
                     </button>
@@ -549,37 +549,37 @@ export default function UserActivityLog() {
               <tbody className="divide-y divide-border">
                 {loading ? (
                   Array(6).fill(0).map((_, i) => (
-                    <tr key={i}><td colSpan={10} className="px-4 py-2.5"><div className="h-6 bg-muted rounded animate-pulse" /></td></tr>
+                    <tr key={i}><td colSpan={10} className="cell-density "><div className="h-6 bg-muted rounded animate-pulse" /></td></tr>
                   ))
                 ) : sorted.length === 0 ? (
-                  <tr><td colSpan={10} className="text-center py-12 text-muted-foreground text-sm">
+                  <tr><td colSpan={10} className="cell-density text-center py-12 text-muted-foreground text-sm">
                     <History className="w-8 h-8 mx-auto mb-2 opacity-20" />
                     No opening balance changes recorded yet
                   </td></tr>
                 ) : sorted.map((log, i) => (
                   <tr key={log.id || i} className="hover:bg-muted/20 transition-colors">
-                    <td className="px-4 py-2.5 font-mono text-xs text-primary">{log.account_code}</td>
-                    <td className="px-4 py-2.5 font-medium text-sm">{log.account_name}</td>
-                    <td className="px-4 py-2.5 text-xs text-muted-foreground">{log.account_group || '—'}</td>
-                    <td className="px-4 py-2.5 text-xs text-muted-foreground">{log.opening_date || '—'}</td>
-                    <td className="px-4 py-2.5 text-right text-sm font-mono text-muted-foreground">
+                    <td className="cell-density font-mono text-xs text-primary">{log.account_code}</td>
+                    <td className="cell-density font-medium text-sm">{log.account_name}</td>
+                    <td className="cell-density text-xs text-muted-foreground">{log.account_group || '—'}</td>
+                    <td className="cell-density text-xs text-muted-foreground">{log.opening_date || '—'}</td>
+                    <td className="cell-density text-right text-sm font-mono text-muted-foreground">
                       {Number(log.previous_balance || 0).toLocaleString()}
                     </td>
-                    <td className="px-4 py-2.5 text-right text-sm font-mono font-semibold">
+                    <td className="cell-density text-right text-sm font-mono font-semibold">
                       {Number(log.new_balance || 0).toLocaleString()}
                     </td>
-                    <td className="px-4 py-2.5 text-right">
+                    <td className="cell-density text-right">
                       {formatChange(log.previous_balance || 0, log.new_balance || 0) || <span className="text-xs text-muted-foreground">—</span>}
                     </td>
-                    <td className="px-4 py-2.5 text-center">
+                    <td className="cell-density text-center">
                       <span className={cn('inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold',
                         log.balance_type === 'Debit' ? 'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400' : 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400'
                       )}>
                         {log.balance_type === 'Debit' ? 'Dr' : 'Cr'}
                       </span>
                     </td>
-                    <td className="px-4 py-2.5 text-xs text-muted-foreground">{log.changed_by || '—'}</td>
-                    <td className="px-4 py-2.5 text-xs text-muted-foreground">
+                    <td className="cell-density text-xs text-muted-foreground">{log.changed_by || '—'}</td>
+                    <td className="cell-density text-xs text-muted-foreground">
                       {log.created_date ? new Date(log.created_date).toLocaleString() : '—'}
                     </td>
                   </tr>
