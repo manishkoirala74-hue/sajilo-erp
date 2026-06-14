@@ -289,6 +289,31 @@ export const sajilo = {
       window.location.href = '/login';
     }
   },
+  storage: {
+    uploadFiles: async (bucket, files, pathPrefix = '') => {
+      const uploadPromises = Array.from(files).map(async (file) => {
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${pathPrefix}${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+        
+        const { data, error } = await supabase.storage
+          .from(bucket)
+          .upload(fileName, file, {
+            cacheControl: '3600',
+            upsert: false
+          });
+
+        if (error) throw error;
+        
+        const { data: publicUrlData } = supabase.storage
+          .from(bucket)
+          .getPublicUrl(fileName);
+          
+        return publicUrlData.publicUrl;
+      });
+      
+      return Promise.all(uploadPromises);
+    }
+  },
   entities: new Proxy({}, {
     get: (target, prop) => {
       if (!target[prop]) {

@@ -6,7 +6,7 @@ import {
   Receipt, ClipboardList, Menu, X, Boxes, Wallet,
   Landmark, ShieldCheck, UserCog, Banknote, Factory, Handshake, BookOpen,
   Ruler, Tag, RotateCcw, SlidersHorizontal, ShoppingBag, BarChart2, TrendingDown, CreditCard,
-  UserCheck, Truck, Plus, Search
+  UserCheck, Truck, Plus, Search, LifeBuoy
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { sajilo } from '@/api/sajiloClient';
@@ -90,6 +90,7 @@ const buildNavGroups = (settings) => {
     items: [
       { icon: BarChart2, label: 'Reports', path: '/reports' },
       { icon: Settings, label: 'Settings', path: '/settings' },
+      { icon: LifeBuoy, label: 'Help & Support', path: '/help-support' },
     ]
   });
 

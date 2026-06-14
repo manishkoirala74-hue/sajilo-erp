@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/api/sajiloClient';
 import { useDateFormat } from '@/lib/DateFormatContext';
 import { FileText, Receipt } from 'lucide-react';
@@ -6,34 +6,21 @@ import { cn } from '@/lib/utils';
 
 export default function PartnerTransactionHistory({ partner, type }) {
   const { formatDate } = useDateFormat();
-  const [history, setHistory] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  useEffect(() => {
-    if (!partner?.id) return;
-
-    const fetchHistory = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const { data, error } = await supabase.rpc('get_partner_ledger_history_rpc', {
-          p_entity_id: partner.id,
-          p_limit: 100
-        });
-
-        if (error) throw error;
-        setHistory(data || []);
-      } catch (err) {
-        console.error('Failed to fetch ledger history:', err);
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchHistory();
-  }, [partner?.id]);
+  
+  const { data: history = [], isLoading: loading, error } = useQuery({
+    queryKey: ['partnerLedgerHistory', partner?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_partner_ledger_history_rpc', {
+        p_entity_id: partner.id
+      });
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!partner?.id,
+    staleTime: 600000,
+    refetchOnWindowFocus: false,
+    retry: false
+  });
 
   const getIconForDocType = (docType) => {
     if (docType === 'SalesInvoice') return <FileText className="w-4 h-4 text-blue-500" />;
@@ -54,25 +41,31 @@ export default function PartnerTransactionHistory({ partner, type }) {
   };
 
   return (
-    <div className="w-full">
+    <div className="w-full h-auto max-h-[400px] overflow-y-auto block">
       {loading ? (
         <div className="flex flex-col gap-2 py-8 px-4">
           {[...Array(5)].map((_, i) => (
-             <div key={i} className="h-10 bg-muted/50 animate-pulse rounded-lg" />
+            <div key={i} className="flex gap-4 items-center">
+              <div className="w-8 h-8 rounded-full bg-muted/50 animate-pulse" />
+              <div className="h-4 bg-muted/50 rounded animate-pulse flex-1" />
+              <div className="h-4 bg-muted/50 rounded animate-pulse w-24" />
+            </div>
           ))}
         </div>
       ) : error ? (
-        <div className="py-8 text-center text-red-500 font-medium">Error: {error}</div>
+        <div className="p-4 text-sm text-red-500 bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800 rounded-lg">
+          Failed to load history: {error}
+        </div>
       ) : history.length === 0 ? (
-        <div className="py-12 flex flex-col items-center justify-center text-center">
-          <div className="w-12 h-12 bg-muted rounded-full flex items-center justify-center mb-3">
+        <div className="flex flex-col items-center justify-center py-12 text-center bg-muted/10 border border-dashed border-border rounded-xl">
+          <div className="w-12 h-12 bg-muted/30 rounded-full flex items-center justify-center mb-3">
             <Receipt className="w-6 h-6 text-muted-foreground/50" />
           </div>
-          <p className="text-muted-foreground">No ledger transactions found for this {type.toLowerCase()}.</p>
+          <p className="text-muted-foreground">No ledger transactions found for this {type?.toLowerCase() || 'partner'}.</p>
         </div>
       ) : (
         <div className="bg-card border border-border rounded-xl overflow-hidden mt-2">
-          <div className="max-h-[60vh] overflow-y-auto">
+          <div className="w-full">
             <table className="table-fluid-grid text-sm w-full">
               <thead className="cell-density bg-muted/30 border-b border-border sticky top-0 z-10">
                 <tr>
@@ -101,14 +94,14 @@ export default function PartnerTransactionHistory({ partner, type }) {
                     <td className="cell-density text-muted-foreground truncate max-w-[250px]" title={row.description}>
                       {row.description || '—'}
                     </td>
-                    <td className="cell-density text-right font-mono">
+                    <td className="cell-density font-mono text-right">
                       {row.debit_amount > 0 ? (
                         <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
                           {Number(row.debit_amount).toLocaleString()}
                         </span>
                       ) : '—'}
                     </td>
-                    <td className="cell-density text-right font-mono">
+                    <td className="cell-density font-mono text-right">
                       {row.credit_amount > 0 ? (
                         <span className="text-blue-600 dark:text-blue-400 font-semibold">
                           {Number(row.credit_amount).toLocaleString()}

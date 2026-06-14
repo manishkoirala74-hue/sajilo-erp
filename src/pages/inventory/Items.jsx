@@ -550,7 +550,7 @@ export default function Items() {
           )}
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="table-scroll-container">
           {loading ? (
             <div className="p-8 space-y-3">
               {Array(6).fill(0).map((_, i) => <div key={i} className="h-10 bg-muted rounded animate-pulse" />)}

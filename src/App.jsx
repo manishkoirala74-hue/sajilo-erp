@@ -39,6 +39,7 @@ import EmployeeReceivableReport from '@/pages/reports/EmployeeReceivableReport';
 import EmployeePayableReport from '@/pages/reports/EmployeePayableReport';
 import CommunicationLogs from '@/pages/reports/CommunicationLogs';
 import Profile from '@/pages/Profile';
+import HelpSupport from '@/pages/HelpSupport';
 
 // Accounting
 import ChartOfAccounts from '@/pages/accounting/ChartOfAccounts';
@@ -148,6 +149,7 @@ const AuthenticatedApp = () => {
           <Route path="/sales/invoices" element={<SalesInvoices />} />
           <Route path="/sales/returns" element={<SalesReturns />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/help-support" element={<HelpSupport />} />
           {/* Reports */}
           <Route path="/reports" element={<Reports />} />
           <Route path="/reports/employee-receivables" element={<EmployeeReceivableReport />} />

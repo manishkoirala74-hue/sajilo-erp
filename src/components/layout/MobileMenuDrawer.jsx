@@ -8,7 +8,7 @@ import {
   Receipt, ClipboardList, Boxes, Wallet, 
   BookOpen, Ruler, RotateCcw, SlidersHorizontal, 
   ShoppingBag, BarChart2, CreditCard,
-  UserCheck, Truck, X
+  UserCheck, Truck, X, LifeBuoy
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -63,6 +63,7 @@ const buildNavGroups = (settings) => {
       items: [
         { icon: BarChart2, label: 'Reports', path: '/reports' },
         { icon: Settings, label: 'Settings', path: '/settings' },
+        { icon: LifeBuoy, label: 'Help & Support', path: '/help-support' },
       ]
     }
   ];

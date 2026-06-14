@@ -193,9 +193,9 @@ export default function GlobalVoucherDrawer() {
           let itemsMap = {};
           if (itemIds.length > 0) {
             const allItems = await sajilo.entities.Item.list();
-            allItems.forEach(i => itemsMap[i.id] = i.name);
+            allItems.forEach(i => itemsMap[i.id] = i.item_name);
           }
-          docLines = rawLines.map(l => ({ ...l, item_name: itemsMap[l.item_id] || l.item_name || 'Unknown Item' }));
+          docLines = rawLines.map(l => ({ ...l, item_name: itemsMap[l.item_id] || l.item_name || (l.item_id ? 'Unknown Item' : 'Unspecified Item') }));
         }
 
         if (isMounted) {
@@ -299,9 +299,9 @@ export default function GlobalVoucherDrawer() {
                         ) : (
                           <>
                             <TableCell className="font-medium">{line.item_name}</TableCell>
-                            <TableCell className="text-right">{line.quantity}</TableCell>
-                            <TableCell className="text-right">{line.unit_price?.toLocaleString() || '-'}</TableCell>
-                            <TableCell className="text-right">{(line.total_price || (line.quantity * line.unit_price))?.toLocaleString() || '-'}</TableCell>
+                            <TableCell className="text-right">{line.quantity ?? '-'}</TableCell>
+                            <TableCell className="text-right">{line.unit_price != null ? Number(line.unit_price).toLocaleString() : '-'}</TableCell>
+                            <TableCell className="text-right">{line.line_total != null ? Number(line.line_total).toLocaleString() : (line.quantity != null && line.unit_price != null && !isNaN(line.quantity * line.unit_price) ? (Number(line.quantity) * Number(line.unit_price)).toLocaleString() : '-')}</TableCell>
                           </>
                         )}
                       </TableRow>

@@ -10,14 +10,13 @@ import { supabase } from '@/api/sajiloClient';
  *
  * The RPC 'get_item_recent_trading_history_rpc' uses INDEX ONLY SCANS on composite B-Tree indexes.
  */
-export function useItemTradingHistory(itemId, limit = 5) {
+export function useItemTradingHistory(itemId) {
   return useQuery({
-    queryKey: ['itemTradingHistory', itemId, limit],
+    queryKey: ['itemTradingHistory', itemId],
     queryFn: async () => {
       if (!itemId) return [];
       const { data, error } = await supabase.rpc('get_item_recent_trading_history_rpc', {
-        p_item_id: itemId,
-        p_limit: limit,
+        p_item_id: itemId
       });
 
       if (error) {
@@ -27,7 +26,7 @@ export function useItemTradingHistory(itemId, limit = 5) {
       return data || [];
     },
     enabled: Boolean(itemId),
-    staleTime: 300000,
+    staleTime: 600000,
     refetchOnWindowFocus: false,
     retry: false,
   });

@@ -81,7 +81,12 @@
 
   /* Table Grid Defense Constraints */
   .table-scroll-container {
-    @apply w-full overflow-x-auto block clear-both scroll-smooth;
+    @apply w-full overflow-auto block clear-both scroll-smooth border rounded-md;
+    max-height: calc(100vh - 220px);
+  }
+  
+  .table-scroll-container thead th {
+    @apply sticky top-0 bg-muted/95 z-10 backdrop-blur-sm shadow-[0_1px_0_0_var(--border)];
   }
   
   .table-fluid-grid {

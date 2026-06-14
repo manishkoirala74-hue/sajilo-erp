@@ -59,7 +59,7 @@ export default function CommunicationLogs() {
       </div>
 
       <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className="table-scroll-container">
           <Table>
             <TableHeader className="bg-muted/50">
               <TableRow>

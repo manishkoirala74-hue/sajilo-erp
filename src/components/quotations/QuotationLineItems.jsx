@@ -52,7 +52,7 @@ export default function QuotationLineItems({ value = [], onChange, items = [], v
 
   return (
     <div className="space-y-2">
-      <div className="overflow-x-auto rounded-lg border border-border">
+      <div className="table-scroll-container rounded-lg border border-border">
         <table className="table-fluid-grid text-sm">
           <thead className="cell-density bg-muted/30">
             <tr>

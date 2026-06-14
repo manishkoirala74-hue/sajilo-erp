@@ -254,7 +254,7 @@ export default function LineItemsEditor({ value = [], onChange, taxTypes = [] })
                         ) : historyError ? (
                           <div className="text-red-500 text-sm font-medium">Error: {historyError.message}</div>
                         ) : tradingHistory?.length > 0 ? (
-                          <div className="overflow-hidden border border-border rounded bg-card">
+                          <div className="h-auto max-h-[400px] overflow-y-auto block border border-border rounded bg-card">
                             <table className="w-full text-sm text-left">
                               <thead className="bg-muted/50 border-b border-border text-xs text-muted-foreground">
                                 <tr>
@@ -271,8 +271,8 @@ export default function LineItemsEditor({ value = [], onChange, taxTypes = [] })
                                     <td className="px-3 py-1.5 font-medium">{hist.transaction_type}</td>
                                     <td className="px-3 py-1.5 text-muted-foreground">{hist.invoice_number}</td>
                                     <td className="px-3 py-1.5 text-muted-foreground">{new Date(hist.invoice_date).toLocaleDateString()}</td>
-                                    <td className="px-3 py-1.5 text-right">{hist.quantity}</td>
-                                    <td className="px-3 py-1.5 text-right tabular-nums">NPR {Number(hist.unit_price).toLocaleString()}</td>
+                                    <td className="px-3 py-1.5 font-mono text-right">{hist.quantity}</td>
+                                    <td className="px-3 py-1.5 font-mono text-right">NPR {Number(hist.unit_price).toLocaleString()}</td>
                                   </tr>
                                 ))}
                               </tbody>

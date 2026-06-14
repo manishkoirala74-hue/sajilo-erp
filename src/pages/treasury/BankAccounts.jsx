@@ -182,7 +182,7 @@ export default function BankAccounts() {
                 </button>
 
                 {!isCollapsed && (
-                  <div className="overflow-x-auto">
+                  <div className="table-scroll-container">
                     {items.length === 0 ? (
                       <div className="text-center py-10 text-muted-foreground text-sm">
                         No {type.toLowerCase()} accounts found.{' '}
