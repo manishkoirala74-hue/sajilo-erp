@@ -196,7 +196,7 @@ export default function FiscalYearSettings() {
                 value={form.fiscal_year_name} 
                 onChange={e => setForm({...form, fiscal_year_name: e.target.value})} 
                 placeholder="e.g. FY 2026-2027" 
-                className="mt-1.5"
+                className="h-10 border border-border bg-background px-3 text-sm rounded-md focus:ring-1 focus:ring-primary outline-none mt-1 .5"
               />
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -206,7 +206,7 @@ export default function FiscalYearSettings() {
                   type="date" 
                   value={form.start_date} 
                   onChange={e => setForm({...form, start_date: e.target.value})} 
-                  className="mt-1.5"
+                  className="h-10 border border-border bg-background px-3 text-sm rounded-md focus:ring-1 focus:ring-primary outline-none mt-1 .5"
                 />
               </div>
               <div>
@@ -215,7 +215,7 @@ export default function FiscalYearSettings() {
                   type="date" 
                   value={form.end_date} 
                   onChange={e => setForm({...form, end_date: e.target.value})} 
-                  className="mt-1.5"
+                  className="h-10 border border-border bg-background px-3 text-sm rounded-md focus:ring-1 focus:ring-primary outline-none mt-1 .5"
                 />
               </div>
             </div>
@@ -250,7 +250,7 @@ export default function FiscalYearSettings() {
                 value={reopenReason} 
                 onChange={e => setReopenReason(e.target.value)} 
                 placeholder="Audit adjustment for Q4..." 
-                className="mt-1.5"
+                className="h-10 border border-border bg-background px-3 text-sm rounded-md focus:ring-1 focus:ring-primary outline-none mt-1 .5"
               />
             </div>
           </div>

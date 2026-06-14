@@ -52,7 +52,7 @@ export default function DataUtilities() {
           </div>
           <div className="flex-1">
             <h3 className="font-semibold text-sm text-foreground">Ledger Timeline Recovery</h3>
-            <p className="text-xs text-muted-foreground mt-1 mb-4 leading-relaxed max-w-2xl">
+            <p className="mt-1 text-xs text-muted-foreground mb-4 leading-relaxed max-w-2xl">
               Chronologically rebuild the inventory Weighted Average Cost (WAC) timeline. This utility isolates all purchases, sales, and stock adjustments within the specified period and recalculates the historical moving average cost point-in-time, stamping it safely onto all posted transactions.
             </p>
             

@@ -150,6 +150,19 @@ const buildEntityMethods = (tableName) => {
       const cacheKey = `${tableName}:filter:${JSON.stringify(sanitizedMatch)}:${orderBy}:${limit}:${sajilo.getCompanyId()}`;
       if (queryCache.has(cacheKey)) return queryCache.get(cacheKey);
 
+      // Intelligent Cache Lookup for primary key point queries
+      const matchKeys = Object.keys(sanitizedMatch);
+      if (matchKeys.length === 1 && matchKeys[0] === 'id') {
+        for (const [key, cachedData] of queryCache.entries()) {
+          if (key.startsWith(`${tableName}:list:`) && Array.isArray(cachedData)) {
+            const found = cachedData.find(item => item.id === sanitizedMatch.id);
+            if (found) {
+              return [found];
+            }
+          }
+        }
+      }
+
       let query = supabase.from(tableName).select('*').match(sanitizedMatch).limit(limit);
       query = applyCompanyFilter(query);
       

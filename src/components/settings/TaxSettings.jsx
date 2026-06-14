@@ -251,25 +251,25 @@ export default function TaxSettings() {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label>Tax Name *</Label>
-              <Input value={form.tax_name} onChange={e => sf('tax_name', e.target.value)} placeholder="e.g. VAT 13%" className="mt-1" />
+              <Input value={form.tax_name} onChange={e => sf('tax_name', e.target.value)} placeholder="e.g. VAT 13%" className="h-10 border border-border bg-background px-3 text-sm rounded-md focus:ring-1 focus:ring-primary outline-none mt-1 " />
             </div>
             <div>
               <Label>Tax Code</Label>
-              <Input value={form.tax_code} onChange={e => sf('tax_code', e.target.value)} placeholder="e.g. VAT13" className="mt-1 font-mono" />
+              <Input value={form.tax_code} onChange={e => sf('tax_code', e.target.value)} placeholder="e.g. VAT13" className="h-10 border border-border bg-background px-3 text-sm rounded-md focus:ring-1 focus:ring-primary outline-none mt-1 font-mono" />
             </div>
             <div>
               <Label>Tax Rate (%)* </Label>
-              <Input type="number" min={0} max={100} step={0.001} value={form.tax_rate} onChange={e => sf('tax_rate', e.target.value)} className="mt-1" />
+              <Input type="number" min={0} max={100} step={0.001} value={form.tax_rate} onChange={e => sf('tax_rate', e.target.value)} className="h-10 border border-border bg-background px-3 text-sm rounded-md focus:ring-1 focus:ring-primary outline-none mt-1 font-mono text-right" />
             </div>
             <div>
               <Label>Sort Order</Label>
               <p className="text-xs text-muted-foreground mb-1">Lower number = applied first (e.g. Excise=5, VAT=10)</p>
-              <Input type="number" min={0} step={1} value={form.sort_order} onChange={e => sf('sort_order', parseInt(e.target.value) || 0)} className="mt-1" />
+              <Input type="number" min={0} step={1} value={form.sort_order} onChange={e => sf('sort_order', parseInt(e.target.value) || 0)} className="h-10 border border-border bg-background px-3 text-sm rounded-md focus:ring-1 focus:ring-primary outline-none mt-1 font-mono text-right" />
             </div>
             <div>
               <Label>Calculation Method</Label>
               <Select value={form.tax_type} onValueChange={v => sf('tax_type', v)}>
-                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="mt-1 "><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="Exclusive">Exclusive — tax added on top of net price</SelectItem>
                   <SelectItem value="Inclusive">Inclusive — tax extracted from gross price</SelectItem>
@@ -279,7 +279,7 @@ export default function TaxSettings() {
             <div>
               <Label>Applies To</Label>
               <Select value={form.applies_to} onValueChange={v => sf('applies_to', v)}>
-                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="mt-1 "><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="Both">Both Sales & Purchase</SelectItem>
                   <SelectItem value="Sales">Sales only</SelectItem>
@@ -289,7 +289,7 @@ export default function TaxSettings() {
             </div>
             <div className="col-span-2">
               <Label>Description</Label>
-              <Input value={form.description} onChange={e => sf('description', e.target.value)} placeholder="Optional note" className="mt-1" />
+              <Input value={form.description} onChange={e => sf('description', e.target.value)} placeholder="Optional note" className="h-10 border border-border bg-background px-3 text-sm rounded-md focus:ring-1 focus:ring-primary outline-none mt-1 " />
             </div>
           </div>
 
@@ -331,9 +331,9 @@ export default function TaxSettings() {
                     value: g.id,
                     label: `${g.account_code} — ${g.account_name}`
                   }))}
-                  className="mt-1"
+                  className="h-10 border border-border bg-background px-3 text-sm rounded-md focus:ring-1 focus:ring-primary outline-none mt-1 "
                 />
-                <p className="text-xs text-muted-foreground mt-1">
+                <p className="mt-1 text-xs text-muted-foreground ">
                   A new sub-ledger named "<strong>{form.tax_name || 'Tax Payable'}</strong>" will be created under this group.
                 </p>
               </div>
@@ -351,7 +351,7 @@ export default function TaxSettings() {
                       label: `${a.account_code} — ${a.account_name}`
                     }))
                   }
-                  className="mt-1"
+                  className="h-10 border border-border bg-background px-3 text-sm rounded-md focus:ring-1 focus:ring-primary outline-none mt-1 "
                 />
               </div>
             )}

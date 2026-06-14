@@ -92,17 +92,14 @@ function AccountsTab({ openingDate }) {
     if (changedIds.length === 0) { toast.info('No changes to save'); return; }
     setSaving(true);
     try {
-  const logs = [];
-      for (const id of changedIds) {
+      const logs = [];
+      const promises = changedIds.map(async (id) => {
         const acc = accounts.find(a => a.id === id);
-        if (!acc) continue;
+        if (!acc) return;
         const e = edits[id];
         const prevBalance = acc.opening_balance ?? acc.current_balance ?? 0;
         const newBalance  = Number(e.opening_balance ?? prevBalance);
-        await sajilo.entities.ChartOfAccount.update(id, {
-          current_balance: newBalance,
-          normal_balance:  e.balance_type || acc.normal_balance,
-        });
+        
         if (prevBalance !== newBalance) {
           logs.push({
             account_id: id, account_code: acc.account_code, account_name: acc.account_name,
@@ -112,14 +109,23 @@ function AccountsTab({ openingDate }) {
             changed_by: currentUser?.email || 'system', change_reason: 'Opening balance set via Settings',
           });
         }
-      }
+        
+        return sajilo.entities.ChartOfAccount.update(id, {
+          current_balance: newBalance,
+          normal_balance:  e.balance_type || acc.normal_balance,
+        });
+      });
+      
+      await Promise.all(promises);
       if (logs.length > 0) await sajilo.entities.OpeningBalanceLog.bulkCreate(logs);
       toast.success(`Saved opening balances for ${changedIds.length} account(s)`);
-        } catch (err) {
+    } catch (err) {
       toast.error(err.message || 'Error occurred while saving');
     } finally {
       setSaving(false);
-    } setSaved(true); fetchAll();
+    } 
+    setSaved(true); 
+    fetchAll();
   };
 
   const dirtyCount = Object.keys(edits).length;
@@ -306,25 +312,29 @@ function PartnersTab({ mode, openingDate }) {
     if (changedIds.length === 0) { toast.info('No changes to save'); return; }
     setSaving(true);
     try {
-  const mergedPartners = partners.map(p => ({ ...p, ...(edits[p.id] || {}) }));
-      for (const id of changedIds) {
+      const mergedPartners = partners.map(p => ({ ...p, ...(edits[p.id] || {}) }));
+      const promises = changedIds.map(id => {
         const e = edits[id];
-        await sajilo.entities.BusinessPartner.update(id, {
+        return sajilo.entities.BusinessPartner.update(id, {
           opening_balance:      Number(e.opening_balance) || 0,
           opening_balance_type: e.opening_balance_type,
           opening_balance_date: e.opening_balance_date || openingDate,
         });
-      }
+      });
+      await Promise.all(promises);
+      
       const syncedName = await syncControlAccount(mergedPartners);
       toast.success(syncedName
         ? `Saved ${changedIds.length} partner(s) & synced '${syncedName}'`
         : `Saved ${changedIds.length} partner(s) (control account not found in COA)`
       );
-        } catch (err) {
+    } catch (err) {
       toast.error(err.message || 'Error occurred while saving');
     } finally {
       setSaving(false);
-    } setSaved(true); fetchAll();
+    } 
+    setSaved(true); 
+    fetchAll();
   };
 
   const filtered = useMemo(() => {

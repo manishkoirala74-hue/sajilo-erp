@@ -490,7 +490,7 @@ export default function PartnerImportExport() {
                 <h4 className="text-sm font-semibold text-amber-800 dark:text-amber-300 flex items-center gap-2">
                   <AlertTriangle className="w-4 h-4" /> Duplicate Detection
                 </h4>
-                <p className="text-xs text-amber-700 dark:text-amber-400 mt-1 mb-3">
+                <p className="mt-1 text-xs text-amber-700 dark:text-amber-400 mb-3">
                   We found <strong>{duplicateCount}</strong> records in your file with Tax PAN Numbers or Names that already exist in the system.
                 </p>
                 <div className="flex gap-4">

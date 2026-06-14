@@ -261,8 +261,9 @@ export default function Suppliers() {
 
       {/* Table */}
       <div className="bg-card border border-border rounded-xl overflow-hidden">
-        <table className="table-fluid-grid text-sm">
-          <thead className="cell-density bg-muted/30 border-b border-border">
+        <div className="table-scroll-container">
+          <table className="table-fluid-grid text-sm">
+            <thead className="cell-density bg-muted border-b border-border sticky top-0 z-10 shadow-sm backdrop-blur-sm">
             <tr>
               <th className="cell-density w-10">
                 <Checkbox
@@ -344,6 +345,7 @@ export default function Suppliers() {
             ))}
           </tbody>
         </table>
+        </div>
         <div className="px-4 py-2 border-t border-border text-xs text-muted-foreground">
           {filteredPartners.length} supplier{filteredPartners.length !== 1 ? 's' : ''}
           {selected.size > 0 && <span className="ml-2 text-primary font-medium">· {selected.size} selected</span>}

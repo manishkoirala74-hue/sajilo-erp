@@ -258,13 +258,12 @@ export default function BulkAssetCreation({ open, onClose, accounts, assets, onS
       const ledgerTotals = {}; // { asset_ledger_id: { amount, name } }
 
       // 1. Create Assets
-      for (let i = 0; i < validRows.length; i++) {
-        const r = validRows[i];
+      const createPromises = validRows.map(async (r, i) => {
         const code = `AST-${String(startIndex + i + 1).padStart(3, '0')}`;
         const gross   = parseFloat(r.gross_purchase_value) || 0;
         const salvage = parseFloat(r.salvage_value) || 0;
 
-        const asset = await sajilo.entities.FixedAsset.create({
+        await sajilo.entities.FixedAsset.create({
           asset_code: code,
           asset_name: r.asset_name.trim(),
           category: r.asset_ledger_name || '',
@@ -288,11 +287,21 @@ export default function BulkAssetCreation({ open, onClose, accounts, assets, onS
           payment_account_name: '',
           document_urls: [],
         });
-        created++;
+        
+        return {
+          asset_ledger_id: r.asset_ledger_id,
+          asset_ledger_name: r.asset_ledger_name,
+          gross: gross
+        };
+      });
 
-        if (r.asset_ledger_id && gross > 0) {
-          if (!ledgerTotals[r.asset_ledger_id]) ledgerTotals[r.asset_ledger_id] = { amount: 0, name: r.asset_ledger_name };
-          ledgerTotals[r.asset_ledger_id].amount += gross;
+      const results = await Promise.all(createPromises);
+      created = results.length;
+      
+      for (const res of results) {
+        if (res.asset_ledger_id && res.gross > 0) {
+          if (!ledgerTotals[res.asset_ledger_id]) ledgerTotals[res.asset_ledger_id] = { amount: 0, name: res.asset_ledger_name };
+          ledgerTotals[res.asset_ledger_id].amount += res.gross;
         }
       }
 

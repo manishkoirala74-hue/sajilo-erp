@@ -82,7 +82,7 @@
   /* Table Grid Defense Constraints */
   .table-scroll-container {
     @apply w-full overflow-auto block clear-both scroll-smooth border rounded-md;
-    max-height: calc(100vh - 220px);
+    max-height: calc(100vh - 320px);
   }
   
   .table-scroll-container thead th {

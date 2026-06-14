@@ -391,7 +391,7 @@ export default function UsersRoles({ approvalSettings, onApprovalChange }) {
             {Object.entries(ROLE_PRESETS).map(([key, preset]) => (
               <div key={key} className={cn('border rounded-lg p-3', preset.color)}>
                 <p className="font-semibold text-sm">{preset.label}</p>
-                <p className="text-xs mt-1 opacity-80">
+                <p className="mt-1 text-xs opacity-80">
                   {Object.values(preset.perms).filter(v => v === 'full').length} full •{' '}
                   {Object.values(preset.perms).filter(v => v === 'edit').length} edit •{' '}
                   {Object.values(preset.perms).filter(v => v === 'view').length} view •{' '}
@@ -457,7 +457,7 @@ export default function UsersRoles({ approvalSettings, onApprovalChange }) {
             <p className="text-xs text-muted-foreground mb-1.5">POs above this value require approval</p>
             <Input type="number" value={approvalSettings?.approval_limit_amount || 50000}
               onChange={e => onApprovalChange('approval_limit_amount', Number(e.target.value))}
-              className="max-w-xs" />
+              className="h-10 border border-border bg-background px-3 text-sm rounded-md focus:ring-1 focus:ring-primary outline-none mt-1 font-mono text-right" />
           </div>
         </div>
       </div>
@@ -475,7 +475,7 @@ export default function UsersRoles({ approvalSettings, onApprovalChange }) {
             <div className="space-y-4 mt-2">
               <div className="bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 rounded-lg p-4 text-sm text-emerald-800 dark:text-emerald-300">
                 <p className="font-semibold mb-1">✓ User account created!</p>
-                <p className="text-xs mt-1">The user must verify their email via the OTP sent to <strong>{createdUser.email}</strong>, then log in with the temporary password below.</p>
+                <p className="mt-1 text-xs ">The user must verify their email via the OTP sent to <strong>{createdUser.email}</strong>, then log in with the temporary password below.</p>
               </div>
               <div className="bg-muted/40 rounded-lg p-4 space-y-3 text-sm">
                 <div className="flex justify-between items-center">
@@ -517,18 +517,18 @@ export default function UsersRoles({ approvalSettings, onApprovalChange }) {
                 <div className="col-span-2">
                   <Label>Email Address (Username) *</Label>
                   <Input type="email" value={createForm.email} onChange={e => setCreateForm(f => ({ ...f, email: e.target.value }))}
-                    placeholder="john@company.com" className="mt-1" />
+                    placeholder="john@company.com" className="h-10 border border-border bg-background px-3 text-sm rounded-md focus:ring-1 focus:ring-primary outline-none mt-1 " />
                 </div>
                 <div className="col-span-2">
                   <Label>Full Name</Label>
                   <Input value={createForm.full_name} onChange={e => setCreateForm(f => ({ ...f, full_name: e.target.value }))}
-                    placeholder="John Doe" className="mt-1" />
+                    placeholder="John Doe" className="h-10 border border-border bg-background px-3 text-sm rounded-md focus:ring-1 focus:ring-primary outline-none mt-1 " />
                 </div>
               </div>
               <div>
                 <Label>System Role</Label>
                 <Select value={createForm.role} onValueChange={v => setCreateForm(f => ({ ...f, role: v }))}>
-                  <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="mt-1 "><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="user"><div className="flex items-center gap-2"><User className="w-3.5 h-3.5" /> User — Standard access</div></SelectItem>
                     <SelectItem value="admin"><div className="flex items-center gap-2"><Crown className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" /> Admin — Full access</div></SelectItem>
@@ -537,13 +537,13 @@ export default function UsersRoles({ approvalSettings, onApprovalChange }) {
               </div>
               <div>
                 <Label>Temporary Password</Label>
-                <div className="flex gap-2 mt-1">
+                <div className="h-10 border border-border bg-background px-3 text-sm rounded-md focus:ring-1 focus:ring-primary outline-none mt-1 flex gap-2 ">
                   <Input value={createForm.temp_password} onChange={e => setCreateForm(f => ({ ...f, temp_password: e.target.value }))} className="font-mono" />
                   <Button variant="outline" size="icon" onClick={() => setCreateForm(f => ({ ...f, temp_password: generateTempPassword() }))}>
                     <RefreshCw className="w-4 h-4" />
                   </Button>
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">User must change this on first login.</p>
+                <p className="mt-1 text-xs text-muted-foreground ">User must change this on first login.</p>
               </div>
               <div className="flex justify-end gap-3 pt-2">
                 <Button variant="outline" onClick={resetCreateForm}>Cancel</Button>
@@ -565,14 +565,14 @@ export default function UsersRoles({ approvalSettings, onApprovalChange }) {
               <Label>Email Address *</Label>
               <Input
                 type="email" value={inviteEmail} onChange={e => setInviteEmail(e.target.value)}
-                placeholder="user@company.com" className="mt-1"
+                placeholder="user@company.com" className="h-10 border border-border bg-background px-3 text-sm rounded-md focus:ring-1 focus:ring-primary outline-none mt-1 "
                 onKeyDown={e => e.key === 'Enter' && handleInvite()}
               />
             </div>
             <div>
               <Label>System Role</Label>
               <Select value={inviteRole} onValueChange={setInviteRole}>
-                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="mt-1 "><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="user">
                     <div className="flex items-center gap-2"><User className="w-3.5 h-3.5" /><span>User — Standard access</span></div>

@@ -68,14 +68,19 @@ export default function EditCompanyDetails({ companyId, onBack }) {
     setSaving(true);
     try {
       if (companyId) {
-        await sajilo.entities.Company.update(companyId, formData);
-        // Sync logo with CompanySettings for reports
+        const updateCompanyPromise = sajilo.entities.Company.update(companyId, formData);
+        let updateSettingsPromise = Promise.resolve();
+        
         if (formData.logo_url) {
-          const settings = await sajilo.entities.CompanySettings.filter({ company_id: companyId });
-          if (settings.length > 0) {
-            await sajilo.entities.CompanySettings.update(settings[0].id, { company_logo_url: formData.logo_url });
-          }
+          updateSettingsPromise = sajilo.entities.CompanySettings.filter({ company_id: companyId })
+            .then(settings => {
+              if (settings.length > 0) {
+                return sajilo.entities.CompanySettings.update(settings[0].id, { company_logo_url: formData.logo_url });
+              }
+            });
         }
+        
+        await Promise.all([updateCompanyPromise, updateSettingsPromise]);
         toast.success("Company details updated successfully");
       }
     } catch (e) {
@@ -162,27 +167,27 @@ export default function EditCompanyDetails({ companyId, onBack }) {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label>Company Name *</Label>
-              <Input value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="mt-1" />
+              <Input value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="h-10 border border-border bg-background px-3 text-sm rounded-md focus:ring-1 focus:ring-primary outline-none mt-1 " />
             </div>
             <div>
               <Label>Tax ID / VAT</Label>
-              <Input value={formData.tax_id} onChange={e => setFormData({...formData, tax_id: e.target.value})} className="mt-1" />
+              <Input value={formData.tax_id} onChange={e => setFormData({...formData, tax_id: e.target.value})} className="h-10 border border-border bg-background px-3 text-sm rounded-md focus:ring-1 focus:ring-primary outline-none mt-1 " />
             </div>
             <div>
               <Label>Email</Label>
-              <Input type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} className="mt-1" />
+              <Input type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} className="h-10 border border-border bg-background px-3 text-sm rounded-md focus:ring-1 focus:ring-primary outline-none mt-1 " />
             </div>
             <div>
               <Label>Phone</Label>
-              <Input value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} className="mt-1" />
+              <Input value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} className="h-10 border border-border bg-background px-3 text-sm rounded-md focus:ring-1 focus:ring-primary outline-none mt-1 " />
             </div>
             <div>
               <Label>Website</Label>
-              <Input value={formData.website} onChange={e => setFormData({...formData, website: e.target.value})} className="mt-1" placeholder="https://" />
+              <Input value={formData.website} onChange={e => setFormData({...formData, website: e.target.value})} className="h-10 border border-border bg-background px-3 text-sm rounded-md focus:ring-1 focus:ring-primary outline-none mt-1 " placeholder="https://" />
             </div>
             <div className="col-span-2">
               <Label>Address</Label>
-              <Input value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} className="mt-1" />
+              <Input value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} className="h-10 border border-border bg-background px-3 text-sm rounded-md focus:ring-1 focus:ring-primary outline-none mt-1 " />
             </div>
             <div className="col-span-2 border border-border p-4 rounded-lg bg-card mt-2">
               <Label className="mb-2 block">Company Logo</Label>
@@ -205,7 +210,7 @@ export default function EditCompanyDetails({ companyId, onBack }) {
                     {isUploadingLogo ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Upload className="w-3.5 h-3.5 mr-1.5" />}
                     {isUploadingLogo ? 'Uploading...' : 'Upload Logo'}
                   </Button>
-                  <p className="text-xs text-muted-foreground mt-1.5">Recommended size: 500x500px or smaller.</p>
+                  <p className="mt-1 text-xs text-muted-foreground .5">Recommended size: 500x500px or smaller.</p>
                 </div>
               </div>
             </div>

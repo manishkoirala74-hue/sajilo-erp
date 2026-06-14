@@ -66,32 +66,42 @@ export async function seedDefaultChartOfAccounts() {
   const codeToId = {};
   const codeToName = {};
 
-  for (const acc of DEFAULT_COA) {
-    const payload = {
-      account_code: acc.code,
-      account_name: acc.name,
-      account_type: acc.type,
-      account_subtype: acc.subtype,
-      ledger_type: acc.ledger_type,
-      normal_balance: acc.balance,
-      is_active: true,
-      is_system_account: true, // Prevent deletion
-      current_balance: 0,
-      description: 'System Default Account',
-    };
+  // Group accounts by level to satisfy foreign key dependencies
+  const level0 = DEFAULT_COA.filter(a => !a.parent);
+  const level1 = DEFAULT_COA.filter(a => a.parent && level0.some(p => p.code === a.parent));
+  const level2 = DEFAULT_COA.filter(a => a.parent && level1.some(p => p.code === a.parent));
+  const level3 = DEFAULT_COA.filter(a => a.parent && level2.some(p => p.code === a.parent));
 
-    if (acc.parent && codeToId[acc.parent]) {
-      payload.parent_account_id = codeToId[acc.parent];
-      payload.parent_account_name = codeToName[acc.parent];
-    }
+  const levels = [level0, level1, level2, level3].filter(l => l.length > 0);
 
-    try {
+  for (const level of levels) {
+    const promises = level.map(async (acc) => {
+      const payload = {
+        account_code: acc.code,
+        account_name: acc.name,
+        account_type: acc.type,
+        account_subtype: acc.subtype,
+        ledger_type: acc.ledger_type,
+        normal_balance: acc.balance,
+        is_active: true,
+        is_system_account: true,
+        current_balance: 0,
+        description: 'System Default Account',
+      };
+
+      if (acc.parent && codeToId[acc.parent]) {
+        payload.parent_account_id = codeToId[acc.parent];
+        payload.parent_account_name = codeToName[acc.parent];
+      }
+
       const created = await sajilo.entities.ChartOfAccount.create(payload);
-      codeToId[acc.code] = created.id;
-      codeToName[acc.code] = created.account_name;
-    } catch (e) {
-      console.error(`Failed to create COA ${acc.code}:`, e);
-      throw e; // Throw to allow UI to catch the error
-    }
+      return { code: acc.code, id: created.id, name: created.account_name };
+    });
+
+    const results = await Promise.all(promises);
+    results.forEach(res => {
+      codeToId[res.code] = res.id;
+      codeToName[res.code] = res.name;
+    });
   }
 }

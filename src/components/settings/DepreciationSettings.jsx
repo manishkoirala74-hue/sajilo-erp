@@ -28,7 +28,7 @@ function AccountPicker({ label, desc, valueId, valueName, accounts, onSelect }) 
         const acc = accounts.find(a => a.id === v);
         onSelect(v, acc?.account_name || '');
       }}>
-        <SelectTrigger className="mt-1">
+        <SelectTrigger className="mt-1 ">
           <SelectValue placeholder="Select GL Account…" />
         </SelectTrigger>
         <SelectContent>
@@ -39,7 +39,7 @@ function AccountPicker({ label, desc, valueId, valueName, accounts, onSelect }) 
           ))}
         </SelectContent>
       </Select>
-      {valueName && <p className="text-xs text-muted-foreground mt-1">Selected: <span className="font-medium">{valueName}</span></p>}
+      {valueName && <p className="mt-1 text-xs text-muted-foreground ">Selected: <span className="font-medium">{valueName}</span></p>}
     </div>
   );
 }
@@ -70,7 +70,7 @@ export default function DepreciationSettings({ settings, onChange }) {
             <Label>Default Depreciation Method</Label>
             <p className="text-xs text-muted-foreground mb-1.5">Applied to new assets unless overridden per asset</p>
             <Select value={settings?.dep_default_method || 'Straight-Line'} onValueChange={v => set('dep_default_method', v)}>
-              <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="mt-1 "><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="Straight-Line">
                   <div>
@@ -99,7 +99,7 @@ export default function DepreciationSettings({ settings, onChange }) {
             <Input type="number" min={1} max={100} step={0.5}
               value={settings?.dep_default_rate_percent || 20}
               onChange={e => set('dep_default_rate_percent', Number(e.target.value))}
-              className="mt-1" placeholder="e.g. 20" />
+              className="h-10 border border-border bg-background px-3 text-sm rounded-md focus:ring-1 focus:ring-primary outline-none mt-1 " placeholder="e.g. 20" />
           </div>
           <div className="col-span-2">
             <div className="flex items-center justify-between p-3 border rounded-lg">

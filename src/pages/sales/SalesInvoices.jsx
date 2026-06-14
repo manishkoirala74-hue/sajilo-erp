@@ -286,16 +286,18 @@ export default function SalesInvoices() {
 
     // Reverse stock if it was Posted
     if (inv.status === 'Posted') {
+      const qtyByItem = {};
       for (const line of (inv.line_items || [])) {
-        if (line.item_id) {
-          const items = await sajilo.entities.Item.filter({ id: line.item_id });
-          if (items.length > 0) {
-            const item = items[0];
-            const restoredQty = (item.quantity_on_hand || 0) + (line.quantity || 0);
-            await sajilo.entities.Item.update(item.id, { quantity_on_hand: restoredQty });
-          }
-        }
+        if (line.item_id) qtyByItem[line.item_id] = (qtyByItem[line.item_id] || 0) + (line.quantity || 0);
       }
+      await Promise.all(Object.entries(qtyByItem).map(async ([itemId, qty]) => {
+        const items = await sajilo.entities.Item.filter({ id: itemId });
+        if (items.length > 0) {
+          const item = items[0];
+          const restoredQty = (item.quantity_on_hand || 0) + qty;
+          return sajilo.entities.Item.update(item.id, { quantity_on_hand: restoredQty });
+        }
+      }));
     }
 
     await sajilo.entities.SalesInvoice.update(inv.id, {

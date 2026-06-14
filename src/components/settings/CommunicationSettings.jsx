@@ -124,7 +124,7 @@ export default function CommunicationSettings({ companyId }) {
           <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5 shrink-0" />
           <div>
             <h4 className="text-sm font-semibold text-blue-900 dark:text-blue-300">Using a Google (Gmail / Workspace) Account?</h4>
-            <p className="text-sm text-blue-800 dark:text-blue-400 mt-1">
+            <p className="mt-1 text-sm text-blue-800 dark:text-blue-400 ">
               Due to mandatory 2-Step Verification, standard passwords will be blocked. You must use a <strong>16-character App Password</strong>.
             </p>
             <ol className="list-decimal list-inside text-sm text-blue-800 dark:text-blue-400 mt-3 space-y-1">
@@ -143,11 +143,11 @@ export default function CommunicationSettings({ companyId }) {
           <h3 className="font-semibold text-foreground text-sm">SMTP Email Integration</h3>
         </div>
         <div className="p-5 grid grid-cols-2 gap-4">
-          <div><Label>SMTP Host</Label><Input value={config.email_smtp_host || ''} onChange={e => set('email_smtp_host', e.target.value)} className="mt-1" placeholder="smtp.gmail.com" /></div>
-          <div><Label>SMTP Port</Label><Input type="number" value={config.email_smtp_port || 587} onChange={e => set('email_smtp_port', Number(e.target.value))} className="mt-1" /></div>
-          <div><Label>SMTP Username</Label><Input value={config.email_smtp_user || ''} onChange={e => set('email_smtp_user', e.target.value)} className="mt-1" placeholder="you@company.com" /></div>
-          <div><Label>SMTP Password</Label><Input type="password" value={config.email_smtp_password || ''} onChange={e => set('email_smtp_password', e.target.value)} className="mt-1" placeholder="••••••••" /></div>
-          <div className="col-span-2"><Label>From Name (Sender Name)</Label><Input value={config.email_from_name || ''} onChange={e => set('email_from_name', e.target.value)} className="mt-1" placeholder="Sajilo Trading" /></div>
+          <div><Label>SMTP Host</Label><Input value={config.email_smtp_host || ''} onChange={e => set('email_smtp_host', e.target.value)} className="h-10 border border-border bg-background px-3 text-sm rounded-md focus:ring-1 focus:ring-primary outline-none mt-1 " placeholder="smtp.gmail.com" /></div>
+          <div><Label>SMTP Port</Label><Input type="number" value={config.email_smtp_port || 587} onChange={e => set('email_smtp_port', Number(e.target.value))} className="h-10 border border-border bg-background px-3 text-sm rounded-md focus:ring-1 focus:ring-primary outline-none mt-1 font-mono text-right" /></div>
+          <div><Label>SMTP Username</Label><Input value={config.email_smtp_user || ''} onChange={e => set('email_smtp_user', e.target.value)} className="h-10 border border-border bg-background px-3 text-sm rounded-md focus:ring-1 focus:ring-primary outline-none mt-1 " placeholder="you@company.com" /></div>
+          <div><Label>SMTP Password</Label><Input type="password" value={config.email_smtp_password || ''} onChange={e => set('email_smtp_password', e.target.value)} className="h-10 border border-border bg-background px-3 text-sm rounded-md focus:ring-1 focus:ring-primary outline-none mt-1 " placeholder="••••••••" /></div>
+          <div className="h-10 border border-border bg-background px-3 text-sm rounded-md focus:ring-1 focus:ring-primary outline-none mt-1 col-span-2"><Label>From Name (Sender Name)</Label><Input value={config.email_from_name || ''} onChange={e => set('email_from_name', e.target.value)} className=" " placeholder="Sajilo Trading" /></div>
           
           <div className="col-span-2 pt-2 flex justify-end">
              <Button variant="outline" size="sm" onClick={handleTestConnection} disabled={testing}>

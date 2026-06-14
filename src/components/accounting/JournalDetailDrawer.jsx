@@ -76,16 +76,22 @@ export default function JournalDetailDrawer({ journal, open, onClose, onRefresh 
 
       await sajilo.entities.GeneralLedgerLine.bulkCreate(revLines);
 
+      // Aggregate deltas by account to prevent race conditions during parallel update
+      const deltasByAccount = {};
       for (const l of revLines) {
         if (!l.account_id) continue;
-        const results = await sajilo.entities.ChartOfAccount.filter({ id: l.account_id }, 'account_code', 1);
-        const acc = results[0];
-        if (!acc) continue;
         const delta = (l.debit_amount || 0) - (l.credit_amount || 0);
+        deltasByAccount[l.account_id] = (deltasByAccount[l.account_id] || 0) + delta;
+      }
+
+      await Promise.all(Object.entries(deltasByAccount).map(async ([accountId, delta]) => {
+        const results = await sajilo.entities.ChartOfAccount.filter({ id: accountId }, 'account_code', 1);
+        const acc = results[0];
+        if (!acc) return;
         const debitNormal = ['Asset', 'COGS', 'Expense', 'OPEX', 'Cost of Goods Sold', 'Other Expense'].includes(acc.account_type);
         const balanceChange = debitNormal ? delta : -delta;
-        await sajilo.entities.ChartOfAccount.update(acc.id, { current_balance: Math.round(((acc.current_balance || 0) + balanceChange) * 100) / 100 });
-      }
+        return sajilo.entities.ChartOfAccount.update(acc.id, { current_balance: Math.round(((acc.current_balance || 0) + balanceChange) * 100) / 100 });
+      }));
 
       await sajilo.entities.GeneralLedgerJournal.update(journal.id, { status: 'Reversed' });
       const { toast } = await import('sonner');
