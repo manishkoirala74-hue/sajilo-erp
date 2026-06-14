@@ -21,6 +21,8 @@ import { usePermissions } from '@/lib/AuthContext';
 import SearchableSelect from '@/components/shared/SearchableSelect';
 import QuickPartnerCreate from '@/components/shared/QuickPartnerCreate';
 import VoucherLink from '@/components/shared/VoucherLink';
+import CommunicationModal from '@/components/shared/CommunicationModal';
+import { Mail } from 'lucide-react';
 
 const emptySI = {
   invoice_number: '', customer_id: '', customer_name: '', sales_order_id: '',
@@ -65,6 +67,8 @@ export default function SalesInvoices() {
   // Duplicate warning state
   const [dupWarning, setDupWarning] = useState(false);
   const [pendingPostStatus, setPendingPostStatus] = useState(null);
+
+  const [showCommModal, setShowCommModal] = useState(false);
 
   const loadData = () => {
     Promise.all([
@@ -571,10 +575,15 @@ export default function SalesInvoices() {
                 Invoice {viewDetail?.invoice_number}
                 <StatusBadge status={viewDetail?.status} />
               </div>
-              {viewDetail?._isViewMode && (
-                <span className="text-xs font-semibold bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 px-2 py-1 rounded border border-blue-200 dark:border-blue-800">
-                  View Mode
-                </span>
+              {viewDetail && (
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setShowCommModal(true)}>
+                    <Mail className="w-3.5 h-3.5 mr-1.5" /> Email Invoice
+                  </Button>
+                  <span className="text-xs font-semibold bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 px-2 py-1 rounded border border-blue-200 dark:border-blue-800">
+                    View Mode
+                  </span>
+                </div>
               )}
             </DialogTitle>
           </DialogHeader>
@@ -627,6 +636,16 @@ export default function SalesInvoices() {
           )}
         </DialogContent>
       </Dialog>
+
+      <CommunicationModal 
+        open={showCommModal} 
+        onOpenChange={setShowCommModal}
+        module="SalesInvoice"
+        referenceId={viewDetail?.id}
+        partnerId={viewDetail?.customer_id}
+        companyId={sajilo.getCompanyId()}
+        payload={viewDetail || {}}
+      />
 
       {/* ── CANCEL DIALOG ── */}
       <Dialog open={!!cancelTarget} onOpenChange={() => setCancelTarget(null)}>

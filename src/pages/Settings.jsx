@@ -18,6 +18,7 @@ import QuotationSettings from '@/components/settings/QuotationSettings';
 import OpeningBalances from '@/components/settings/OpeningBalances.jsx';
 import ItemImportExport from '@/components/settings/ItemImportExport';
 import DataUtilities from '@/components/settings/DataUtilities';
+import CommunicationSettings from '@/components/settings/CommunicationSettings';
 
 import GLAccountSettings from '@/components/settings/GLAccountSettings';
 import PayrollGLSettings from '@/components/settings/PayrollGLSettings';
@@ -39,7 +40,7 @@ const SECTIONS = [
   { id: 'quotation', label: 'Quotation Design', icon: FileText },
   { id: 'import_export', label: 'Import / Export', icon: FileSpreadsheet },
   { id: 'data_utilities', label: 'Data Utilities', icon: HardDrive, adminOnly: true },
-  { id: 'email', label: 'Email Notifications', icon: Mail },
+  { id: 'communication', label: 'Communication & API', icon: Mail, adminOnly: true },
 ];
 
 function SectionCard({ title, icon: CardIcon, children }) {
@@ -419,30 +420,9 @@ export default function Settings() {
           </SectionCard>
         )}
 
-        {/* ── EMAIL NOTIFICATIONS ── */}
-        {activeSection === 'email' && (
-          <>
-            <SectionCard title="SMTP Configuration" icon={Mail}>
-              <div className="grid grid-cols-2 gap-4">
-                <div><Label>SMTP Host</Label><Input value={settings.email_smtp_host || ''} onChange={e => set('email_smtp_host', e.target.value)} className="mt-1" placeholder="smtp.gmail.com" /></div>
-                <div><Label>SMTP Port</Label><Input type="number" value={settings.email_smtp_port || 587} onChange={e => set('email_smtp_port', Number(e.target.value))} className="mt-1" /></div>
-                <div><Label>SMTP Username</Label><Input value={settings.email_smtp_user || ''} onChange={e => set('email_smtp_user', e.target.value)} className="mt-1" placeholder="you@company.com" /></div>
-                <div><Label>SMTP Password</Label><Input type="password" value={settings.email_smtp_password || ''} onChange={e => set('email_smtp_password', e.target.value)} className="mt-1" placeholder="••••••••" /></div>
-                <div className="col-span-2"><Label>From Name (Sender Name)</Label><Input value={settings.email_from_name || ''} onChange={e => set('email_from_name', e.target.value)} className="mt-1" placeholder="Sajilo Trading" /></div>
-              </div>
-            </SectionCard>
-
-            <SectionCard title="Debtor Reminder Email Template" icon={Bell}>
-              <p className="text-xs text-muted-foreground mb-3">
-                Available variables: <code className="bg-muted px-1 rounded">{'{customer_name}'}</code>, <code className="bg-muted px-1 rounded">{'{invoice_number}'}</code>, <code className="bg-muted px-1 rounded">{'{amount}'}</code>, <code className="bg-muted px-1 rounded">{'{due_date}'}</code>, <code className="bg-muted px-1 rounded">{'{company_name}'}</code>
-              </p>
-              <textarea
-                className="w-full h-48 bg-transparent border border-input rounded-md px-3 py-2 text-sm font-mono resize-y focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                value={settings.email_debtor_template || ''}
-                onChange={e => set('email_debtor_template', e.target.value)}
-              />
-            </SectionCard>
-          </>
+        {/* ── COMMUNICATION & API ── */}
+        {activeSection === 'communication' && (
+          <CommunicationSettings companyId={settings.company_id} />
         )}
       </div>
     </div>

@@ -16,6 +16,8 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { format } from 'date-fns';
 import SearchableSelect from '@/components/shared/SearchableSelect';
 import VoucherLink from '@/components/shared/VoucherLink';
+import CommunicationModal from '@/components/shared/CommunicationModal';
+import { Mail } from 'lucide-react';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function fmtNPR(n) {
@@ -118,13 +120,19 @@ const PRINT_STYLE = `
 `;
 
 // ── Shared: Simple flat ReportTable ──────────────────────────────────────────
-function ReportTable({ title, subtitle, headers, rows, footer, onExport, fromDate, toDate }) {
+function ReportTable({ title, subtitle, headers, rows, footer, onExport, onEmail, fromDate, toDate }) {
   const rightCols = new Set([headers.length - 1, headers.length - 2]); // last 2 cols = numeric
 
   return (
     <div className="space-y-3">
       <BusinessHeader reportTitle={title} fromDate={fromDate} toDate={toDate} subtitle={subtitle} />
-      <div className="report-no-print flex justify-end">
+      <div className="report-no-print flex justify-end gap-2">
+        {onEmail && (
+          <button onClick={onEmail}
+            className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 border border-blue-300 dark:border-blue-500/30 rounded-lg bg-blue-50 dark:bg-blue-500/10 hover:bg-blue-100 dark:bg-blue-500/20 text-blue-800 dark:text-blue-300 transition-colors">
+            <Mail className="w-3.5 h-3.5" /> Email Report
+          </button>
+        )}
         {onExport && (
           <button onClick={onExport}
             className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 border border-emerald-300 dark:border-emerald-500/30 rounded-lg bg-emerald-50 dark:bg-emerald-500/10 hover:bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 transition-colors">
@@ -1130,6 +1138,7 @@ function GeneralLedgerDetailReport({ initialFromDate, initialToDate }) {
   const [summary,   setSummary]   = useCachedState('general_ledger_detail_summary', { ob: 0, cb: 0, obIsDr: true, cbIsDr: true });
   const [loading,   setLoading]   = useState(false);
   const [hasLoaded, setHasLoaded] = useCachedState('general_ledger_detail_hasLoaded', false);
+  const [showCommModal, setShowCommModal] = useState(false);
 
   useEffect(() => {
     sajilo.entities.ChartOfAccount.filter({ is_active: true, ledger_type: 'Sub Ledger' }, 'account_name', 1000).then(res => {
@@ -1246,12 +1255,30 @@ function GeneralLedgerDetailReport({ initialFromDate, initialToDate }) {
       ) : loading ? (
         <div className="py-10 text-center text-muted-foreground text-sm">Loading ledger…</div>
       ) : (
-        <ReportTable title={title} fromDate={filters.fromDate} toDate={filters.toDate}
-          headers={['Date', 'Voucher #', 'Description', 'Debit (NPR)', 'Credit (NPR)', 'Balance (NPR)']}
-          rows={tableRows}
-          footer={['', '', 'Closing Balance', fmtNPR(lines.reduce((s,l)=>s+l.dr,0)), fmtNPR(lines.reduce((s,l)=>s+l.cr,0)), fmtNPR(summary.cb) + (summary.cbIsDr ? ' Dr' : ' Cr')]}
-          onExport={handleExport}
-        />
+        <>
+          <ReportTable title={title} fromDate={filters.fromDate} toDate={filters.toDate}
+            headers={['Date', 'Voucher #', 'Description', 'Debit (NPR)', 'Credit (NPR)', 'Balance (NPR)']}
+            rows={tableRows}
+            footer={['', '', 'Closing Balance', fmtNPR(lines.reduce((s,l)=>s+l.dr,0)), fmtNPR(lines.reduce((s,l)=>s+l.cr,0)), fmtNPR(summary.cb) + (summary.cbIsDr ? ' Dr' : ' Cr')]}
+            onExport={handleExport}
+            onEmail={() => setShowCommModal(true)}
+          />
+          <CommunicationModal 
+            open={showCommModal} 
+            onOpenChange={setShowCommModal}
+            module="GeneralLedger"
+            referenceId={filters.accountId} // Treating the account ID as reference
+            partnerId={null} // GL Statement usually isn't tied to a specific business partner in this context
+            companyId={sajilo.getCompanyId()}
+            payload={{
+              reportTitle: title,
+              fromDate: filters.fromDate,
+              toDate: filters.toDate,
+              linesCount: lines.length,
+              closingBalance: summary.cb
+            }}
+          />
+        </>
       )}
     </div>
   );

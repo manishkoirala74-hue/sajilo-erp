@@ -87,7 +87,9 @@ const CATEGORIES = [
   },
   {
     id: 'system', label: 'System Report', icon: Settings2, color: 'slate',
-    reports: [], isCustom: true,
+    reports: [
+      { id: 'communication_logs', label: 'Communication Logs', desc: 'Audit trail of Email and WhatsApp deliveries', isRoute: true, path: '/reports/communication-logs' }
+    ]
   },
   {
     id: 'activity_log', label: 'Activity Log', icon: History, color: 'slate',
@@ -196,7 +198,7 @@ export default function Reports() {
           {category.isCustom && activeCategory === 'activity_log' && <UserActivityLog />}
 
           {/* System Report placeholder */}
-          {category.isCustom && activeCategory === 'system' && (
+          {category.isCustom && activeCategory === 'system' && category.reports?.length === 0 && (
             <div className="bg-card border border-border rounded-xl p-8 text-center text-muted-foreground text-sm">
               System reports coming soon.
             </div>

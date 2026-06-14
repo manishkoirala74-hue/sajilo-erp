@@ -37,6 +37,7 @@ import Settings from '@/pages/Settings';
 import Reports from '@/pages/Reports.jsx';
 import EmployeeReceivableReport from '@/pages/reports/EmployeeReceivableReport';
 import EmployeePayableReport from '@/pages/reports/EmployeePayableReport';
+import CommunicationLogs from '@/pages/reports/CommunicationLogs';
 import Profile from '@/pages/Profile';
 
 // Accounting
@@ -151,6 +152,7 @@ const AuthenticatedApp = () => {
           <Route path="/reports" element={<Reports />} />
           <Route path="/reports/employee-receivables" element={<EmployeeReceivableReport />} />
           <Route path="/reports/employee-payables" element={<EmployeePayableReport />} />
+          <Route path="/reports/communication-logs" element={<CommunicationLogs />} />
           <Route path="/profile" element={<Profile />} />
 
           {/* Accounting */}
