@@ -1,7 +1,7 @@
 import { useSearchParams } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { sajilo } from '@/api/sajiloClient';
-import { Plus, Edit2, ToggleLeft, ToggleRight, Building2, User, Trash2, Camera, Loader2 } from 'lucide-react';
+import { Plus, Edit2, ToggleLeft, ToggleRight, Building2, User, Trash2, Camera, Loader2, History } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -14,6 +14,7 @@ import StatusBadge from '@/components/shared/StatusBadge';
 import { toast } from 'sonner';
 import { provisionPartnerLedgers, createPartnerLedger } from '@/lib/partnerLedgerService';
 import PartnerBatchActions from '@/components/partners/PartnerBatchActions';
+import PartnerTransactionHistory from '@/components/partners/PartnerTransactionHistory';
 
 const emptyForm = {
   name: '', partner_type: 'Company', tax_id_number: '',
@@ -45,6 +46,7 @@ export default function Customers() {
   const [search, setSearch]         = useState('');
   const [uploading, setUploading]   = useState(false);
   const [maxFileSize, setMaxFileSize] = useState(null);
+  const [historyPartner, setHistoryPartner] = useState(null);
 
   const enrichWithAccountCodes = async (partners, settingsData) => {
     const accounts = await sajilo.entities.ChartOfAccount.list('account_code', 2000);
@@ -331,6 +333,9 @@ export default function Customers() {
                 <td className="cell-density "><StatusBadge status={row.is_active ? 'Active' : 'Inactive'} /></td>
                 <td className="cell-density " onClick={e => e.stopPropagation()}>
                   <div className="flex items-center gap-1">
+                    <Button variant="ghost" size="icon" title="Transaction History" onClick={() => setHistoryPartner(row)}>
+                      <History className="w-4 h-4 text-muted-foreground" />
+                    </Button>
                     <Button variant="ghost" size="icon" onClick={() => openEdit(row)}><Edit2 className="w-4 h-4" /></Button>
                     <Button variant="ghost" size="icon" onClick={() => toggleActive(row)}>
                       {row.is_active ? <ToggleRight className="w-4 h-4 text-emerald-500" /> : <ToggleLeft className="w-4 h-4 text-slate-400" />}
@@ -490,6 +495,19 @@ export default function Customers() {
             <Button variant="outline" onClick={() => setShowForm(false)}>Cancel</Button>
             <Button onClick={handleSave} disabled={saving}>{saving ? 'Saving...' : editing ? 'Update' : 'Create Customer'}</Button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Transaction History Dialog */}
+      <Dialog open={!!historyPartner} onOpenChange={() => setHistoryPartner(null)}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <History className="w-4 h-4 text-primary" />
+              Transaction History — {historyPartner?.name}
+            </DialogTitle>
+          </DialogHeader>
+          {historyPartner && <PartnerTransactionHistory partner={historyPartner} type="Customer" />}
         </DialogContent>
       </Dialog>
     </div>

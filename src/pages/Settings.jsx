@@ -76,6 +76,7 @@ const DEFAULT_SETTINGS = {
   invoice_prefix_sales_order: 'SO', invoice_prefix_purchase_order: 'PO',
   invoice_suffix: '', invoice_next_number: 1, include_fy_in_invoice_number: true,
   invoice_numbering_method: 'Auto', invoice_duplicate_handling: 'Block',
+  show_recent_trading_history: true,
   overdue_reminder_days: 7, send_invoice_reminder_on_due: true, self_reminder_days_before_due: 3,
   email_smtp_host: '', email_smtp_port: 587, email_smtp_user: '', email_smtp_password: '', email_from_name: '',
   email_debtor_template: 'Dear {customer_name},\n\nThis is a reminder that invoice {invoice_number} for NPR {amount} is due on {due_date}.\n\nPlease make the payment at your earliest convenience.\n\nRegards,\n{company_name}',
@@ -273,6 +274,15 @@ export default function Settings() {
         {/* ── VOUCHER & INVOICE SETUP ── */}
         {activeSection === 'vouchers' && (
           <>
+            <SectionCard title="Trading History" icon={FileText}>
+              <ToggleRow 
+                label="Allow Display of Transaction History While Making Purchase/Sales Transactions" 
+                desc="When active, users can choose to view recent transactions for an item during invoice creation." 
+                checked={settings.show_recent_trading_history} 
+                onChange={v => set('show_recent_trading_history', v)} 
+              />
+            </SectionCard>
+
             <SectionCard title="Invoice Numbering Method" icon={Hash}>
               <div className="grid grid-cols-2 gap-6">
                 <div>

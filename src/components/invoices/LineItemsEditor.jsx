@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,6 +8,7 @@ import QuickItemCreate from '@/components/shared/QuickItemCreate';
 import { sajilo } from '@/api/sajiloClient';
 import { useSajiloSync } from '@/hooks/useSajiloSync';
 import { computeItemTaxes } from '@/lib/taxService';
+import { useItemTradingHistory } from '@/hooks/useItemTradingHistory';
 
 const emptyLine = {
   item_id: '', item_name: '', item_code: '', hs_code: '',
@@ -30,12 +31,29 @@ export default function LineItemsEditor({ value = [], onChange, taxTypes = [] })
   const [items, setItems] = useState([]);
   const [showItemCreate, setShowItemCreate] = useState(false);
   const [activeLineIdx, setActiveLineIdx] = useState(null);
+  
+  // ── Trading History State ──
+  const [openHistoryRowIdx, setOpenHistoryRowIdx] = useState(null);
+  const [historyItemId, setHistoryItemId] = useState(null);
+  const [settings, setSettings] = useState(null);
+
+  // ── Fetch Trading History ──
+  const { data: tradingHistory, isLoading: isHistoryLoading, error: historyError } = useItemTradingHistory(historyItemId);
 
   const loadItems = () => {
     sajilo.entities.Item.filter({ is_active: true }).then(setItems);
   };
 
-  useEffect(() => { loadItems(); }, []);
+  const loadSettings = () => {
+    sajilo.entities.CompanySettings.list().then(data => {
+      if (data.length > 0) setSettings(data[0]);
+    });
+  };
+
+  useEffect(() => { 
+    loadItems(); 
+    loadSettings();
+  }, []);
   useSajiloSync(['Item'], loadItems);
 
   // ── Helpers ────────────────────────────────────────────────────────────────
@@ -128,7 +146,8 @@ export default function LineItemsEditor({ value = [], onChange, taxTypes = [] })
                 .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
 
               return (
-                <tr key={idx}>
+                <React.Fragment key={idx}>
+                <tr>
                   <td className="cell-density ">
                     <SearchableSelect
                       value={line.item_id}
@@ -192,11 +211,81 @@ export default function LineItemsEditor({ value = [], onChange, taxTypes = [] })
                     NPR {Number(line.line_total || 0).toLocaleString()}
                   </td>
                   <td className="cell-density ">
-                    <Button variant="ghost" size="icon" className="h-7 w-7 text-red-400 hover:text-red-600 dark:text-red-400" onClick={() => removeLine(idx)}>
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </Button>
+                    <div className="flex items-center gap-1">
+                      {settings?.show_recent_trading_history !== false && line.item_id && (
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className={`h-7 px-2 text-xs ${openHistoryRowIdx === idx ? 'bg-primary/10 text-primary' : 'text-muted-foreground'}`}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            if (openHistoryRowIdx === idx) {
+                              setOpenHistoryRowIdx(null);
+                              setHistoryItemId(null);
+                            } else {
+                              setOpenHistoryRowIdx(idx);
+                              setHistoryItemId(line.item_id);
+                            }
+                          }}
+                        >
+                          History
+                        </Button>
+                      )}
+                      <Button variant="ghost" size="icon" className="h-7 w-7 text-red-400 hover:text-red-600 dark:text-red-400" onClick={() => removeLine(idx)}>
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
                   </td>
                 </tr>
+                {openHistoryRowIdx === idx && historyItemId && line.item_id === historyItemId && (
+                  <tr>
+                    <td colSpan="6" className="p-0 border-b border-border">
+                      <div className="bg-primary/5 p-4 shadow-inner">
+                        <div className="flex justify-between items-center mb-3">
+                          <div className="font-semibold text-muted-foreground text-sm">
+                            Recent Trading History
+                          </div>
+                          <Button variant="ghost" size="sm" className="h-6 text-xs px-2" onClick={() => { setOpenHistoryRowIdx(null); setHistoryItemId(null); }}>
+                            Close
+                          </Button>
+                        </div>
+                        {isHistoryLoading ? (
+                          <div className="animate-pulse text-muted-foreground text-sm">Loading history...</div>
+                        ) : historyError ? (
+                          <div className="text-red-500 text-sm font-medium">Error: {historyError.message}</div>
+                        ) : tradingHistory?.length > 0 ? (
+                          <div className="overflow-hidden border border-border rounded bg-card">
+                            <table className="w-full text-sm text-left">
+                              <thead className="bg-muted/50 border-b border-border text-xs text-muted-foreground">
+                                <tr>
+                                  <th className="px-3 py-2 font-medium">Type</th>
+                                  <th className="px-3 py-2 font-medium">Invoice #</th>
+                                  <th className="px-3 py-2 font-medium">Date</th>
+                                  <th className="px-3 py-2 font-medium text-right">Qty</th>
+                                  <th className="px-3 py-2 font-medium text-right">Unit Price</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-border">
+                                {tradingHistory.map((hist, hIdx) => (
+                                  <tr key={hIdx} className="hover:bg-muted/20">
+                                    <td className="px-3 py-1.5 font-medium">{hist.transaction_type}</td>
+                                    <td className="px-3 py-1.5 text-muted-foreground">{hist.invoice_number}</td>
+                                    <td className="px-3 py-1.5 text-muted-foreground">{new Date(hist.invoice_date).toLocaleDateString()}</td>
+                                    <td className="px-3 py-1.5 text-right">{hist.quantity}</td>
+                                    <td className="px-3 py-1.5 text-right tabular-nums">NPR {Number(hist.unit_price).toLocaleString()}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        ) : (
+                          <div className="text-muted-foreground text-sm italic">No recent history found for this item.</div>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                )}
+                </React.Fragment>
               );
             })}
             {value.length === 0 && (
