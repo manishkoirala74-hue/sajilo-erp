@@ -122,7 +122,7 @@ export default function SearchableSelect({
           type="button"
           disabled={disabled}
           className={cn(
-            'flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm',
+            'flex h-11 sm:h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-transparent px-3 py-2 text-base sm:text-sm shadow-sm',
             'focus:outline-none focus:ring-1 focus:ring-ring',
             'disabled:cursor-not-allowed disabled:opacity-50',
             !displayLabel && 'text-muted-foreground',

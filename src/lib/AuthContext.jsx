@@ -58,9 +58,7 @@ export const AuthProvider = ({ children }) => {
     }
 
     try {
-      await sajilo.prefetchCompanyData();
-    } catch (e) {
-      console.error("Prefetch failed:", e);
+      sajilo.prefetchCompanyData().catch(e => console.error("Prefetch failed:", e));
     } finally {
       setIsSwitchingCompany(false);
     }

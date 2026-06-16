@@ -2,10 +2,11 @@ import { useSearchParams, useLocation, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { sajilo } from '@/api/sajiloClient';
 import { toast } from 'sonner';
-import { Plus, Eye, Trash2, RotateCcw, AlertTriangle } from 'lucide-react';
+import { Plus, Eye, Trash2, RotateCcw, TriangleAlert } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import SearchableSelect from '@/components/shared/SearchableSelect';
 import PageHeader from '@/components/shared/PageHeader';
@@ -83,7 +84,7 @@ export default function FinancialVouchers() {
   async function fetchData() {
     setLoading(true);
     const [data, accounts] = await Promise.all([
-      sajilo.entities.FinancialVoucher.list('-created_date', 200),
+      sajilo.entities.FinancialVoucher.list('-created_at', 200),
       sajilo.entities.ChartOfAccount.filter({ is_active: true }, 'account_code', 1000),
     ]);
     setVouchers(data);
@@ -602,7 +603,7 @@ export default function FinancialVouchers() {
 
           <div className="space-y-4">
             <div className={`flex items-start gap-2 rounded-lg p-3 border ${actionDialog === 'delete' ? 'bg-red-50 dark:bg-red-500/10 border-red-200 dark:border-red-500/20' : 'bg-amber-50 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/20'}`}>
-              <AlertTriangle className={`w-4 h-4 mt-0.5 shrink-0 ${actionDialog === 'delete' ? 'text-red-500' : 'text-amber-500'}`} />
+              <TriangleAlert className={`w-4 h-4 mt-0.5 shrink-0 ${actionDialog === 'delete' ? 'text-red-500' : 'text-amber-500'}`} />
               <div className="text-sm">
                 {actionDialog === 'delete' ? (
                   <p className="font-medium text-red-800 dark:text-red-300">

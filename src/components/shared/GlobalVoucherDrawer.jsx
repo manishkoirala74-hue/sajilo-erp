@@ -187,8 +187,8 @@ export default function GlobalVoucherDrawer() {
         if (isFinancial || usedFallback) {
           docLines = doc.entries || [];
         } else {
-          const rawLines = doc.line_items || [];
-          
+          // Filter out completely empty "ghost" rows that have no item assigned and no values
+          const rawLines = (doc.line_items || []).filter(l => l.item_id || l.item_name || (l.quantity && l.quantity > 0) || (l.line_total && l.line_total > 0));
           const itemIds = [...new Set(rawLines.map(l => l.item_id).filter(Boolean))];
           let itemsMap = {};
           if (itemIds.length > 0) {
@@ -227,7 +227,7 @@ export default function GlobalVoucherDrawer() {
             )}
           </SheetTitle>
           <SheetDescription>
-            {data ? `Date: ${data.date || data.transaction_date || 'N/A'}` : 'Voucher Details View'}
+            {data ? `Date: ${data.date || data.transaction_date || data.invoice_date || data.order_date || data.entry_date || 'N/A'}` : 'Voucher Details View'}
           </SheetDescription>
         </SheetHeader>
 
@@ -288,7 +288,12 @@ export default function GlobalVoucherDrawer() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {lines.map((line, idx) => (
+                    {lines.map((line, idx) => {
+                      const qty = line.quantity ?? line.qty;
+                      const rate = line.unit_price ?? line.rate ?? line.price;
+                      const total = line.line_total ?? line.amount ?? line.total_price ?? line.total ?? (qty != null && rate != null && !isNaN(qty * rate) ? qty * rate : null);
+
+                      return (
                       <TableRow key={line.id || idx}>
                         {data._isFinancial ? (
                           <>
@@ -299,13 +304,13 @@ export default function GlobalVoucherDrawer() {
                         ) : (
                           <>
                             <TableCell className="font-medium">{line.item_name}</TableCell>
-                            <TableCell className="text-right">{line.quantity ?? '-'}</TableCell>
-                            <TableCell className="text-right">{line.unit_price != null ? Number(line.unit_price).toLocaleString() : '-'}</TableCell>
-                            <TableCell className="text-right">{line.line_total != null ? Number(line.line_total).toLocaleString() : (line.quantity != null && line.unit_price != null && !isNaN(line.quantity * line.unit_price) ? (Number(line.quantity) * Number(line.unit_price)).toLocaleString() : '-')}</TableCell>
+                            <TableCell className="text-right">{qty != null ? qty : '-'}</TableCell>
+                            <TableCell className="text-right">{rate != null ? Number(rate).toLocaleString() : '-'}</TableCell>
+                            <TableCell className="text-right">{total != null ? Number(total).toLocaleString() : '-'}</TableCell>
                           </>
                         )}
                       </TableRow>
-                    ))}
+                    )})}
                     {lines.length === 0 && (
                       <TableRow>
                         <TableCell colSpan={data._isFinancial ? 3 : 4} className="text-center py-6 text-muted-foreground">
