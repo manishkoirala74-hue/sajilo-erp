@@ -1583,12 +1583,35 @@ export default function ReportViewer({ reportId, data, fromDate, toDate, columnS
           )} />;
 
       case 'sales_return_report':
-        return <SimpleReport title="Sales Return Report" reportId={reportId} initialData={data} initialFromDate={fromDate} initialToDate={toDate}
+        return <SimpleReport title="Sales Master Report" reportId={reportId} initialData={data} initialFromDate={fromDate} initialToDate={toDate}
           renderFn={(rows, fd, td) => (
-            <ReportTable title="Sales Return Report" fromDate={fd} toDate={td}
-              headers={['Return #','Date','Customer','Amount (NPR)','Status']}
-              rows={rows.map(r => [r.return_number, r.return_date, r.customer_name, fmtNPR(r.grand_total), r.status])}
-              onExport={() => downloadCSV('sales_returns.csv',['Return #','Date','Customer','Amount','Status'],rows.map(r=>[r.return_number,r.return_date,r.customer_name,r.grand_total?.toFixed(2),r.status]))}
+            <ReportTable title="Sales Master Report (All Invoices)" fromDate={fd} toDate={td}
+              headers={['Invoice #','Date','Customer','Status','Subtotal (NPR)','VAT (NPR)','Grand Total (NPR)']}
+              rows={rows.map(r => [r.invoice_number, r.invoice_date, r.customer_name, r.status, fmtNPR(r.goods_subtotal || r.subtotal), fmtNPR(r.total_tax_amount || r.vat_amount), fmtNPR(r.grand_total)])}
+              footer={['','','','TOTAL','', fmtNPR(rows.reduce((s,r)=>s+(r.total_tax_amount||r.vat_amount||0),0)), fmtNPR(rows.reduce((s,r)=>s+(r.grand_total||0),0))]}
+              onExport={() => downloadCSV('sales_master_report.csv',['Invoice #','Date','Customer','Status','Subtotal','VAT','Grand Total'],rows.map(r=>[r.invoice_number,r.invoice_date,r.customer_name,r.status,(r.goods_subtotal||r.subtotal)?.toFixed(2),(r.total_tax_amount||r.vat_amount)?.toFixed(2),r.grand_total?.toFixed(2)]))}
+            />
+          )} />;
+
+      case 'stock_movement':
+        return <SimpleReport title="Stock Movement" reportId={reportId} initialData={data} initialFromDate={fromDate} initialToDate={toDate}
+          renderFn={(rows, fd, td) => (
+            <ReportTable title="Stock Movement Report" fromDate={fd} toDate={td}
+              headers={['Date','Ref #','Type','Item Code','Item Name','Qty In','Qty Out','Unit Cost (NPR)']}
+              rows={rows.map(r => [r.date, r.ref, r.type, r.item_code, r.item_name, r.qty_in || '—', r.qty_out || '—', fmtNPR(r.unit_cost)])}
+              footer={['','','','','TOTAL', rows.reduce((s,r)=>s+(r.qty_in||0),0), rows.reduce((s,r)=>s+(r.qty_out||0),0), '']}
+              onExport={() => downloadCSV('stock_movement.csv',['Date','Ref','Type','Code','Item','Qty In','Qty Out','Unit Cost'],rows.map(r=>[r.date,r.ref,r.type,r.item_code,r.item_name,r.qty_in,r.qty_out,r.unit_cost?.toFixed(2)]))}
+            />
+          )} />;
+
+      case 'tds_report':
+        return <SimpleReport title="TDS Deduction Report" reportId={reportId} initialData={data} initialFromDate={fromDate} initialToDate={toDate}
+          renderFn={(rows, fd, td) => (
+            <ReportTable title="TDS Deduction Report" fromDate={fd} toDate={td}
+              headers={['Employee','Pay Period','Gross Pay (NPR)','TDS Deducted (NPR)','Net Pay (NPR)']}
+              rows={rows.map(r => [r.employee_name, r.pay_period, fmtNPR(r.gross_pay), fmtNPR(r.tds_amount), fmtNPR(r.net_pay)])}
+              footer={['TOTAL','', fmtNPR(rows.reduce((s,r)=>s+(r.gross_pay||0),0)), fmtNPR(rows.reduce((s,r)=>s+(r.tds_amount||0),0)), fmtNPR(rows.reduce((s,r)=>s+(r.net_pay||0),0))]}
+              onExport={() => downloadCSV('tds_report.csv',['Employee','Pay Period','Gross Pay','TDS','Net Pay'],rows.map(r=>[r.employee_name,r.pay_period,r.gross_pay?.toFixed(2),r.tds_amount?.toFixed(2),r.net_pay?.toFixed(2)]))}
             />
           )} />;
 

@@ -241,8 +241,9 @@ export async function fetchReportData(reportId, fromDate, toDate, extraParams = 
     }
 
     case 'sales_return_report': {
-      const returns = await sajilo.entities.SalesReturn.list('-return_date', 1000);
-      return returns.filter(r => inRange(r.return_date, fromDate, toDate));
+      // "Sales Master Report" — all sales invoices & POS in the period
+      const invoices = await sajilo.entities.SalesInvoice.list('-invoice_date', 2000);
+      return (invoices || []).filter(i => inRange(i.invoice_date, fromDate, toDate));
     }
 
     case 'pos_daily': {
@@ -288,22 +289,36 @@ export async function fetchReportData(reportId, fromDate, toDate, extraParams = 
       const p_company_id = sajilo.getCompanyId();
       const { data, error } = await supabase.rpc('get_ar_aging_rpc', { p_company_id });
       if (error) throw error;
-      return (data || []).map(r => ({
-        customer_name: r.customer_name || 'Unknown',
-        bucket: r.bucket,
-        grand_total: r.balance
-      })).sort((a, b) => b.grand_total - a.grand_total);
+      const map = {};
+      (data || []).forEach(r => {
+        const cust = r.customer_name || 'Unknown';
+        if (!map[cust]) map[cust] = { customer: cust, current: 0, '30d': 0, '60d': 0, '60d+': 0, total: 0 };
+        const amt = r.balance;
+        map[cust].total += amt;
+        if (r.bucket === 'Current') map[cust].current += amt;
+        else if (r.bucket === '1\u201330 days') map[cust]['30d'] += amt;
+        else if (r.bucket === '31\u201360 days') map[cust]['60d'] += amt;
+        else map[cust]['60d+'] += amt;
+      });
+      return Object.values(map).sort((a, b) => b.total - a.total);
     }
 
     case 'ap_aging_summary': {
       const p_company_id = sajilo.getCompanyId();
       const { data, error } = await supabase.rpc('get_ap_aging_rpc', { p_company_id });
       if (error) throw error;
-      return (data || []).map(r => ({
-        vendor_name: r.vendor_name || 'Unknown',
-        bucket: r.bucket,
-        grand_total: r.balance
-      })).sort((a, b) => b.grand_total - a.grand_total);
+      const map = {};
+      (data || []).forEach(r => {
+        const vendor = r.vendor_name || 'Unknown';
+        if (!map[vendor]) map[vendor] = { vendor, current: 0, '30d': 0, '60d': 0, '60d+': 0, total: 0 };
+        const amt = r.balance;
+        map[vendor].total += amt;
+        if (r.bucket === 'Current') map[vendor].current += amt;
+        else if (r.bucket === '1\u201330 days') map[vendor]['30d'] += amt;
+        else if (r.bucket === '31\u201360 days') map[vendor]['60d'] += amt;
+        else map[vendor]['60d+'] += amt;
+      });
+      return Object.values(map).sort((a, b) => b.total - a.total);
     }
 
     case 'ar_aging': {
@@ -405,14 +420,44 @@ export async function fetchReportData(reportId, fromDate, toDate, extraParams = 
     }
 
     case 'gl_summary': {
+      // Aggregate GL lines directly — no RPC dependency
       const p_company_id = sajilo.getCompanyId();
-      const { data, error } = await supabase.rpc('get_gl_summary_rpc', {
-        p_company_id,
-        p_from_date: fromDate,
-        p_to_date: toDate
+      const journals = await sajilo.entities.GeneralLedgerJournal.filter({ status: 'Posted' }, 'entry_date', 10000);
+      const filteredIds = new Set(
+        journals.filter(j => inRange(j.entry_date?.split('T')[0], fromDate, toDate)).map(j => j.id)
+      );
+      if (filteredIds.size === 0) return [];
+      const accounts = await sajilo.entities.ChartOfAccount.filter({ is_active: true }, 'account_code', 2000);
+      const accMap = {};
+      accounts.forEach(a => { accMap[a.id] = a; });
+
+      let allLines = [];
+      const chunkIds = Array.from(filteredIds);
+      for (let i = 0; i < chunkIds.length; i += 100) {
+        const { data: chunk } = await supabase.from('GeneralLedgerLine')
+          .select('account_id, debit_amount, credit_amount')
+          .in('journal_id', chunkIds.slice(i, i + 100));
+        if (chunk) allLines = allLines.concat(chunk);
+      }
+
+      const totals = {};
+      allLines.forEach(l => {
+        const id = l.account_id;
+        if (!id) return;
+        if (!totals[id]) totals[id] = { debit: 0, credit: 0 };
+        totals[id].debit  += l.debit_amount  || 0;
+        totals[id].credit += l.credit_amount || 0;
       });
-      if (error) throw error;
-      return data || [];
+
+      return Object.entries(totals)
+        .filter(([, t]) => t.debit > 0 || t.credit > 0)
+        .map(([id, t]) => ({
+          account_code: accMap[id]?.account_code || '',
+          account_name: accMap[id]?.account_name || 'Unknown',
+          debit: t.debit,
+          credit: t.credit,
+        }))
+        .sort((a, b) => (a.account_code || '').localeCompare(b.account_code || ''));
     }
 
     case 'journal_report': {
@@ -458,6 +503,44 @@ export async function fetchReportData(reportId, fromDate, toDate, extraParams = 
         const j = jMap[l.journal_id];
         return { ...l, entry_date: j?.entry_date?.split('T')[0] || '', journal_memo: j?.memo || '', voucher_no: j?.voucher_no || '' };
       });
+    }
+
+    case 'stock_movement': {
+      // Aggregate stock in/out from posted Purchase & Sales invoices
+      const [purchases, sales] = await Promise.all([
+        sajilo.entities.PurchaseInvoice.list('-invoice_date', 2000),
+        sajilo.entities.SalesInvoice.list('-invoice_date', 2000),
+      ]);
+      const rows = [];
+      (purchases || []).filter(i => i.status === 'Posted' && inRange(i.invoice_date, fromDate, toDate)).forEach(inv => {
+        (inv.line_items || []).forEach(l => {
+          if (l.item_id || l.item_name) {
+            rows.push({ date: inv.invoice_date, ref: inv.invoice_number, type: 'Purchase In', item_code: l.item_code || '—', item_name: l.item_name, qty_in: l.quantity || 0, qty_out: 0, unit_cost: l.unit_price || 0 });
+          }
+        });
+      });
+      (sales || []).filter(i => i.status === 'Posted' && inRange(i.invoice_date, fromDate, toDate)).forEach(inv => {
+        (inv.line_items || []).forEach(l => {
+          if (l.item_id || l.item_name) {
+            rows.push({ date: inv.invoice_date, ref: inv.invoice_number, type: 'Sales Out', item_code: l.item_code || '—', item_name: l.item_name, qty_in: 0, qty_out: l.quantity || 0, unit_cost: l.unit_price || 0 });
+          }
+        });
+      });
+      return rows.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+    }
+
+    case 'tds_report': {
+      // TDS from payroll — fetch HR payslips with TDS deductions
+      const payslips = await sajilo.entities.Payslip?.list('-pay_period_end', 2000).catch(() => []) || [];
+      return (payslips)
+        .filter(p => p.status === 'Paid' && inRange(p.pay_period_end || p.pay_period_start, fromDate, toDate))
+        .map(p => ({
+          employee_name: p.employee_name || '—',
+          pay_period:    p.pay_period_end || p.pay_period_start || '—',
+          gross_pay:     p.gross_pay     || 0,
+          tds_amount:    p.tds_amount    || p.income_tax_amount || 0,
+          net_pay:       p.net_pay       || 0,
+        }));
     }
 
     case 'purchase_summary': {
