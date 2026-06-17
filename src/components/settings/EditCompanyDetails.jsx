@@ -122,16 +122,25 @@ export default function EditCompanyDetails({ companyId, onBack }) {
     }
     setDeleting(true);
     try {
-      // 1. Verify password
-      await sajilo.auth.loginWithPassword(user.email, password);
+      // 1. Get the actual authenticated email from the Supabase session
+      //    (user.email from the app's User entity may be undefined for OAuth users)
+      const { data: { user: authUser }, error: authErr } = await sajilo.auth.supabase.auth.getUser();
+      if (authErr || !authUser?.email) {
+        setDeleteError('Could not retrieve your account email. Please log out and log back in.');
+        setDeleting(false);
+        return;
+      }
+
+      // 2. Verify password using the session email
+      await sajilo.auth.loginWithPassword(authUser.email, password);
       
-      // 2. Call the RPC to wipe data
+      // 3. Call the RPC to wipe data
       await sajilo.wipeCompanyData(companyId);
       
       toast.success("Company data deleted successfully");
       setShowDeleteModal(false);
       
-      // 3. Reset company ID and check auth to redirect or reload
+      // 4. Reset company ID and check auth to redirect or reload
       sajilo.setCompanyId(null);
       await checkUserAuth();
       window.location.href = '/settings';
