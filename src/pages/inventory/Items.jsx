@@ -229,7 +229,7 @@ export default function Items() {
   const openNew = () => { 
     const defSales = accounts.find(a => a.account_code === '4100');
     const defCogs = accounts.find(a => a.account_code === '5100');
-    const defInv = accounts.find(a => a.account_code === '1132');
+    const defInv = accounts.find(a => a.account_code === '1140');
 
     setForm({ 
       ...emptyItem, 

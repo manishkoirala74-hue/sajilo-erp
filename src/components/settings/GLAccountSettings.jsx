@@ -27,13 +27,13 @@ const LEDGER_GROUP_FIELDS = [
   {
     key: 'gl_customer_ledger_group',
     label: 'Customer Ledger Group Parent',
-    desc: 'Asset group under which new Customer sub-ledgers are auto-created (e.g. 1020 – Trade Debtors). Dual-role partners (also marked as Vendor) also get their AR ledger here.',
+    desc: 'Asset group under which new Customer sub-ledgers are auto-created (e.g. 1130 – Trade Receivables). Dual-role partners (also marked as Vendor) also get their AR ledger here.',
     filterType: 'Asset',
   },
   {
     key: 'gl_supplier_ledger_group',
     label: 'Supplier Ledger Group Parent',
-    desc: 'Liability group under which new Supplier sub-ledgers are auto-created (e.g. 2010 – Trade Creditors). Dual-role partners (also marked as Customer) also get their AP ledger here.',
+    desc: 'Liability group under which new Supplier sub-ledgers are auto-created (e.g. 2110 – Trade Payables). Dual-role partners (also marked as Customer) also get their AP ledger here.',
     filterType: 'Liability',
   },
 ];
@@ -58,13 +58,60 @@ export default function GLAccountSettings({ settings, onChange }) {
   }, []);
 
   const handleRestoreDefaults = async () => {
-    if (!window.confirm("This will load the default system Chart of Accounts. Continue?")) return;
+    if (!window.confirm("This will load the default system Chart of Accounts and pre-populate the GL mappings below. Continue?")) return;
     setSeeding(true);
     try {
       await seedDefaultChartOfAccounts();
-      loadAccounts();
-      toast.success("Default Chart of Accounts restored successfully.");
+      // After seeding, reload accounts and auto-populate CompanySettings with standard defaults
+      const [subs, groups] = await Promise.all([
+        sajilo.entities.ChartOfAccount.filter({ ledger_type: 'Sub Ledger',   is_active: true }, 'account_name', 300),
+        sajilo.entities.ChartOfAccount.filter({ ledger_type: 'Group Ledger', is_active: true }, 'account_code', 300),
+      ]);
+      setSubAccounts(subs);
+      setGroupAccounts(groups);
+
+      // Build lookup helpers
+      const byCode = (list, code) => list.find(a => a.account_code === code);
+
+      // Standard default mappings
+      const defaults = {};
+      const map = (baseKey, list, code) => {
+        const acc = byCode(list, code);
+        if (acc) {
+          defaults[`${baseKey}_id`]   = acc.id;
+          defaults[`${baseKey}_name`] = acc.account_name;
+        }
+      };
+      const mapGroup = (baseKey, list, code) => {
+        const acc = byCode(list, code);
+        if (acc) {
+          defaults[`${baseKey}_id`]   = acc.id;
+          defaults[`${baseKey}_name`] = `${acc.account_code} – ${acc.account_name}`;
+        }
+      };
+
+      // Sub-ledger GL accounts
+      map('gl_default_sales_account',    subs, '4100');  // Sales Revenue
+      map('gl_default_cogs_account',     subs, '5100');  // Cost of Sales
+      map('gl_default_inventory_account',subs, '1140');  // Inventory
+      map('gl_sales_return_account',     subs, '4100');  // Sales Returns → Sales Revenue
+      map('gl_purchase_return_account',  subs, '5100');  // Purchase Returns → Cost of Sales
+      map('gl_vat_payable',              subs, '2120');  // VAT Payable
+      map('gl_opening_equity_account',   subs, '3200');  // Retained Earnings
+      map('gl_stock_variance_account',   subs, '6700');  // Miscellaneous Expense
+
+      // Group-ledger parent mappings
+      mapGroup('gl_customer_ledger_group', groups, '1130'); // Trade Receivables (Customers)
+      mapGroup('gl_supplier_ledger_group', groups, '2110'); // Trade Payables (Suppliers)
+
+      // Push merged defaults to parent Settings form
+      if (Object.keys(defaults).length > 0) {
+        onChange(defaults);
+      }
+
+      toast.success("Default Chart of Accounts restored and GL mappings pre-populated.");
     } catch (e) {
+      console.error('Restore defaults error:', e);
       toast.error("Failed to restore default accounts.");
     }
     setSeeding(false);
