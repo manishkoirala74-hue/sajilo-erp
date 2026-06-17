@@ -128,7 +128,7 @@ DECLARE
     v_user_gl_line JSONB;
 BEGIN
     -- Idempotency Check
-    SELECT * INTO v_invoice FROM "SalesInvoice" WHERE idempotency_key = p_idempotency_key LIMIT 1;
+    SELECT * INTO v_invoice FROM "SalesInvoice" WHERE idempotency_key::text = p_idempotency_key::text LIMIT 1;
     IF v_invoice.id IS NOT NULL THEN
         RETURN jsonb_build_object('status', 'duplicate', 'journal_id', v_invoice.gl_journal_id);
     END IF;
@@ -226,7 +226,7 @@ DECLARE
     v_invoice RECORD;
     v_item RECORD;
 BEGIN
-    SELECT * INTO v_invoice FROM "PurchaseInvoice" WHERE idempotency_key = p_idempotency_key LIMIT 1;
+    SELECT * INTO v_invoice FROM "PurchaseInvoice" WHERE idempotency_key::text = p_idempotency_key::text LIMIT 1;
     IF v_invoice.id IS NOT NULL THEN RETURN jsonb_build_object('status', 'duplicate', 'journal_id', v_invoice.gl_journal_id); END IF;
 
     SELECT * INTO v_invoice FROM "PurchaseInvoice" WHERE id = p_invoice_id;
@@ -279,7 +279,7 @@ DECLARE
     v_journal_id UUID;
     v_voucher RECORD;
 BEGIN
-    SELECT * INTO v_voucher FROM "FinancialVoucher" WHERE idempotency_key = p_idempotency_key LIMIT 1;
+    SELECT * INTO v_voucher FROM "FinancialVoucher" WHERE idempotency_key::text = p_idempotency_key::text LIMIT 1;
     IF v_voucher.id IS NOT NULL THEN RETURN jsonb_build_object('status', 'duplicate', 'journal_id', v_voucher.gl_journal_id); END IF;
 
     SELECT * INTO v_voucher FROM "FinancialVoucher" WHERE id = p_voucher_id;
@@ -287,8 +287,8 @@ BEGIN
     IF p_is_reversal THEN PERFORM rpc_delete_gl_journals(p_voucher_id, 'FinancialVoucher'); END IF;
 
     v_journal_id := rpc_commit_journal_entry_internal(
-        p_company_id, v_voucher.voucher_date, v_voucher.narration,
-        'Vouchers', p_voucher_id, 'FinancialVoucher', v_voucher.voucher_number, p_gl_lines
+        p_company_id, v_voucher.voucher_date::DATE, COALESCE(v_voucher.narration, ''),
+        'Vouchers', p_voucher_id, 'FinancialVoucher', COALESCE(v_voucher.voucher_number, ''), p_gl_lines
     );
 
     UPDATE "FinancialVoucher" SET status = 'Posted', gl_journal_id = v_journal_id, idempotency_key = p_idempotency_key WHERE id = p_voucher_id;

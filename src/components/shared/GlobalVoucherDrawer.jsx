@@ -192,8 +192,11 @@ export default function GlobalVoucherDrawer() {
           const itemIds = [...new Set(rawLines.map(l => l.item_id).filter(Boolean))];
           let itemsMap = {};
           if (itemIds.length > 0) {
-            const allItems = await sajilo.entities.Item.list();
-            allItems.forEach(i => itemsMap[i.id] = i.item_name);
+            const { data: matchedItems } = await sajilo.auth.supabase
+              .from('Item')
+              .select('id, item_name')
+              .in('id', itemIds);
+            (matchedItems || []).forEach(i => itemsMap[i.id] = i.item_name);
           }
           docLines = rawLines.map(l => ({ ...l, item_name: itemsMap[l.item_id] || l.item_name || (l.item_id ? 'Unknown Item' : 'Unspecified Item') }));
         }

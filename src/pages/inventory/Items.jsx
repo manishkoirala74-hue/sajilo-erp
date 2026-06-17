@@ -16,7 +16,7 @@ import PageHeader from '@/components/shared/PageHeader';
 import StatusBadge from '@/components/shared/StatusBadge';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { postItemDeletionWriteOff, loadSettings } from '@/lib/glPostingService';
+import { postItemDeletionWriteOff, loadSettings, postOpeningStock } from '@/lib/glPostingService';
 
 const emptyItem = {
   item_code: '', item_name: '', category_id: '', category_name: '', item_type: 'Product',
@@ -282,19 +282,56 @@ export default function Items() {
 
   const handleSave = async () => {
     if (!form.item_name) { toast.error('Item name is required'); return; }
+
+    const isPhysical = form.item_type !== 'Service';
+    const hasOpeningStock = Number(form.quantity_on_hand || 0) > 0;
+    const purchasePrice = Number(form.purchase_price || 0);
+
+    if (isPhysical && hasOpeningStock && purchasePrice <= 0) {
+      toast.error('Purchase cost/WAC must be strictly greater than zero when initializing opening stock.', { duration: 6000 });
+      return;
+    }
+
     setSaving(true);
     try {
       const { image_urls, total_asset_value, ...payload } = form;
-      // Derive is_vat_applicable from tax_type_ids for backward compatibility
       const taxIds = Array.isArray(form.tax_type_ids) ? form.tax_type_ids : [];
       payload.tax_type_ids = taxIds;
       payload.is_vat_applicable = taxIds.length > 0;
+      
       if (editing) {
         await sajilo.entities.Item.update(editing.id, payload);
         toast.success('Item updated');
       } else {
-        await sajilo.entities.Item.create(payload);
+        if (isPhysical) {
+          payload.weighted_average_cost = purchasePrice;
+          payload.current_unit_cost = purchasePrice;
+        }
+        const newItem = await sajilo.entities.Item.create(payload);
         toast.success('Item created');
+        
+        if (isPhysical && hasOpeningStock && purchasePrice > 0) {
+          try {
+            const settings = await loadSettings();
+            let itemRecord = newItem;
+            if (!itemRecord?.id) {
+              const { data } = await sajilo.auth.supabase
+                .from('Item')
+                .select('*')
+                .eq('item_name', payload.item_name)
+                .eq('company_id', payload.company_id || sajilo.getCompanyId())
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .maybeSingle();
+              itemRecord = data;
+            }
+            if (itemRecord?.id) {
+              await postOpeningStock(itemRecord, settings);
+            }
+          } catch (e) {
+            console.error('Failed to post opening stock GL:', e);
+          }
+        }
       }
     } catch (err) {
       toast.error(err.message || 'Error occurred while saving');

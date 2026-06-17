@@ -20,7 +20,8 @@ const emptyVoucher = {
   voucher_type: 'Receipt', voucher_date: new Date().toISOString().split('T')[0],
   contact_name: '', payment_mode: 'Cash', reference_no: '', narration: '',
   total_amount: 0, status: 'Draft',
-  entries: [{ account_name: '', account_code: '', account_type: 'Asset', debit: 0, credit: 0, narration: '' }]
+  source_account_id: '', source_account_name: '', source_account_code: '', source_account_type: '',
+  entries: [{ account_name: '', account_code: '', account_type: '', debit: 0, credit: 0, narration: '' }]
 };
 
 const fmt = (n) => `NPR ${Number(n || 0).toLocaleString()}`;
@@ -104,8 +105,14 @@ export default function FinancialVouchers() {
   );
 
   const isPaymentType = form.voucher_type === 'Payment' || form.voucher_type === 'Receipt' || form.voucher_type === 'Contra';
-  const paymentSourceAccounts = isPaymentType ? cashAccounts : allAccounts.filter(a => a.ledger_type === 'Sub Ledger');
+  const paymentSourceAccounts = cashAccounts;
   const ledgerAccounts = allAccounts.filter(a => a.ledger_type === 'Sub Ledger');
+
+  const targetAccounts = form.voucher_type === 'Contra' 
+    ? cashAccounts 
+    : (form.voucher_type === 'Payment' || form.voucher_type === 'Receipt')
+      ? ledgerAccounts.filter(a => !cashAccounts.find(ca => ca.id === a.id))
+      : ledgerAccounts;
 
   const handleEntry = (idx, field, val) => {
     setForm(prev => {
@@ -121,13 +128,71 @@ export default function FinancialVouchers() {
 
   const genNumber = () => {
     const prefix = { Receipt: 'RV', Payment: 'PV', Journal: 'JV', Contra: 'CV' }[form.voucher_type] || 'VV';
-    return `${prefix}-${new Date().getFullYear()}-${String(vouchers.length + 1).padStart(3, '0')}`;
+    const year = new Date().getFullYear();
+    const prefixStr = `${prefix}-${year}-`;
+    let max = 0;
+    vouchers.forEach(v => {
+      if (v.voucher_number && v.voucher_number.startsWith(prefixStr)) {
+        const numStr = v.voucher_number.replace(prefixStr, '');
+        const num = parseInt(numStr, 10);
+        if (!isNaN(num) && num > max) max = num;
+      }
+    });
+    return `${prefixStr}${String(max + 1).padStart(3, '0')}`;
   };
 
   const save = async (status) => {
     setSaving(true);
     try {
-      const payload = { ...form, status, voucher_number: genNumber() };
+      let finalEntries = [];
+      const isPaymentTypeLocal = form.voucher_type === 'Payment' || form.voucher_type === 'Receipt' || form.voucher_type === 'Contra';
+      
+      if (isPaymentTypeLocal) {
+        if (!form.source_account_id) throw new Error("Please select a Source Account.");
+        
+        let totalAmount = 0;
+        const targetEntries = form.entries.filter(e => e.account_id).map(e => {
+          const amt = e.debit || 0; // UI uses 'debit' for Amount field
+          totalAmount += amt;
+          return {
+            ...e,
+            debit: form.voucher_type === 'Receipt' ? 0 : amt, // Payment/Contra targets get Debited
+            credit: form.voucher_type === 'Receipt' ? amt : 0 // Receipt targets get Credited
+          };
+        });
+        
+        if (targetEntries.length === 0) throw new Error("Please add at least one ledger entry.");
+        if (totalAmount <= 0) throw new Error("Total amount must be greater than zero.");
+        
+        const sourceEntry = {
+          account_id: form.source_account_id,
+          account_name: form.source_account_name,
+          account_code: form.source_account_code,
+          account_type: form.source_account_type,
+          debit: form.voucher_type === 'Receipt' ? totalAmount : 0, // Receipt: Bank Debited
+          credit: form.voucher_type !== 'Receipt' ? totalAmount : 0, // Payment/Contra: Bank Credited
+          narration: `Source account for ${form.voucher_type}`
+        };
+        
+        finalEntries = [sourceEntry, ...targetEntries];
+        form.total_amount = totalAmount;
+      } else {
+        // Journal Voucher
+        finalEntries = form.entries.filter(e => e.account_id && (e.debit > 0 || e.credit > 0));
+        if (finalEntries.length < 2) throw new Error("Journal voucher must have at least two entries.");
+        
+        const totDebit = finalEntries.reduce((s, e) => s + (e.debit || 0), 0);
+        const totCredit = finalEntries.reduce((s, e) => s + (e.credit || 0), 0);
+        if (Math.abs(totDebit - totCredit) > 0.01) throw new Error(`Unbalanced Journal! Debits: ${totDebit}, Credits: ${totCredit}`);
+        form.total_amount = totDebit;
+      }
+
+      const payload = { ...form, entries: finalEntries, status, voucher_number: genNumber() };
+      delete payload.source_account_id;
+      delete payload.source_account_name;
+      delete payload.source_account_code;
+      delete payload.source_account_type;
+
       const savedVoucher = await sajilo.entities.FinancialVoucher.create(payload);
       
       if (status === 'Posted') {
@@ -336,7 +401,7 @@ export default function FinancialVouchers() {
 
       {/* Filter Tabs */}
       <div className="flex gap-2 mb-4">
-        {['All', 'Receipt', 'Payment', 'Journal', 'Contra', 'Cancelled'].map(f => (
+        {['All', 'Receipt', 'Payment', 'Contra', 'Cancelled'].map(f => (
           <button key={f} onClick={() => setFilter(f)} className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${filter === f ? 'bg-primary text-white' : 'bg-card border border-border text-muted-foreground hover:bg-muted'}`}>
             {f}
           </button>
@@ -359,7 +424,6 @@ export default function FinancialVouchers() {
                     <SelectItem value="Receipt">Receipt (Inflow)</SelectItem>
                     <SelectItem value="Payment">Payment (Outflow)</SelectItem>
                     <SelectItem value="Contra">Contra (Bank Transfer/Cash Dep)</SelectItem>
-                    <SelectItem value="Journal">Journal (Adjustment)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -375,13 +439,16 @@ export default function FinancialVouchers() {
                   <Label>Payment Source / Dest *</Label>
                   <SearchableSelect
                     options={paymentSourceAccounts.map(a => ({ value: a.id, label: `${a.account_name} (${a.account_type})` }))}
-                    value={form.entries[0]?.account_id}
+                    value={form.source_account_id}
                     onChange={v => {
                       const a = allAccounts.find(x => x.id === v);
-                      handleEntry(0, 'account_id', v);
-                      handleEntry(0, 'account_name', a?.account_name);
-                      handleEntry(0, 'account_code', a?.account_code);
-                      handleEntry(0, 'account_type', a?.account_type);
+                      setForm({
+                        ...form,
+                        source_account_id: v,
+                        source_account_name: a?.account_name,
+                        source_account_code: a?.account_code,
+                        source_account_type: a?.account_type,
+                      });
                     }}
                     placeholder="Select Cash/Bank account"
                     className="mt-1"
@@ -434,12 +501,11 @@ export default function FinancialVouchers() {
                   </tr></thead>
                   <tbody className="divide-y divide-border">
                     {form.entries.map((e, i) => {
-                      const isLocked = isPaymentType && i === 0;
                       return (
-                        <tr key={i} className={isLocked ? "bg-muted/10" : ""}>
+                        <tr key={i}>
                           <td className="cell-density ">
                             <SearchableSelect
-                              options={ledgerAccounts.map(a => ({ value: a.id, label: `${a.account_name} (${a.account_type})` }))}
+                              options={targetAccounts.map(a => ({ value: a.id, label: `${a.account_name} (${a.account_type})` }))}
                               value={e.account_id}
                               onChange={v => {
                                 const a = allAccounts.find(x => x.id === v);
@@ -448,8 +514,7 @@ export default function FinancialVouchers() {
                                 handleEntry(i, 'account_code', a?.account_code);
                                 handleEntry(i, 'account_type', a?.account_type);
                               }}
-                              placeholder={isLocked ? "Source account..." : "Select account"}
-                              disabled={isLocked}
+                              placeholder="Select account"
                             />
                           </td>
                           {form.voucher_type === 'Journal' ? (
@@ -459,14 +524,14 @@ export default function FinancialVouchers() {
                             </>
                           ) : (
                             <td className="cell-density ">
-                              <Input type="number" min={0} value={e.debit || ''} onChange={ev => handleEntry(i, 'debit', ev.target.value)} className="text-right h-8 font-medium" placeholder="Amount" disabled={isLocked} />
+                              <Input type="number" min={0} value={e.debit || ''} onChange={ev => handleEntry(i, 'debit', ev.target.value)} className="text-right h-8 font-medium" placeholder="Amount" />
                             </td>
                           )}
                           <td className="cell-density ">
                             <Input value={e.narration || ''} onChange={ev => handleEntry(i, 'narration', ev.target.value)} className="h-8" placeholder="Line note" />
                           </td>
                           <td className="cell-density text-center">
-                            {!isLocked && <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => removeEntry(i)}><Trash2 className="w-4 h-4" /></Button>}
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => removeEntry(i)}><Trash2 className="w-4 h-4" /></Button>
                           </td>
                         </tr>
                       )

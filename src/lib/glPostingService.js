@@ -118,7 +118,87 @@ export async function postPayroll(payroll, settings, isReversal = false) {
 export async function postAssetPurchase() { return null; }
 export async function postAssetDepreciation() { return null; }
 export async function postAssetDisposal() { return null; }
-export async function postOpeningStock(balances, settings) { return null; }
+export async function postOpeningStock(item, settings) {
+  const qty = Number(item.quantity_on_hand || 0);
+  if (qty <= 0) return null;
+
+  const price = Number(item.purchase_price || 0);
+  if (price <= 0) {
+    throw new Error('ERR_INVALID_VALUATION: Purchase cost/WAC must be strictly greater than zero when initializing opening stock.');
+  }
+  const total = qty * price;
+  const s = settings || await loadSettings();
+  const compId = item.company_id || s.company_id || sajilo.getCompanyId();
+  let invAccId = item.inventory_account_id || s.gl_default_inventory_account_id;
+  if (!invAccId) {
+    const { data: invAcc } = await supabase
+      .from('ChartOfAccount')
+      .select('id')
+      .eq('account_code', '1130')
+      .eq('company_id', compId)
+      .maybeSingle();
+    if (invAcc) invAccId = invAcc.id;
+  }
+
+  let equityAccId = s.gl_opening_equity_account_id;
+  if (!equityAccId) {
+    const { data: eqAcc } = await supabase
+      .from('ChartOfAccount')
+      .select('id')
+      .eq('account_type', 'Equity')
+      .eq('ledger_type', 'Sub Ledger')
+      .eq('company_id', compId)
+      .limit(1)
+      .maybeSingle();
+    if (eqAcc) equityAccId = eqAcc.id;
+  }
+
+  if (!invAccId || !equityAccId) {
+    console.warn('Skipping opening stock GL posting: Inventory or Opening Equity account mapping missing.');
+    return null;
+  }
+
+  const lines = [
+    { account_id: invAccId, debit_amount: total, credit_amount: 0, description: `Opening Stock: ${item.item_name}` },
+    { account_id: equityAccId, debit_amount: 0, credit_amount: total, description: `Opening Stock: ${item.item_name}` }
+  ];
+
+  const payload = {
+    p_company_id: item.company_id || sajilo.getCompanyId(),
+    p_date: new Date().toISOString().split('T')[0],
+    p_description: `Opening Stock for ${item.item_name}`,
+    p_module: 'Inventory',
+    p_source_id: item.id,
+    p_source_type: 'Item',
+    p_voucher_no: `OP-${item.item_code || item.id.substring(0,8)}`,
+    p_lines: lines
+  };
+
+  const { data, error } = await supabase.rpc('rpc_commit_journal_entry_internal', payload);
+  if (error) {
+    console.error('Error posting opening stock GL:', error);
+    toast.error('Failed to post opening stock to general ledger.');
+    throw error;
+  }
+
+  // Also insert into InventoryHistory
+  const { error: histErr } = await supabase.from('InventoryHistory').insert({
+    item_id: item.id,
+    company_id: payload.p_company_id,
+    transaction_date: payload.p_date,
+    reference_id: item.id,
+    reference_type: 'Item',
+    reference_no: payload.p_voucher_no,
+    quantity_change: qty,
+    unit_cost: price,
+    notes: 'Opening Stock'
+  });
+  if (histErr) {
+    console.error('Error writing opening stock history:', histErr);
+  }
+
+  return data;
+}
 export async function resolveDifferenceInTrialBalance(data, settings) { return null; }
 
 
@@ -151,12 +231,12 @@ export async function postSalesInvoice(invoice, itemsMap, settings, isReversal =
   const s = settings || await loadSettings();
   const lines = [];
 
-  let customerArId = invoice.receivable_account_id || invoice.customer?.receivable_account_id;
+  let customerArId = invoice.receivable_account_id || invoice.payable_account_id || invoice.customer?.receivable_account_id || invoice.customer?.payable_account_id;
   if (!customerArId && invoice.customer_id) {
-    const { data: cData } = await supabase.from('BusinessPartner').select('receivable_account_id').eq('id', invoice.customer_id).maybeSingle();
-    if (cData) customerArId = cData.receivable_account_id;
+    const { data: cData } = await supabase.from('BusinessPartner').select('receivable_account_id, payable_account_id').eq('id', invoice.customer_id).maybeSingle();
+    if (cData) customerArId = cData.receivable_account_id || cData.payable_account_id;
   }
-  const arId = customerArId || s.gl_accounts_receivable_id;
+  const arId = customerArId || s.gl_accounts_receivable_id || s.gl_accounts_payable_id;
 
   // Determine Payment Mode logic (Cash vs Credit) based on the presence of a cash_bank_account
   const cbId = invoice.cash_bank_account_id;
@@ -170,6 +250,7 @@ export async function postSalesInvoice(invoice, itemsMap, settings, isReversal =
 
   for (const line of (invoice.line_items || [])) {
     lines.push({ 
+      account_id: itemsMap[line.item_id]?.sales_account_id || s.gl_default_sales_account_id,
       account_category: 'sales', item_id: line.item_id,
       debit_amount: 0, credit_amount: line.line_total, 
       description: `Sale: ${line.item_name}`
@@ -205,7 +286,12 @@ export async function postPurchaseInvoice(invoice, itemsMap, settings, isReversa
   const lines = [];
 
   for (const line of (invoice.line_items || [])) {
-    lines.push({ account_category: 'inventory', item_id: line.item_id, debit_amount: line.line_total, credit_amount: 0, description: `Purchase: ${line.item_name}` });
+    lines.push({ 
+      account_id: itemsMap[line.item_id]?.inventory_account_id || s.gl_default_inventory_account_id,
+      account_category: 'inventory', item_id: line.item_id, 
+      debit_amount: line.line_total, credit_amount: 0, 
+      description: `Purchase: ${line.item_name}` 
+    });
   }
 
   if (invoice.total_tax_amount > 0) {
@@ -213,19 +299,20 @@ export async function postPurchaseInvoice(invoice, itemsMap, settings, isReversa
     lines.push({ account_id: s.gl_vat_receivable_id, debit_amount: invoice.total_tax_amount, credit_amount: 0 });
   }
 
-  let supplierApId = invoice.payable_account_id || invoice.supplier?.payable_account_id;
-  if (!supplierApId && invoice.supplier_id) {
-    const { data: cData } = await supabase.from('BusinessPartner').select('payable_account_id').eq('id', invoice.supplier_id).maybeSingle();
-    if (cData) supplierApId = cData.payable_account_id;
+  let supplierApId = invoice.payable_account_id || invoice.receivable_account_id || invoice.supplier?.payable_account_id || invoice.supplier?.receivable_account_id || invoice.vendor?.payable_account_id || invoice.vendor?.receivable_account_id;
+  const partnerId = invoice.vendor_id || invoice.supplier_id;
+  if (!supplierApId && partnerId) {
+    const { data: cData } = await supabase.from('BusinessPartner').select('payable_account_id, receivable_account_id').eq('id', partnerId).maybeSingle();
+    if (cData) supplierApId = cData.payable_account_id || cData.receivable_account_id;
   }
-  const apId = supplierApId || s.gl_accounts_payable_id;
+  const apId = supplierApId || s.gl_accounts_payable_id || s.gl_accounts_receivable_id;
 
   const cbId = invoice.cash_bank_account_id;
   if (cbId) {
-    lines.push({ account_id: cbId, debit_amount: 0, credit_amount: invoice.grand_total, entity_type: 'Supplier', entity_id: invoice.supplier_id, due_date: invoice.due_date || invoice.invoice_date });
+    lines.push({ account_id: cbId, debit_amount: 0, credit_amount: invoice.grand_total, entity_type: 'Supplier', entity_id: partnerId, due_date: invoice.due_date || invoice.invoice_date });
   } else {
     if (!apId) throw new Error('ERR_STRICT_ACCOUNT_MAPPING: Missing Accounts Payable (AP) Account for this Supplier');
-    lines.push({ account_id: apId, debit_amount: 0, credit_amount: invoice.grand_total, entity_type: 'Supplier', entity_id: invoice.supplier_id, due_date: invoice.due_date || invoice.invoice_date });
+    lines.push({ account_id: apId, debit_amount: 0, credit_amount: invoice.grand_total, entity_type: 'Supplier', entity_id: partnerId, due_date: invoice.due_date || invoice.invoice_date });
   }
 
   const payload = {
@@ -252,7 +339,7 @@ export async function postFinancialVoucher(voucher, isReversal = false, idempote
     p_company_id: voucher.company_id || sajilo.getCompanyId(),
     p_voucher_id: voucher.id,
     p_idempotency_key: idempotencyKey,
-    p_gl_lines: voucher.lines, // UI MUST pass correct debits/credits inside the lines array
+    p_gl_lines: voucher.lines || [], // Fallback to empty array to prevent signature mismatch
     p_is_reversal: isReversal
   };
 

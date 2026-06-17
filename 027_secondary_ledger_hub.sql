@@ -64,7 +64,7 @@ DECLARE
     v_existing RECORD;
 BEGIN
     -- Check Idempotency
-    SELECT * INTO v_existing FROM "POSSale" WHERE idempotency_key = p_idempotency_key LIMIT 1;
+    SELECT * INTO v_existing FROM "POSSale" WHERE idempotency_key::text = p_idempotency_key::text LIMIT 1;
     IF FOUND THEN
         RETURN jsonb_build_object('success', true, 'id', v_existing.id, 'message', 'POS Sale already posted');
     END IF;
@@ -122,7 +122,7 @@ DECLARE
     v_qty NUMERIC;
     v_existing RECORD;
 BEGIN
-    SELECT * INTO v_existing FROM "SalesReturn" WHERE idempotency_key = p_idempotency_key LIMIT 1;
+    SELECT * INTO v_existing FROM "SalesReturn" WHERE idempotency_key::text = p_idempotency_key::text LIMIT 1;
     IF FOUND THEN
         RETURN jsonb_build_object('success', true, 'id', v_existing.id, 'message', 'Return already posted');
     END IF;
@@ -179,7 +179,7 @@ DECLARE
     v_qty NUMERIC;
     v_existing RECORD;
 BEGIN
-    SELECT * INTO v_existing FROM "PurchaseReturn" WHERE idempotency_key = p_idempotency_key LIMIT 1;
+    SELECT * INTO v_existing FROM "PurchaseReturn" WHERE idempotency_key::text = p_idempotency_key::text LIMIT 1;
     IF FOUND THEN
         RETURN jsonb_build_object('success', true, 'id', v_existing.id, 'message', 'Return already posted');
     END IF;
@@ -236,7 +236,7 @@ DECLARE
     v_adjusted_qty NUMERIC;
     v_existing RECORD;
 BEGIN
-    SELECT * INTO v_existing FROM "StockAdjustment" WHERE idempotency_key = p_idempotency_key LIMIT 1;
+    SELECT * INTO v_existing FROM "StockAdjustment" WHERE idempotency_key::text = p_idempotency_key::text LIMIT 1;
     IF FOUND THEN
         RETURN jsonb_build_object('success', true, 'id', v_existing.id, 'message', 'Adjustment already posted');
     END IF;
@@ -290,7 +290,7 @@ DECLARE
     v_journal_id UUID;
     v_existing RECORD;
 BEGIN
-    SELECT * INTO v_existing FROM "PayrollRun" WHERE idempotency_key = p_idempotency_key LIMIT 1;
+    SELECT * INTO v_existing FROM "PayrollRun" WHERE idempotency_key::text = p_idempotency_key::text LIMIT 1;
     IF FOUND THEN
         RETURN jsonb_build_object('success', true, 'id', v_existing.id, 'message', 'Payroll Run already posted');
     END IF;

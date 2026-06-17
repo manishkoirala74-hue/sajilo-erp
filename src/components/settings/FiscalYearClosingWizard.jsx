@@ -97,7 +97,7 @@ export default function FiscalYearClosingWizard() {
   const openYears = fiscalYears.filter(f => !f.is_locked);
   
   return (
-    <div className="bg-card border border-border rounded-xl p-5 mt-6">
+    <div id="closing-wizard" className="bg-card border border-border rounded-xl p-5 mt-6">
       <div className="flex items-center gap-2 mb-4">
         <DatabaseBackup className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
         <h3 className="font-semibold text-foreground text-sm">Automated Year-End Closing Wizard</h3>

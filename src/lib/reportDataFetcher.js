@@ -72,37 +72,18 @@ export async function fetchReportData(reportId, fromDate, toDate, extraParams = 
       const compFromDate = new Date(fd.setFullYear(fd.getFullYear() - 1)).toISOString().slice(0, 10);
       const compToDate = new Date(td.setFullYear(td.getFullYear() - 1)).toISOString().slice(0, 10);
 
-      const [all, journals, lines] = await Promise.all([
-        sajilo.entities.ChartOfAccount.filter({ is_active: true }, 'account_code', 2000),
-        sajilo.entities.GeneralLedgerJournal.filter({ status: 'Posted' }, 'entry_date', 10000),
-        sajilo.entities.GeneralLedgerLine.list('', 50000)
-      ]);
-      
-      const journalMap = {};
-      journals.forEach(j => { journalMap[j.id] = j.entry_date?.split('T')[0]; });
-
-      const accountTotals = {};
-      all.forEach(a => { accountTotals[a.id] = { cur_dr: 0, cur_cr: 0, comp_dr: 0, comp_cr: 0 }; });
-
-      lines.forEach(l => {
-        const date = journalMap[l.journal_id];
-        if (!date || !accountTotals[l.account_id]) return;
-        
-        if (date >= fromDate && date <= toDate) {
-          accountTotals[l.account_id].cur_dr += (l.debit_amount || 0);
-          accountTotals[l.account_id].cur_cr += (l.credit_amount || 0);
-        }
-        if (date >= compFromDate && date <= compToDate) {
-          accountTotals[l.account_id].comp_dr += (l.debit_amount || 0);
-          accountTotals[l.account_id].comp_cr += (l.credit_amount || 0);
-        }
+      const { data, error } = await supabase.rpc('get_comparative_profit_loss_rpc', {
+        p_company_id,
+        p_from_date: fromDate,
+        p_to_date: toDate,
+        p_comp_from_date: compFromDate,
+        p_comp_to_date: compToDate
       });
+      if (error) throw error;
 
-      const mappedData = all.filter(a => ['Revenue', 'Income', 'Expense', 'Expenses', 'Cost of Sales', 'COGS', 'Operating Expense', 'OPEX', 'Other Income', 'Other Expense'].includes(a.account_type)).map(a => {
-        const t = accountTotals[a.id];
-        const isDebitNormal = ['Expense', 'Expenses', 'Cost of Sales', 'COGS', 'Operating Expense', 'OPEX', 'Other Expense'].includes(a.account_type);
-        const cur_bal = isDebitNormal ? (t.cur_dr - t.cur_cr) : (t.cur_cr - t.cur_dr);
-        const comp_bal = isDebitNormal ? (t.comp_dr - t.comp_cr) : (t.comp_cr - t.comp_dr);
+      const mappedData = (data || []).map(a => {
+        const cur_bal = Number(a.current_balance || 0);
+        const comp_bal = Number(a.comparative_balance || 0);
         return {
           ...a,
           current_balance: cur_bal,
@@ -120,29 +101,23 @@ export async function fetchReportData(reportId, fromDate, toDate, extraParams = 
       const p_company_id = sajilo.getCompanyId();
       const safeToDate = toDate || new Date().toISOString().slice(0,10);
       
-      const [all, journals, lines] = await Promise.all([
+      const [all, { data: tbData, error: tbErr }] = await Promise.all([
         sajilo.entities.ChartOfAccount.filter({ is_active: true }, 'account_code', 2000),
-        sajilo.entities.GeneralLedgerJournal.filter({ status: 'Posted' }, 'entry_date', 10000),
-        sajilo.entities.GeneralLedgerLine.list('', 50000)
+        supabase.rpc('get_trial_balance_rpc', {
+          p_company_id,
+          p_from_date: '1970-01-01',
+          p_to_date: safeToDate
+        })
       ]);
+      if (tbErr) throw tbErr;
 
-      const journalMap = {};
-      journals.forEach(j => { journalMap[j.id] = j.entry_date?.split('T')[0]; });
-
-      const accountTotals = {};
-      all.forEach(a => { accountTotals[a.id] = { dr: 0, cr: 0 }; });
-
-      lines.forEach(l => {
-        const date = journalMap[l.journal_id];
-        if (!date || !accountTotals[l.account_id]) return;
-        if (date <= safeToDate) {
-          accountTotals[l.account_id].dr += (l.debit_amount || 0);
-          accountTotals[l.account_id].cr += (l.credit_amount || 0);
-        }
+      const tbMap = {};
+      (tbData || []).forEach(r => {
+        tbMap[r.id] = r;
       });
 
       const allAccounts = all.map(a => {
-        const t = accountTotals[a.id];
+        const r = tbMap[a.id] || { current_debit: 0, current_credit: 0 };
         const isDebitNormal = ['Asset', 'Cost of Sales', 'COGS', 'Expense', 'Expenses', 'OPEX', 'Operating Expense', 'Other Expense'].includes(a.account_type);
         
         const base_ob = Number(a.opening_balance || 0);
@@ -151,8 +126,8 @@ export async function fetchReportData(reportId, fromDate, toDate, extraParams = 
         let ob_dr = 0, ob_cr = 0;
         if (isBaseObDr) ob_dr = base_ob; else ob_cr = base_ob;
 
-        const total_dr = ob_dr + t.dr;
-        const total_cr = ob_cr + t.cr;
+        const total_dr = ob_dr + Number(r.current_debit || 0);
+        const total_cr = ob_cr + Number(r.current_credit || 0);
 
         const bal = isDebitNormal ? (total_dr - total_cr) : (total_cr - total_dr);
 

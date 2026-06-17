@@ -59,31 +59,9 @@ export default function FiscalYearSettings() {
       fetchFiscalYears();
     } catch (e) {
       console.error(e);
-      toast.error('Error creating Fiscal Year');
+      toast.error('Failed to create Fiscal Year');
     } finally {
       setSaving(false);
-    }
-  };
-
-  const toggleActive = async (id, currentActiveStatus) => {
-    // If it's already active, the user might be trying to deactivate it, but we require at least one active usually.
-    // The DB trigger handles setting others to false if this is true.
-    try {
-      await sajilo.entities.FiscalYear.update(id, { is_active: !currentActiveStatus });
-      toast.success('Active status updated');
-      fetchFiscalYears();
-    } catch (e) {
-      toast.error('Failed to update status');
-    }
-  };
-
-  const toggleLock = async (id, currentLockStatus) => {
-    try {
-      await sajilo.entities.FiscalYear.update(id, { is_locked: !currentLockStatus });
-      toast.success(`Fiscal Year ${!currentLockStatus ? 'locked' : 'unlocked'}`);
-      fetchFiscalYears();
-    } catch (e) {
-      toast.error('Failed to update lock status');
     }
   };
 
@@ -151,13 +129,10 @@ export default function FiscalYearSettings() {
                   </td>
                   <td className="cell-density ">
                     <div className="flex justify-center">
-                      <button 
-                        onClick={() => toggleActive(fy.id, fy.is_active)}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${fy.is_active ? 'bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400 hover:bg-green-200' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-                      >
+                      <span className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium ${fy.is_active ? 'bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400' : 'bg-gray-100 text-gray-600'}`}>
                         {fy.is_active ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Circle className="w-3.5 h-3.5" />}
                         {fy.is_active ? 'Active' : 'Inactive'}
-                      </button>
+                      </span>
                     </div>
                   </td>
                   <td className="cell-density ">
@@ -167,13 +142,14 @@ export default function FiscalYearSettings() {
                           if (fy.is_locked) {
                             setReopenDialog(fy);
                           } else {
-                            toggleLock(fy.id, fy.is_locked);
+                            document.getElementById('closing-wizard')?.scrollIntoView({ behavior: 'smooth' });
+                            toast.info('Please use the Closing Wizard below to lock a fiscal year.');
                           }
                         }}
                         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${fy.is_locked ? 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400 hover:bg-red-200' : 'bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:bg-blue-500/20'}`}
                       >
                         {fy.is_locked ? <KeyRound className="w-3.5 h-3.5" /> : <Unlock className="w-3.5 h-3.5" />}
-                        {fy.is_locked ? 'Re-Open' : 'Open'}
+                        {fy.is_locked ? 'Re-Open' : 'Close Year'}
                       </button>
                     </div>
                   </td>
