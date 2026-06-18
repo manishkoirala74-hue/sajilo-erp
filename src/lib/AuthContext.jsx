@@ -68,7 +68,6 @@ export const AuthProvider = ({ children }) => {
 
   const fetchUserCompanies = async (userData) => {
     try {
-      // SECURITY: Pull explicit mapping lines for the authenticated user session
       const userCompanies = await sajilo.entities.UserCompany.filter({ user_id: userData.id });
 
       if (!userCompanies || userCompanies.length === 0) {
@@ -80,8 +79,6 @@ export const AuthProvider = ({ children }) => {
 
       const companyIds = userCompanies.map(uc => uc.company_id);
 
-      // HIGH-VELOCITY REFACTOR: Bypass bulk global listings
-      // Explicitly pull only the target companies mapped to the user
       const { data: allowedCompanies, error } = await sajilo.auth.supabase
         .from('Company')
         .select('*')
@@ -104,6 +101,41 @@ export const AuthProvider = ({ children }) => {
       }
     } catch (e) {
       console.error("Failed to fetch companies cleanly:", e);
+    }
+  };
+
+  // =========================================================================
+  // PRODUCTION REFACTOR: ERP-GRADE TRANSACT-SAFE COMPANY CREATOR
+  // =========================================================================
+  const createCompany = async (companyName) => {
+    try {
+      if (!user || !user.id) throw new Error("No authenticated session available");
+
+      // 1. Explicitly match 'created_by' string to bypass RLS Rule C instantly
+      const companyPayload = {
+        name: companyName,
+        created_by: user.id.toString()
+      };
+
+      const newCompany = await sajilo.entities.Company.create(companyPayload);
+      if (!newCompany || !newCompany.id) throw new Error("Database failed to yield returned company reference object");
+
+      // 2. Build direct user relationship mapping link
+      await sajilo.entities.UserCompany.create({
+        user_id: user.id,
+        company_id: newCompany.id,
+        is_default: true
+      });
+
+      // 3. Re-sync memory collection vectors and shift context automatically
+      if (user) {
+        await fetchUserCompanies(user);
+      }
+      
+      return newCompany;
+    } catch (error) {
+      console.error("Intercepted transactional workspace failure:", error);
+      throw error;
     }
   };
 
@@ -230,6 +262,7 @@ export const AuthProvider = ({ children }) => {
       isSwitchingCompany,
       switchCompany,
       checkUserAuth,
+      createCompany, // 🟢 EXPOSED TO FRONTEND CONTEXT
       login,
       loginWithGoogle,
       signUp,
