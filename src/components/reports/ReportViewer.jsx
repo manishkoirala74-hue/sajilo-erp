@@ -452,16 +452,36 @@ function PartnerSummaryReport({ title, mode, reportId, initialFromDate, initialT
 
   let baseHeaders = [];
   let rowMapper = () => [];
+  let footerBuilder = null;
   
   if (reportId.includes('aging_summary')) {
-    baseHeaders = [isAR ? 'Customer' : 'Supplier', 'Bucket', 'Balance (NPR)'];
-    rowMapper = (r, meta) => [r.customer_name || r.vendor_name || 'Unknown', r.bucket, fmtNPR(r.grand_total || r.balance), ...meta];
+    // Fetcher returns pivot objects: {customer, current, 30d, 60d, '60d+', total} for AR
+    //                                {vendor, current, 30d, 60d, '60d+', total} for AP
+    baseHeaders = [isAR ? 'Customer' : 'Supplier', 'Current (NPR)', '1-30 Days (NPR)', '31-60 Days (NPR)', '60+ Days (NPR)', 'Total (NPR)'];
+    rowMapper = (r, meta) => [
+      r.customer || r.vendor || 'Unknown',
+      fmtNPR(r.current || 0),
+      fmtNPR(r['30d']  || 0),
+      fmtNPR(r['60d']  || 0),
+      fmtNPR(r['60d+'] || 0),
+      fmtNPR(r.total   || 0),
+      ...meta
+    ];
+    footerBuilder = (rows) => ['TOTAL',
+      fmtNPR(rows.reduce((s, r) => s + (r.current || 0), 0)),
+      fmtNPR(rows.reduce((s, r) => s + (r['30d']  || 0), 0)),
+      fmtNPR(rows.reduce((s, r) => s + (r['60d']  || 0), 0)),
+      fmtNPR(rows.reduce((s, r) => s + (r['60d+'] || 0), 0)),
+      fmtNPR(rows.reduce((s, r) => s + (r.total   || 0), 0)),
+    ];
   } else if (reportId === 'customer_balance') {
-    baseHeaders = ['Customer', 'Total Invoiced', 'Total Paid', 'Balance (NPR)'];
-    rowMapper = (r, meta) => [r.customer, r.total_invoiced, r.total_paid, r.balance, ...meta];
+    baseHeaders = ['Customer', 'Total Invoiced (NPR)', 'Total Paid (NPR)', 'Balance (NPR)'];
+    rowMapper = (r, meta) => [r.customer, fmtNPR(r.total_invoiced), fmtNPR(r.total_paid), fmtNPR(r.balance), ...meta];
+    footerBuilder = (rows) => ['TOTAL', '', '', fmtNPR(rows.reduce((s, r) => s + (r.balance || 0), 0))];
   } else if (reportId === 'vendor_balance') {
-    baseHeaders = ['Supplier', 'Total Billed', 'Total Paid', 'Balance (NPR)'];
-    rowMapper = (r, meta) => [r.vendor, r.total_billed, r.total_paid, r.balance, ...meta];
+    baseHeaders = ['Supplier', 'Total Billed (NPR)', 'Total Paid (NPR)', 'Balance (NPR)'];
+    rowMapper = (r, meta) => [r.vendor, fmtNPR(r.total_billed), fmtNPR(r.total_paid), fmtNPR(r.balance), ...meta];
+    footerBuilder = (rows) => ['TOTAL', '', '', fmtNPR(rows.reduce((s, r) => s + (r.balance || 0), 0))];
   } else if (reportId === 'debtor_statement' || reportId === 'vendor_statement') {
      // fallback if mapped here
      baseHeaders = ['Partner', 'Balance'];
@@ -519,8 +539,9 @@ function PartnerSummaryReport({ title, mode, reportId, initialFromDate, initialT
             title={title}
             fromDate={filters.fromDate}
             toDate={filters.toDate}
-            headers={headers}
+            headers={[...baseHeaders, ...metaHeaders]}
             rows={tableRows}
+            footer={footerBuilder ? footerBuilder(data || []) : undefined}
             onExport={() => {}}
         />
       )}
@@ -1409,13 +1430,14 @@ export default function ReportViewer({ reportId, data, fromDate, toDate, columnS
             <ReportTable title="Journal Report" fromDate={fd} toDate={td}
               headers={['Date', 'Voucher #', 'Memo', 'Lines', 'Total Amount (NPR)']}
               rows={rows.map(r => [
-                r.entry_date?.split('T')[0], 
-                <VoucherLink voucherNumber={r.voucher_no}><span className="cursor-pointer text-primary">{r.voucher_no}</span></VoucherLink>, 
-                r.memo, 
-                r.lines?.length || 0, 
-                fmtNPR(r.total_amount)
+                (r.entry_date || '').substring(0, 10),
+                <VoucherLink voucherNumber={r.voucher_no}><span className="cursor-pointer text-primary">{r.voucher_no}</span></VoucherLink>,
+                r.memo,
+                r.lines?.length || 0,
+                fmtNPR(r.total_amount || (r.lines || []).reduce((s, l) => s + (l.debit_amount || 0), 0))
               ])}
-              onExport={() => downloadCSV('journal_report.csv', ['Date','Voucher #','Memo','Lines','Total Amount'], rows.map(r=>[r.entry_date?.split('T')[0], r.voucher_no, r.memo, r.lines?.length || 0, r.total_amount?.toFixed(2)]))}
+              footer={['', '', '', 'TOTAL', fmtNPR(rows.reduce((s, r) => s + (r.total_amount || (r.lines || []).reduce((ls, l) => ls + (l.debit_amount || 0), 0)), 0))]}
+              onExport={() => downloadCSV('journal_report.csv', ['Date','Voucher #','Memo','Lines','Total Amount'], rows.map(r => [(r.entry_date || '').substring(0, 10), r.voucher_no, r.memo, r.lines?.length || 0, (r.total_amount || 0)?.toFixed(2)]))}
             />
           )} />;
 
@@ -1620,8 +1642,9 @@ export default function ReportViewer({ reportId, data, fromDate, toDate, columnS
           renderFn={(rows) => (
             <ReportTable title="Category-wise Summary"
               headers={['Category','Items','Total Qty','Total Value (NPR)']}
-              rows={rows.map(r => [r.category, r.item_count, r.total_qty, r.total_value])}
-              onExport={() => downloadCSV('category_summary.csv',['Category','Items','Qty','Value'],rows.map(r=>[r.category,r.item_count,r.total_qty,r.total_value]))}
+              rows={rows.map(r => [r.category, r.item_count, r.total_qty, fmtNPR(r.total_value)])}
+              footer={['TOTAL', rows.reduce((s,r)=>s+(r.item_count||0),0), rows.reduce((s,r)=>s+(r.total_qty||0),0), fmtNPR(rows.reduce((s,r)=>s+(r.total_value||0),0))]}
+              onExport={() => downloadCSV('category_summary.csv',['Category','Items','Qty','Value'],rows.map(r=>[r.category,r.item_count,r.total_qty,(r.total_value||0).toFixed(2)]))}
             />
           )} />;
 
