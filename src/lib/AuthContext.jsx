@@ -58,7 +58,6 @@ export const AuthProvider = ({ children }) => {
     }
 
     try {
-      // Await prefetch so the dashboard receives fresh data before overlay clears
       await sajilo.prefetchCompanyData();
     } catch (e) {
       console.error('Prefetch failed:', e);
@@ -69,37 +68,42 @@ export const AuthProvider = ({ children }) => {
 
   const fetchUserCompanies = async (userData) => {
     try {
-      if (userData.company_scope === 'ALL' || userData.role === 'admin') {
-        const allCompanies = await sajilo.entities.Company.list();
-        setAvailableCompanies(allCompanies);
-        if (allCompanies.length > 0) {
-          const userCompanies = await sajilo.entities.UserCompany.filter({ user_id: userData.id });
-          const defaultUc = userCompanies.find(uc => uc.is_default);
+      // SECURITY: Pull explicit mapping lines for the authenticated user session
+      const userCompanies = await sajilo.entities.UserCompany.filter({ user_id: userData.id });
+
+      if (!userCompanies || userCompanies.length === 0) {
+        setAvailableCompanies([]);
+        setActiveCompany(null);
+        sajilo.setCompanyId(null);
+        return;
+      }
+
+      const companyIds = userCompanies.map(uc => uc.company_id);
+
+      // HIGH-VELOCITY REFACTOR: Bypass bulk global listings
+      // Explicitly pull only the target companies mapped to the user
+      const { data: allowedCompanies, error } = await sajilo.auth.supabase
+        .from('Company')
+        .select('*')
+        .in('id', companyIds);
+
+      if (error) throw error;
+
+      setAvailableCompanies(allowedCompanies || []);
+
+      if (allowedCompanies && allowedCompanies.length > 0) {
+        const defaultUc = userCompanies.find(uc => uc.is_default);
+        const stored = sajilo.getCompanyId();
+        const storedIsAllowed = stored && companyIds.includes(stored);
+        
+        const targetId = (storedIsAllowed ? stored : null) ||
+          (defaultUc ? defaultUc.company_id : allowedCompanies[0].id);
           
-          const stored = sajilo.getCompanyId();
-          const targetId = stored || (defaultUc ? defaultUc.company_id : allCompanies[0].id);
-          const target = allCompanies.find(c => c.id === targetId) || allCompanies[0];
-          await switchCompany(target.id, target);
-        }
-      } else {
-        const userCompanies = await sajilo.entities.UserCompany.filter({ user_id: userData.id });
-        if (userCompanies.length > 0) {
-          const companyIds = userCompanies.map(uc => uc.company_id);
-          const companies = await sajilo.entities.Company.list();
-          const allowedCompanies = companies.filter(c => companyIds.includes(c.id));
-          setAvailableCompanies(allowedCompanies);
-          
-          if (allowedCompanies.length > 0) {
-            const defaultUc = userCompanies.find(uc => uc.is_default);
-            const stored = sajilo.getCompanyId();
-            const targetId = stored || (defaultUc ? defaultUc.company_id : allowedCompanies[0].id);
-            const target = allowedCompanies.find(c => c.id === targetId) || allowedCompanies[0];
-            await switchCompany(target.id, target);
-          }
-        }
+        const target = allowedCompanies.find(c => c.id === targetId) || allowedCompanies[0];
+        await switchCompany(target.id, target);
       }
     } catch (e) {
-      console.error("Failed to fetch companies:", e);
+      console.error("Failed to fetch companies cleanly:", e);
     }
   };
 
@@ -115,7 +119,7 @@ export const AuthProvider = ({ children }) => {
             const newProfile = {
               id: authUser.id,
               role: 'admin',
-              company_scope: 'ALL',
+              company_scope: 'SELECTED',
               must_change_password: false
             };
             await sajilo.entities.User.create(newProfile);
@@ -197,9 +201,8 @@ export const AuthProvider = ({ children }) => {
   };
 
   const hasAccess = useCallback((module, operation) => {
-    if (user?.role === 'admin' && user?.company_scope === 'ALL') return true;
+    if (user?.role === 'admin' || user?.is_super_admin === true) return true;
     
-    // Check overrides
     const override = activeOverrides.find(o => o.module_key === module && o.operation === operation);
     if (override) {
       if (override.override_type === 'DENY') return false;
@@ -207,7 +210,6 @@ export const AuthProvider = ({ children }) => {
     }
 
     if (!activeRole) {
-       if (user?.role === 'admin') return true; // Migration safety
        return false;
     }
 
