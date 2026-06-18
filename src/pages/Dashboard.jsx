@@ -27,7 +27,7 @@ function formatNPR(val) {
 }
 
 export default function Dashboard() {
-  const { availableCompanies, isLoadingAuth } = useAuth();
+  const { availableCompanies, isLoadingAuth, activeCompany } = useAuth();
   const [salesInvoices, setSalesInvoices] = useState([]);
   const [purchaseInvoices, setPurchaseInvoices] = useState([]);
   const [items, setItems] = useState([]);
@@ -37,8 +37,21 @@ export default function Dashboard() {
   const [amountsVisible, setAmountsVisible] = useState(true);
   const [chartData, setChartData] = useState([]);
   const { theme } = useTheme();
+  // Track the company ID so useEffect re-runs on company switch
+  const activeCompanyId = activeCompany?.id || null;
 
   useEffect(() => {
+    if (!activeCompanyId) return; // Don't fetch until company is set
+
+    // Reset state so stale data from the previous company is cleared immediately
+    setLoading(true);
+    setSalesInvoices([]);
+    setPurchaseInvoices([]);
+    setItems([]);
+    setPartners([]);
+    setPurchaseOrders([]);
+    setChartData([]);
+
     const td = new Date();
     const fd = new Date();
     fd.setMonth(fd.getMonth() - 5);
@@ -98,7 +111,7 @@ export default function Dashboard() {
       setChartData(Object.values(monthlyMap).sort((a, b) => a.sortKey.localeCompare(b.sortKey)));
       setLoading(false);
     });
-  }, []);
+  }, [activeCompanyId]);
 
   const totalSales = salesInvoices.filter(i => i.status === 'Posted').reduce((s, inv) => s + (inv.grand_total || 0), 0);
   const totalPurchases = purchaseInvoices.filter(i => i.status === 'Posted').reduce((s, inv) => s + (inv.grand_total || 0), 0);

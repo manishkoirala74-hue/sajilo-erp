@@ -58,7 +58,10 @@ export const AuthProvider = ({ children }) => {
     }
 
     try {
-      sajilo.prefetchCompanyData().catch(e => console.error("Prefetch failed:", e));
+      // Await prefetch so the dashboard receives fresh data before overlay clears
+      await sajilo.prefetchCompanyData();
+    } catch (e) {
+      console.error('Prefetch failed:', e);
     } finally {
       setIsSwitchingCompany(false);
     }
