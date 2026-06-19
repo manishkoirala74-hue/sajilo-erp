@@ -31,6 +31,8 @@ app.post('/api/communication/test', async (req, res) => {
         host: config.email_smtp_host,
         port: config.email_smtp_port,
         secure: config.email_smtp_port === 465,
+        connectionTimeout: 5000, // 5 seconds max wait to prevent infinite hang
+        greetingTimeout: 5000,
         auth: {
           user: config.email_smtp_user,
           pass: config.email_smtp_password
