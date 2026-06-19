@@ -2,7 +2,6 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/api/sajiloClient';
 import { useDateFormat } from '@/lib/DateFormatContext';
 import { FileText, Receipt } from 'lucide-react';
-import { cn } from '@/lib/utils';
 
 export default function PartnerTransactionHistory({ partner, type }) {
   const { formatDate } = useDateFormat();

@@ -3,7 +3,7 @@ import { useAuth } from '@/lib/AuthContext';
 import { sajilo } from '@/api/sajiloClient';
 import {
   Save, Users, Settings2, FileText, Mail,
-  ChevronRight, Globe, Bell, Hash, Palette, Database, TrendingDown, FileSpreadsheet, BookOpen, Calendar, HardDrive, Percent,
+  ChevronRight, Globe, Bell, Hash, Palette, Database, BookOpen, Calendar, Percent,
   Building2, Landmark, Briefcase, DatabaseBackup
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';

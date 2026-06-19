@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { sajilo, supabase } from '@/api/sajiloClient';
+import { supabase } from '@/api/sajiloClient';
 import { useAuth } from '@/lib/AuthContext';
 import { 
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow 

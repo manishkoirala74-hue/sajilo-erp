@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import SearchableSelect from '@/components/shared/SearchableSelect';
 import QuickItemCreate from '@/components/shared/QuickItemCreate';
 import { sajilo } from '@/api/sajiloClient';

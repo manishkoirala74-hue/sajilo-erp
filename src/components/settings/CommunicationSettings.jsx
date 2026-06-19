@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/AuthContext';
-import { sajilo, supabase } from '@/api/sajiloClient';
+import { supabase } from '@/api/sajiloClient';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
@@ -20,18 +20,6 @@ export default function CommunicationSettings({ companyId }) {
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [existingId, setExistingId] = useState(null);
-
-  if (user?.role !== 'admin') {
-    return (
-      <div className="flex flex-col items-center justify-center p-8 text-center bg-red-50 dark:bg-red-950/20 rounded-xl border border-red-200 dark:border-red-900/50">
-        <AlertCircle className="w-12 h-12 text-red-500 mb-3" />
-        <h3 className="text-lg font-semibold text-red-800 dark:text-red-400">Access Denied</h3>
-        <p className="text-sm text-red-600 dark:text-red-300 max-w-md mt-2">
-          You do not have the required 'System_Admin' privileges to view or modify communication integration settings.
-        </p>
-      </div>
-    );
-  }
 
   useEffect(() => {
     if (!companyId) return;
@@ -115,6 +103,18 @@ export default function CommunicationSettings({ companyId }) {
       setSaving(false);
     }
   };
+
+  if (user?.role !== 'admin') {
+    return (
+      <div className="flex flex-col items-center justify-center p-8 text-center bg-red-50 dark:bg-red-950/20 rounded-xl border border-red-200 dark:border-red-900/50">
+        <AlertCircle className="w-12 h-12 text-red-500 mb-3" />
+        <h3 className="text-lg font-semibold text-red-800 dark:text-red-400">Access Denied</h3>
+        <p className="text-sm text-red-600 dark:text-red-300 max-w-md mt-2">
+          You do not have the required 'System_Admin' privileges to view or modify communication integration settings.
+        </p>
+      </div>
+    );
+  }
 
   if (loading) return <div className="p-4 text-sm text-muted-foreground">Loading settings...</div>;
 

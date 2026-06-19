@@ -5,7 +5,6 @@
  */
 import { X, Printer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import BusinessHeader from '@/components/reports/BusinessHeader';
 import PartnerStatement from '@/components/reports/PartnerStatement';
 import FinancialReportTable from '@/components/reports/FinancialReportTable';
