@@ -69,7 +69,7 @@ export default function CommunicationSettings({ companyId }) {
       const response = await fetch(`${workerUrl}/api/communication/test`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'EMAIL', config })
+        body: JSON.stringify({ type: 'RESEND', config })
       });
       const result = await response.json();
       
@@ -120,39 +120,33 @@ export default function CommunicationSettings({ companyId }) {
 
   return (
     <div className="space-y-6">
-      <div className="bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-900/50 rounded-xl p-5">
-        <div className="flex gap-3">
-          <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5 shrink-0" />
-          <div>
-            <h4 className="text-sm font-semibold text-blue-900 dark:text-blue-300">Using a Google (Gmail / Workspace) Account?</h4>
-            <p className="mt-1 text-sm text-blue-800 dark:text-blue-400 ">
-              Due to mandatory 2-Step Verification, standard passwords will be blocked. You must use a <strong>16-character App Password</strong>.
-            </p>
-            <ol className="list-decimal list-inside text-sm text-blue-800 dark:text-blue-400 mt-3 space-y-1">
-              <li>Go to your <a href="https://myaccount.google.com/security" target="_blank" rel="noreferrer" className="underline font-medium hover:text-blue-600">Google Account Security Settings</a></li>
-              <li>Ensure 2-Step Verification is enabled.</li>
-              <li>Search for "App Passwords" and create one named "Sajilo ERP".</li>
-              <li>Paste that exact 16-character code into the SMTP Password field below.</li>
-            </ol>
-          </div>
-        </div>
-      </div>
-
       <div className="bg-card border border-border rounded-xl overflow-hidden">
         <div className="flex items-center gap-2 px-5 py-4 border-b border-border bg-muted/20">
           <Mail className="w-4 h-4 text-primary" />
-          <h3 className="font-semibold text-foreground text-sm">SMTP Email Integration</h3>
+          <h3 className="font-semibold text-foreground text-sm">Resend API Integration</h3>
         </div>
         <div className="p-5 grid grid-cols-2 gap-4">
-          <div><Label>SMTP Host</Label><Input value={config.email_smtp_host || ''} onChange={e => set('email_smtp_host', e.target.value)} className="h-10 border border-border bg-background px-3 text-sm rounded-md focus:ring-1 focus:ring-primary outline-none mt-1 " placeholder="smtp.gmail.com" /></div>
-          <div><Label>SMTP Port</Label><Input type="number" value={config.email_smtp_port || 587} onChange={e => set('email_smtp_port', Number(e.target.value))} className="h-10 border border-border bg-background px-3 text-sm rounded-md focus:ring-1 focus:ring-primary outline-none mt-1 font-mono text-right" /></div>
-          <div><Label>SMTP Username</Label><Input value={config.email_smtp_user || ''} onChange={e => set('email_smtp_user', e.target.value)} className="h-10 border border-border bg-background px-3 text-sm rounded-md focus:ring-1 focus:ring-primary outline-none mt-1 " placeholder="you@company.com" /></div>
-          <div><Label>SMTP Password</Label><Input type="password" value={config.email_smtp_password || ''} onChange={e => set('email_smtp_password', e.target.value)} className="h-10 border border-border bg-background px-3 text-sm rounded-md focus:ring-1 focus:ring-primary outline-none mt-1 " placeholder="••••••••" /></div>
-          <div className="h-10 border border-border bg-background px-3 text-sm rounded-md focus:ring-1 focus:ring-primary outline-none mt-1 col-span-2"><Label>From Name (Sender Name)</Label><Input value={config.email_from_name || ''} onChange={e => set('email_from_name', e.target.value)} className=" " placeholder="Sajilo Trading" /></div>
+          <div className="col-span-2">
+            <div className="bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-900/50 rounded-xl p-4 mb-4">
+              <div className="flex gap-3">
+                <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5 shrink-0" />
+                <div>
+                  <h4 className="text-sm font-semibold text-blue-900 dark:text-blue-300">Using Resend Email API</h4>
+                  <p className="mt-1 text-sm text-blue-800 dark:text-blue-400">
+                    Sajilo ERP uses Resend.com to bypass standard SMTP port blocks on cloud hosts. Create a free account at Resend.com, generate an API Key, and verify your sending domain.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div className="col-span-2"><Label>Resend API Key</Label><Input type="password" value={config.email_smtp_password || ''} onChange={e => set('email_smtp_password', e.target.value)} className="h-10 border border-border bg-background px-3 text-sm rounded-md focus:ring-1 focus:ring-primary outline-none mt-1" placeholder="re_..." /></div>
+          <div><Label>Sender Email Address</Label><Input value={config.email_smtp_user || ''} onChange={e => set('email_smtp_user', e.target.value)} className="h-10 border border-border bg-background px-3 text-sm rounded-md focus:ring-1 focus:ring-primary outline-none mt-1" placeholder="onboarding@resend.dev" /></div>
+          <div><Label>Sender Name</Label><Input value={config.email_from_name || ''} onChange={e => set('email_from_name', e.target.value)} className="h-10 border border-border bg-background px-3 text-sm rounded-md focus:ring-1 focus:ring-primary outline-none mt-1" placeholder="Sajilo Trading" /></div>
           
           <div className="col-span-2 pt-2 flex justify-end">
              <Button variant="outline" size="sm" onClick={handleTestConnection} disabled={testing}>
-               Test SMTP Connection
+               Test Resend Connection
              </Button>
           </div>
         </div>

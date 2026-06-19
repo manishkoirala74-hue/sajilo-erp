@@ -4,6 +4,7 @@ import puppeteer from 'puppeteer';
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import { Resend } from 'resend';
 
 // Load environment variables (assuming running locally or passed via process.env)
 dotenv.config({ path: '.env.local' });
@@ -26,20 +27,21 @@ app.use(express.json());
 app.post('/api/communication/test', async (req, res) => {
   const { type, config } = req.body;
   try {
-    if (type === 'EMAIL') {
-      const transporter = nodemailer.createTransport({
-        host: config.email_smtp_host,
-        port: config.email_smtp_port,
-        secure: config.email_smtp_port === 465,
-        connectionTimeout: 5000, // 5 seconds max wait to prevent infinite hang
-        greetingTimeout: 5000,
-        auth: {
-          user: config.email_smtp_user,
-          pass: config.email_smtp_password
-        }
+    if (type === 'RESEND') {
+      const resend = new Resend(config.email_smtp_password);
+      
+      const { data, error } = await resend.emails.send({
+        from: config.email_from_name ? `${config.email_from_name} <${config.email_smtp_user}>` : config.email_smtp_user,
+        to: config.email_smtp_user, // Send a test email to the sender address
+        subject: 'Sajilo ERP - Resend Connection Test',
+        html: '<h3>Connection Successful</h3><p>Your Resend API is correctly configured in Sajilo ERP.</p>'
       });
-      await transporter.verify();
-      return res.json({ success: true, message: 'SMTP Handshake Successful' });
+
+      if (error) {
+        return res.status(400).json({ success: false, error: error.message });
+      }
+      
+      return res.json({ success: true, message: 'Resend API Handshake Successful' });
     }
     return res.status(400).json({ success: false, error: 'Invalid type' });
   } catch (error) {
@@ -128,18 +130,9 @@ async function processOutbox() {
         const pdfBuffer = await generatePDF(payload);
 
         if (row.type === 'EMAIL') {
-          const transporter = nodemailer.createTransport({
-            host: configRows.email_smtp_host,
-            port: configRows.email_smtp_port,
-            secure: configRows.email_smtp_port === 465,
-            auth: {
-              user: configRows.email_smtp_user,
-              pass: configRows.email_smtp_password
-            }
-          });
-
-          await transporter.sendMail({
-            from: `"${configRows.email_from_name}" <${configRows.email_smtp_user}>`,
+          const resend = new Resend(configRows.email_smtp_password);
+          const { data, error } = await resend.emails.send({
+            from: configRows.email_from_name ? `"${configRows.email_from_name}" <${configRows.email_smtp_user}>` : configRows.email_smtp_user,
             to: row.recipient_email,
             subject: `Document ${payload.voucher_no || ''} from ${configRows.email_from_name}`,
             text: `Please find the attached document.\n\nThank you.`,
@@ -148,6 +141,10 @@ async function processOutbox() {
               content: pdfBuffer
             }]
           });
+          
+          if (error) {
+            throw new Error(`Resend API Error: ${error.message}`);
+          }
           emailSuccess = true;
         }
 
