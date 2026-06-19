@@ -144,7 +144,7 @@ export default function Sidebar({ collapsed, onToggle }) {
   // Filter groups
   const filteredGroups = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
-    const isAdmin = user?.role === 'admin' && user?.company_scope === 'ALL';
+    const isAdmin = user?.role === 'admin';
     
     return navGroups.map(group => {
       let items = group.items.map(item => {

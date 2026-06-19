@@ -65,7 +65,8 @@ export default function CommunicationSettings({ companyId }) {
   const handleTestConnection = async () => {
     setTesting(true);
     try {
-      const response = await fetch('http://localhost:3001/api/communication/test', {
+      const workerUrl = import.meta.env.VITE_COMMUNICATION_WORKER_URL || 'http://localhost:3001';
+      const response = await fetch(`${workerUrl}/api/communication/test`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ type: 'EMAIL', config })

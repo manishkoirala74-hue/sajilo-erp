@@ -45,7 +45,7 @@ app.post('/api/communication/test', async (req, res) => {
   }
 });
 
-const PORT = process.env.WORKER_PORT || 3001;
+const PORT = process.env.PORT || process.env.WORKER_PORT || 3001;
 app.listen(PORT, () => {
   console.log(`Communication Worker Admin Handshake API running on port ${PORT}`);
 });

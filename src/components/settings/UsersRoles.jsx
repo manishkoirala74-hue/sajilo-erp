@@ -200,7 +200,9 @@ export default function UsersRoles({ approvalSettings, onApprovalChange }) {
           email: email,
           role: createForm.role,
           full_name: createForm.full_name,
-          company_scope: createForm.role === 'admin' ? 'ALL' : 'SELECTED',
+          // Always use 'SELECTED' — data isolation is enforced via UserCompany,
+          // not company_scope. company_scope='ALL' was the root cause of the tenant breach.
+          company_scope: 'SELECTED',
           must_change_password: true,
           temp_password: createForm.temp_password,
           password_last_changed: new Date().toISOString().split('T')[0],

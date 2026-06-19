@@ -87,7 +87,7 @@ const DEFAULT_SETTINGS = {
 };
 
 export default function Settings() {
-  const { user } = useAuth();
+  const { user, activeCompany, availableCompanies, isLoadingAuth } = useAuth();
   const [activeHub, setActiveHub] = useState('workspace');
   const [settings, setSettings] = useState(null);
   const [settingsId, setSettingsId] = useState(null);
@@ -95,12 +95,22 @@ export default function Settings() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // If there's no active company yet (new user), skip loading CompanySettings
+    if (!activeCompany) {
+      setSettings({ ...DEFAULT_SETTINGS });
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
     sajilo.entities.CompanySettings.list().then(data => {
       if (data.length > 0) { setSettings({ ...DEFAULT_SETTINGS, ...data[0] }); setSettingsId(data[0].id); }
       else setSettings({ ...DEFAULT_SETTINGS });
       setLoading(false);
+    }).catch(() => {
+      setSettings({ ...DEFAULT_SETTINGS });
+      setLoading(false);
     });
-  }, []);
+  }, [activeCompany?.id]);
 
   const set = (key, val) => setSettings(s => ({ ...s, [key]: val }));
 

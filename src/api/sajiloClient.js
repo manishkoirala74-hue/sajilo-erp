@@ -110,20 +110,29 @@ const buildEntityMethods = (tableName) => {
     if (cid) {
       return query.eq('company_id', cid);
     }
-    return query;
+    // No company selected: return an impossible filter so the query yields 0 rows
+    // instead of sending an unscoped query that bypasses tenant isolation.
+    return query.eq('company_id', '00000000-0000-0000-0000-000000000000');
   };
 
   const injectCompanyId = (obj) => {
     if (isGlobal) return obj;
-    const cid = sajilo.getCompanyId();
-    if (cid && typeof obj === 'object') {
-      return { ...obj, company_id: cid };
+    if (typeof obj === 'object' && obj !== null) {
+      // Respect explicit company_id if provided (e.g. background job or cross-tenant reversal)
+      const finalCompanyId = obj.company_id || sajilo.getCompanyId();
+      if (!finalCompanyId) {
+        throw new Error(`[Sajilo Framework] Security Exception: Cannot perform action on '${tableName}' without an active company context. company_id is missing.`);
+      }
+      return { ...obj, company_id: finalCompanyId };
     }
     return obj;
   };
 
   return {
     list: async (orderBy = '', limit = 1000) => {
+      // Short-circuit: non-global tables require a company context
+      if (!isGlobal && !sajilo.getCompanyId()) return [];
+
       const cacheKey = `${tableName}:list:${orderBy}:${limit}:${sajilo.getCompanyId()}`;
       if (queryCache.has(cacheKey)) return queryCache.get(cacheKey);
 
@@ -146,6 +155,9 @@ const buildEntityMethods = (tableName) => {
     },
     
     filter: async (matchObj, orderBy = '', limit = 1000) => {
+      // Short-circuit: non-global tables require a company context
+      if (!isGlobal && !sajilo.getCompanyId()) return [];
+
       const sanitizedMatch = sanitizePayload(matchObj);
       const cacheKey = `${tableName}:filter:${JSON.stringify(sanitizedMatch)}:${orderBy}:${limit}:${sajilo.getCompanyId()}`;
       if (queryCache.has(cacheKey)) return queryCache.get(cacheKey);
@@ -271,6 +283,9 @@ export const sajilo = {
     loginWithGoogle: async () => {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
+        options: {
+          redirectTo: typeof window !== 'undefined' ? window.location.origin : undefined,
+        },
       });
       if (error) throw error;
     },

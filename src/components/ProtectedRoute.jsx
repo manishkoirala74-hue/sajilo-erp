@@ -50,7 +50,9 @@ export default function ProtectedRoute({ fallback = <DefaultFallback />, unauthe
 
   // RBAC Routing Check
   const path = location.pathname;
-  const isAdmin = user?.role === 'admin' && user?.company_scope === 'ALL';
+  // Admin role grants full routing access regardless of company_scope.
+  // company_scope is now used only to scope company list, not permissions.
+  const isAdmin = user?.role === 'admin';
   const isStandardRoute = path === '/' || path === '/settings' || path === '/reports';
   
   if (!isAdmin && !isStandardRoute) {
