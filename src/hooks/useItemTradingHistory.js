@@ -1,6 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/api/sajiloClient';
 
+import { isValidUUID } from '@/lib/utils';
+
 /**
  * Hook to fetch and cache item trading history (Sales & Purchases)
  *
@@ -14,7 +16,7 @@ export function useItemTradingHistory(itemId) {
   return useQuery({
     queryKey: ['itemTradingHistory', itemId],
     queryFn: async () => {
-      if (!itemId) return [];
+      if (!itemId || !isValidUUID(itemId)) return [];
       const { data, error } = await supabase.rpc('get_item_recent_trading_history_rpc', {
         p_item_id: itemId
       });

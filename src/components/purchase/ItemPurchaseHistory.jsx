@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { sajilo } from '@/api/sajiloClient';
 import { History, ChevronDown, ChevronRight } from 'lucide-react';
+import { isValidUUID } from '@/lib/utils';
 
 export default function ItemPurchaseHistory({ vendorId }) {
   const [history, setHistory] = useState([]);
@@ -8,7 +9,7 @@ export default function ItemPurchaseHistory({ vendorId }) {
   const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
-    if (!vendorId || !expanded) return;
+    if (!vendorId || !isValidUUID(vendorId) || !expanded) return;
     setLoading(true);
     sajilo.entities.PurchaseInvoice.filter({ vendor_id: vendorId, status: 'Posted' }, '-invoice_date', 10)
       .then(data => { setHistory(data); setLoading(false); });

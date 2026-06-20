@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/api/sajiloClient';
 import { useDateFormat } from '@/lib/DateFormatContext';
 import { FileText, Receipt } from 'lucide-react';
+import { isValidUUID } from '@/lib/utils';
 
 export default function PartnerTransactionHistory({ partner, type }) {
   const { formatDate } = useDateFormat();
@@ -9,13 +10,14 @@ export default function PartnerTransactionHistory({ partner, type }) {
   const { data: history = [], isLoading: loading, error } = useQuery({
     queryKey: ['partnerLedgerHistory', partner?.id],
     queryFn: async () => {
+      if (!partner?.id || !isValidUUID(partner.id)) return [];
       const { data, error } = await supabase.rpc('get_partner_ledger_history_rpc', {
         p_entity_id: partner.id
       });
       if (error) throw error;
       return data || [];
     },
-    enabled: !!partner?.id,
+    enabled: !!partner?.id && isValidUUID(partner.id),
     staleTime: 600000,
     refetchOnWindowFocus: false,
     retry: false
