@@ -123,30 +123,30 @@ export default function CommunicationSettings({ companyId }) {
       <div className="bg-card border border-border rounded-xl overflow-hidden">
         <div className="flex items-center gap-2 px-5 py-4 border-b border-border bg-muted/20">
           <Mail className="w-4 h-4 text-primary" />
-          <h3 className="font-semibold text-foreground text-sm">Resend API Integration</h3>
+          <h3 className="font-semibold text-foreground text-sm">Email Integration</h3>
         </div>
         <div className="p-5 grid grid-cols-2 gap-4">
           <div className="col-span-2">
-            <div className="bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-900/50 rounded-xl p-4 mb-4">
+            <div className="bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-900/50 rounded-xl p-4 mb-4">
               <div className="flex gap-3">
-                <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5 shrink-0" />
+                <AlertCircle className="w-5 h-5 text-green-600 mt-0.5 shrink-0" />
                 <div>
-                  <h4 className="text-sm font-semibold text-blue-900 dark:text-blue-300">Using Resend Email API</h4>
-                  <p className="mt-1 text-sm text-blue-800 dark:text-blue-400">
-                    Sajilo ERP uses Resend.com to bypass standard SMTP port blocks on cloud hosts. Create a free account at Resend.com, generate an API Key, and verify your sending domain.
+                  <h4 className="text-sm font-semibold text-green-900 dark:text-green-300">Platform-Managed Email is Active</h4>
+                  <p className="mt-1 text-sm text-green-800 dark:text-green-400">
+                    Sajilo ERP fully manages email delivery for you via Resend. No API keys or domain verification required! 
+                    Emails will be sent on your behalf, and customer replies will automatically route to your Reply-To address below.
                   </p>
                 </div>
               </div>
             </div>
           </div>
           
-          <div className="col-span-2"><Label>Resend API Key</Label><Input type="password" value={config.email_smtp_password || ''} onChange={e => set('email_smtp_password', e.target.value)} className="h-10 border border-border bg-background px-3 text-sm rounded-md focus:ring-1 focus:ring-primary outline-none mt-1" placeholder="re_..." /></div>
-          <div><Label>Sender Email Address</Label><Input value={config.email_smtp_user || ''} onChange={e => set('email_smtp_user', e.target.value)} className="h-10 border border-border bg-background px-3 text-sm rounded-md focus:ring-1 focus:ring-primary outline-none mt-1" placeholder="onboarding@resend.dev" /></div>
+          <div><Label>Reply-To Email Address</Label><Input value={config.email_smtp_user || ''} onChange={e => set('email_smtp_user', e.target.value)} className="h-10 border border-border bg-background px-3 text-sm rounded-md focus:ring-1 focus:ring-primary outline-none mt-1" placeholder="billing@yourcompany.com" /></div>
           <div><Label>Sender Name</Label><Input value={config.email_from_name || ''} onChange={e => set('email_from_name', e.target.value)} className="h-10 border border-border bg-background px-3 text-sm rounded-md focus:ring-1 focus:ring-primary outline-none mt-1" placeholder="Sajilo Trading" /></div>
           
           <div className="col-span-2 pt-2 flex justify-end">
              <Button variant="outline" size="sm" onClick={handleTestConnection} disabled={testing}>
-               Test Resend Connection
+               Test Email Delivery
              </Button>
           </div>
         </div>

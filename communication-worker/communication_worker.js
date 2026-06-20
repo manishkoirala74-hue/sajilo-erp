@@ -28,20 +28,27 @@ app.post('/api/communication/test', async (req, res) => {
   const { type, config } = req.body;
   try {
     if (type === 'RESEND') {
-      const resend = new Resend(config.email_smtp_password);
+      const apiKey = process.env.RESEND_API_KEY;
+      if (!apiKey) {
+        return res.status(500).json({ success: false, error: 'Platform RESEND_API_KEY environment variable is missing' });
+      }
+
+      const resend = new Resend(apiKey);
+      const senderEmail = process.env.PLATFORM_SENDER_EMAIL || 'onboarding@resend.dev';
       
       const { data, error } = await resend.emails.send({
-        from: config.email_from_name ? `${config.email_from_name} <${config.email_smtp_user}>` : config.email_smtp_user,
-        to: config.email_smtp_user, // Send a test email to the sender address
-        subject: 'Sajilo ERP - Resend Connection Test',
-        html: '<h3>Connection Successful</h3><p>Your Resend API is correctly configured in Sajilo ERP.</p>'
+        from: config.email_from_name ? `${config.email_from_name} <${senderEmail}>` : senderEmail,
+        reply_to: config.email_smtp_user,
+        to: config.email_smtp_user, // Send a test email to the user's Reply-To address
+        subject: 'Sajilo ERP - Platform Email Delivery Test',
+        html: '<h3>Delivery Successful</h3><p>Your platform-managed email is correctly configured in Sajilo ERP.</p>'
       });
 
       if (error) {
         return res.status(400).json({ success: false, error: error.message });
       }
       
-      return res.json({ success: true, message: 'Resend API Handshake Successful' });
+      return res.json({ success: true, message: 'Platform Email Handshake Successful' });
     }
     return res.status(400).json({ success: false, error: 'Invalid type' });
   } catch (error) {
@@ -130,9 +137,17 @@ async function processOutbox() {
         const pdfBuffer = await generatePDF(payload);
 
         if (row.type === 'EMAIL') {
-          const resend = new Resend(configRows.email_smtp_password);
+          const apiKey = process.env.RESEND_API_KEY;
+          if (!apiKey) {
+            throw new Error('Platform RESEND_API_KEY is missing');
+          }
+
+          const resend = new Resend(apiKey);
+          const senderEmail = process.env.PLATFORM_SENDER_EMAIL || 'onboarding@resend.dev';
+
           const { data, error } = await resend.emails.send({
-            from: configRows.email_from_name ? `"${configRows.email_from_name}" <${configRows.email_smtp_user}>` : configRows.email_smtp_user,
+            from: configRows.email_from_name ? `"${configRows.email_from_name}" <${senderEmail}>` : senderEmail,
+            reply_to: configRows.email_smtp_user,
             to: row.recipient_email,
             subject: `Document ${payload.voucher_no || ''} from ${configRows.email_from_name}`,
             text: `Please find the attached document.\n\nThank you.`,
