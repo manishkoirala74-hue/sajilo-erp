@@ -223,7 +223,7 @@ BEGIN
   FOR v_rev_exp IN (
     SELECT l.account_id, l.account_code, l.account_name, l.account_type, SUM(l.credit_amount - l.debit_amount) as net_balance
     FROM "GeneralLedgerLine" l
-    JOIN "GeneralLedgerJournal" j ON l.journal_id = j.id::TEXT
+    JOIN "GeneralLedgerJournal" j ON l.journal_id::uuid = j.id
     WHERE j.company_id = p_company_id AND j.entry_date BETWEEN v_closing_fy.start_date AND v_closing_fy.end_date
     AND j.status = 'Posted' AND j.reference_module != 'YearEndClose'
     AND l.account_type IN ('Revenue', 'COGS', 'OPEX', 'Expense', 'Income')
@@ -257,7 +257,7 @@ BEGIN
   FOR v_perm IN (
     SELECT l.account_id, l.account_code, l.account_name, l.account_type, SUM(l.debit_amount - l.credit_amount) as net_balance
     FROM "GeneralLedgerLine" l
-    JOIN "GeneralLedgerJournal" j ON l.journal_id = j.id::TEXT
+    JOIN "GeneralLedgerJournal" j ON l.journal_id::uuid = j.id
     WHERE j.company_id = p_company_id AND j.entry_date <= (v_closing_fy.end_date + time '23:59:59')
     AND j.status = 'Posted'
     AND l.account_type IN ('Asset', 'Liability', 'Equity')

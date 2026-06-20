@@ -49,6 +49,7 @@ const buildNavGroups = (settings) => {
         { icon: Ruler, label: 'Units of Measure', path: '/inventory/uom' },
         { icon: SlidersHorizontal, label: 'Stock Adjustments', path: '/inventory/adjustments' },
         { icon: Tag, label: 'Discount Schemes', path: '/inventory/discounts' },
+        { icon: Settings, label: 'Price Revision', path: '/inventory/price-revision' },
         ...(s.enable_manufacturing_module !== false ? [{ icon: Factory, label: 'Mfg Orders', path: '/manufacturing/orders' }] : []),
         ...(s.enable_services_module !== false ? [{ icon: Handshake, label: 'Service Contracts', path: '/services/contracts' }] : []),
       ]

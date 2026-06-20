@@ -222,8 +222,8 @@ BEGIN
 
   -- Update Journal Totals
   UPDATE "GeneralLedgerJournal" SET
-    total_debit = (SELECT SUM(debit_amount) FROM "GeneralLedgerLine" WHERE journal_id = v_journal_id::TEXT),
-    total_credit = (SELECT SUM(credit_amount) FROM "GeneralLedgerLine" WHERE journal_id = v_journal_id::TEXT)
+    total_debit = (SELECT SUM(debit_amount) FROM "GeneralLedgerLine" WHERE journal_id::uuid = v_journal_id),
+    total_credit = (SELECT SUM(credit_amount) FROM "GeneralLedgerLine" WHERE journal_id::uuid = v_journal_id)
   WHERE id = v_journal_id;
 
   RETURN v_run_id;

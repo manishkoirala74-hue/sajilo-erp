@@ -18,7 +18,7 @@ RETURNS TABLE (
   account_name TEXT,
   account_type TEXT,
   ledger_type TEXT,
-  parent_account_id TEXT,
+  parent_account_id UUID,
   opening_debit NUMERIC,
   opening_credit NUMERIC,
   current_debit NUMERIC,
@@ -36,7 +36,7 @@ BEGIN
       SUM(CASE WHEN j.entry_date::DATE >= p_from_date AND j.entry_date::DATE <= p_to_date THEN l.debit_amount ELSE 0 END) as cur_dr,
       SUM(CASE WHEN j.entry_date::DATE >= p_from_date AND j.entry_date::DATE <= p_to_date THEN l.credit_amount ELSE 0 END) as cur_cr
     FROM "GeneralLedgerLine" l
-    JOIN "GeneralLedgerJournal" j ON l.journal_id = j.id::text
+    JOIN "GeneralLedgerJournal" j ON l.journal_id::uuid = j.id
     WHERE j.status = 'Posted'
       AND l.company_id = p_company_id
       AND j.company_id = p_company_id
@@ -85,7 +85,7 @@ BEGIN
     END AS closing_credit
 
   FROM "ChartOfAccount" a
-  LEFT JOIN account_activity aa ON a.id::text = aa.account_id
+  LEFT JOIN account_activity aa ON a.id = aa.account_id::uuid
   WHERE a.company_id = p_company_id
     AND a.is_active = true
     AND a.ledger_type = 'Sub Ledger'
@@ -101,7 +101,7 @@ $$;
 CREATE OR REPLACE FUNCTION get_profit_loss_rpc(p_company_id UUID, p_from_date DATE, p_to_date DATE)
 RETURNS TABLE (
   id UUID,
-  parent_account_id TEXT,
+  parent_account_id UUID,
   account_code TEXT,
   account_name TEXT,
   account_type TEXT,
@@ -116,7 +116,7 @@ BEGIN
       l.account_id,
       SUM(l.debit_amount - l.credit_amount) as net_debit
     FROM "GeneralLedgerLine" l
-    JOIN "GeneralLedgerJournal" j ON l.journal_id = j.id::text
+    JOIN "GeneralLedgerJournal" j ON l.journal_id::uuid = j.id
     WHERE j.status = 'Posted'
       AND l.company_id = p_company_id
       AND j.company_id = p_company_id
@@ -137,7 +137,7 @@ BEGIN
       ELSE -COALESCE(aa.net_debit, 0)
     END AS balance
   FROM "ChartOfAccount" a
-  LEFT JOIN account_activity aa ON a.id::text = aa.account_id
+  LEFT JOIN account_activity aa ON a.id = aa.account_id::uuid
   WHERE a.company_id = p_company_id
     AND a.is_active = true
     AND a.account_type IN ('Revenue', 'Other Income', 'Expense', 'COGS', 'OPEX', 'Cost of Goods Sold', 'Other Expense');
@@ -164,8 +164,8 @@ BEGIN
     COALESCE(SUM(l.debit_amount), 0) AS debit,
     COALESCE(SUM(l.credit_amount), 0) AS credit
   FROM "ChartOfAccount" a
-  JOIN "GeneralLedgerLine" l ON a.id::text = l.account_id AND l.company_id = p_company_id
-  JOIN "GeneralLedgerJournal" j ON l.journal_id = j.id::text AND j.company_id = p_company_id
+  JOIN "GeneralLedgerLine" l ON a.id = l.account_id::uuid AND l.company_id = p_company_id
+  JOIN "GeneralLedgerJournal" j ON l.journal_id::uuid = j.id AND j.company_id = p_company_id
   WHERE a.company_id = p_company_id
     AND a.is_active = true
     AND j.status = 'Posted'
@@ -186,7 +186,7 @@ CREATE OR REPLACE FUNCTION get_comparative_profit_loss_rpc(
 )
 RETURNS TABLE (
   id UUID,
-  parent_account_id TEXT,
+  parent_account_id UUID,
   account_code TEXT,
   account_name TEXT,
   account_type TEXT,
@@ -202,7 +202,7 @@ BEGIN
       l.account_id,
       SUM(l.debit_amount - l.credit_amount) as net_debit
     FROM "GeneralLedgerLine" l
-    JOIN "GeneralLedgerJournal" j ON l.journal_id = j.id::text
+    JOIN "GeneralLedgerJournal" j ON l.journal_id::uuid = j.id
     WHERE j.status = 'Posted'
       AND l.company_id = p_company_id
       AND j.company_id = p_company_id
@@ -215,7 +215,7 @@ BEGIN
       l.account_id,
       SUM(l.debit_amount - l.credit_amount) as net_debit
     FROM "GeneralLedgerLine" l
-    JOIN "GeneralLedgerJournal" j ON l.journal_id = j.id::text
+    JOIN "GeneralLedgerJournal" j ON l.journal_id::uuid = j.id
     WHERE j.status = 'Posted'
       AND l.company_id = p_company_id
       AND j.company_id = p_company_id
@@ -240,8 +240,8 @@ BEGIN
       ELSE -COALESCE(coa.net_debit, 0)
     END AS comparative_balance
   FROM "ChartOfAccount" a
-  LEFT JOIN current_activity ca ON a.id::text = ca.account_id
-  LEFT JOIN comparative_activity coa ON a.id::text = coa.account_id
+  LEFT JOIN current_activity ca ON a.id = ca.account_id::uuid
+  LEFT JOIN comparative_activity coa ON a.id = coa.account_id::uuid
   WHERE a.company_id = p_company_id
     AND a.is_active = true
     AND a.account_type IN ('Revenue', 'Other Income', 'Expense', 'COGS', 'OPEX', 'Cost of Goods Sold', 'Other Expense');

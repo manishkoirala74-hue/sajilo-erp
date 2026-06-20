@@ -300,6 +300,25 @@ export default function Items() {
       payload.is_vat_applicable = taxIds.length > 0;
       
       if (editing) {
+        if (Number(editing.selling_price || 0) !== Number(payload.selling_price || 0)) {
+          const reason = window.prompt("Selling price changed. Please provide a mandatory reason for this change:");
+          if (!reason || !reason.trim()) {
+            toast.error("Price update cancelled. A reason is mandatory.");
+            setSaving(false);
+            return;
+          }
+          await sajilo.auth.supabase.rpc('apply_price_revision_rpc', {
+            p_company_id: sajilo.getCompanyId(),
+            p_category_id: null,
+            p_item_id: editing.id,
+            p_adjustment_type: 'MANUAL_INDIVIDUAL',
+            p_adjustment_value: Number(payload.selling_price || 0),
+            p_remarks: reason.trim(),
+            p_user_id: (await sajilo.auth.supabase.auth.getUser()).data.user.id
+          });
+          delete payload.selling_price; // Handled by RPC
+        }
+
         await sajilo.entities.Item.update(editing.id, payload);
         toast.success('Item updated');
       } else {

@@ -233,6 +233,7 @@ const buildEntityMethods = (tableName) => {
   };
 };
 export const sajilo = {
+  invalidateCache,
   clearCache: () => {
     queryCache.clear();
   },

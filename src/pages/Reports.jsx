@@ -83,6 +83,7 @@ const CATEGORIES = [
       { id: 'stock_movement',    label: 'Stock Movement',         desc: 'All stock changes in the period' },
       { id: 'item_valuation',    label: 'Item Valuation',         desc: 'Inventory value at cost' },
       { id: 'category_summary',  label: 'Category-wise Summary',  desc: 'Stock grouped by category' },
+      { id: 'price_revision_history', label: 'Sales Price Revision History', desc: 'Audit trail of sales price changes', isRoute: true, path: '/reports/price-revision-history' },
     ]
   },
   {

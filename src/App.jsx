@@ -25,6 +25,7 @@ import Categories from '@/pages/inventory/Categories';
 import UnitOfMeasures from '@/pages/inventory/UnitOfMeasures';
 import DiscountSchemes from '@/pages/inventory/DiscountSchemes';
 import StockAdjustments from '@/pages/inventory/StockAdjustments';
+import PriceRevisionWizard from './pages/inventory/PriceRevisionWizard';
 import POSSales from '@/pages/pos/POSSales';
 import PurchaseOrders from '@/pages/purchase/PurchaseOrders';
 import PurchaseInvoices from '@/pages/purchase/PurchaseInvoices';
@@ -38,6 +39,7 @@ import Reports from '@/pages/Reports.jsx';
 import EmployeeReceivableReport from '@/pages/reports/EmployeeReceivableReport';
 import EmployeePayableReport from '@/pages/reports/EmployeePayableReport';
 import CommunicationLogs from '@/pages/reports/CommunicationLogs';
+import PriceRevisionHistory from '@/pages/reports/PriceRevisionHistory';
 import Profile from '@/pages/Profile';
 import HelpSupport from '@/pages/HelpSupport';
 
@@ -140,6 +142,7 @@ const AuthenticatedApp = () => {
           <Route path="/inventory/uom" element={<UnitOfMeasures />} />
           <Route path="/inventory/discounts" element={<DiscountSchemes />} />
           <Route path="/inventory/adjustments" element={<StockAdjustments />} />
+          <Route path="/inventory/price-revision" element={<PriceRevisionWizard />} />
           <Route path="/pos" element={<POSSales />} />
           <Route path="/purchase/orders" element={<PurchaseOrders />} />
           <Route path="/purchase/invoices" element={<PurchaseInvoices />} />
@@ -155,6 +158,7 @@ const AuthenticatedApp = () => {
           <Route path="/reports/employee-receivables" element={<EmployeeReceivableReport />} />
           <Route path="/reports/employee-payables" element={<EmployeePayableReport />} />
           <Route path="/reports/communication-logs" element={<CommunicationLogs />} />
+          <Route path="/reports/price-revision-history" element={<PriceRevisionHistory />} />
           <Route path="/profile" element={<Profile />} />
 
           {/* Accounting */}
