@@ -66,7 +66,10 @@ app.listen(PORT, () => {
 const POLLING_INTERVAL = 5000;
 
 async function generatePDF(payload) {
-  const browser = await puppeteer.launch({ headless: 'new' });
+  const browser = await puppeteer.launch({ 
+    headless: 'new',
+    args: ['--no-sandbox', '--disable-setuid-sandbox']
+  });
   const page = await browser.newPage();
   
   const html = `
