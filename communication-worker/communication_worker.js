@@ -159,7 +159,7 @@ async function processOutbox() {
             text: `Please find the attached document.\n\nThank you.`,
             attachments: [{
               filename: `document_${payload.voucher_no || 'doc'}.pdf`,
-              content: pdfBuffer
+              content: Buffer.from(pdfBuffer).toString('base64')
             }]
           });
           
