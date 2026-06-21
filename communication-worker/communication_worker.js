@@ -7,8 +7,12 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { Resend } from 'resend';
 
+import { fileURLToPath } from 'url';
+import path from 'path';
+
 // Load environment variables (assuming running locally or passed via process.env)
-dotenv.config({ path: '.env.local' });
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: path.resolve(__dirname, '../.env.local') });
 
 const supabaseUrl = process.env.VITE_SAJILO_APP_BASE_URL || process.env.VITE_SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SAJILO_APP_ID || process.env.VITE_SUPABASE_ANON_KEY;
@@ -67,6 +71,7 @@ app.listen(PORT, () => {
 const POLLING_INTERVAL = 5000;
 
 async function generatePDF(payload) {
+  // Fallback PDF generation if storage_path is not provided
   const browser = await puppeteer.launch({ 
     args: chromium.args,
     defaultViewport: chromium.defaultViewport,
@@ -140,7 +145,16 @@ async function processOutbox() {
       const payload = row.payload || {};
 
       try {
-        const pdfBuffer = await generatePDF(payload);
+        let pdfBuffer;
+        if (payload.storage_path) {
+          // Download directly from Supabase Storage
+          const { data, error } = await supabase.storage.from('erp_documents').download(payload.storage_path);
+          if (error) throw new Error(`Storage download error: ${error.message}`);
+          pdfBuffer = await data.arrayBuffer();
+        } else {
+          // Fallback to Puppeteer if no storage_path
+          pdfBuffer = await generatePDF(payload);
+        }
 
         if (row.type === 'EMAIL') {
           const apiKey = process.env.RESEND_API_KEY;
@@ -151,12 +165,16 @@ async function processOutbox() {
           const resend = new Resend(apiKey);
           const senderEmail = process.env.PLATFORM_SENDER_EMAIL || 'onboarding@resend.dev';
 
+          // Determine if body contains HTML tags
+          const bodyContent = payload.body || `Please find the attached document.\n\nThank you.`;
+          const isHtml = /<[a-z][\s\S]*>/i.test(bodyContent);
+
           const { data, error } = await resend.emails.send({
             from: configRows.email_from_name ? `"${configRows.email_from_name}" <${senderEmail}>` : senderEmail,
             reply_to: configRows.email_smtp_user,
             to: row.recipient_email,
-            subject: `Document ${payload.voucher_no || ''} from ${configRows.email_from_name}`,
-            text: `Please find the attached document.\n\nThank you.`,
+            subject: payload.subject || `Document ${payload.voucher_no || ''} from ${configRows.email_from_name}`,
+            [isHtml ? 'html' : 'text']: bodyContent,
             attachments: [{
               filename: `document_${payload.voucher_no || 'doc'}.pdf`,
               content: Buffer.from(pdfBuffer).toString('base64')

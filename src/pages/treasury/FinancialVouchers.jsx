@@ -14,6 +14,7 @@ import DataTable from '@/components/shared/DataTable';
 import StatusBadge from '@/components/shared/StatusBadge';
 import { useSajiloSync } from '@/hooks/useSajiloSync';
 import { postFinancialVoucher } from '@/lib/glPostingService';
+import { generateVectorPDF } from '@/utils/pdfGenerator';
 import VoucherLink from '@/components/shared/VoucherLink';
 
 const emptyVoucher = {
@@ -204,6 +205,20 @@ export default function FinancialVouchers() {
           description: e.narration || payload.narration || `Financial Voucher ${payload.voucher_number}`
         }));
         await postFinancialVoucher({ ...savedVoucher, lines: linesToPost }, false, idempotencyKey);
+      }
+
+      // Native Vector PDF cache generation
+      try {
+        const partner = { name: savedVoucher.contact_name || '' };
+        await generateVectorPDF(
+          savedVoucher,
+          'FinancialVoucher',
+          null,
+          partner,
+          sajilo.getCompanyId()
+        );
+      } catch (pdfErr) {
+        console.error('Vector PDF Gen error:', pdfErr);
       }
 
       toast.success(`Voucher ${status}`);

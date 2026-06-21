@@ -19,9 +19,9 @@ import { computeTotalTax } from '@/lib/taxService';
 import { useSajiloSync } from '@/hooks/useSajiloSync';
 import SearchableSelect from '@/components/shared/SearchableSelect';
 import QuickPartnerCreate from '@/components/shared/QuickPartnerCreate';
-import CommunicationModal from '@/components/shared/CommunicationModal';
 import { Mail } from 'lucide-react';
 import VoucherLink from '@/components/shared/VoucherLink';
+import { generateVectorPDF } from '@/utils/pdfGenerator';
 
 const emptyPI = {
   invoice_number: '', vendor_invoice_no: '', po_reference_id: '',
@@ -50,8 +50,6 @@ export default function PurchaseInvoices() {
   const [form, setForm] = useState(emptyPI);
   const [saving, setSaving] = useState(false);
   const [filterStatus, setFilterStatus] = useState('all');
-
-  const [showCommModal, setShowCommModal] = useState(false);
 
   // Cancel dialog state
   const [cancelTarget, setCancelTarget] = useState(null);
@@ -219,6 +217,23 @@ export default function PurchaseInvoices() {
         }
       }
 
+      // Native Vector PDF cache generation
+      try {
+        const docId = form.id || created?.id;
+        const fullDoc = { ...data, id: docId, purchase_number: form.invoice_number || data.invoice_number || created?.invoice_number };
+        const partner = vendors.find(v => v.id === form.vendor_id);
+        
+        await generateVectorPDF(
+          fullDoc,
+          'PurchaseInvoice',
+          settings,
+          partner,
+          sajilo.getCompanyId()
+        );
+      } catch (pdfErr) {
+        console.error('Vector PDF Gen error:', pdfErr);
+      }
+
     } catch (err) {
       toast.error(err.message || 'Error occurred while saving');
     } finally {
@@ -241,21 +256,7 @@ export default function PurchaseInvoices() {
     setCancelling(true);
     const inv = cancelTarget;
 
-    // Reverse stock if it was Posted
-    if (inv.status === 'Posted') {
-      const qtyByItem = {};
-      for (const line of (inv.line_items || [])) {
-        if (line.item_id) qtyByItem[line.item_id] = (qtyByItem[line.item_id] || 0) + (line.quantity || 0);
-      }
-      await Promise.all(Object.entries(qtyByItem).map(async ([itemId, qty]) => {
-        const items = await sajilo.entities.Item.filter({ id: itemId });
-        if (items.length > 0) {
-          const item = items[0];
-          const restoredQty = (item.quantity_on_hand || 0) - qty;
-          return sajilo.entities.Item.update(item.id, { quantity_on_hand: Math.max(0, restoredQty) });
-        }
-      }));
-    }
+    // (Stock reversal is perfectly handled by backend rpc_post_purchase_invoice with p_is_reversal: true)
 
     await sajilo.entities.PurchaseInvoice.update(inv.id, {
       status: 'Cancelled',
@@ -489,7 +490,7 @@ export default function PurchaseInvoices() {
               </div>
               {viewDetail && (
                 <div className="flex items-center gap-2">
-                  <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setShowCommModal(true)}>
+                  <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => navigate(`/email/compose?module=PurchaseInvoice&id=${viewDetail.id}`)}>
                     <Mail className="w-3.5 h-3.5 mr-1.5" /> Email Invoice
                   </Button>
                   <span className="text-xs font-semibold bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 px-2 py-1 rounded border border-blue-200 dark:border-blue-800">
@@ -540,16 +541,6 @@ export default function PurchaseInvoices() {
           )}
         </DialogContent>
       </Dialog>
-
-      <CommunicationModal 
-        open={showCommModal} 
-        onOpenChange={setShowCommModal}
-        module="PurchaseInvoice"
-        referenceId={viewDetail?.id}
-        partnerId={viewDetail?.vendor_id}
-        companyId={sajilo.getCompanyId()}
-        payload={viewDetail || {}}
-      />
 
       {/* ── CANCEL DIALOG ── */}
       <Dialog open={!!cancelTarget} onOpenChange={() => setCancelTarget(null)}>
