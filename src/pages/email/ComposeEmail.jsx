@@ -10,11 +10,12 @@ import { toast } from 'sonner';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
 import { generateVectorPDF } from '@/utils/pdfGenerator';
+import { generatePDF } from '@/utils/pdf-engine/generator';
 
 export default function ComposeEmail() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { session } = useAuth();
+  const { session, activeCompany } = useAuth();
   
   const moduleName = searchParams.get('module');
   const referenceId = searchParams.get('id');
@@ -104,27 +105,67 @@ export default function ComposeEmail() {
 
       setDocumentData(docData);
 
-      // Fetch pre-compiled native Vector PDF from Supabase Storage
       if (companyId) {
         const fileName = `${docData.id}.pdf`;
         const sPath = `${companyId}/${moduleName}/${fileName}`;
         
-        const { data: urlData, error: urlErr } = await supabase.storage
-            .from('erp_documents')
-            .createSignedUrl(sPath, 3600);
-            
-        if (urlData) {
-          setPdfBlobUrl(urlData.signedUrl);
-          setStoragePath(sPath);
-        } else {
-          console.log("PDF not found in storage, generating on the fly...");
+        let blobToUpload = null;
+
+        // For Sales Invoices, we use the advanced template engine
+        if (moduleName === 'SalesInvoice') {
+          console.log("Generating SalesInvoice PDF with advanced template engine...");
           try {
-            const { blob, storagePath: newPath } = await generateVectorPDF(docData, moduleName, currentSettings, currentPartner, companyId);
-            setPdfBlobUrl(URL.createObjectURL(blob));
-            setStoragePath(newPath);
-          } catch (genErr) {
-            console.error("Failed to generate PDF on the fly", genErr);
+            // Fetch template
+            const { data: templates } = await supabase.from('DocumentTemplate')
+              .select('*').eq('document_type', 'Sales Invoice');
+            const defaultTemplate = (templates || []).find(t => t.is_default) || (templates && templates[0]);
+            const layoutConfig = defaultTemplate ? defaultTemplate.layout_config : {};
+
+            const customerDetails = currentPartner ? {
+              ...currentPartner,
+              phone: currentPartner.phone || currentPartner.contact_number
+            } : { name: docData.customer_name };
+
+            const pdfData = {
+              ...docData,
+              date: docData.invoice_date,
+              reference_number: docData.invoice_number,
+              company: activeCompany || currentSettings || { name: 'Sajilo ERP' },
+              customer: customerDetails,
+              subtotal: docData.goods_subtotal,
+              tax_total: docData.total_tax_amount,
+              total: docData.grand_total,
+            };
+
+            blobToUpload = await generatePDF(pdfData, layoutConfig);
+          } catch (err) {
+            console.error("Advanced PDF engine failed", err);
           }
+        }
+
+        // Fallback or other modules use the legacy vector PDF
+        if (!blobToUpload) {
+          console.log("Generating legacy Vector PDF...");
+          try {
+            const result = await generateVectorPDF(docData, moduleName, currentSettings, currentPartner, companyId);
+            blobToUpload = result.blob;
+          } catch (genErr) {
+            console.error("Failed to generate legacy PDF", genErr);
+          }
+        }
+
+        if (blobToUpload) {
+          setPdfBlobUrl(URL.createObjectURL(blobToUpload));
+          setStoragePath(sPath);
+          
+          // Upload to storage to overwrite any stale cached version
+          const { error: uploadError } = await supabase.storage
+            .from('erp_documents')
+            .upload(sPath, blobToUpload, {
+              contentType: 'application/pdf',
+              upsert: true 
+            });
+          if (uploadError) console.error("Failed to cache new PDF to storage", uploadError);
         }
       }
 

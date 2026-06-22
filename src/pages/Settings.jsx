@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
 import { sajilo } from '@/api/sajiloClient';
 import {
@@ -88,6 +89,7 @@ const DEFAULT_SETTINGS = {
 
 export default function Settings() {
   const { user, activeCompany, availableCompanies, isLoadingAuth } = useAuth();
+  const navigate = useNavigate();
   const [activeHub, setActiveHub] = useState('workspace');
   const [settings, setSettings] = useState(null);
   const [settingsId, setSettingsId] = useState(null);
@@ -312,22 +314,13 @@ export default function Settings() {
               </div>
             </SectionCard>
 
-            <SectionCard title="Invoice Template Design" icon={FileText}>
-              <div className="space-y-3">
-                <p className="text-sm text-muted-foreground">Choose the print template style for your documents.</p>
-                {['Sales Invoice', 'Purchase Order', 'Sales Order'].map(t => (
-                  <div key={t} className="flex items-center justify-between py-2.5 border-b border-border last:border-0 text-foreground">
-                    <span className="text-sm font-medium">{t}</span>
-                    <Select defaultValue="standard">
-                      <SelectTrigger className="w-44 h-8 text-xs border border-border bg-background"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="standard">Standard (Classic)</SelectItem>
-                        <SelectItem value="modern">Modern (Compact)</SelectItem>
-                        <SelectItem value="detailed">Detailed (With Notes)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                ))}
+            <SectionCard title="PDF Document Templates" icon={FileText}>
+              <div className="flex flex-col gap-3 items-start">
+                <p className="text-sm text-muted-foreground">Design and manage custom PDF templates for your invoices, orders, and quotations.</p>
+                <Button onClick={() => navigate('/settings/templates')} variant="outline" className="w-full justify-between group">
+                  <span>Open Template Builder</span>
+                  <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+                </Button>
               </div>
             </SectionCard>
             

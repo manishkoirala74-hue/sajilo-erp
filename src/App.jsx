@@ -35,6 +35,8 @@ import SalesInvoices from '@/pages/sales/SalesInvoices';
 import SalesReturns from '@/pages/sales/SalesReturns';
 import Quotations from '@/pages/sales/Quotations';
 import Settings from '@/pages/Settings';
+import PDFTemplatesList from '@/pages/settings/PDFTemplatesList';
+import TemplateBuilder from '@/pages/settings/TemplateBuilder';
 import Reports from '@/pages/Reports.jsx';
 import EmployeeReceivableReport from '@/pages/reports/EmployeeReceivableReport';
 import EmployeePayableReport from '@/pages/reports/EmployeePayableReport';
@@ -153,6 +155,8 @@ const AuthenticatedApp = () => {
           <Route path="/sales/invoices" element={<SalesInvoices />} />
           <Route path="/sales/returns" element={<SalesReturns />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/settings/templates" element={<PDFTemplatesList />} />
+          <Route path="/settings/templates/builder/:id" element={<TemplateBuilder />} />
           <Route path="/help-support" element={<HelpSupport />} />
           <Route path="/email/compose" element={<ComposeEmail />} />
           {/* Reports */}

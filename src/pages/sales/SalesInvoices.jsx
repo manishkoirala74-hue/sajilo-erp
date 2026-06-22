@@ -17,12 +17,13 @@ import DateInput from '@/components/shared/DateInput';
 import { postSalesInvoice, loadItemsMap, loadSettings } from '@/lib/glPostingService';
 import { loadActiveTaxTypes, computeTotalTax } from '@/lib/taxService';
 import { useSajiloSync } from '@/hooks/useSajiloSync';
-import { usePermissions } from '@/lib/AuthContext';
+import { usePermissions, useAuth } from '@/lib/AuthContext';
 import SearchableSelect from '@/components/shared/SearchableSelect';
 import QuickPartnerCreate from '@/components/shared/QuickPartnerCreate';
 import VoucherLink from '@/components/shared/VoucherLink';
 import { generateVectorPDF } from '@/utils/pdfGenerator';
-import { Mail } from 'lucide-react';
+import { downloadPDF } from '@/utils/pdf-engine/generator';
+import { Mail, Download } from 'lucide-react';
 
 const emptySI = {
   invoice_number: '', customer_id: '', customer_name: '', sales_order_id: '',
@@ -36,6 +37,7 @@ const emptySI = {
 
 export default function SalesInvoices() {
   const { hasAccess } = usePermissions();
+  const { activeCompany } = useAuth();
   const canCreate = hasAccess('sales_invoices', 'create');
   const canEdit = hasAccess('sales_invoices', 'edit');
   const canReverse = hasAccess('sales_invoices', 'reverse');
@@ -118,6 +120,43 @@ export default function SalesInvoices() {
         searchParams.delete('view');
         setSearchParams(searchParams, { replace: true });
       }
+    }
+  };
+
+  const handleDownloadPDF = async (invoice) => {
+    toast.loading('Generating PDF...', { id: 'pdf-gen' });
+    try {
+      const templates = await sajilo.entities.DocumentTemplate.filter({ document_type: 'Sales Invoice' });
+      const defaultTemplate = templates.find(t => t.is_default) || templates[0];
+      const layoutConfig = defaultTemplate ? defaultTemplate.layout_config : {};
+
+      let customerDetails = { name: invoice.customer_name };
+      if (invoice.customer_id) {
+        const custData = await sajilo.entities.BusinessPartner.get(invoice.customer_id);
+        if (custData) {
+          customerDetails = {
+            ...custData,
+            phone: custData.phone || custData.contact_number // Map contact_number to phone for PDF generator
+          };
+        }
+      }
+
+      const pdfData = {
+        ...invoice,
+        date: invoice.invoice_date,
+        reference_number: invoice.invoice_number,
+        company: activeCompany || settings || { name: 'Sajilo ERP' },
+        customer: customerDetails,
+        subtotal: invoice.goods_subtotal,
+        tax_total: invoice.total_tax_amount,
+        total: invoice.grand_total,
+      };
+
+      await downloadPDF(pdfData, layoutConfig, `Invoice_${invoice.invoice_number}.pdf`);
+      toast.success('PDF generated successfully!', { id: 'pdf-gen' });
+    } catch (e) {
+      console.error(e);
+      toast.error('Failed to generate PDF', { id: 'pdf-gen' });
     }
   };
 
@@ -580,6 +619,9 @@ export default function SalesInvoices() {
               </div>
               {viewDetail && (
                 <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => handleDownloadPDF(viewDetail)}>
+                    <Download className="w-3.5 h-3.5 mr-1.5" /> Download PDF
+                  </Button>
                   <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => navigate(`/email/compose?module=SalesInvoice&id=${viewDetail.id}`)}>
                     <Mail className="w-3.5 h-3.5 mr-1.5" /> Email Invoice
                   </Button>

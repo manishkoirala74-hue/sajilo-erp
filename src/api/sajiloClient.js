@@ -191,6 +191,30 @@ const buildEntityMethods = (tableName) => {
       return data;
     },
     
+    get: async (id) => {
+      const sanitizedMatch = sanitizePayload({ id });
+      const cacheKey = `${tableName}:get:${id}:${sajilo.getCompanyId()}`;
+      if (queryCache.has(cacheKey)) return queryCache.get(cacheKey);
+
+      // Intelligent Cache Lookup for primary key point queries
+      for (const [key, cachedData] of queryCache.entries()) {
+        if (key.startsWith(`${tableName}:list:`) && Array.isArray(cachedData)) {
+          const found = cachedData.find(item => item.id === id);
+          if (found) {
+            return found;
+          }
+        }
+      }
+
+      let query = supabase.from(tableName).select('*').eq('id', id).single();
+      query = applyCompanyFilter(query);
+      
+      const { data, error } = await query;
+      if (error && error.code !== 'PGRST116') throw error; // Ignore not found error
+      if (data) queryCache.set(cacheKey, data);
+      return data;
+    },
+    
     create: async (obj) => {
       const sanitized = sanitizePayload(obj);
       await validateFiscalYear(tableName, sanitized);
