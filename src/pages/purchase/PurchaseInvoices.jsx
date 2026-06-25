@@ -370,111 +370,153 @@ export default function PurchaseInvoices() {
           <DialogHeader>
             <DialogTitle>{form.id ? 'Edit Purchase Invoice' : 'New Purchase Invoice'} — {form.invoice_number}</DialogTitle>
           </DialogHeader>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5 mt-4">
-            <div className="col-span-2">
-              <Label>Payment Mode</Label>
-              <div className="flex gap-2 mt-1">
-                {['Credit', 'Cash', 'Bank'].map(mode => (
-                  <Button 
-                    key={mode} 
-                    type="button"
-                    variant={form.payment_mode === mode ? 'default' : 'outline'}
-                    onClick={() => setForm(f => ({ ...f, payment_mode: mode, cash_bank_account_id: '', cash_bank_account_name: '', vendor_id: '', vendor_name: '' }))}
-                    className="flex-1"
-                  >
-                    {mode}
-                  </Button>
-                ))}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-4 pb-24">
+            {/* LEFT COLUMN */}
+            <div className="lg:col-span-2 space-y-6">
+              <div className="bg-card rounded-2xl border border-stone-200 p-5 shadow-sm">
+                <h3 className="font-semibold text-lg text-foreground mb-4">Vendor & invoice context</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
+                  <div className="col-span-2">
+                    <Label>Payment Mode</Label>
+                    <div className="flex gap-2 mt-1">
+                      {['Credit', 'Cash', 'Bank'].map(mode => (
+                        <Button 
+                          key={mode} 
+                          type="button"
+                          variant={form.payment_mode === mode ? 'default' : 'outline'}
+                          onClick={() => setForm(f => ({ ...f, payment_mode: mode, cash_bank_account_id: '', cash_bank_account_name: '', vendor_id: '', vendor_name: '' }))}
+                          className="flex-1 rounded-xl"
+                        >
+                          {mode}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  {form.payment_mode === 'Credit' ? (
+                    <div className="col-span-2">
+                      <Label>Vendor *</Label>
+                      <SearchableSelect
+                        options={vendors.map(v => ({ value: v.id, label: v.name }))}
+                        value={form.vendor_id}
+                        onChange={v => {
+                          const vnd = vendors.find(x => x.id === v);
+                          setForm(f => ({ ...f, vendor_id: v, vendor_name: vnd?.name || '' }));
+                        }}
+                        placeholder="Select vendor"
+                        className="mt-1"
+                        onCreateNew={() => setShowVendorCreate(true)}
+                        createNewText="New Vendor"
+                      />
+                    </div>
+                  ) : (
+                    <>
+                      <div className="col-span-2 md:col-span-1">
+                        <Label>{form.payment_mode} Account (Ledger) *</Label>
+                        <SearchableSelect
+                          options={accounts
+                            .filter(a => a.ledger_type === 'Sub Ledger' && (form.payment_mode === 'Cash' ? a.account_name.toLowerCase().includes('cash') : (a.parent_account_name?.toLowerCase().includes('bank') || a.account_name.toLowerCase().includes('bank'))))
+                            .map(a => ({ value: a.id, label: a.account_name }))}
+                          value={form.cash_bank_account_id}
+                          onChange={v => {
+                            const acc = accounts.find(x => x.id === v);
+                            setForm(f => ({ ...f, cash_bank_account_id: v, cash_bank_account_name: acc?.account_name || '' }));
+                          }}
+                          placeholder={`Select ${form.payment_mode} account`}
+                          className="mt-1"
+                        />
+                      </div>
+                      <div className="col-span-2 md:col-span-1">
+                        <Label>Vendor Name (Optional)</Label>
+                        <Input 
+                          value={form.vendor_name} 
+                          onChange={e => setForm(f => ({ ...f, vendor_name: e.target.value }))} 
+                          placeholder="Walk-in Vendor" 
+                          className="mt-1" 
+                        />
+                      </div>
+                    </>
+                  )}
+                  <div>
+                    <Label>Fetch from Approved PO</Label>
+                    <Select onValueChange={fetchFromPO}>
+                      <SelectTrigger className="mt-1 border-dashed border-primary/50 text-primary rounded-xl">
+                        <SelectValue placeholder="📋 Fetch from PO..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {approvedPOs.map(po => (
+                          <SelectItem key={po.id} value={po.id}>{po.po_number} — {po.vendor_name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>Vendor's Invoice No.</Label>
+                    <Input value={form.vendor_invoice_no} onChange={e => setForm(f => ({...f, vendor_invoice_no: e.target.value}))} placeholder="Supplier reference" className="mt-1" />
+                  </div>
+                  <div>
+                    <DateInput label="Invoice Date" value={form.invoice_date} onChange={v => setForm(f => ({...f, invoice_date: v}))} className="mt-1" />
+                  </div>
+                  <div>
+                    <DateInput label="Due Date" value={form.due_date} onChange={v => setForm(f => ({...f, due_date: v}))} className="mt-1" />
+                  </div>
+                  <div>
+                    <Label>Landed Cost (NPR)</Label>
+                    <Input type="number" value={form.landed_cost_total} onChange={e => {
+                      const lc = Number(e.target.value);
+                      setForm(f => ({ ...f, landed_cost_total: lc, grand_total: (f.subtotal || 0) + (f.vat_amount || 0) + lc }));
+                    }} className="mt-1" />
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-card rounded-2xl border border-stone-200 p-5 shadow-sm">
+                <h3 className="font-semibold text-lg text-foreground mb-4">Line Items</h3>
+                <LineItemsEditor value={form.line_items} onChange={handleLineChange} taxTypes={taxTypes} hideTotals={true} />
               </div>
             </div>
-            
-            {form.payment_mode === 'Credit' ? (
-              <div>
-                <Label>Vendor *</Label>
-                <SearchableSelect
-                  options={vendors.map(v => ({ value: v.id, label: v.name }))}
-                  value={form.vendor_id}
-                  onChange={v => {
-                    const vendor = vendors.find(vn => vn.id === v);
-                    setForm(f => ({ ...f, vendor_id: v, vendor_name: vendor?.name || '' }));
-                  }}
-                  placeholder="Select vendor"
-                  className="mt-1"
-                  onCreateNew={() => setShowVendorCreate(true)}
-                  createNewText="New Vendor"
-                />
+
+            {/* RIGHT COLUMN */}
+            <div className="lg:col-span-1">
+              <div className="bg-card rounded-2xl border border-stone-200 p-6 sticky top-4 shadow-sm">
+                <h3 className="font-semibold text-lg text-foreground mb-5">Invoice totals</h3>
+                <div className="space-y-4 text-sm">
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground font-medium">Subtotal</span>
+                    <span className="font-semibold">NPR {(form.subtotal || 0).toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground font-medium">VAT Amount</span>
+                    <span className="font-semibold">NPR {(form.vat_amount || 0).toLocaleString()}</span>
+                  </div>
+                  {form.landed_cost_total > 0 && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-muted-foreground font-medium">Landed Cost</span>
+                      <span className="font-semibold text-orange-600">NPR {(form.landed_cost_total || 0).toLocaleString()}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between items-center text-xl font-bold border-t border-stone-100 pt-4 mt-4">
+                    <span className="text-foreground">Invoice Total</span>
+                    <span className="text-foreground">NPR {(form.grand_total || 0).toLocaleString()}</span>
+                  </div>
+                </div>
               </div>
-            ) : (
-              <>
-                <div>
-                  <Label>{form.payment_mode} Account (Ledger) *</Label>
-                  <SearchableSelect
-                    options={accounts
-                      .filter(a => a.ledger_type === 'Sub Ledger' && (form.payment_mode === 'Cash' ? a.account_name.toLowerCase().includes('cash') : (a.parent_account_name?.toLowerCase().includes('bank') || a.account_name.toLowerCase().includes('bank'))))
-                      .map(a => ({ value: a.id, label: a.account_name }))}
-                    value={form.cash_bank_account_id}
-                    onChange={v => {
-                      const acc = accounts.find(x => x.id === v);
-                      setForm(f => ({ ...f, cash_bank_account_id: v, cash_bank_account_name: acc?.account_name || '' }));
-                    }}
-                    placeholder={`Select ${form.payment_mode} account`}
-                    className="mt-1"
-                  />
-                </div>
-                <div>
-                  <Label>Vendor Name (Optional)</Label>
-                  <Input 
-                    value={form.vendor_name} 
-                    onChange={e => setForm(f => ({ ...f, vendor_name: e.target.value }))} 
-                    placeholder="Walk-in Vendor" 
-                    className="mt-1" 
-                  />
-                </div>
-              </>
-            )}
-            <div>
-              <Label>Fetch from Approved PO</Label>
-              <Select onValueChange={fetchFromPO}>
-                <SelectTrigger className="mt-1 border-dashed border-primary/50 text-primary">
-                  <SelectValue placeholder="📋 Fetch from PO..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {approvedPOs.map(po => (
-                    <SelectItem key={po.id} value={po.id}>{po.po_number} — {po.vendor_name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Vendor's Invoice No.</Label>
-              <Input value={form.vendor_invoice_no} onChange={e => setForm(f => ({...f, vendor_invoice_no: e.target.value}))} placeholder="Supplier reference" className="mt-1" />
-            </div>
-            <div>
-              <DateInput label="Invoice Date" value={form.invoice_date} onChange={v => setForm(f => ({...f, invoice_date: v}))} className="mt-1" />
-            </div>
-            <div>
-              <DateInput label="Due Date" value={form.due_date} onChange={v => setForm(f => ({...f, due_date: v}))} className="mt-1" />
-            </div>
-            <div>
-              <Label>Landed Cost (NPR)</Label>
-              <Input type="number" value={form.landed_cost_total} onChange={e => {
-                const lc = Number(e.target.value);
-                setForm(f => ({ ...f, landed_cost_total: lc, grand_total: f.subtotal + f.vat_amount + lc }));
-              }} className="mt-1" />
             </div>
           </div>
 
-          <div className="mt-6">
-            <Label className="text-base font-semibold mb-3 block">Line Items</Label>
-            <LineItemsEditor value={form.line_items} onChange={handleLineChange} />
-          </div>
-
-          <div className="flex justify-end gap-3 mt-4 pt-4 border-t border-border">
-            <Button variant="outline" onClick={() => setShowForm(false)}>Cancel</Button>
-            <Button variant="outline" onClick={() => handleSave('Draft')} disabled={saving}>Save Draft</Button>
-            <Button onClick={() => handleSave('Posted')} disabled={saving}>
-              {saving ? 'Posting...' : 'Post Invoice (Update Stock)'}
-            </Button>
+          {/* STICKY FOOTER */}
+          <div className="sticky bottom-0 -mx-6 -mb-6 mt-4 bg-stone-50/90 backdrop-blur-md border-t border-stone-200 p-4 flex justify-between items-center z-50 rounded-b-lg">
+            <div className="flex flex-col ml-6">
+              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Invoice Total</span>
+              <span className="text-xl font-bold text-foreground leading-none mt-1">NPR {(form.grand_total || 0).toLocaleString()}</span>
+            </div>
+            <div className="flex gap-3 mr-6 items-center">
+              <Button variant="ghost" className="rounded-xl" onClick={() => setShowForm(false)}>Cancel</Button>
+              <Button variant="outline" className="rounded-xl border-primary text-primary hover:bg-primary/10" onClick={() => handleSave('Draft')} disabled={saving}>Save Draft</Button>
+              <Button className="rounded-xl font-bold shadow-sm px-6" onClick={() => handleSave('Posted')} disabled={saving}>
+                {saving ? 'Saving...' : '✓ Save'}
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

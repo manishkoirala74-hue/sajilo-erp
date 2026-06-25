@@ -479,131 +479,179 @@ export default function SalesInvoices() {
             <DialogTitle>{form.id ? 'Edit Sales Invoice' : 'New Sales Invoice'}</DialogTitle>
           </DialogHeader>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5 mt-4">
-            <div className="col-span-2">
-              <Label>Payment Mode</Label>
-              <div className="flex gap-2 mt-1">
-                {['Credit', 'Cash', 'Bank'].map(mode => (
-                  <Button 
-                    key={mode} 
-                    type="button"
-                    variant={form.payment_mode === mode ? 'default' : 'outline'}
-                    onClick={() => setForm(f => ({ ...f, payment_mode: mode, cash_bank_account_id: '', cash_bank_account_name: '', customer_id: '', customer_name: '' }))}
-                    className="flex-1"
-                  >
-                    {mode}
-                  </Button>
-                ))}
-              </div>
-            </div>
-            <div className="col-span-2">
-              <Label>Invoice Number *</Label>
-              <div className="flex gap-2 mt-1">
-                <Input
-                  value={form.invoice_number}
-                  onChange={e => setForm(f => ({ ...f, invoice_number: e.target.value }))}
-                  readOnly={settings?.invoice_numbering_method !== 'Manual'}
-                  className={settings?.invoice_numbering_method !== 'Manual' ? 'font-mono bg-muted' : 'font-mono'}
-                  placeholder={settings?.invoice_numbering_method === 'Manual' ? 'Enter invoice number' : ''}
-                />
-                {settings?.invoice_numbering_method !== 'Manual' && (
-                  <span className="flex items-center text-xs text-muted-foreground bg-muted px-2 rounded border border-border whitespace-nowrap">Auto</span>
-                )}
-              </div>
-              {settings?.invoice_numbering_method === 'Manual' && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  Manual mode — {settings?.invoice_duplicate_handling === 'Warn' ? 'Duplicate numbers will trigger a warning' : 'Duplicate numbers are blocked'}
-                </p>
-              )}
-            </div>
-            
-            {form.payment_mode === 'Credit' ? (
-              <div>
-                <Label>Customer *</Label>
-                <SearchableSelect
-                  options={customers.map(c => ({ value: c.id, label: c.name }))}
-                  value={form.customer_id}
-                  onChange={v => {
-                    const c = customers.find(x => x.id === v);
-                    setForm(f => ({ ...f, customer_id: v, customer_name: c?.name || '' }));
-                  }}
-                  placeholder="Select customer"
-                  className="mt-1"
-                  onCreateNew={() => setShowCustomerCreate(true)}
-                  createNewText="New Customer"
-                />
-              </div>
-            ) : (
-              <>
-                <div>
-                  <Label>{form.payment_mode} Account (Ledger) *</Label>
-                  <SearchableSelect
-                    options={accounts
-                      .filter(a => a.ledger_type === 'Sub Ledger' && (form.payment_mode === 'Cash' ? a.account_name.toLowerCase().includes('cash') : (a.parent_account_name?.toLowerCase().includes('bank') || a.account_name.toLowerCase().includes('bank'))))
-                      .map(a => ({ value: a.id, label: a.account_name }))}
-                    value={form.cash_bank_account_id}
-                    onChange={v => {
-                      const acc = accounts.find(x => x.id === v);
-                      setForm(f => ({ ...f, cash_bank_account_id: v, cash_bank_account_name: acc?.account_name || '' }));
-                    }}
-                    placeholder={`Select ${form.payment_mode} account`}
-                    className="mt-1"
-                  />
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-4 pb-24">
+            {/* LEFT COLUMN */}
+            <div className="lg:col-span-2 space-y-6">
+              <div className="bg-card rounded-2xl border border-stone-200 p-5 shadow-sm">
+                <h3 className="font-semibold text-lg text-foreground mb-4">Customer & invoice context</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
+                  <div className="col-span-2">
+                    <Label>Payment Mode</Label>
+                    <div className="flex gap-2 mt-1">
+                      {['Credit', 'Cash', 'Bank'].map(mode => (
+                        <Button 
+                          key={mode} 
+                          type="button"
+                          variant={form.payment_mode === mode ? 'default' : 'outline'}
+                          onClick={() => setForm(f => ({ ...f, payment_mode: mode, cash_bank_account_id: '', cash_bank_account_name: '', customer_id: '', customer_name: '' }))}
+                          className="flex-1 rounded-xl"
+                        >
+                          {mode}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="col-span-2">
+                    <Label>Invoice Number *</Label>
+                    <div className="flex gap-2 mt-1">
+                      <Input
+                        value={form.invoice_number}
+                        onChange={e => setForm(f => ({ ...f, invoice_number: e.target.value }))}
+                        readOnly={settings?.invoice_numbering_method !== 'Manual'}
+                        className={settings?.invoice_numbering_method !== 'Manual' ? 'font-mono bg-muted' : 'font-mono'}
+                        placeholder={settings?.invoice_numbering_method === 'Manual' ? 'Enter invoice number' : ''}
+                      />
+                      {settings?.invoice_numbering_method !== 'Manual' && (
+                        <span className="flex items-center text-xs text-muted-foreground bg-muted px-2 rounded-xl border border-border whitespace-nowrap">Auto</span>
+                      )}
+                    </div>
+                    {settings?.invoice_numbering_method === 'Manual' && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Manual mode — {settings?.invoice_duplicate_handling === 'Warn' ? 'Duplicate numbers will trigger a warning' : 'Duplicate numbers are blocked'}
+                      </p>
+                    )}
+                  </div>
+                  
+                  {form.payment_mode === 'Credit' ? (
+                    <div>
+                      <Label>Customer *</Label>
+                      <SearchableSelect
+                        options={customers.map(c => ({ value: c.id, label: c.name }))}
+                        value={form.customer_id}
+                        onChange={v => {
+                          const c = customers.find(x => x.id === v);
+                          setForm(f => ({ ...f, customer_id: v, customer_name: c?.name || '' }));
+                        }}
+                        placeholder="Select customer"
+                        className="mt-1"
+                        onCreateNew={() => setShowCustomerCreate(true)}
+                        createNewText="New Customer"
+                      />
+                    </div>
+                  ) : (
+                    <>
+                      <div>
+                        <Label>{form.payment_mode} Account (Ledger) *</Label>
+                        <SearchableSelect
+                          options={accounts
+                            .filter(a => a.ledger_type === 'Sub Ledger' && (form.payment_mode === 'Cash' ? a.account_name.toLowerCase().includes('cash') : (a.parent_account_name?.toLowerCase().includes('bank') || a.account_name.toLowerCase().includes('bank'))))
+                            .map(a => ({ value: a.id, label: a.account_name }))}
+                          value={form.cash_bank_account_id}
+                          onChange={v => {
+                            const acc = accounts.find(x => x.id === v);
+                            setForm(f => ({ ...f, cash_bank_account_id: v, cash_bank_account_name: acc?.account_name || '' }));
+                          }}
+                          placeholder={`Select ${form.payment_mode} account`}
+                          className="mt-1"
+                        />
+                      </div>
+                      <div>
+                        <Label>Customer Name (Optional)</Label>
+                        <Input 
+                          value={form.customer_name} 
+                          onChange={e => setForm(f => ({ ...f, customer_name: e.target.value }))} 
+                          placeholder="Walk-in Customer" 
+                          className="mt-1" 
+                        />
+                      </div>
+                    </>
+                  )}
+                  <div>
+                    <Label>Fetch from Sales Order</Label>
+                    <Select onValueChange={fetchFromSO}>
+                      <SelectTrigger className="mt-1 border-dashed border-primary/50 text-primary rounded-xl">
+                        <SelectValue placeholder="📋 Fetch from SO..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {salesOrders.map(so => (
+                          <SelectItem key={so.id} value={so.id}>{so.order_number} — {so.customer_name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <DateInput label="Invoice Date" value={form.invoice_date} onChange={v => setForm(f => ({...f, invoice_date: v}))} className="mt-1" />
+                  </div>
+                  <div>
+                    <DateInput label="Due Date" value={form.due_date} onChange={v => setForm(f => ({...f, due_date: v}))} className="mt-1" />
+                  </div>
+                  <div>
+                    <Label>Sundry Charges (NPR)</Label>
+                    <Input type="number" value={form.sundry_charges_total} onChange={e => {
+                      const sc = Number(e.target.value);
+                      setForm(f => ({ ...f, sundry_charges_total: sc, grand_total: (f.goods_subtotal || 0) + (f.total_tax_amount || 0) + sc }));
+                    }} className="mt-1" />
+                  </div>
+                  <div>
+                    <Label>Notes</Label>
+                    <Input value={form.notes} onChange={e => setForm(f => ({...f, notes: e.target.value}))} placeholder="Optional" className="mt-1" />
+                  </div>
                 </div>
-                <div>
-                  <Label>Customer Name (Optional)</Label>
-                  <Input 
-                    value={form.customer_name} 
-                    onChange={e => setForm(f => ({ ...f, customer_name: e.target.value }))} 
-                    placeholder="Walk-in Customer" 
-                    className="mt-1" 
-                  />
+              </div>
+
+              <div className="bg-card rounded-2xl border border-stone-200 p-5 shadow-sm">
+                <h3 className="font-semibold text-lg text-foreground mb-4">Line Items</h3>
+                <LineItemsEditor value={form.line_items} onChange={handleLineChange} taxTypes={taxTypes} hideTotals={true} />
+              </div>
+            </div>
+
+            {/* RIGHT COLUMN */}
+            <div className="lg:col-span-1">
+              <div className="bg-card rounded-2xl border border-stone-200 p-6 sticky top-4 shadow-sm">
+                <h3 className="font-semibold text-lg text-foreground mb-5">Invoice totals</h3>
+                <div className="space-y-4 text-sm">
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground font-medium">Subtotal</span>
+                    <span className="font-semibold">NPR {(form.goods_subtotal || 0).toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground font-medium">VAT Amount</span>
+                    <span className="font-semibold">NPR {(form.total_tax_amount || 0).toLocaleString()}</span>
+                  </div>
+                  {form.sundry_charges_total > 0 && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-muted-foreground font-medium">Charges</span>
+                      <span className="font-semibold text-orange-600">NPR {(form.sundry_charges_total || 0).toLocaleString()}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between items-center text-xl font-bold border-t border-stone-100 pt-4 mt-4">
+                    <span className="text-foreground">Invoice Total</span>
+                    <span className="text-foreground">NPR {(form.grand_total || 0).toLocaleString()}</span>
+                  </div>
+                  <div className="pt-4 flex items-center gap-2 text-muted-foreground text-xs justify-center">
+                    <span className="flex-1 border-t border-stone-200"></span>
+                    No linked source document
+                    <span className="flex-1 border-t border-stone-200"></span>
+                  </div>
                 </div>
-              </>
-            )}
-            <div>
-              <Label>Fetch from Sales Order</Label>
-              <Select onValueChange={fetchFromSO}>
-                <SelectTrigger className="mt-1 border-dashed border-primary/50 text-primary">
-                  <SelectValue placeholder="📋 Fetch from SO..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {salesOrders.map(so => (
-                    <SelectItem key={so.id} value={so.id}>{so.order_number} — {so.customer_name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <DateInput label="Invoice Date" value={form.invoice_date} onChange={v => setForm(f => ({...f, invoice_date: v}))} className="mt-1" />
-            </div>
-            <div>
-              <DateInput label="Due Date" value={form.due_date} onChange={v => setForm(f => ({...f, due_date: v}))} className="mt-1" />
-            </div>
-            <div>
-              <Label>Sundry Charges (NPR)</Label>
-              <Input type="number" value={form.sundry_charges_total} onChange={e => {
-                const sc = Number(e.target.value);
-                setForm(f => ({ ...f, sundry_charges_total: sc, grand_total: f.goods_subtotal + f.total_tax_amount + sc }));
-              }} className="mt-1" />
-            </div>
-            <div>
-              <Label>Notes</Label>
-              <Input value={form.notes} onChange={e => setForm(f => ({...f, notes: e.target.value}))} placeholder="Optional" className="mt-1" />
+              </div>
             </div>
           </div>
 
-          <div className="mt-6">
-            <Label className="text-base font-semibold mb-3 block">Line Items</Label>
-            <LineItemsEditor value={form.line_items} onChange={handleLineChange} taxTypes={taxTypes} />
-          </div>
-
-          <div className="flex justify-end gap-3 mt-4 pt-4 border-t border-border">
-            <Button variant="outline" onClick={() => setShowForm(false)}>Cancel</Button>
-            <Button variant="outline" onClick={() => handleSave('Draft')} disabled={saving}>Save Draft</Button>
-            <Button onClick={() => handleSave('Posted')} disabled={saving}>
-              {saving ? 'Posting...' : 'Post Invoice (Deduct Stock)'}
-            </Button>
+          {/* STICKY FOOTER */}
+          <div className="sticky bottom-0 -mx-6 -mb-6 mt-4 bg-stone-50/90 backdrop-blur-md border-t border-stone-200 p-4 flex justify-between items-center z-50 rounded-b-lg">
+            <div className="flex flex-col ml-6">
+              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Invoice Total</span>
+              <span className="text-xl font-bold text-foreground leading-none mt-1">NPR {(form.grand_total || 0).toLocaleString()}</span>
+            </div>
+            <div className="flex gap-3 mr-6 items-center">
+              <span className="text-sm text-green-600 font-medium mr-4 flex items-center gap-1">✓ No changes yet</span>
+              <Button variant="ghost" className="rounded-xl" onClick={() => setShowForm(false)}>Cancel</Button>
+              <Button variant="outline" className="rounded-xl border-primary text-primary hover:bg-primary/10" onClick={() => handleSave('Draft')} disabled={saving}>Save Draft</Button>
+              <Button className="rounded-xl font-bold shadow-sm px-6" onClick={() => handleSave('Posted')} disabled={saving}>
+                {saving ? 'Saving...' : '✓ Save'}
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

@@ -78,8 +78,8 @@ const SelectTrigger = React.forwardRef(({ className, children, onClick, ...props
             if (onClick) onClick(e);
           }}
           className={cn(
-            "flex h-11 sm:h-9 w-full rounded-md border border-slate-200 bg-white px-3 py-2 pr-8 text-base sm:text-sm shadow-sm transition-all duration-200 ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400 disabled:border-slate-100",
-            disabled && "cursor-not-allowed bg-slate-50 text-slate-400 border-slate-100"
+            "flex h-11 sm:h-10 w-full rounded-xl border border-transparent bg-stone-100/80 px-3 py-2 pr-8 text-base sm:text-sm transition-all duration-200 ring-offset-background placeholder:text-stone-400 hover:bg-stone-200/50 focus:outline-none focus:bg-white focus:border-primary focus:ring-4 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-50",
+            disabled && "cursor-not-allowed opacity-50 bg-stone-100"
           )}
           {...props}
         />
