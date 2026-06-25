@@ -370,7 +370,7 @@ export default function PurchaseInvoices() {
           <DialogHeader>
             <DialogTitle>{form.id ? 'Edit Purchase Invoice' : 'New Purchase Invoice'} — {form.invoice_number}</DialogTitle>
           </DialogHeader>
-          <div className="grid grid-cols-2 gap-4 mt-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5 mt-4">
             <div className="col-span-2">
               <Label>Payment Mode</Label>
               <div className="flex gap-2 mt-1">

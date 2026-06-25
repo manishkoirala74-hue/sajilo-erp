@@ -106,7 +106,8 @@ export default function ComposeEmail() {
       setDocumentData(docData);
 
       if (companyId) {
-        const fileName = `${docData.id}.pdf`;
+        const timestamp = Date.now();
+        const fileName = `${docData.id}_${timestamp}.pdf`;
         const sPath = `${companyId}/${moduleName}/${fileName}`;
         
         let blobToUpload = null;

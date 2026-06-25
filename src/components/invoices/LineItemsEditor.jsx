@@ -146,7 +146,7 @@ export default function LineItemsEditor({ value = [], onChange, taxTypes = [] })
 
               return (
                 <React.Fragment key={idx}>
-                <tr>
+                <tr className="border-b border-slate-100 last:border-0">
                   <td className="cell-density ">
                     <SearchableSelect
                       value={line.item_id}
@@ -302,20 +302,20 @@ export default function LineItemsEditor({ value = [], onChange, taxTypes = [] })
         <Button variant="outline" size="sm" onClick={addLine}>
           <Plus className="w-4 h-4 mr-1" /> Add Line
         </Button>
-        <div className="text-right space-y-1 text-sm">
-          <div className="flex justify-between gap-12">
-            <span className="text-muted-foreground">Subtotal:</span>
-            <span className="font-medium">NPR {subtotal.toLocaleString()}</span>
+        <div className="text-right space-y-3 text-sm bg-white p-5 rounded-xl border border-slate-200 shadow-sm w-72">
+          <div className="flex justify-between items-center">
+            <span className="text-slate-500 font-medium">Subtotal</span>
+            <span className="font-semibold text-slate-700">NPR {subtotal.toLocaleString()}</span>
           </div>
           {taxTotal > 0 && (
-            <div className="flex justify-between gap-12">
-              <span className="text-muted-foreground">{taxLabel}:</span>
-              <span className="font-medium">NPR {taxTotal.toLocaleString()}</span>
+            <div className="flex justify-between items-center">
+              <span className="text-slate-500 font-medium">{taxLabel}</span>
+              <span className="font-semibold text-slate-700">NPR {taxTotal.toLocaleString()}</span>
             </div>
           )}
-          <div className="flex justify-between gap-12 text-base font-bold border-t border-border pt-1">
-            <span>Grand Total:</span>
-            <span>NPR {grandTotal.toLocaleString()}</span>
+          <div className="flex justify-between items-center text-lg font-bold border-t border-slate-100 pt-3 mt-3">
+            <span className="text-slate-900">Grand Total</span>
+            <span className="text-indigo-600">NPR {grandTotal.toLocaleString()}</span>
           </div>
         </div>
       </div>

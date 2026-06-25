@@ -59,10 +59,23 @@ export default function DateInput({ value, onChange, label, className, disabled 
   };
 
   const bsDisplay = value ? adToBS(value) : null;
+  const alternateText = mode === 'AD'
+    ? (bsDisplay ? `BS: ${formatBS(bsDisplay)}` : '')
+    : (value ? `AD: ${formatAD(value)}` : (bsText.length === 10 && (() => { const p = bsText.split('-').map(Number); return !isValidBSDate(p[0],p[1],p[2]); })() ? '⚠ Invalid BS date' : ''));
 
   return (
     <div className={cn('space-y-1', className)}>
-      {label && <Label>{label}</Label>}
+      <div className="flex items-center justify-between min-h-[20px]">
+        {label && <Label>{label}</Label>}
+        {alternateText && (
+          <span className={cn(
+            "bg-slate-100 text-slate-600 text-[10px] px-2 py-0.5 rounded-md font-mono",
+            alternateText.includes('⚠') && "bg-red-50 text-red-600"
+          )}>
+            {alternateText}
+          </span>
+        )}
+      </div>
       <div className="flex items-center gap-1">
         {mode === 'AD' ? (
           <Input
@@ -96,13 +109,6 @@ export default function DateInput({ value, onChange, label, className, disabled 
           {mode}
         </button>
       </div>
-      {/* Helper text — shows the opposite calendar */}
-      <p className="text-xs text-muted-foreground min-h-[1rem]">
-        {mode === 'AD'
-          ? (bsDisplay ? `BS: ${formatBS(bsDisplay)}` : '')
-          : (value ? `AD: ${formatAD(value)}` : (bsText.length === 10 && (() => { const p = bsText.split('-').map(Number); return !isValidBSDate(p[0],p[1],p[2]); })() ? '⚠ Invalid BS date' : ''))
-        }
-      </p>
     </div>
   );
 }

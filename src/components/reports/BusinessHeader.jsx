@@ -6,13 +6,15 @@
 import { useEffect, useState } from 'react';
 import { sajilo } from '@/api/sajiloClient';
 import { adToBS, formatBS, formatAD } from '@/lib/nepaliDate';
+import { useAuth } from '@/lib/AuthContext';
 
 export default function BusinessHeader({ reportTitle, fromDate, toDate, subtitle }) {
-  const [company, setCompany] = useState(null);
+  const { activeCompany } = useAuth();
+  const [settings, setSettings] = useState(null);
 
   useEffect(() => {
     sajilo.entities.CompanySettings.list()
-      .then(d => { if (d.length > 0) setCompany(d[0]); })
+      .then(d => { if (d.length > 0) setSettings(d[0]); })
       .catch(() => {});
   }, []);
 
@@ -31,10 +33,10 @@ export default function BusinessHeader({ reportTitle, fromDate, toDate, subtitle
     <div className="flex items-start gap-4 pb-4 mb-4 border-b-2 border-border print:pb-3 print:mb-3">
       {/* Logo — left anchor */}
       <div className="shrink-0 w-16 h-16 flex items-center justify-center">
-        {company?.company_logo_url
-          ? <img src={company.company_logo_url} alt="logo" className="h-16 w-16 object-contain rounded-md" />
+        {settings?.company_logo_url
+          ? <img src={settings.company_logo_url} alt="logo" className="h-16 w-16 object-contain rounded-md" />
           : <div className="h-14 w-14 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-bold text-xl">
-              {company?.company_name?.[0] || '?'}
+              {activeCompany?.name?.[0] || '?'}
             </div>
         }
       </div>
@@ -42,17 +44,17 @@ export default function BusinessHeader({ reportTitle, fromDate, toDate, subtitle
       {/* Company + Report info — centered */}
       <div className="flex-1 text-center">
         <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest print:text-[9px]">
-          {company?.tax_id ? `PAN: ${company.tax_id}` : ''}
+          {activeCompany?.tax_id ? `PAN: ${activeCompany.tax_id}` : ''}
         </p>
         <h2 className="text-lg font-extrabold text-foreground leading-tight print:text-base">
-          {company?.company_name || '—'}
+          {activeCompany?.name || '—'}
         </h2>
-        {company?.address && (
-          <p className="text-xs text-muted-foreground print:text-[10px]">{company.address}</p>
+        {activeCompany?.address && (
+          <p className="text-xs text-muted-foreground print:text-[10px]">{activeCompany.address}</p>
         )}
-        {(company?.phone || company?.email) && (
+        {(activeCompany?.phone || activeCompany?.email) && (
           <p className="text-xs text-muted-foreground print:text-[10px]">
-            {[company.phone, company.email].filter(Boolean).join(' | ')}
+            {[activeCompany.phone, activeCompany.email].filter(Boolean).join(' | ')}
           </p>
         )}
       </div>

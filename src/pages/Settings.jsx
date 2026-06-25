@@ -186,7 +186,7 @@ export default function Settings() {
       </div>
 
       {/* Content */}
-      <div className="h-auto flex flex-col w-full gap-4 text-foreground">
+      <div className="h-auto flex flex-col w-full space-y-6 text-foreground">
 
         {/* ── HUB 1: COMPANY WORKSPACE ── */}
         {activeHub === 'workspace' && (
