@@ -103,14 +103,20 @@ export default function SearchableSelect({
         onClick={() => handleSelect(opt.value)}
         onMouseEnter={() => setActiveIndex(itemIndex)}
         className={cn(
-          'w-full flex items-center gap-2 px-3 py-1.5 text-sm text-left rounded-md transition-colors hover:bg-accent',
-          isMatched && 'bg-accent font-medium',
+          'w-full flex items-start gap-2 px-3 py-2 text-left rounded-md transition-colors hover:bg-accent',
+          isMatched && 'bg-accent',
           isHighlighted && 'bg-accent outline-none ring-1 ring-ring/50'
         )}
       >
-        <Check className={cn('w-3.5 h-3.5 shrink-0', isMatched ? 'opacity-100 text-primary' : 'opacity-0')} />
-        <span className="flex-1 truncate">{opt.label}</span>
-        {opt.sub && <span className="text-xs text-muted-foreground font-mono shrink-0">{opt.sub}</span>}
+        <Check className={cn('w-3.5 h-3.5 shrink-0 mt-1', isMatched ? 'opacity-100 text-primary' : 'opacity-0')} />
+        <div className="flex flex-col items-start space-y-0.5">
+          <span className="text-sm font-medium text-stone-900 dark:text-stone-100 whitespace-normal break-words leading-tight">
+            {opt.label}
+          </span>
+          <span className="text-[11px] text-stone-400 dark:text-stone-500 font-mono">
+            Code: {opt.code || opt.sub || 'N/A'} • Unit: {opt.unit || 'N/A'}
+          </span>
+        </div>
       </button>
     );
   };
@@ -135,9 +141,8 @@ export default function SearchableSelect({
       </PopoverTrigger>
 
       <PopoverContent 
-        className="p-0 z-[100]" 
+        className="p-0 z-[100] w-full min-w-[320px] md:min-w-[450px] max-w-[600px]" 
         align="start"
-        style={{ width: 'var(--radix-popover-trigger-width)', minWidth: '12rem' }}
       >
         {/* Search box */}
         <div className="flex items-center gap-2 px-2 py-1.5 border-b bg-muted/30">

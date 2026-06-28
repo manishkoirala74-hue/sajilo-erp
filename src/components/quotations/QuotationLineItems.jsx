@@ -75,31 +75,33 @@ export default function QuotationLineItems({ value = [], onChange, items = [], v
                     placeholder="Select item…"
                     options={items.map(it => ({
                       value: it.id,
-                      label: `${it.item_name}${it.item_code ? ` (${it.item_code})` : ''}`
+                      label: `${it.item_name}${it.item_code ? ` (${it.item_code})` : ''}`,
+                      code: it.item_code,
+                      unit: it.unit_of_measure
                     }))}
                   />
                 </td>
                 <td className="cell-density ">
                   <Input value={line.description || ''} onChange={e => update(idx, 'description', e.target.value)}
-                    className="h-8 text-xs" placeholder="Optional description" />
+                    className="h-8 text-sm" placeholder="Optional description" />
                 </td>
                 <td className="cell-density ">
                   <Input type="number" min={0} value={line.quantity}
                     onChange={e => update(idx, 'quantity', Number(e.target.value))}
                     onBlur={() => onChange(recalc(value))}
-                    className="h-8 text-xs text-center" />
+                    className="h-8 text-sm text-center" />
                 </td>
                 <td className="cell-density ">
                   <Input type="number" min={0} value={line.unit_price}
                     onChange={e => update(idx, 'unit_price', Number(e.target.value))}
                     onBlur={() => onChange(recalc(value))}
-                    className="h-8 text-xs text-right" />
+                    className="h-8 text-sm text-right" />
                 </td>
                 <td className="cell-density ">
                   <Input type="number" min={0} max={100} value={line.discount_percent || 0}
                     onChange={e => update(idx, 'discount_percent', Number(e.target.value))}
                     onBlur={() => onChange(recalc(value))}
-                    className="h-8 text-xs text-center" />
+                    className="h-8 text-sm text-center" />
                 </td>
                 <td className="cell-density text-center">
                   <Switch checked={!!line.vat_applicable} onCheckedChange={v => update(idx, 'vat_applicable', v)} />

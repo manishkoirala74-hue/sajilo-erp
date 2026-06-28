@@ -125,7 +125,7 @@ export default function LineItemsEditor({ value = [], onChange, taxTypes = [], h
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-3">
-      <div className="bg-muted/30 rounded-lg overflow-hidden border border-border">
+      <div className="bg-muted/30 rounded-lg overflow-x-auto border border-border">
         <table className="table-fluid-grid text-sm">
           <thead>
             <tr className="bg-muted/70 border-b border-border">
@@ -151,9 +151,9 @@ export default function LineItemsEditor({ value = [], onChange, taxTypes = [], h
                     <SearchableSelect
                       value={line.item_id}
                       onValueChange={v => updateLine(idx, 'item_id', v)}
-                      options={items.map(i => ({ value: i.id, label: i.item_name, sub: i.item_code || i.unit_of_measure }))}
+                      options={items.map(i => ({ value: i.id, label: i.item_name, sub: i.item_code || i.unit_of_measure, code: i.item_code, unit: i.unit_of_measure }))}
                       placeholder="Select item..."
-                      className="w-full h-8 text-xs bg-card"
+                      className="w-full h-8 text-sm bg-card"
                       onCreateNew={() => {
                         setActiveLineIdx(idx);
                         setShowItemCreate(true);
@@ -165,7 +165,7 @@ export default function LineItemsEditor({ value = [], onChange, taxTypes = [], h
                         value={line.item_name}
                         onChange={e => updateLine(idx, 'item_name', e.target.value)}
                         placeholder="Item name"
-                        className="mt-1 h-7 text-xs"
+                        className="mt-1 h-7 text-sm"
                       />
                     )}
                   </td>

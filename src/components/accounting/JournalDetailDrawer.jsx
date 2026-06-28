@@ -61,6 +61,7 @@ export default function JournalDetailDrawer({ journal, open, onClose, onRefresh 
         total_credit: totalDebit, 
         is_balanced: isBalanced,
         notes: `Reversing journal ID: ${journal.id}`,
+        voucher_no: `REV-${journal.voucher_no || journal.id.substring(0,8)}`,
       });
 
       const revLines = lines.map(l => ({
@@ -140,7 +141,7 @@ export default function JournalDetailDrawer({ journal, open, onClose, onRefresh 
             {loading ? (
               <div className="space-y-2">{Array(3).fill(0).map((_, i) => <div key={i} className="h-10 bg-muted rounded animate-pulse" />)}</div>
             ) : (
-              <div className="border border-border rounded-xl overflow-hidden">
+              <div className="border border-border rounded-xl overflow-x-auto">
                 <table className="table-fluid-grid text-sm">
                   <thead className="cell-density bg-muted/40">
                     <tr>
