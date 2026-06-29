@@ -394,7 +394,7 @@ CREATE TABLE IF NOT EXISTS "FinancialVoucher" (
   "reference_no" TEXT,
   "status" TEXT DEFAULT 'Draft',
   "narration" TEXT,
-  "entries" JSONB,
+  "entries" JSONB,`n  "bill_allocations" JSONB,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   created_by TEXT,
@@ -515,7 +515,7 @@ CREATE TABLE IF NOT EXISTS "GeneralLedgerJournal" (
   "status" TEXT DEFAULT 'Draft',
   "total_debit" NUMERIC DEFAULT 0,
   "total_credit" NUMERIC DEFAULT 0,
-  "is_balanced" BOOLEAN DEFAULT false,
+  "is_balanced" BOOLEAN DEFAULT false,`n  "bill_allocations" JSONB,
   "posted_by" TEXT,
   "notes" TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -865,7 +865,7 @@ CREATE TABLE IF NOT EXISTS "PurchaseInvoice" (
   "invoice_date" TIMESTAMP WITH TIME ZONE,
   "due_date" TIMESTAMP WITH TIME ZONE,
   "status" TEXT DEFAULT 'Draft',
-  "payment_status" TEXT DEFAULT 'Unpaid',
+  "payment_status" TEXT DEFAULT 'Unpaid',`n  "paid_amount" NUMERIC DEFAULT 0,
   "subtotal" NUMERIC DEFAULT 0,
   "vat_amount" NUMERIC DEFAULT 0,
   "landed_cost_total" NUMERIC DEFAULT 0,
@@ -988,7 +988,7 @@ CREATE TABLE IF NOT EXISTS "SalesInvoice" (
   "invoice_date" TIMESTAMP WITH TIME ZONE,
   "due_date" TIMESTAMP WITH TIME ZONE,
   "status" TEXT DEFAULT 'Draft',
-  "payment_status" TEXT DEFAULT 'Unpaid',
+  "payment_status" TEXT DEFAULT 'Unpaid',`n  "paid_amount" NUMERIC DEFAULT 0,
   "goods_subtotal" NUMERIC DEFAULT 0,
   "sundry_charges_total" NUMERIC DEFAULT 0,
   "total_tax_amount" NUMERIC DEFAULT 0,
@@ -1572,6 +1572,7 @@ ALTER TABLE "CompanySettings" ADD COLUMN IF NOT EXISTS hr_deduction_mappings JSO
 ALTER TABLE "CompanySettings" ADD COLUMN IF NOT EXISTS hr_salary_payable_account_id TEXT;
 ALTER TABLE "CompanySettings" ADD COLUMN IF NOT EXISTS include_fy_in_invoice_number BOOLEAN DEFAULT true;
 ALTER TABLE "CompanySettings" ADD COLUMN IF NOT EXISTS show_recent_trading_history BOOLEAN DEFAULT true;
+ALTER TABLE "CompanySettings" ADD COLUMN IF NOT EXISTS enable_bill_wise_entry BOOLEAN DEFAULT false;
 
 -- 2. Create the missing RPC for DataUtilities (Ledger Timeline Recovery)
 CREATE OR REPLACE FUNCTION rebuild_inventory_wac_timeline(
@@ -1622,3 +1623,369 @@ BEGIN
     -- This query correctly re-establishes the baseline WAC for the period's purchases.
 END;
 $$;
+- -   A d d   e n a b l e _ b i l l _ w i s e _ e n t r y   t o   C o m p a n y S e t t i n g s 
+ 
+ A L T E R   T A B L E   " C o m p a n y S e t t i n g s "   A D D   C O L U M N   I F   N O T   E X I S T S   e n a b l e _ b i l l _ w i s e _ e n t r y   B O O L E A N   D E F A U L T   f a l s e ; 
+ 
+ 
+ 
+ - -   A d d   p a i d _ a m o u n t   t o   S a l e s I n v o i c e 
+ 
+ A L T E R   T A B L E   " S a l e s I n v o i c e "   A D D   C O L U M N   I F   N O T   E X I S T S   p a i d _ a m o u n t   N U M E R I C   D E F A U L T   0 ; 
+ 
+ 
+ 
+ - -   A d d   p a i d _ a m o u n t   t o   P u r c h a s e I n v o i c e 
+ 
+ A L T E R   T A B L E   " P u r c h a s e I n v o i c e "   A D D   C O L U M N   I F   N O T   E X I S T S   p a i d _ a m o u n t   N U M E R I C   D E F A U L T   0 ; 
+ 
+ 
+ 
+ - -   A d d   b i l l _ a l l o c a t i o n s   t o   F i n a n c i a l V o u c h e r 
+ 
+ A L T E R   T A B L E   " F i n a n c i a l V o u c h e r "   A D D   C O L U M N   I F   N O T   E X I S T S   b i l l _ a l l o c a t i o n s   J S O N B ; 
+ 
+ 
+ 
+ - -   A d d   b i l l _ a l l o c a t i o n s   t o   G e n e r a l L e d g e r J o u r n a l 
+ 
+ A L T E R   T A B L E   " G e n e r a l L e d g e r J o u r n a l "   A D D   C O L U M N   I F   N O T   E X I S T S   b i l l _ a l l o c a t i o n s   J S O N B ; 
+ 
+ C R E A T E   O R   R E P L A C E   F U N C T I O N   r p c _ r e t r o a c t i v e _ b i l l _ k n o c k o f f ( 
+ 
+         p _ c o m p a n y _ i d   U U I D , 
+ 
+         p _ t y p e   T E X T , 
+ 
+         p _ a l l o c a t i o n s   J S O N B 
+ 
+ )   R E T U R N S   J S O N B   A S   $ $ 
+ 
+ D E C L A R E 
+ 
+         a l l o c _ r e c o r d   R E C O R D ; 
+ 
+         v _ i n v o i c e _ i d   U U I D ; 
+ 
+         v _ v o u c h e r _ i d   U U I D ; 
+ 
+         v _ a l l o c _ a m o u n t   N U M E R I C ; 
+ 
+         v _ i n v _ r e c o r d   R E C O R D ; 
+ 
+         v _ v o u c h e r _ r e c o r d   R E C O R D ; 
+ 
+         v _ n e w _ p a i d   N U M E R I C ; 
+ 
+         v _ n e w _ s t a t u s   T E X T ; 
+ 
+         v _ n e w _ a l l o c   J S O N B ; 
+ 
+ B E G I N 
+ 
+         F O R   a l l o c _ r e c o r d   I N   S E L E C T   *   F R O M   j s o n b _ a r r a y _ e l e m e n t s ( p _ a l l o c a t i o n s )   L O O P 
+ 
+                 v _ i n v o i c e _ i d   : =   ( a l l o c _ r e c o r d . v a l u e - > > ' i n v o i c e _ i d ' ) : : U U I D ; 
+ 
+                 v _ v o u c h e r _ i d   : =   ( a l l o c _ r e c o r d . v a l u e - > > ' v o u c h e r _ i d ' ) : : U U I D ; 
+ 
+                 v _ a l l o c _ a m o u n t   : =   ( a l l o c _ r e c o r d . v a l u e - > > ' a l l o c a t e d _ a m o u n t ' ) : : N U M E R I C ; 
+ 
+                 
+ 
+                 - -   L o c k   v o u c h e r 
+ 
+                 S E L E C T   *   I N T O   v _ v o u c h e r _ r e c o r d   F R O M   " F i n a n c i a l V o u c h e r "   W H E R E   i d   =   v _ v o u c h e r _ i d   A N D   c o m p a n y _ i d   =   p _ c o m p a n y _ i d   F O R   U P D A T E ; 
+ 
+                 I F   N O T   F O U N D   T H E N 
+ 
+                         R A I S E   E X C E P T I O N   ' V o u c h e r   %   n o t   f o u n d ' ,   v _ v o u c h e r _ i d ; 
+ 
+                 E N D   I F ; 
+ 
+                 
+ 
+                 - -   L o c k   i n v o i c e 
+ 
+                 I F   p _ t y p e   =   ' C u s t o m e r '   T H E N 
+ 
+                         S E L E C T   *   I N T O   v _ i n v _ r e c o r d   F R O M   " S a l e s I n v o i c e "   W H E R E   i d   =   v _ i n v o i c e _ i d   A N D   c o m p a n y _ i d   =   p _ c o m p a n y _ i d   F O R   U P D A T E ; 
+ 
+                 E L S I F   p _ t y p e   =   ' S u p p l i e r '   T H E N 
+ 
+                         S E L E C T   *   I N T O   v _ i n v _ r e c o r d   F R O M   " P u r c h a s e I n v o i c e "   W H E R E   i d   =   v _ i n v o i c e _ i d   A N D   c o m p a n y _ i d   =   p _ c o m p a n y _ i d   F O R   U P D A T E ; 
+ 
+                 E L S E 
+ 
+                         R A I S E   E X C E P T I O N   ' I n v a l i d   t y p e   % ' ,   p _ t y p e ; 
+ 
+                 E N D   I F ; 
+ 
+                 
+ 
+                 I F   v _ i n v _ r e c o r d   I S   N U L L   T H E N 
+ 
+                         R A I S E   E X C E P T I O N   ' I n v o i c e   %   n o t   f o u n d ' ,   v _ i n v o i c e _ i d ; 
+ 
+                 E N D   I F ; 
+ 
+                 
+ 
+                 - -   B u i l d   t h e   a l l o c a t i o n   d e t a i l 
+ 
+                 v _ n e w _ a l l o c   : =   j s o n b _ b u i l d _ o b j e c t ( 
+ 
+                         ' i n v o i c e _ i d ' ,   v _ i n v o i c e _ i d , 
+ 
+                         ' i n v o i c e _ n u m b e r ' ,   v _ i n v _ r e c o r d . i n v o i c e _ n u m b e r , 
+ 
+                         ' i n v o i c e _ d a t e ' ,   v _ i n v _ r e c o r d . i n v o i c e _ d a t e , 
+ 
+                         ' t o t a l ' ,   v _ i n v _ r e c o r d . g r a n d _ t o t a l , 
+ 
+                         ' d u e ' ,   C O A L E S C E ( v _ i n v _ r e c o r d . g r a n d _ t o t a l ,   0 )   -   C O A L E S C E ( v _ i n v _ r e c o r d . p a i d _ a m o u n t ,   0 ) , 
+ 
+                         ' a l l o c a t e d _ a m o u n t ' ,   v _ a l l o c _ a m o u n t 
+ 
+                 ) ; 
+ 
+                 
+ 
+                 - -   U p d a t e   v o u c h e r 
+ 
+                 U P D A T E   " F i n a n c i a l V o u c h e r " 
+ 
+                 S E T   b i l l _ a l l o c a t i o n s   =   C O A L E S C E ( 
+ 
+                         C A S E   
+ 
+                                 W H E N   j s o n b _ t y p e o f ( b i l l _ a l l o c a t i o n s )   =   ' a r r a y '   T H E N   b i l l _ a l l o c a t i o n s 
+ 
+                                 W H E N   b i l l _ a l l o c a t i o n s   I S   N O T   N U L L   T H E N   j s o n b _ b u i l d _ a r r a y ( b i l l _ a l l o c a t i o n s ) 
+ 
+                                 E L S E   ' [ ] ' : : j s o n b 
+ 
+                         E N D ,   ' [ ] ' : : j s o n b 
+ 
+                 )   | |   C O A L E S C E ( j s o n b _ b u i l d _ a r r a y ( v _ n e w _ a l l o c ) ,   ' [ ] ' : : j s o n b ) 
+ 
+                 W H E R E   i d   =   v _ v o u c h e r _ i d ; 
+ 
+                 
+ 
+                 - -   U p d a t e   i n v o i c e 
+ 
+                 v _ n e w _ p a i d   : =   C O A L E S C E ( v _ i n v _ r e c o r d . p a i d _ a m o u n t ,   0 )   +   v _ a l l o c _ a m o u n t ; 
+ 
+                 I F   v _ n e w _ p a i d   > =   v _ i n v _ r e c o r d . g r a n d _ t o t a l   T H E N 
+ 
+                         v _ n e w _ s t a t u s   : =   ' P a i d ' ; 
+ 
+                 E L S I F   v _ n e w _ p a i d   >   0   T H E N 
+ 
+                         v _ n e w _ s t a t u s   : =   ' P a r t i a l   P a i d ' ; 
+ 
+                 E L S E 
+ 
+                         v _ n e w _ s t a t u s   : =   ' U n p a i d ' ; 
+ 
+                 E N D   I F ; 
+ 
+                 
+ 
+                 I F   p _ t y p e   =   ' C u s t o m e r '   T H E N 
+ 
+                         U P D A T E   " S a l e s I n v o i c e "   S E T   p a i d _ a m o u n t   =   v _ n e w _ p a i d ,   p a y m e n t _ s t a t u s   =   v _ n e w _ s t a t u s   W H E R E   i d   =   v _ i n v o i c e _ i d ; 
+ 
+                 E L S I F   p _ t y p e   =   ' S u p p l i e r '   T H E N 
+ 
+                         U P D A T E   " P u r c h a s e I n v o i c e "   S E T   p a i d _ a m o u n t   =   v _ n e w _ p a i d ,   p a y m e n t _ s t a t u s   =   v _ n e w _ s t a t u s   W H E R E   i d   =   v _ i n v o i c e _ i d ; 
+ 
+                 E N D   I F ; 
+ 
+         E N D   L O O P ; 
+ 
+         
+ 
+         R E T U R N   j s o n b _ b u i l d _ o b j e c t ( ' s u c c e s s ' ,   t r u e ) ; 
+ 
+ E N D ; 
+ 
+ $ $   L A N G U A G E   p l p g s q l   S E C U R I T Y   D E F I N E R ; 
+ 
+ CREATE OR REPLACE FUNCTION rpc_retroactive_bill_knockoff(
+    p_company_id UUID,
+    p_type TEXT,
+    p_allocations JSONB
+) RETURNS void AS $$
+DECLARE
+    alloc RECORD;
+    v_invoice_id UUID;
+    v_voucher_id UUID;
+    v_alloc_amt NUMERIC;
+    
+    v_inv_total NUMERIC;
+    v_inv_paid NUMERIC;
+    v_new_paid NUMERIC;
+    
+    v_voucher_allocs JSONB;
+    v_found BOOLEAN;
+    v_elem JSONB;
+    v_new_allocs JSONB;
+    v_inv_number TEXT;
+    v_inv_date DATE;
+BEGIN
+    FOR alloc IN SELECT * FROM jsonb_array_elements(p_allocations) LOOP
+        v_invoice_id := (alloc.value->>'invoice_id')::UUID;
+        v_voucher_id := (alloc.value->>'voucher_id')::UUID;
+        v_alloc_amt := (alloc.value->>'allocated_amount')::NUMERIC;
+        
+        IF p_type = 'Customer' THEN
+            -- Update SalesInvoice
+            SELECT grand_total, COALESCE(paid_amount, 0), invoice_number, invoice_date INTO v_inv_total, v_inv_paid, v_inv_number, v_inv_date 
+            FROM "SalesInvoice" WHERE id = v_invoice_id AND company_id = p_company_id;
+            
+            v_new_paid := v_inv_paid + v_alloc_amt;
+            
+            UPDATE "SalesInvoice" 
+            SET paid_amount = v_new_paid,
+                payment_status = CASE WHEN v_new_paid >= grand_total THEN 'Paid' ELSE 'Partial' END
+            WHERE id = v_invoice_id;
+        ELSE
+            -- Update PurchaseInvoice
+            SELECT grand_total, COALESCE(paid_amount, 0), invoice_number, invoice_date INTO v_inv_total, v_inv_paid, v_inv_number, v_inv_date 
+            FROM "PurchaseInvoice" WHERE id = v_invoice_id AND company_id = p_company_id;
+            
+            v_new_paid := v_inv_paid + v_alloc_amt;
+            
+            UPDATE "PurchaseInvoice" 
+            SET paid_amount = v_new_paid,
+                payment_status = CASE WHEN v_new_paid >= grand_total THEN 'Paid' ELSE 'Partial' END
+            WHERE id = v_invoice_id;
+        END IF;
+        
+        -- Update FinancialVoucher
+        SELECT COALESCE(bill_allocations, '[]'::jsonb) INTO v_voucher_allocs 
+        FROM "FinancialVoucher" WHERE id = v_voucher_id AND company_id = p_company_id;
+        
+        v_found := false;
+        v_new_allocs := '[]'::jsonb;
+        
+        -- Try to update existing allocation if it exists
+        IF jsonb_typeof(v_voucher_allocs) = 'array' THEN
+            FOR v_elem IN SELECT * FROM jsonb_array_elements(v_voucher_allocs) LOOP
+                IF (v_elem->>'invoice_id') = v_invoice_id::text THEN
+                    v_elem := jsonb_set(v_elem, '{allocated_amount}', to_jsonb((v_elem->>'allocated_amount')::NUMERIC + v_alloc_amt));
+                    v_found := true;
+                END IF;
+                v_new_allocs := v_new_allocs || v_elem;
+            END LOOP;
+        END IF;
+        
+        IF NOT v_found THEN
+            -- Append new allocation object
+            v_new_allocs := v_new_allocs || jsonb_build_object(
+                'invoice_id', v_invoice_id,
+                'invoice_number', v_inv_number,
+                'invoice_date', v_inv_date,
+                'total', v_inv_total,
+                'due', v_inv_total - v_inv_paid,
+                'allocated_amount', v_alloc_amt
+            );
+        END IF;
+        
+        UPDATE "FinancialVoucher"
+        SET bill_allocations = v_new_allocs
+        WHERE id = v_voucher_id;
+        
+    END LOOP;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+CREATE OR REPLACE FUNCTION rpc_retroactive_bill_knockoff(
+    p_company_id UUID,
+    p_type TEXT,
+    p_allocations JSONB
+) RETURNS void AS $$
+DECLARE
+    alloc RECORD;
+    v_invoice_id UUID;
+    v_voucher_id UUID;
+    v_alloc_amt NUMERIC;
+    
+    v_inv_total NUMERIC;
+    v_inv_paid NUMERIC;
+    v_new_paid NUMERIC;
+    
+    v_voucher_allocs JSONB;
+    v_found BOOLEAN;
+    v_elem JSONB;
+    v_new_allocs JSONB;
+    v_inv_number TEXT;
+    v_inv_date DATE;
+BEGIN
+    FOR alloc IN SELECT * FROM jsonb_array_elements(p_allocations) LOOP
+        v_invoice_id := (alloc.value->>'invoice_id')::UUID;
+        v_voucher_id := (alloc.value->>'voucher_id')::UUID;
+        v_alloc_amt := (alloc.value->>'allocated_amount')::NUMERIC;
+        
+        IF p_type = 'Customer' THEN
+            -- Update SalesInvoice
+            SELECT grand_total, COALESCE(paid_amount, 0), invoice_number, invoice_date INTO v_inv_total, v_inv_paid, v_inv_number, v_inv_date 
+            FROM "SalesInvoice" WHERE id = v_invoice_id AND company_id = p_company_id;
+            
+            v_new_paid := v_inv_paid + v_alloc_amt;
+            
+            UPDATE "SalesInvoice" 
+            SET paid_amount = v_new_paid,
+                payment_status = CASE WHEN v_new_paid >= grand_total THEN 'Paid' ELSE 'Partial' END
+            WHERE id = v_invoice_id;
+        ELSE
+            -- Update PurchaseInvoice
+            SELECT grand_total, COALESCE(paid_amount, 0), invoice_number, invoice_date INTO v_inv_total, v_inv_paid, v_inv_number, v_inv_date 
+            FROM "PurchaseInvoice" WHERE id = v_invoice_id AND company_id = p_company_id;
+            
+            v_new_paid := v_inv_paid + v_alloc_amt;
+            
+            UPDATE "PurchaseInvoice" 
+            SET paid_amount = v_new_paid,
+                payment_status = CASE WHEN v_new_paid >= grand_total THEN 'Paid' ELSE 'Partial' END
+            WHERE id = v_invoice_id;
+        END IF;
+        
+        -- Update FinancialVoucher
+        SELECT COALESCE(bill_allocations, '[]'::jsonb) INTO v_voucher_allocs 
+        FROM "FinancialVoucher" WHERE id = v_voucher_id AND company_id = p_company_id;
+        
+        v_found := false;
+        v_new_allocs := '[]'::jsonb;
+        
+        -- Try to update existing allocation if it exists
+        IF jsonb_typeof(v_voucher_allocs) = 'array' THEN
+            FOR v_elem IN SELECT * FROM jsonb_array_elements(v_voucher_allocs) LOOP
+                IF (v_elem->>'invoice_id') = v_invoice_id::text THEN
+                    v_elem := jsonb_set(v_elem, '{allocated_amount}', to_jsonb((v_elem->>'allocated_amount')::NUMERIC + v_alloc_amt));
+                    v_found := true;
+                END IF;
+                v_new_allocs := v_new_allocs || v_elem;
+            END LOOP;
+        END IF;
+        
+        IF NOT v_found THEN
+            -- Append new allocation object
+            v_new_allocs := v_new_allocs || jsonb_build_object(
+                'invoice_id', v_invoice_id,
+                'invoice_number', v_inv_number,
+                'invoice_date', v_inv_date,
+                'total', v_inv_total,
+                'due', v_inv_total - v_inv_paid,
+                'allocated_amount', v_alloc_amt
+            );
+        END IF;
+        
+        UPDATE "FinancialVoucher"
+        SET bill_allocations = v_new_allocs
+        WHERE id = v_voucher_id;
+        
+    END LOOP;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;

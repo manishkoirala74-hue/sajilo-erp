@@ -1,7 +1,8 @@
 import { useSearchParams, useLocation, useNavigate } from 'react-router-dom';
 import { useState, useEffect, useRef } from 'react';
+import { useAuth } from '@/lib/AuthContext';
 import { sajilo } from '@/api/sajiloClient';
-import { Plus, Edit2, Printer, Copy, CheckCircle, XCircle, ArrowRight, FileText, Send } from 'lucide-react';
+import { Plus, Printer, Copy, CheckCircle, XCircle, ArrowRight, FileText, Send, Eye, Pencil, Ban } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -18,22 +19,26 @@ import { loadActiveTaxTypes, computeTotalTax } from '@/lib/taxService';
 import SearchableSelect from '@/components/shared/SearchableSelect';
 import QuickPartnerCreate from '@/components/shared/QuickPartnerCreate';
 import VoucherLink from '@/components/shared/VoucherLink';
+import DataTable from '@/components/shared/DataTable';
+import StatusBadge from '@/components/shared/StatusBadge';
 
 const STATUS_COLORS = {
   Draft: 'bg-gray-100 text-gray-700',
-  Sent: 'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400',
+  Final: 'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400',
   Accepted: 'bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400',
   Rejected: 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400',
   Expired: 'bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-400',
   Converted: 'bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-400',
+  Cancelled: 'bg-gray-200 dark:bg-gray-800 text-gray-500 dark:text-gray-400',
 };
 
-const ALL_STATUSES = ['Draft', 'Sent', 'Accepted', 'Rejected', 'Expired', 'Converted'];
+const ALL_STATUSES = ['Draft', 'Final', 'Accepted', 'Rejected', 'Expired', 'Converted', 'Cancelled'];
 
 export default function Quotations() {
   const [quotations, setQuotations] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [items, setItems] = useState([]);
+  const { activeCompany } = useAuth();
   const [settings, setSettings] = useState(null);
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState('all');
@@ -218,6 +223,75 @@ export default function Quotations() {
 
   const filtered = filterStatus === 'all' ? quotations : quotations.filter(q => q.status === filterStatus);
 
+  
+  const columns = [
+    { key: 'quotation_number', label: 'Quotation #', render: (val, row) => (
+      <VoucherLink voucherNumber={val}>
+        <span className={`cursor-pointer font-mono font-semibold ${row.status === 'Cancelled' || row.status === 'Rejected' ? 'text-muted-foreground line-through' : 'text-primary'}`}>{val}</span>
+      </VoucherLink>
+    )},
+    { key: 'customer_name', label: 'Customer', render: (val, row) => (
+      <div className={row.status === 'Cancelled' || row.status === 'Rejected' ? 'text-muted-foreground' : ''}>
+        <p className="font-medium">{val}</p>
+        {row.customer_email && <p className="text-xs opacity-70">{row.customer_email}</p>}
+      </div>
+    )},
+    { key: 'quotation_date', label: 'Date', isDate: true },
+    { key: 'valid_until', label: 'Valid Until', render: (val, row) => (
+      val ? (
+        <span className={new Date(val) < new Date() && row.status === 'Final' ? 'text-red-500 font-medium' : 'text-muted-foreground'}>
+          {val}
+        </span>
+      ) : '—'
+    )},
+    { key: 'grand_total', label: 'Total', render: (val, row) => (
+      <span className={`font-semibold ${row.status === 'Cancelled' || row.status === 'Rejected' ? 'line-through text-muted-foreground' : ''}`}>NPR {Number(val).toLocaleString()}</span>
+    )},
+    { key: 'status', label: 'Status', render: (val) => <StatusBadge status={val} /> },
+    {
+      key: 'actions', label: 'Actions', render: (_, row) => (
+        <div className="flex items-center gap-1">
+          <Button variant="ghost" size="icon" title="View / Print" onClick={() => openPrint(row)}>
+            <Eye className="w-4 h-4" />
+          </Button>
+          {row.status === 'Draft' && (
+            <Button variant="ghost" size="icon" className="text-primary" title="Edit Quotation" onClick={() => openEdit(row)}>
+              <Pencil className="w-4 h-4" />
+            </Button>
+          )}
+          {row.status === 'Draft' && (
+            <Button variant="ghost" size="icon" className="text-blue-500" title="Mark as Final" onClick={() => updateStatus(row, 'Final')}>
+              <Send className="w-4 h-4" />
+            </Button>
+          )}
+          {row.status === 'Final' && (
+            <Button variant="ghost" size="icon" className="text-green-500" title="Accept" onClick={() => updateStatus(row, 'Accepted')}>
+              <CheckCircle className="w-4 h-4" />
+            </Button>
+          )}
+          {row.status === 'Final' && (
+            <Button variant="ghost" size="icon" className="text-red-500" title="Reject" onClick={() => updateStatus(row, 'Rejected')}>
+              <Ban className="w-4 h-4" />
+            </Button>
+          )}
+          {row.status === 'Accepted' && (
+            <Button variant="ghost" size="icon" className="text-purple-500" title="Convert to Sales Order" onClick={() => convertToOrder(row)}>
+              <ArrowRight className="w-4 h-4" />
+            </Button>
+          )}
+          <Button variant="ghost" size="icon" className="text-muted-foreground" title="Duplicate" onClick={() => duplicate(row)}>
+            <Copy className="w-4 h-4" />
+          </Button>
+          {(row.status === 'Draft' || row.status === 'Final') && (
+            <Button variant="ghost" size="icon" className="text-destructive" title="Cancel Quotation" onClick={() => updateStatus(row, 'Cancelled')}>
+              <XCircle className="w-4 h-4" />
+            </Button>
+          )}
+        </div>
+      )
+    }
+  ];
+
   return (
     <div>
       <PageHeader
@@ -252,83 +326,7 @@ export default function Quotations() {
             <Button className="mt-4" onClick={openNew}><Plus className="w-4 h-4 mr-1" /> New Quotation</Button>
           </div>
         ) : (
-          <table className="table-fluid-grid text-sm">
-            <thead className="cell-density bg-muted/30 border-b border-border">
-              <tr>
-                <th className="cell-density text-left  text-xs font-semibold text-muted-foreground">Quotation #</th>
-                <th className="cell-density text-left  text-xs font-semibold text-muted-foreground">Customer</th>
-                <th className="cell-density text-left  text-xs font-semibold text-muted-foreground">Date</th>
-                <th className="cell-density text-left  text-xs font-semibold text-muted-foreground">Valid Until</th>
-                <th className="cell-density text-right  text-xs font-semibold text-muted-foreground">Amount</th>
-                <th className="cell-density text-center  text-xs font-semibold text-muted-foreground">Status</th>
-                <th className="cell-density text-xs font-semibold text-muted-foreground text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {filtered.map(q => (
-                <tr key={q.id} className="hover:bg-muted/20 transition-colors">
-                  <td className="cell-density ">
-                    <VoucherLink voucherNumber={q.quotation_number}>
-                      <span className="font-mono font-semibold text-primary cursor-pointer">{q.quotation_number}</span>
-                    </VoucherLink>
-                  </td>
-                  <td className="cell-density ">
-                    <p className="font-medium">{q.customer_name}</p>
-                    {q.customer_email && <p className="text-xs text-muted-foreground">{q.customer_email}</p>}
-                  </td>
-                  <td className="cell-density text-muted-foreground">{q.quotation_date}</td>
-                  <td className="cell-density ">
-                    {q.valid_until ? (
-                      <span className={new Date(q.valid_until) < new Date() && q.status === 'Sent' ? 'text-red-500 font-medium' : 'text-muted-foreground'}>
-                        {q.valid_until}
-                      </span>
-                    ) : '—'}
-                  </td>
-                  <td className="cell-density text-right font-semibold">NPR {Number(q.grand_total).toLocaleString()}</td>
-                  <td className="cell-density text-center">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[q.status] || 'bg-gray-100 text-gray-700'}`}>
-                      {q.status}
-                    </span>
-                  </td>
-                  <td className="cell-density ">
-                    <div className="flex items-center justify-end gap-1">
-                      <Button variant="ghost" size="icon" className="h-7 w-7" title="Print / Preview" onClick={() => openPrint(q)}>
-                        <Printer className="w-3.5 h-3.5 text-muted-foreground" />
-                      </Button>
-                      {q.status === 'Draft' && (
-                        <>
-                          <Button variant="ghost" size="icon" className="h-7 w-7" title="Edit" onClick={() => openEdit(q)}>
-                            <Edit2 className="w-3.5 h-3.5" />
-                          </Button>
-                          <Button variant="ghost" size="icon" className="h-7 w-7" title="Mark as Sent" onClick={() => updateStatus(q, 'Sent')}>
-                            <Send className="w-3.5 h-3.5 text-blue-500" />
-                          </Button>
-                        </>
-                      )}
-                      {q.status === 'Sent' && (
-                        <>
-                          <Button variant="ghost" size="icon" className="h-7 w-7" title="Accept" onClick={() => updateStatus(q, 'Accepted')}>
-                            <CheckCircle className="w-3.5 h-3.5 text-green-500" />
-                          </Button>
-                          <Button variant="ghost" size="icon" className="h-7 w-7" title="Reject" onClick={() => updateStatus(q, 'Rejected')}>
-                            <XCircle className="w-3.5 h-3.5 text-red-500" />
-                          </Button>
-                        </>
-                      )}
-                      {q.status === 'Accepted' && (
-                        <Button variant="ghost" size="icon" className="h-7 w-7" title="Convert to Sales Order" onClick={() => convertToOrder(q)}>
-                          <ArrowRight className="w-3.5 h-3.5 text-purple-500" />
-                        </Button>
-                      )}
-                      <Button variant="ghost" size="icon" className="h-7 w-7" title="Duplicate" onClick={() => duplicate(q)}>
-                        <Copy className="w-3.5 h-3.5 text-muted-foreground" />
-                      </Button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <DataTable columns={columns} data={filtered} searchKey="quotation_number" />
         )}
         <div className="px-4 py-2 border-t border-border text-xs text-muted-foreground">
           {filtered.length} quotation{filtered.length !== 1 ? 's' : ''}
@@ -479,7 +477,7 @@ export default function Quotations() {
       {printTarget && (
         <QuotationPrint
           quotation={printTarget}
-          settings={settings}
+          settings={activeCompany || settings}
           onClose={closePrintTarget}
         />
       )}

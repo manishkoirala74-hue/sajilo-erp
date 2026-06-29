@@ -34,6 +34,7 @@ const CATEGORIES = [
       { id: 'ar_aging_summary',   label: 'Customer Ageing Summary',        desc: 'AR aging grouped by customer' },
       { id: 'customer_balance',   label: 'Customer Receivable Summary',    desc: 'Total receivables per customer' },
       { id: 'employee_receivable',label: 'Employee Receivable Balance',    desc: 'Outstanding advances and receivables due from employees', isRoute: true, path: '/reports/employee-receivables' },
+      { id: 'customer_bill_due',  label: 'Customer Bill Due',              desc: 'Track and receive payments for outstanding customer invoices', isRoute: true, path: '/reports/customer-bill-due' },
     ]
   },
   {
@@ -44,6 +45,7 @@ const CATEGORIES = [
       { id: 'ap_aging_summary',   label: 'Supplier Ageing Summary',        desc: 'AP aging grouped by supplier' },
       { id: 'vendor_balance',     label: 'Supplier Payable Summary',       desc: 'Total payables per supplier' },
       { id: 'employee_payable',   label: 'Employee Payable Balance',       desc: 'Unliquidated net wages owed to employees', isRoute: true, path: '/reports/employee-payables' },
+      { id: 'supplier_bill_due',  label: 'Supplier Bill Due',              desc: 'Track and make payments for outstanding supplier invoices', isRoute: true, path: '/reports/supplier-bill-due' },
     ]
   },
   {
@@ -84,6 +86,8 @@ const CATEGORIES = [
       { id: 'item_valuation',    label: 'Item Valuation',         desc: 'Inventory value at cost' },
       { id: 'category_summary',  label: 'Category-wise Summary',  desc: 'Stock grouped by category' },
       { id: 'price_revision_history', label: 'Sales Price Revision History', desc: 'Audit trail of sales price changes', isRoute: true, path: '/reports/price-revision-history' },
+      { id: 'inventory_turnover', label: 'Inventory Turnover Ratio', desc: 'Turnover ratio, COGS, and DSI for inventory items', isRoute: true, path: '/reports/inventory-turnover' },
+      { id: 'gross_profit_margin', label: 'Gross Profit Margin Report', desc: 'Revenue, COGS, and Gross Margin per item', isRoute: true, path: '/reports/inventory/gross-profit-margin' },
     ]
   },
   {

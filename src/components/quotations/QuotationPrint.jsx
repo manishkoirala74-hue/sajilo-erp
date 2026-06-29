@@ -1,9 +1,12 @@
 import { useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { X, Printer } from 'lucide-react';
+import { X, Printer, Download } from 'lucide-react';
+import { downloadPDF } from '@/utils/pdf-engine/generator';
 import { Checkbox } from '@/components/ui/checkbox';
 
 const FONT_MAP = { inter: 'Inter, sans-serif', georgia: 'Georgia, serif', mono: 'monospace' };
+
+const formatDate = (d) => d ? d.split('T')[0] : '';
 
 export default function QuotationPrint({ quotation: q, settings: s = {}, onClose }) {
   const printRef = useRef();
@@ -49,6 +52,41 @@ export default function QuotationPrint({ quotation: q, settings: s = {}, onClose
     setTimeout(() => { win.focus(); win.print(); win.close(); }, 400);
   };
 
+  
+  
+  const handleDownloadPdf = async () => {
+    try {
+      const pdfData = {
+        ...q,
+        date: formatDate(q.quotation_date),
+        reference_number: q.quotation_number,
+        due_date: formatDate(q.valid_until),
+        company: s,
+        customer: { name: q.customer_name, email: q.customer_email, phone: q.customer_phone, address: q.customer_address },
+        line_items: (q.line_items || []).map(l => ({
+          item_name: l.item_name,
+          description: l.description || '',
+          quantity: l.quantity,
+          rate: l.unit_price,
+          tax_amount: l.tax_amount || 0,
+          total_amount: l.line_total
+        })),
+        subtotal: q.goods_subtotal,
+        tax_total: q.total_tax_amount,
+        total: q.grand_total,
+      };
+      
+      const layoutConfig = {
+        headerText: 'QUOTATION',
+        showTaxColumn: s.quotation_show_vat !== false
+      };
+      
+      await downloadPDF(pdfData, layoutConfig, `Quotation_${q.quotation_number}.pdf`);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   const totalQty = (q.line_items || []).reduce((s, l) => s + (l.quantity || 0), 0);
 
   return (
@@ -74,6 +112,9 @@ export default function QuotationPrint({ quotation: q, settings: s = {}, onClose
               </label>
             </div>
             <div className="flex items-center gap-2">
+              <Button size="sm" variant="secondary" onClick={handleDownloadPdf} className="gap-1.5">
+                <Download className="w-4 h-4" /> Download PDF
+              </Button>
               <Button size="sm" onClick={handlePrint} className="gap-1.5">
                 <Printer className="w-4 h-4" /> Print
               </Button>

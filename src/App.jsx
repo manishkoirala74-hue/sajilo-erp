@@ -40,8 +40,13 @@ import TemplateBuilder from '@/pages/settings/TemplateBuilder';
 import Reports from '@/pages/Reports.jsx';
 import EmployeeReceivableReport from '@/pages/reports/EmployeeReceivableReport';
 import EmployeePayableReport from '@/pages/reports/EmployeePayableReport';
+import UserActivityLog from '@/pages/reports/UserActivityLog';
+import InventoryTurnoverReport from '@/pages/reports/InventoryTurnoverReport';
 import CommunicationLogs from '@/pages/reports/CommunicationLogs';
 import PriceRevisionHistory from '@/pages/reports/PriceRevisionHistory';
+import GrossProfitMarginReport from '@/pages/reports/GrossProfitMarginReport';
+import CustomerBillDue from '@/pages/reports/CustomerBillDue';
+import SupplierBillDue from '@/pages/reports/SupplierBillDue';
 import ComposeEmail from '@/pages/email/ComposeEmail';
 import Profile from '@/pages/Profile';
 import HelpSupport from '@/pages/HelpSupport';
@@ -165,6 +170,10 @@ const AuthenticatedApp = () => {
           <Route path="/reports/employee-payables" element={<EmployeePayableReport />} />
           <Route path="/reports/communication-logs" element={<CommunicationLogs />} />
           <Route path="/reports/price-revision-history" element={<PriceRevisionHistory />} />
+          <Route path="/reports/inventory-turnover" element={<InventoryTurnoverReport />} />
+          <Route path="/reports/inventory/gross-profit-margin" element={<GrossProfitMarginReport />} />
+          <Route path="/reports/customer-bill-due" element={<CustomerBillDue />} />
+          <Route path="/reports/supplier-bill-due" element={<SupplierBillDue />} />
           <Route path="/profile" element={<Profile />} />
 
           {/* Accounting */}

@@ -2,7 +2,7 @@ import { useSearchParams, useLocation, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { sajilo } from '@/api/sajiloClient';
 import { toast } from 'sonner';
-import { Plus, Eye, Trash2, RotateCcw, TriangleAlert } from 'lucide-react';
+import { Plus, Eye, Trash2, RotateCcw, TriangleAlert , ListChecks} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -37,6 +37,13 @@ export default function FinancialVouchers() {
   const [viewOpen, setViewOpen] = useState(false);
   const [selected, setSelected] = useState(null);
   const [form, setForm] = useState(emptyVoucher);
+  const [settings, setSettings] = useState({});
+  const [billAllocations, setBillAllocations] = useState([]);
+  const [partnerAccounts, setPartnerAccounts] = useState(new Set());
+  const [activeAllocationRow, setActiveAllocationRow] = useState(null);
+  const [pendingBillsModalOpen, setPendingBillsModalOpen] = useState(false);
+  const [pendingBills, setPendingBills] = useState([]);
+  const [loadingBills, setLoadingBills] = useState(false);
   const [saving, setSaving] = useState(false);
   const [filter, setFilter] = useState('All');
 
@@ -85,12 +92,25 @@ export default function FinancialVouchers() {
 
   async function fetchData() {
     setLoading(true);
-    const [data, accounts] = await Promise.all([
+    const [data, accounts, settingsData, partners] = await Promise.all([
       sajilo.entities.FinancialVoucher.list('-created_at', 200),
       sajilo.entities.ChartOfAccount.filter({ is_active: true }, 'account_code', 1000),
+      sajilo.entities.CompanySettings.list(),
+      sajilo.entities.BusinessPartner.list(),
     ]);
     setVouchers(data);
     setAllAccounts(accounts);
+    
+    const pIds = new Set();
+    if (partners) {
+      partners.forEach(p => {
+        if (p.receivable_account_id) pIds.add(p.receivable_account_id);
+        if (p.payable_account_id) pIds.add(p.payable_account_id);
+      });
+    }
+    setPartnerAccounts(pIds);
+
+    if (settingsData && settingsData.length > 0) setSettings(settingsData[0]);
     setLoading(false);
   };
 
@@ -114,6 +134,62 @@ export default function FinancialVouchers() {
     : (form.voucher_type === 'Payment' || form.voucher_type === 'Receipt')
       ? ledgerAccounts.filter(a => !cashAccounts.find(ca => ca.id === a.id))
       : ledgerAccounts;
+
+  
+  const openPendingBills = async (rowIndex) => {
+    setActiveAllocationRow(rowIndex);
+    setLoadingBills(true);
+    setPendingBillsModalOpen(true);
+    try {
+      const table = form.voucher_type === 'Receipt' ? 'SalesInvoice' : 'PurchaseInvoice';
+      const contactField = form.voucher_type === 'Receipt' ? 'customer_name' : 'supplier_name';
+      
+      let q = sajilo.auth.supabase.from(table).select('*').eq('status', 'Posted').neq('payment_status', 'Paid').eq('company_id', sajilo.getCompanyId());
+      
+      const accountName = form.entries[rowIndex]?.account_name;
+      if (accountName) {
+        q = q.ilike(contactField, `%${accountName}%`);
+      } else if (form.contact_name) {
+        // Fallback for compatibility
+        q = q.ilike(contactField, `%${form.contact_name}%`);
+      }
+      const { data } = await q;
+      setPendingBills(data || []);
+    } catch(e) {
+      toast.error('Failed to load pending bills');
+    } finally {
+      setLoadingBills(false);
+    }
+  };
+
+  const handleBillAllocationChange = (invoice, amount) => {
+    setBillAllocations(prev => {
+      const exists = prev.find(p => p.invoice_id === invoice.id);
+      if (amount <= 0) {
+        return prev.filter(p => p.invoice_id !== invoice.id);
+      }
+      if (exists) {
+        return prev.map(p => p.invoice_id === invoice.id ? { ...p, allocated_amount: amount } : p);
+      }
+      return [...prev, { invoice_id: invoice.id, invoice_number: invoice.invoice_number, invoice_date: invoice.invoice_date, total: invoice.grand_total, due: (invoice.grand_total - (invoice.paid_amount||0)), allocated_amount: amount }];
+    });
+  };
+
+  const autoAllocate = () => {
+    let remaining = form.total_amount || 0;
+    const newAlloc = [];
+    for (const bill of pendingBills) {
+      if (remaining <= 0) break;
+      const due = bill.grand_total - (bill.paid_amount || 0);
+      const alloc = Math.min(due, remaining);
+      newAlloc.push({
+        invoice_id: bill.id, invoice_number: bill.invoice_number, invoice_date: bill.invoice_date,
+        total: bill.grand_total, due: due, allocated_amount: alloc
+      });
+      remaining -= alloc;
+    }
+    setBillAllocations(newAlloc);
+  };
 
   const handleEntry = (idx, field, val) => {
     setForm(prev => {
@@ -188,7 +264,7 @@ export default function FinancialVouchers() {
         form.total_amount = totDebit;
       }
 
-      const payload = { ...form, entries: finalEntries, status, voucher_number: genNumber() };
+      const payload = { ...form, entries: finalEntries, status, voucher_number: genNumber(), bill_allocations: (form.voucher_type === 'Receipt' || form.voucher_type === 'Payment') ? JSON.stringify(billAllocations) : null };
       delete payload.source_account_id;
       delete payload.source_account_name;
       delete payload.source_account_code;
@@ -205,6 +281,22 @@ export default function FinancialVouchers() {
           description: e.narration || payload.narration || `Financial Voucher ${payload.voucher_number}`
         }));
         await postFinancialVoucher({ ...savedVoucher, lines: linesToPost }, false, idempotencyKey);
+        
+        // Update Paid Amounts for Invoices
+        if ((form.voucher_type === 'Receipt' || form.voucher_type === 'Payment') && billAllocations.length > 0) {
+          for (const alloc of billAllocations) {
+            const table = form.voucher_type === 'Receipt' ? 'SalesInvoice' : 'PurchaseInvoice';
+            try {
+              // Fetch current
+              const res = await sajilo.client.from(table).select('paid_amount, grand_total').eq('id', alloc.invoice_id).single();
+              if (res.data) {
+                const newPaid = (res.data.paid_amount || 0) + alloc.allocated_amount;
+                const newStatus = newPaid >= res.data.grand_total ? 'Paid' : (newPaid > 0 ? 'Partial Paid' : 'Unpaid');
+                await sajilo.client.from(table).update({ paid_amount: newPaid, payment_status: newStatus }).eq('id', alloc.invoice_id);
+              }
+            } catch(e) { console.error('Failed to update invoice payment status', e); }
+          }
+        }
       }
 
       // Native Vector PDF cache generation
@@ -409,7 +501,7 @@ export default function FinancialVouchers() {
       <PageHeader
         title="Financial Vouchers"
         subtitle="Receipt, Payment, Journal & Contra entries"
-        action={() => { setForm(emptyVoucher); setOpen(true); }}
+        action={() => { setForm(emptyVoucher); setBillAllocations([]); setOpen(true); }}
         actionLabel="New Voucher"
         actionIcon={Plus}
       />
@@ -498,13 +590,16 @@ export default function FinancialVouchers() {
               </div>
             </div>
 
+            
+
+
             {/* Entries table */}
             <div>
               <div className="flex justify-between items-end mb-2">
                 <Label>Ledger Entries *</Label>
                 <Button variant="outline" size="sm" onClick={addEntry}><Plus className="w-4 h-4 mr-1" /> Add Row</Button>
               </div>
-              <div className="border border-border rounded-lg overflow-hidden">
+              <div className="border border-border rounded-lg overflow-x-auto">
                 <table className="table-fluid-grid text-sm">
                   <thead className="cell-density bg-muted/50"><tr>
                     <th className="cell-density text-left w-2/5">Account</th>
@@ -519,18 +614,36 @@ export default function FinancialVouchers() {
                       return (
                         <tr key={i}>
                           <td className="cell-density ">
-                            <SearchableSelect
-                              options={targetAccounts.map(a => ({ value: a.id, label: `${a.account_name} (${a.account_type})` }))}
-                              value={e.account_id}
-                              onChange={v => {
-                                const a = allAccounts.find(x => x.id === v);
-                                handleEntry(i, 'account_id', v);
-                                handleEntry(i, 'account_name', a?.account_name);
-                                handleEntry(i, 'account_code', a?.account_code);
-                                handleEntry(i, 'account_type', a?.account_type);
-                              }}
-                              placeholder="Select account"
-                            />
+                            <div className="flex items-center gap-1">
+                              <div className="flex-1 min-w-[200px]">
+                                <SearchableSelect
+                                  options={targetAccounts.map(a => ({ value: a.id, label: `${a.account_name} (${a.account_type})` }))}
+                                  value={e.account_id}
+                                  onChange={v => {
+                                    const a = allAccounts.find(x => x.id === v);
+                                    handleEntry(i, 'account_id', v);
+                                    handleEntry(i, 'account_name', a?.account_name);
+                                    handleEntry(i, 'account_code', a?.account_code);
+                                    handleEntry(i, 'account_type', a?.account_type);
+                                  }}
+                                  placeholder="Select account"
+                                />
+                              </div>
+                              {(() => {
+                                if (settings.enable_bill_wise_entry === false) return null;
+                                if (form.voucher_type !== 'Receipt' && form.voucher_type !== 'Payment') return null;
+                                if (!e.account_id) return null;
+                                const showIcon = partnerAccounts.has(e.account_id);
+                                if (showIcon) {
+                                  return (
+                                    <Button type="button" variant="outline" size="icon" className="h-8 w-8 shrink-0 text-blue-600 border-blue-200 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors focus:ring-2 focus:ring-blue-500" onClick={() => openPendingBills(i)} title="Bill-Wise Allocation">
+                                      <ListChecks className="w-4 h-4" />
+                                    </Button>
+                                  );
+                                }
+                                return null;
+                              })()}
+                            </div>
                           </td>
                           {form.voucher_type === 'Journal' ? (
                             <>
@@ -563,6 +676,83 @@ export default function FinancialVouchers() {
               <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
               <Button variant="outline" onClick={() => save('Draft')} disabled={saving}>Save Draft</Button>
               <Button onClick={() => save('Posted')} disabled={saving}>Post Voucher</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      
+      {/* Pending Bills Modal */}
+      <Dialog open={pendingBillsModalOpen} onOpenChange={setPendingBillsModalOpen}>
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Select Pending Bills</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 mt-2">
+            <div className="flex justify-between items-center text-sm">
+              <div>Voucher Total: <strong>{fmt(form.total_amount)}</strong></div>
+              <div>Allocated: <strong>{fmt(billAllocations.reduce((s, a) => s + a.allocated_amount, 0))}</strong></div>
+              <Button size="sm" variant="outline" onClick={autoAllocate}>Auto Allocate (FIFO)</Button>
+            </div>
+            
+            {loadingBills ? <div className="p-4 text-center">Loading...</div> : (
+              <div className="border border-border rounded-lg overflow-hidden">
+                <table className="table-fluid-grid text-sm">
+                  <thead className="cell-density bg-muted/50">
+                    <tr>
+                      <th className="cell-density text-left">Date</th>
+                      <th className="cell-density text-left">Invoice #</th>
+                      <th className="cell-density text-left">Contact</th>
+                      <th className="cell-density text-right">Total</th>
+                      <th className="cell-density text-right">Due</th>
+                      <th className="cell-density text-right w-40 min-w-[150px]">Allocate Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {pendingBills.length === 0 ? (
+                      <tr><td colSpan="6" className="text-center py-4 text-muted-foreground">No pending bills found.</td></tr>
+                    ) : (
+                      pendingBills.map(bill => {
+                        const due = bill.grand_total - (bill.paid_amount || 0);
+                        const alloc = billAllocations.find(a => a.invoice_id === bill.id)?.allocated_amount || 0;
+                        return (
+                          <tr key={bill.id}>
+                            <td className="cell-density">{bill.invoice_date}</td>
+                            <td className="cell-density">{bill.invoice_number}</td>
+                            <td className="cell-density">{bill.customer_name || bill.supplier_name}</td>
+                            <td className="cell-density text-right">{fmt(bill.grand_total)}</td>
+                            <td className="cell-density text-right">{fmt(due)}</td>
+                            <td className="cell-density">
+                              <Input 
+                                type="number" min={0} max={due}
+                                value={alloc || ''} 
+                                onChange={e => handleBillAllocationChange(bill, Number(e.target.value))}
+                                className="text-right h-8"
+                                placeholder="0"
+                              />
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            
+            <div className="flex justify-end gap-3 pt-2">
+              <Button onClick={() => {
+                setPendingBillsModalOpen(false);
+                const totalAlloc = billAllocations.reduce((s, a) => s + a.allocated_amount, 0);
+                if (totalAlloc > 0 && activeAllocationRow !== null) {
+                  const entries = [...form.entries];
+                  if (entries[activeAllocationRow]) {
+                     entries[activeAllocationRow].debit = totalAlloc;
+                  }
+                  const total = entries.reduce((s, e) => s + (e.debit || 0), 0);
+                  setForm(prev => ({ ...prev, entries, total_amount: total }));
+                }
+              }}>Done</Button>
             </div>
           </div>
         </DialogContent>
@@ -627,18 +817,72 @@ export default function FinancialVouchers() {
                   variant="outline" 
                   size="sm"
                   onClick={() => {
-                    import('html2canvas').then(({ default: html2canvas }) => {
-                      import('jspdf').then(({ jsPDF }) => {
-                        const el = document.getElementById('voucher-content');
-                        if (!el) return;
-                        html2canvas(el, { scale: 2 }).then((canvas) => {
-                          const imgData = canvas.toDataURL('image/png');
-                          const pdf = new jsPDF('p', 'mm', 'a4');
-                          const pdfWidth = pdf.internal.pageSize.getWidth();
-                          const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-                          pdf.addImage(imgData, 'PNG', 0, 10, pdfWidth, pdfHeight);
-                          pdf.save(`Voucher_${selected.voucher_number}.pdf`);
+                    import('jspdf').then(({ jsPDF }) => {
+                      import('jspdf-autotable').then(({ default: autoTable }) => {
+                        const doc = new jsPDF('p', 'pt', 'a4');
+                        const margin = 40;
+                        const pageWidth = doc.internal.pageSize.getWidth();
+                        
+                        doc.setFont('helvetica', 'bold');
+                        doc.setFontSize(18);
+                        doc.text('FINANCIAL VOUCHER', margin, margin + 10);
+                        
+                        doc.setFontSize(10);
+                        doc.setFont('helvetica', 'normal');
+                        doc.setTextColor(100, 100, 100);
+                        doc.text(selected.voucher_number, margin, margin + 25);
+                        
+                        // Right side
+                        doc.setFont('helvetica', 'bold');
+                        doc.setTextColor(40, 40, 40);
+                        const rightText = settings?.company_name || 'Company Name';
+                        doc.text(rightText, pageWidth - margin - doc.getTextWidth(rightText), margin + 10);
+                        
+                        // Details
+                        let currentY = margin + 60;
+                        doc.setFontSize(10);
+                        doc.text(`Date: ${selected.voucher_date}`, margin, currentY);
+                        doc.text(`Type: ${selected.voucher_type}`, margin, currentY + 15);
+                        if (selected.contact_name) {
+                          doc.text(`Contact: ${selected.contact_name}`, margin, currentY + 30);
+                        }
+                        
+                        currentY += 50;
+                        
+                        // Table
+                        const tableRows = (selected.entries || []).map(e => [
+                          e.account_name || '',
+                          e.account_type || '',
+                          Number(e.debit || 0).toLocaleString(undefined, { minimumFractionDigits: 2 }),
+                          Number(e.credit || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })
+                        ]);
+                        
+                        autoTable(doc, {
+                          startY: currentY,
+                          head: [['Account', 'Type', 'Debit', 'Credit']],
+                          body: tableRows,
+                          theme: 'grid',
+                          headStyles: { fillColor: [59, 130, 246] }, // blue-500
+                          columnStyles: { 2: { halign: 'right' }, 3: { halign: 'right' } }
                         });
+                        
+                        // Totals
+                        const finalY = doc.lastAutoTable.finalY + 20;
+                        doc.setFont('helvetica', 'bold');
+                        doc.text('Total:', pageWidth - margin - 150, finalY);
+                        const totalStr = Number(selected.total_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 });
+                        doc.text(totalStr, pageWidth - margin - doc.getTextWidth(totalStr), finalY);
+                        
+                        // Notes
+                        if (selected.notes) {
+                          doc.setFont('helvetica', 'normal');
+                          doc.setTextColor(100, 100, 100);
+                          doc.text('Notes:', margin, finalY + 30);
+                          const splitNotes = doc.splitTextToSize(selected.notes, pageWidth - margin * 2);
+                          doc.text(splitNotes, margin, finalY + 45);
+                        }
+                        
+                        doc.save(`Voucher_${selected.voucher_number}.pdf`);
                       });
                     });
                   }}

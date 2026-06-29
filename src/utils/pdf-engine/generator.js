@@ -72,9 +72,10 @@ export const generatePDF = async (data, layoutConfig = {}) => {
   let currentY = startY - 8; // Starting a bit higher for logo if any
   if (data.company) {
     let logoLoaded = false;
-    if (config.showLogo && data.company.logo_url) {
+    const logoToUse = data.company.logo_url || data.company.company_logo_url;
+    if (config.showLogo && logoToUse) {
       try {
-        const response = await fetch(data.company.logo_url);
+        const response = await fetch(logoToUse);
         const blob = await response.blob();
         const base64data = await new Promise((resolve) => {
           const reader = new FileReader();
@@ -98,7 +99,7 @@ export const generatePDF = async (data, layoutConfig = {}) => {
     if (config.showCompanyName) {
       doc.setFont(config.fontFamily, 'bold');
       doc.setFontSize(config.fontSizeCompanyName);
-      doc.text(data.company.name || 'Your Company', 14, currentY);
+      doc.text(data.company.name || data.company.company_name || 'Your Company', 14, currentY);
       doc.setFont(config.fontFamily, 'normal');
       doc.setFontSize(config.fontSizeAddress); // Reset font size
       currentY += 6;

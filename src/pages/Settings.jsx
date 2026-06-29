@@ -247,8 +247,9 @@ export default function Settings() {
                   <Input type="number" min={1} value={settings.self_reminder_days_before_due || 3} onChange={e => set('self_reminder_days_before_due', Number(e.target.value))} className="mt-1 h-10 border border-border bg-background px-3 text-sm rounded-md focus:ring-1 focus:ring-primary outline-none font-mono text-right" />
                 </div>
               </div>
-              <div className="mt-3">
+              <div className="mt-3 space-y-3">
                 <ToggleRow label="Auto-send Reminder on Due Date" desc="Automatically email the customer on the invoice due date" checked={settings.send_invoice_reminder_on_due} onChange={v => set('send_invoice_reminder_on_due', v)} />
+                <ToggleRow label="Enable Bill-wise Entry" desc="Track partial and full payments against specific customer or supplier invoices during Receipt/Payment" checked={settings.enable_bill_wise_entry !== false} onChange={v => set('enable_bill_wise_entry', v)} />
               </div>
             </SectionCard>
 

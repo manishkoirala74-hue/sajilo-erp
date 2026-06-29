@@ -59,8 +59,8 @@ export default function GlobalVoucherDrawer() {
           lineFk = 'sale_id';
           docNumberField = 'sale_number';
         } else if (vNum.startsWith('QT-')) {
-          entityName = 'SalesQuotation';
-          lineEntityName = 'SalesQuotationLine';
+          entityName = 'Quotation';
+          lineEntityName = null; // Handled via line_items JSONB
           lineFk = 'quotation_id';
           docNumberField = 'quotation_number';
         } else if (vNum.startsWith('SR-') || vNum.startsWith('SRN-')) {
