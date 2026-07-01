@@ -19,6 +19,7 @@ import { loadActiveTaxTypes, computeTotalTax } from '@/lib/taxService';
 import SearchableSelect from '@/components/shared/SearchableSelect';
 import QuickPartnerCreate from '@/components/shared/QuickPartnerCreate';
 import VoucherLink from '@/components/shared/VoucherLink';
+import FileUpload from '@/components/shared/FileUpload';
 
 const emptyPO = {
   po_number: '', vendor_id: '', vendor_name: '', status: 'Draft',
@@ -101,7 +102,7 @@ export default function PurchaseOrders() {
   };
 
   const openNew = () => {
-    setForm({ ...emptyPO, po_number: generatePONumber() });
+    setForm({ ...emptyPO, id: crypto.randomUUID(), po_number: generatePONumber() });
     setShowForm(true);
   };
 
@@ -259,6 +260,15 @@ export default function PurchaseOrders() {
             <LineItemsEditor value={form.line_items} onChange={handleLineChange} taxTypes={taxTypes} />
           </div>
 
+          <div className="mt-6">
+            <Label className="text-base font-semibold mb-3 block">Attachments</Label>
+            <FileUpload 
+              companyId={sajilo.getCompanyId()} 
+              moduleName="PurchaseOrder" 
+              recordId={form.id} 
+            />
+          </div>
+
           {form.vendor_id && (
             <div className="mt-4">
               <ItemPurchaseHistory vendorId={form.vendor_id} />
@@ -324,6 +334,15 @@ export default function PurchaseOrders() {
                   </div>
                 </div>
               )}
+              
+              <div className="border-t pt-3">
+                <p className="text-sm font-semibold mb-2">Attachments</p>
+                <FileUpload 
+                  companyId={sajilo.getCompanyId()} 
+                  moduleName="PurchaseOrder" 
+                  recordId={viewDetail.id} 
+                />
+              </div>
             </div>
           </DialogContent>
         </Dialog>

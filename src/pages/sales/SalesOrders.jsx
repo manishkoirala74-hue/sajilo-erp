@@ -18,6 +18,7 @@ import { loadActiveTaxTypes, computeTotalTax } from '@/lib/taxService';
 import SearchableSelect from '@/components/shared/SearchableSelect';
 import QuickPartnerCreate from '@/components/shared/QuickPartnerCreate';
 import VoucherLink from '@/components/shared/VoucherLink';
+import FileUpload from '@/components/shared/FileUpload';
 
 const FULFILLMENT_STATUSES = ['Draft', 'Confirmed', 'Preparing', 'Ready', 'Dispatched', 'Delivered'];
 
@@ -102,7 +103,7 @@ export default function SalesOrders() {
   };
 
   const openNew = () => {
-    setForm({ ...emptySO, order_number: generateSONumber() });
+    setForm({ ...emptySO, id: crypto.randomUUID(), order_number: generateSONumber() });
     setShowForm(true);
   };
 
@@ -228,6 +229,15 @@ export default function SalesOrders() {
             <Label className="text-base font-semibold mb-3 block">Line Items</Label>
             <LineItemsEditor value={form.line_items} onChange={handleLineChange} taxTypes={taxTypes} />
           </div>
+          
+          <div className="mt-6">
+            <Label className="text-base font-semibold mb-3 block">Attachments</Label>
+            <FileUpload 
+              companyId={sajilo.getCompanyId()} 
+              moduleName="SalesOrder" 
+              recordId={form.id} 
+            />
+          </div>
           <div className="flex justify-end gap-3 mt-4 pt-4 border-t border-border">
             <Button variant="outline" onClick={() => setShowForm(false)}>Cancel</Button>
             <Button onClick={handleSave} disabled={saving}>{saving ? 'Saving...' : 'Create Order'}</Button>
@@ -290,6 +300,15 @@ export default function SalesOrders() {
                   </table>
                 </div>
               )}
+              
+              <div className="border-t pt-3">
+                <p className="text-sm font-semibold mb-2">Attachments</p>
+                <FileUpload 
+                  companyId={sajilo.getCompanyId()} 
+                  moduleName="SalesOrder" 
+                  recordId={viewDetail.id} 
+                />
+              </div>
             </div>
           )}
         </DialogContent>

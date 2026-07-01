@@ -24,6 +24,7 @@ import VoucherLink from '@/components/shared/VoucherLink';
 import { generateVectorPDF } from '@/utils/pdfGenerator';
 import { downloadPDF } from '@/utils/pdf-engine/generator';
 import { Mail, Download } from 'lucide-react';
+import FileUpload from '@/components/shared/FileUpload';
 
 const emptySI = {
   invoice_number: '', customer_id: '', customer_name: '', sales_order_id: '',
@@ -180,14 +181,14 @@ export default function SalesInvoices() {
   const openNew = () => {
     const isAuto = !settings || settings.invoice_numbering_method !== 'Manual';
     const invNumber = isAuto ? generateInvoiceNumber() : '';
-    setForm({ ...emptySI, invoice_number: invNumber });
+    setForm({ ...emptySI, id: crypto.randomUUID(), invoice_number: invNumber, _isNew: true });
     setDupWarning(false);
     setPendingPostStatus(null);
     setShowForm(true);
   };
 
   const openEdit = (row) => {
-    setForm({ ...emptySI, ...row });
+    setForm({ ...emptySI, ...row, _isNew: false });
     setDupWarning(false);
     setPendingPostStatus(null);
     setShowForm(true);
@@ -261,12 +262,13 @@ export default function SalesInvoices() {
         data.notes = (data.notes ? data.notes + '\n' : '') + `Payment Mode: ${form.payment_mode} (${form.cash_bank_account_name})`;
       }
 
-      const payload = { ...data };
+      let payload = { ...data };
       delete payload.payment_mode;
       delete payload.cash_bank_account_id;
       delete payload.cash_bank_account_name;
+      delete payload._isNew;
 
-      if (form.id) {
+      if (!form._isNew && invoices.find(i => i.id === form.id)) {
         const oldInv = invoices.find(i => i.id === form.id);
         const isReversal = oldInv && oldInv.status === 'Posted';
 
@@ -281,7 +283,7 @@ export default function SalesInvoices() {
           toast.success('Invoice updated as draft');
         }
       } else {
-        const created = await sajilo.entities.SalesInvoice.create(payload);
+        const created = await sajilo.entities.SalesInvoice.create({ ...payload, id: form.id });
 
         if (settings && settings.invoice_numbering_method !== 'Manual') {
           const next = (settings.invoice_next_number || 1) + 1;
@@ -603,6 +605,15 @@ export default function SalesInvoices() {
                 <h3 className="font-semibold text-lg text-foreground mb-4">Line Items</h3>
                 <LineItemsEditor value={form.line_items} onChange={handleLineChange} taxTypes={taxTypes} hideTotals={true} />
               </div>
+
+              <div className="bg-card rounded-2xl border border-stone-200 p-5 shadow-sm">
+                <h3 className="font-semibold text-lg text-foreground mb-4">Attachments</h3>
+                <FileUpload 
+                  companyId={activeCompany?.id || sajilo.getCompanyId()} 
+                  moduleName="SalesInvoice" 
+                  recordId={form.id} 
+                />
+              </div>
             </div>
 
             {/* RIGHT COLUMN */}
@@ -725,6 +736,15 @@ export default function SalesInvoices() {
                   </table>
                 </div>
               )}
+              
+              <div className="border-t pt-3">
+                <p className="text-sm font-semibold mb-2">Attachments</p>
+                <FileUpload 
+                  companyId={activeCompany?.id || sajilo.getCompanyId()} 
+                  moduleName="SalesInvoice" 
+                  recordId={viewDetail.id} 
+                />
+              </div>
             </div>
           )}
         </DialogContent>

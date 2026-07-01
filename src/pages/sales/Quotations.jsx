@@ -21,6 +21,7 @@ import QuickPartnerCreate from '@/components/shared/QuickPartnerCreate';
 import VoucherLink from '@/components/shared/VoucherLink';
 import DataTable from '@/components/shared/DataTable';
 import StatusBadge from '@/components/shared/StatusBadge';
+import FileUpload from '@/components/shared/FileUpload';
 
 const STATUS_COLORS = {
   Draft: 'bg-gray-100 text-gray-700',
@@ -122,6 +123,7 @@ export default function Quotations() {
     const today = format(new Date(), 'yyyy-MM-dd');
     const validDays = settings?.quotation_validity_days || 30;
     return {
+      id: crypto.randomUUID(),
       quotation_number: generateNumber(),
       customer_id: '', customer_name: '', customer_email: '', customer_phone: '', customer_address: '',
       quotation_date: today,
@@ -431,6 +433,16 @@ export default function Quotations() {
                   <span className="text-primary">NPR {Number(form.grand_total || 0).toLocaleString()}</span>
                 </div>
               </div>
+            </div>
+
+            {/* Attachments */}
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 pb-1 border-b border-border">Attachments</p>
+              <FileUpload 
+                companyId={sajilo.getCompanyId()} 
+                moduleName="Quotation" 
+                recordId={form.id} 
+              />
             </div>
 
             {/* Notes & T&C */}

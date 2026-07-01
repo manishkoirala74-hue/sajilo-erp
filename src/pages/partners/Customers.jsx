@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 import { provisionPartnerLedgers, createPartnerLedger } from '@/lib/partnerLedgerService';
 import PartnerBatchActions from '@/components/partners/PartnerBatchActions';
 import PartnerTransactionHistory from '@/components/partners/PartnerTransactionHistory';
+import FileUpload from '@/components/shared/FileUpload';
 
 const emptyForm = {
   name: '', partner_type: 'Company', tax_id_number: '',
@@ -115,8 +116,8 @@ export default function Customers() {
     setSelected(new Set());
   };
 
-  const openNew  = () => { setForm(emptyForm); setEditing(null); setShowForm(true); };
-  const openEdit = (p)  => { setForm({ ...emptyForm, ...p }); setEditing(p); setShowForm(true); };
+  const openNew  = () => { setForm({ ...emptyForm, id: crypto.randomUUID(), _isNew: true }); setEditing(null); setShowForm(true); };
+  const openEdit = (p)  => { setForm({ ...emptyForm, ...p, _isNew: false }); setEditing(p); setShowForm(true); };
 
   const handleSave = async () => {
     if (!form.name) { toast.error('Name is required'); return; }
@@ -128,6 +129,7 @@ export default function Customers() {
       if (!editing) {
         const ledgerUpdates = await provisionPartnerLedgers(saveData, settings || {});
         saveData = { ...saveData, ...ledgerUpdates };
+        delete saveData._isNew;
         await sajilo.entities.BusinessPartner.create(saveData);
         toast.success('Customer created — sub-ledger auto-generated');
       } else {
@@ -135,6 +137,7 @@ export default function Customers() {
         const saveData = { ...form };
         delete saveData.receivable_account_id; // don't mess with system ledgers here
         delete saveData.payable_account_id;
+        delete saveData._isNew;
         
         await sajilo.entities.BusinessPartner.update(editing.id, saveData);
 
@@ -492,6 +495,15 @@ export default function Customers() {
                 AR Ledger: <span className="font-mono font-semibold">{editing.receivable_account_code && `${editing.receivable_account_code} — `}{editing.receivable_account_name}</span>
               </div>
             )}
+            
+            <div className="col-span-2 mt-2">
+              <Label className="text-base font-semibold mb-3 block">Attachments</Label>
+              <FileUpload 
+                companyId={sajilo.getCompanyId()} 
+                moduleName="Customer" 
+                recordId={form.id} 
+              />
+            </div>
           </div>
           <div className="flex justify-end gap-3 mt-4">
             <Button variant="outline" onClick={() => setShowForm(false)}>Cancel</Button>

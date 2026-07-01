@@ -22,6 +22,7 @@ import QuickPartnerCreate from '@/components/shared/QuickPartnerCreate';
 import { Mail } from 'lucide-react';
 import VoucherLink from '@/components/shared/VoucherLink';
 import { generateVectorPDF } from '@/utils/pdfGenerator';
+import FileUpload from '@/components/shared/FileUpload';
 
 const emptyPI = {
   invoice_number: '', vendor_invoice_no: '', po_reference_id: '',
@@ -121,12 +122,12 @@ export default function PurchaseInvoices() {
   };
 
   const openNew = () => {
-    setForm({ ...emptyPI, invoice_number: generateInvoiceNumber() });
+    setForm({ ...emptyPI, id: crypto.randomUUID(), invoice_number: generateInvoiceNumber(), _isNew: true });
     setShowForm(true);
   };
 
   const openEdit = (row) => {
-    setForm({ ...emptyPI, ...row });
+    setForm({ ...emptyPI, ...row, _isNew: false });
     setShowForm(true);
   };
 
@@ -179,8 +180,9 @@ export default function PurchaseInvoices() {
       delete payload.payment_mode;
       delete payload.cash_bank_account_id;
       delete payload.cash_bank_account_name;
+      delete payload._isNew;
 
-      if (form.id) {
+      if (!form._isNew && invoices.find(i => i.id === form.id)) {
         const oldInv = invoices.find(i => i.id === form.id);
         const isReversal = oldInv && oldInv.status === 'Posted';
 
@@ -200,7 +202,7 @@ export default function PurchaseInvoices() {
           toast.success('Invoice updated as draft');
         }
       } else {
-        const created = await sajilo.entities.PurchaseInvoice.create(payload);
+        const created = await sajilo.entities.PurchaseInvoice.create({ ...payload, id: form.id });
 
         if (postStatus === 'Posted') {
           try {
@@ -474,6 +476,15 @@ export default function PurchaseInvoices() {
                 <h3 className="font-semibold text-lg text-foreground mb-4">Line Items</h3>
                 <LineItemsEditor value={form.line_items} onChange={handleLineChange} taxTypes={taxTypes} hideTotals={true} />
               </div>
+              
+              <div className="bg-card rounded-2xl border border-stone-200 p-5 shadow-sm">
+                <h3 className="font-semibold text-lg text-foreground mb-4">Attachments</h3>
+                <FileUpload 
+                  companyId={sajilo.getCompanyId()} 
+                  moduleName="PurchaseInvoice" 
+                  recordId={form.id} 
+                />
+              </div>
             </div>
 
             {/* RIGHT COLUMN */}
@@ -579,6 +590,15 @@ export default function PurchaseInvoices() {
                   </table>
                 </div>
               )}
+              
+              <div className="border-t pt-3">
+                <p className="text-sm font-semibold mb-2">Attachments</p>
+                <FileUpload 
+                  companyId={sajilo.getCompanyId()} 
+                  moduleName="PurchaseInvoice" 
+                  recordId={viewDetail.id} 
+                />
+              </div>
             </div>
           )}
         </DialogContent>

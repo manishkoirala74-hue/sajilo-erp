@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { X, Printer, Download } from 'lucide-react';
 import { downloadPDF } from '@/utils/pdf-engine/generator';
 import { Checkbox } from '@/components/ui/checkbox';
+import FileUpload from '@/components/shared/FileUpload';
 
 const FONT_MAP = { inter: 'Inter, sans-serif', georgia: 'Georgia, serif', mono: 'monospace' };
 
@@ -256,6 +257,15 @@ export default function QuotationPrint({ quotation: q, settings: s = {}, onClose
               <span>{s.company_name} — This is a computer-generated quotation.</span>
               <span>Page 1</span>
             </div>
+          </div>
+          
+          <div className="mt-8 print:hidden">
+            <h3 className="font-semibold text-sm mb-3">Attachments</h3>
+            <FileUpload 
+              companyId={s.id} 
+              moduleName="Quotation" 
+              recordId={q.id} 
+            />
           </div>
         </div>
       </div>
