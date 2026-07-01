@@ -34,3 +34,4 @@ dist-ssr
 check_db.js
 check_jv.js
 scratch/
+.cache/
