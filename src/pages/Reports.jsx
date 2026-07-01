@@ -66,6 +66,7 @@ const CATEGORIES = [
       { id: 'purchase_by_vendor',   label: 'Purchase By Supplier',    desc: 'Spend breakdown per supplier' },
       { id: 'purchase_by_item',     label: 'Purchase By Item',        desc: 'Quantity and cost per item purchased' },
       { id: 'unpaid_bills',         label: 'Unpaid Purchase Invoices',desc: 'All bills with pending payment' },
+      { id: 'purchase_price_change_history', label: 'Purchase Price Change History', desc: 'Audit trail of purchase price changes', isRoute: true, path: '/reports/purchase-price-change-history' },
     ]
   },
   {

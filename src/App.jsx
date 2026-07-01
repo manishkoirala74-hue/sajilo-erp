@@ -47,6 +47,7 @@ import PriceRevisionHistory from '@/pages/reports/PriceRevisionHistory';
 import GrossProfitMarginReport from '@/pages/reports/GrossProfitMarginReport';
 import CustomerBillDue from '@/pages/reports/CustomerBillDue';
 import SupplierBillDue from '@/pages/reports/SupplierBillDue';
+import PurchasePriceChangeHistory from '@/pages/reports/PurchasePriceChangeHistory';
 import ComposeEmail from '@/pages/email/ComposeEmail';
 import Profile from '@/pages/Profile';
 import HelpSupport from '@/pages/HelpSupport';
@@ -174,6 +175,7 @@ const AuthenticatedApp = () => {
           <Route path="/reports/inventory/gross-profit-margin" element={<GrossProfitMarginReport />} />
           <Route path="/reports/customer-bill-due" element={<CustomerBillDue />} />
           <Route path="/reports/supplier-bill-due" element={<SupplierBillDue />} />
+          <Route path="/reports/purchase-price-change-history" element={<PurchasePriceChangeHistory />} />
           <Route path="/profile" element={<Profile />} />
 
           {/* Accounting */}
