@@ -50,6 +50,10 @@ export default function PurchaseOrders() {
       setVendors(vs.filter(v => v.is_vendor || v.treated_as_vendor));
       setTaxTypes(txTypes || []);
       setLoading(false);
+    }).catch(err => {
+      console.error(err);
+      import("sonner").then(m => m.toast.error(err.message || "Error loading data"));
+      setLoading(false);
     });
   };
 

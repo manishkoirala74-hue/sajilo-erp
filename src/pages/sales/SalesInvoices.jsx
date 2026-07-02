@@ -27,7 +27,7 @@ import { Mail, Download } from 'lucide-react';
 import FileUpload from '@/components/shared/FileUpload';
 
 const emptySI = {
-  invoice_number: '', customer_id: '', customer_name: '', sales_order_id: '',
+  invoice_number: '', customer_id: '', customer_name: '', sales_order_id: '', godown_id: '',
   invoice_date: format(new Date(), 'yyyy-MM-dd'),
   due_date: format(new Date(Date.now() + 30 * 86400000), 'yyyy-MM-dd'),
   payment_mode: 'Credit', cash_bank_account_id: '', cash_bank_account_name: '',
@@ -38,7 +38,7 @@ const emptySI = {
 
 export default function SalesInvoices() {
   const { hasAccess } = usePermissions();
-  const { activeCompany } = useAuth();
+  const { activeCompany, mainGodownId, activeGodowns } = useAuth();
   const canCreate = hasAccess('sales_invoices', 'create');
   const canEdit = hasAccess('sales_invoices', 'edit');
   const canReverse = hasAccess('sales_invoices', 'reverse');
@@ -49,6 +49,7 @@ export default function SalesInvoices() {
   const [accounts, setAccounts] = useState([]);
   const [settings, setSettings] = useState(null);
   const [taxTypes, setTaxTypes] = useState([]);
+  const [godowns, setGodowns] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [showCustomerCreate, setShowCustomerCreate] = useState(false);
@@ -73,19 +74,24 @@ export default function SalesInvoices() {
 
   const loadData = () => {
     Promise.all([
-      sajilo.entities.SalesInvoice.list('-created_date'),
+      sajilo.entities.SalesInvoice.list('-created_date', 1000),
       sajilo.entities.BusinessPartner.filter({ is_active: true }),
       sajilo.entities.SalesOrder.filter({ fulfillment_status: 'Confirmed' }),
       sajilo.entities.CompanySettings.list(),
       sajilo.entities.ChartOfAccount.filter({ is_active: true }, 'account_code', 500),
       loadActiveTaxTypes(),
-    ]).then(([inv, cs, sos, sett, accs, txTypes]) => {
+      sajilo.entities.Godown.filter({ is_active: true }),
+    ]).then(([inv, cs, sos, sett, accs, txTypes, gds]) => {
       setInvoices(inv);
       setCustomers(cs.filter(c => c.is_customer || c.treat_as_customer));
       setSalesOrders(sos);
       setSettings(sett.length > 0 ? sett[0] : {});
       setAccounts(accs);
       setTaxTypes(txTypes || []);
+      setGodowns(gds || []);
+      setLoading(false);
+    }).catch(err => {
+      console.error(err);
       setLoading(false);
     });
   };
@@ -165,7 +171,7 @@ export default function SalesInvoices() {
   useSajiloSync(['BusinessPartner', 'SalesOrder', 'CompanySettings'], loadData);
 
   const fetchInvoices = async () => {
-    const data = await sajilo.entities.SalesInvoice.list('-created_date');
+    const data = await sajilo.entities.SalesInvoice.list('-created_date', 1000);
     setInvoices(data);
   };
 
@@ -181,7 +187,7 @@ export default function SalesInvoices() {
   const openNew = () => {
     const isAuto = !settings || settings.invoice_numbering_method !== 'Manual';
     const invNumber = isAuto ? generateInvoiceNumber() : '';
-    setForm({ ...emptySI, id: crypto.randomUUID(), invoice_number: invNumber, _isNew: true });
+    setForm({ ...emptySI, id: crypto.randomUUID(), invoice_number: invNumber, godown_id: mainGodownId || '', _isNew: true });
     setDupWarning(false);
     setPendingPostStatus(null);
     setShowForm(true);
@@ -230,6 +236,7 @@ export default function SalesInvoices() {
     if (['Cash', 'Bank'].includes(form.payment_mode) && !form.cash_bank_account_id) { toast.error('Select a Cash/Bank ledger account'); return; }
     if (!form.invoice_number) { toast.error('Invoice number is required'); return; }
     if (!form.grand_total || form.grand_total <= 0) { toast.error('Total amount cannot be empty or zero'); return; }
+    if (settings?.enable_godown_management && !form.godown_id) { toast.error('Godown / Location is required'); return; }
 
     const isManual = settings?.invoice_numbering_method === 'Manual';
 
@@ -581,6 +588,18 @@ export default function SalesInvoices() {
                       </SelectContent>
                     </Select>
                   </div>
+                  {settings?.enable_godown_management && (
+                    <div>
+                      <Label>Godown / Location *</Label>
+                      <SearchableSelect
+                        options={(activeGodowns || []).map(g => ({ value: g.id, label: g.name }))}
+                        value={form.godown_id}
+                        onChange={v => setForm(f => ({ ...f, godown_id: v }))}
+                        placeholder="Select Godown"
+                        className="mt-1"
+                      />
+                    </div>
+                  )}
                   <div>
                     <DateInput label="Invoice Date" value={form.invoice_date} onChange={v => setForm(f => ({...f, invoice_date: v}))} className="mt-1" />
                   </div>

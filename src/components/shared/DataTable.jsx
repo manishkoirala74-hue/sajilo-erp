@@ -1,6 +1,7 @@
-import { Search } from 'lucide-react';
-import { useState } from 'react';
+import { Search, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useState, useMemo } from 'react';
 import { useDateFormat } from '@/lib/DateFormatContext';
+import { Button } from '@/components/ui/button';
 
 const getAlignClass = (key = '', label = '') => {
   const k = String(key + label).toLowerCase();
@@ -16,12 +17,27 @@ const getAlignClass = (key = '', label = '') => {
 export default function DataTable({ columns, data, searchKey, loading }) {
   const { formatDate } = useDateFormat();
   const [search, setSearch] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const rowsPerPage = 50;
 
-  const filtered = searchKey
-    ? data.filter(row =>
-        String(row[searchKey] || '').toLowerCase().includes(search.toLowerCase())
-      )
-    : data;
+  const filtered = useMemo(() => {
+    return searchKey
+      ? (data || []).filter(row =>
+          String(row[searchKey] || '').toLowerCase().includes(search.toLowerCase())
+        )
+      : (data || []);
+  }, [data, searchKey, search]);
+
+  const totalPages = Math.ceil(filtered.length / rowsPerPage);
+  const paginatedData = useMemo(() => {
+    const startIndex = (currentPage - 1) * rowsPerPage;
+    return filtered.slice(startIndex, startIndex + rowsPerPage);
+  }, [filtered, currentPage]);
+
+  const handleSearchChange = (e) => {
+    setSearch(e.target.value);
+    setCurrentPage(1); // Reset to first page on search
+  };
 
   return (
     <div className="bg-card rounded-xl border border-border overflow-hidden">
@@ -33,7 +49,7 @@ export default function DataTable({ columns, data, searchKey, loading }) {
               type="text"
               placeholder="Search..."
               value={search}
-              onChange={e => setSearch(e.target.value)}
+              onChange={handleSearchChange}
               className="bg-transparent text-sm outline-none text-foreground placeholder:text-muted-foreground w-full"
             />
           </div>
@@ -64,14 +80,14 @@ export default function DataTable({ columns, data, searchKey, loading }) {
                   ))}
                 </tr>
               ))
-            ) : filtered.length === 0 ? (
+            ) : paginatedData.length === 0 ? (
               <tr>
                 <td colSpan={columns.length} className="cell-density text-center text-muted-foreground text-sm">
                   No records found
                 </td>
               </tr>
             ) : (
-              filtered.map((row, idx) => (
+              paginatedData.map((row, idx) => (
                 <tr key={row.id || idx} className="hover:bg-muted/30 transition-colors">
                   {columns.map(col => {
                     const alignClass = getAlignClass(col.key, col.label);
@@ -92,8 +108,36 @@ export default function DataTable({ columns, data, searchKey, loading }) {
         </table>
       </div>
       {!loading && (
-        <div className="px-4 py-3 border-t border-border bg-muted/20">
-          <p className="text-xs text-muted-foreground">{filtered.length} record{filtered.length !== 1 ? 's' : ''}</p>
+        <div className="px-4 py-3 border-t border-border bg-muted/20 flex items-center justify-between">
+          <p className="text-xs text-muted-foreground">
+            Showing {paginatedData.length > 0 ? (currentPage - 1) * rowsPerPage + 1 : 0} to {Math.min(currentPage * rowsPerPage, filtered.length)} of {filtered.length} entries
+          </p>
+          
+          {totalPages > 1 && (
+            <div className="flex items-center gap-2">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="h-8 px-2"
+              >
+                <ChevronLeft className="w-4 h-4 mr-1" /> Prev
+              </Button>
+              <span className="text-xs text-muted-foreground">
+                Page {currentPage} of {totalPages}
+              </span>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="h-8 px-2"
+              >
+                Next <ChevronRight className="w-4 h-4 ml-1" />
+              </Button>
+            </div>
+          )}
         </div>
       )}
     </div>

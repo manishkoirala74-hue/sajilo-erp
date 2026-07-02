@@ -21,10 +21,12 @@ import BusinessPartners from '@/pages/partners/BusinessPartners';
 import Customers from '@/pages/partners/Customers';
 import Suppliers from '@/pages/partners/Suppliers';
 import Items from '@/pages/inventory/Items';
+import StockTransfers from '@/pages/inventory/StockTransfers';
 import Categories from '@/pages/inventory/Categories';
 import UnitOfMeasures from '@/pages/inventory/UnitOfMeasures';
 import DiscountSchemes from '@/pages/inventory/DiscountSchemes';
 import StockAdjustments from '@/pages/inventory/StockAdjustments';
+import Godowns from '@/pages/inventory/Godowns';
 import PriceRevisionWizard from './pages/inventory/PriceRevisionWizard';
 import POSSales from '@/pages/pos/POSSales';
 import PurchaseOrders from '@/pages/purchase/PurchaseOrders';
@@ -147,7 +149,9 @@ const AuthenticatedApp = () => {
           <Route path="/partners/customers" element={<Customers />} />
           <Route path="/partners/suppliers" element={<Suppliers />} />
           <Route path="/inventory/items" element={<Items />} />
+          <Route path="/inventory/transfers" element={<StockTransfers />} />
           <Route path="/inventory/categories" element={<Categories />} />
+          <Route path="/inventory/godowns" element={<Godowns />} />
           <Route path="/inventory/uom" element={<UnitOfMeasures />} />
           <Route path="/inventory/discounts" element={<DiscountSchemes />} />
           <Route path="/inventory/adjustments" element={<StockAdjustments />} />

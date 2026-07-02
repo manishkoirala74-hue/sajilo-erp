@@ -51,6 +51,10 @@ export default function SalesOrders() {
       setCustomers(cs.filter(c => c.is_customer || c.treat_as_customer));
       setTaxTypes(txTypes || []);
       setLoading(false);
+    }).catch(err => {
+      console.error(err);
+      import("sonner").then(m => m.toast.error(err.message || "Error loading data"));
+      setLoading(false);
     });
   };
 

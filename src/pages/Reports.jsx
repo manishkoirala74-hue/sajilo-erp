@@ -82,6 +82,7 @@ const CATEGORIES = [
     id: 'inventory', label: 'Inventory Report', icon: Warehouse, color: 'teal',
     reports: [
       { id: 'stock_summary',     label: 'Stock Summary',          desc: 'Current stock levels and total value' },
+      { id: 'stock_by_location', label: 'Stock by Location',      desc: 'Current stock broken down by Godown' },
       { id: 'low_stock',         label: 'Low Stock / Reorder',    desc: 'Items below reorder level' },
       { id: 'stock_movement',    label: 'Stock Movement',         desc: 'All stock changes in the period' },
       { id: 'item_valuation',    label: 'Item Valuation',         desc: 'Inventory value at cost' },

@@ -6,7 +6,7 @@ import {
   Receipt, ClipboardList, Menu, X, Boxes, Wallet,
   Landmark, ShieldCheck, UserCog, Banknote, Factory, Handshake, BookOpen,
   Ruler, Tag, RotateCcw, SlidersHorizontal, ShoppingBag, BarChart2, TrendingDown, CreditCard,
-  UserCheck, Truck, Plus, Search, LifeBuoy
+  UserCheck, Truck, Plus, Search, LifeBuoy, ArrowRightLeft
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { sajilo } from '@/api/sajiloClient';
@@ -45,6 +45,10 @@ const buildNavGroups = (settings) => {
       label: 'INVENTORY & OPERATIONS',
       items: [
         { icon: Boxes, label: 'Items / Products', path: '/inventory/items' },
+        ...(s.enable_godown_management ? [
+          { icon: Building2, label: 'Godowns / Locations', path: '/inventory/godowns' },
+          { icon: ArrowRightLeft, label: 'Stock Transfers', path: '/inventory/transfers' }
+        ] : []),
         { icon: Package, label: 'Categories', path: '/inventory/categories' },
         { icon: Ruler, label: 'Units of Measure', path: '/inventory/uom' },
         { icon: SlidersHorizontal, label: 'Stock Adjustments', path: '/inventory/adjustments' },

@@ -1536,6 +1536,18 @@ export default function ReportViewer({ reportId, data, fromDate, toDate, columnS
             />
           )} />;
 
+      case 'stock_by_location':
+        return <SimpleReport title="Stock by Location" reportId="stock_by_location" initialData={data} initialFromDate={fromDate} initialToDate={toDate}
+          renderFn={(rows, exp) => (
+            <ReportTable title="Stock by Location" fromDate={fromDate} toDate={toDate}
+              headers={['Item Code', 'Item Name', 'Category', 'UOM', 'Godown / Location', 'Qty', 'WAC (NPR)', 'Value (NPR)']}
+              rows={rows.map(r => [r.item_code, r.item_name, r.category_name, r.unit_of_measure, r.godown_name, r.quantity_on_hand, fmtNPR(r.wac), fmtNPR(r.value)])}
+              footer={['', '', '', '', 'Total', rows.reduce((s,r)=>s+Number(r.quantity_on_hand||0),0), '', fmtNPR(rows.reduce((s,r)=>s+Number(r.value||0),0))]}
+              onExport={() => downloadCSV('stock_by_location.csv',['Code','Item','Category','UOM','Godown','Qty','WAC','Value'],rows.map(r=>[r.item_code,r.item_name,r.category_name,r.unit_of_measure,r.godown_name,r.quantity_on_hand,r.wac?.toFixed(2),r.value?.toFixed(2)]))}
+            />
+          )}
+        />;
+
       case 'stock_summary':
       case 'item_valuation':
         return <SimpleReport title="Stock Summary" reportId="stock_summary" initialData={data} initialFromDate={fromDate} initialToDate={toDate}

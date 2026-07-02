@@ -88,7 +88,7 @@ const DEFAULT_SETTINGS = {
 };
 
 export default function Settings() {
-  const { user, activeCompany, availableCompanies, isLoadingAuth } = useAuth();
+  const { user, activeCompany, availableCompanies, isLoadingAuth, refreshGlobalSettings } = useAuth();
   const navigate = useNavigate();
   const [activeHub, setActiveHub] = useState('workspace');
   const [settings, setSettings] = useState(null);
@@ -147,6 +147,12 @@ export default function Settings() {
         const c = await sajilo.entities.CompanySettings.create(payload);
         setSettingsId(c.id);
       }
+      
+      // Immediately sync context with new settings
+      if (refreshGlobalSettings) {
+        await refreshGlobalSettings();
+      }
+      
       toast.success('Settings saved');
     } catch (e) {
       console.error("Failed to save settings:", e);
@@ -359,6 +365,7 @@ export default function Settings() {
         {activeHub === 'integrations' && (
           <>
             <SectionCard title="Feature Toggles" icon={Settings2}>
+              <ToggleRow label="Godown / Multi-Location Management" desc="Track inventory across multiple warehouses" checked={settings.enable_godown_management} onChange={v => set('enable_godown_management', v)} />
               <ToggleRow label="POS Module" desc="Point of Sale terminal" checked={settings.enable_pos_module} onChange={v => set('enable_pos_module', v)} />
               <ToggleRow label="Purchase Orders" desc="Full PO workflow before invoicing" checked={settings.enable_purchase_orders} onChange={v => set('enable_purchase_orders', v)} />
               <ToggleRow label="Landed Costs" desc="Add freight/customs to inventory WAC" checked={settings.enable_landed_costs} onChange={v => set('enable_landed_costs', v)} />

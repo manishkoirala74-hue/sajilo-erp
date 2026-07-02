@@ -531,6 +531,36 @@ export async function fetchReportData(reportId, fromDate, toDate, extraParams = 
 
     // ── INVENTORY ─────────────────────────────────────────────────────────────
 
+    case 'stock_by_location': {
+      const items = await sajilo.entities.Item.filter({ is_active: true }, 'item_name', 2000);
+      let query = supabase.from('CurrentStock').select('godown_id, item_id, current_qty, Godown(name)');
+      
+      if (extraParams?.godown_id && extraParams.godown_id !== 'all') {
+        query = query.eq('godown_id', extraParams.godown_id);
+      }
+      
+      const { data: stockData } = await query;
+      
+      const reportRows = [];
+      (stockData || []).forEach(row => {
+        const item = items.find(i => i.id === row.item_id);
+        if (!item || item.item_type === 'Service') return;
+        
+        const wac = item.weighted_average_cost || item.purchase_price || 0;
+        reportRows.push({
+          item_code: item.item_code || '—',
+          item_name: item.item_name,
+          category_name: item.category_name || '—',
+          unit_of_measure: item.unit_of_measure,
+          godown_name: row.Godown?.name || 'Unknown',
+          quantity_on_hand: Number(row.current_qty) || 0,
+          wac: wac,
+          value: (Number(row.current_qty) || 0) * wac
+        });
+      });
+      return reportRows;
+    }
+
     case 'stock_summary':
     case 'item_valuation': {
       const items = await sajilo.entities.Item.filter({ is_active: true }, 'item_name', 2000);

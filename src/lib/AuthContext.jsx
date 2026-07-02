@@ -47,6 +47,25 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const [globalSettings, setGlobalSettings] = useState(null);
+  const [mainGodownId, setMainGodownId] = useState(null);
+  const [activeGodowns, setActiveGodowns] = useState([]);
+
+  const fetchGlobalSettings = async (companyId) => {
+    try {
+      const [settList, godownList] = await Promise.all([
+        sajilo.entities.CompanySettings.filter({ company_id: companyId }),
+        sajilo.entities.Godown.filter({ company_id: companyId, status: 'Active' })
+      ]);
+      setGlobalSettings(settList.length > 0 ? settList[0] : null);
+      setActiveGodowns(godownList || []);
+      const mainGodown = (godownList || []).find(g => g.is_main === true);
+      setMainGodownId(mainGodown ? mainGodown.id : null);
+    } catch (e) {
+      console.error("Failed to fetch global settings:", e);
+    }
+  };
+
   const switchCompany = async (companyId, preloadedCompany = null) => {
     setIsSwitchingCompany(true);
     sajilo.setCompanyId(companyId);
@@ -54,7 +73,10 @@ export const AuthProvider = ({ children }) => {
     const company = preloadedCompany || availableCompanies.find(c => c.id === companyId);
     if (company) {
       setActiveCompany(company);
-      if (user) await fetchPermissions(user, companyId);
+      if (user) {
+        await fetchPermissions(user, companyId);
+        await fetchGlobalSettings(companyId);
+      }
     }
 
     try {
@@ -63,6 +85,13 @@ export const AuthProvider = ({ children }) => {
       console.error('Prefetch failed:', e);
     } finally {
       setIsSwitchingCompany(false);
+    }
+  };
+
+  // Expose a method to force refresh settings (useful after toggling feature flags)
+  const refreshGlobalSettings = async () => {
+    if (activeCompany) {
+      await fetchGlobalSettings(activeCompany.id);
     }
   };
 
@@ -269,7 +298,11 @@ export const AuthProvider = ({ children }) => {
       verifyOtp,
       logout,
       activeRole,
-      hasAccess
+      hasAccess,
+      globalSettings,
+      mainGodownId,
+      activeGodowns,
+      refreshGlobalSettings
     }}>
       {children}
     </AuthContext.Provider>

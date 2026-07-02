@@ -15,8 +15,9 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 import DateInput from '@/components/shared/DateInput';
 import { postPurchaseInvoice, loadItemsMap, loadSettings } from '@/lib/glPostingService';
-import { computeTotalTax } from '@/lib/taxService';
+import { computeTotalTax, loadActiveTaxTypes } from '@/lib/taxService';
 import { useSajiloSync } from '@/hooks/useSajiloSync';
+import { usePermissions, useAuth } from '@/lib/AuthContext';
 import SearchableSelect from '@/components/shared/SearchableSelect';
 import QuickPartnerCreate from '@/components/shared/QuickPartnerCreate';
 import { Mail } from 'lucide-react';
@@ -25,7 +26,7 @@ import { generateVectorPDF } from '@/utils/pdfGenerator';
 import FileUpload from '@/components/shared/FileUpload';
 
 const emptyPI = {
-  invoice_number: '', vendor_invoice_no: '', po_reference_id: '',
+  invoice_number: '', vendor_invoice_no: '', po_reference_id: '', godown_id: '',
   po_reference_number: '', vendor_id: '', vendor_name: '',
   invoice_date: format(new Date(), 'yyyy-MM-dd'),
   due_date: format(new Date(Date.now() + 30 * 86400000), 'yyyy-MM-dd'),
@@ -36,14 +37,16 @@ const emptyPI = {
 };
 
 export default function PurchaseInvoices() {
+  const { hasAccess } = usePermissions();
+  const { activeCompany, mainGodownId, activeGodowns } = useAuth();
   
-
   const [invoices, setInvoices] = useState([]);
   const [vendors, setVendors] = useState([]);
   const [approvedPOs, setApprovedPOs] = useState([]);
   const [accounts, setAccounts] = useState([]);
   const [settings, setSettings] = useState(null);
   const [taxTypes, setTaxTypes] = useState([]);
+  const [godowns, setGodowns] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [showVendorCreate, setShowVendorCreate] = useState(false);
@@ -59,16 +62,25 @@ export default function PurchaseInvoices() {
 
   const loadData = () => {
     Promise.all([
-      sajilo.entities.PurchaseInvoice.list('-created_date'),
+      sajilo.entities.PurchaseInvoice.list('-created_date', 1000),
       sajilo.entities.BusinessPartner.filter({ is_active: true }),
       sajilo.entities.PurchaseOrder.filter({ status: 'Approved' }),
-      sajilo.entities.ChartOfAccount.filter({ is_active: true }, 'account_code', 500)
-    ]).then(([inv, vs, pos, accs]) => {
+      sajilo.entities.ChartOfAccount.filter({ is_active: true }, 'account_code', 500),
+      sajilo.entities.Godown.filter({ is_active: true }),
+      sajilo.entities.CompanySettings.list(),
+      loadActiveTaxTypes()
+    ]).then(([inv, vs, pos, accs, gds, sett, txTypes]) => {
       setInvoices(inv);
       // Purchase module: show vendors + customers flagged as treated_as_vendor
       setVendors(vs.filter(v => v.is_vendor || v.treated_as_vendor));
       setApprovedPOs(pos);
       setAccounts(accs);
+      setGodowns(gds || []);
+      setSettings(sett?.length > 0 ? sett[0] : {});
+      setTaxTypes(txTypes || []);
+      setLoading(false);
+    }).catch(err => {
+      console.error(err);
       setLoading(false);
     });
   };
@@ -111,7 +123,7 @@ export default function PurchaseInvoices() {
   useSajiloSync(['BusinessPartner', 'PurchaseOrder'], loadData);
 
   const fetchInvoices = async () => {
-    const data = await sajilo.entities.PurchaseInvoice.list('-created_date');
+    const data = await sajilo.entities.PurchaseInvoice.list('-created_date', 1000);
     setInvoices(data);
   };
 
@@ -121,8 +133,9 @@ export default function PurchaseInvoices() {
     return `PI-${year}-${seq}`;
   };
 
-  const openNew = () => {
-    setForm({ ...emptyPI, id: crypto.randomUUID(), invoice_number: generateInvoiceNumber(), _isNew: true });
+  const openNew = (isAuto = true) => {
+    const invNumber = isAuto ? generateInvoiceNumber() : '';
+    setForm({ ...emptyPI, id: crypto.randomUUID(), invoice_number: invNumber, godown_id: mainGodownId || '', _isNew: true });
     setShowForm(true);
   };
 
@@ -163,6 +176,7 @@ export default function PurchaseInvoices() {
     if (form.payment_mode === 'Credit' && !form.vendor_name) { toast.error('Select a vendor'); return; }
     if (['Cash', 'Bank'].includes(form.payment_mode) && !form.cash_bank_account_id) { toast.error('Select a Cash/Bank ledger account'); return; }
     if (!form.grand_total || form.grand_total <= 0) { toast.error('Total amount cannot be empty or zero'); return; }
+    if (settings?.enable_godown_management && !form.godown_id) { toast.error('Godown / Location is required'); return; }
     setSaving(true);
     try {
       const isCashOrBank = ['Cash', 'Bank'].includes(form.payment_mode);
@@ -452,6 +466,18 @@ export default function PurchaseInvoices() {
                       </SelectContent>
                     </Select>
                   </div>
+                  {settings?.enable_godown_management && (
+                    <div>
+                      <Label>Godown / Location *</Label>
+                      <SearchableSelect
+                        options={(activeGodowns || []).map(g => ({ value: g.id, label: g.name }))}
+                        value={form.godown_id}
+                        onChange={v => setForm(f => ({ ...f, godown_id: v }))}
+                        placeholder="Select Godown"
+                        className="mt-1"
+                      />
+                    </div>
+                  )}
                   <div>
                     <Label>Vendor's Invoice No.</Label>
                     <Input value={form.vendor_invoice_no} onChange={e => setForm(f => ({...f, vendor_invoice_no: e.target.value}))} placeholder="Supplier reference" className="mt-1" />

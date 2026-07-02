@@ -66,6 +66,10 @@ export default function Quotations() {
       setSettings(ss[0] || {});
       setTaxTypes(txTypes || []);
       setLoading(false);
+    }).catch(err => {
+      console.error(err);
+      import("sonner").then(m => m.toast.error(err.message || "Error loading data"));
+      setLoading(false);
     });
   };
 

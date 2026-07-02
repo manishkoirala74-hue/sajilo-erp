@@ -239,6 +239,10 @@ export default function ChartOfAccounts() {
     sajilo.entities.ChartOfAccount.list('account_code', 500).then(data => {
       setAccounts(data);
       setLoading(false);
+    }).catch(err => {
+      console.error(err);
+      import("sonner").then(m => m.toast.error(err.message || "Error loading data"));
+      setLoading(false);
     });
   };
 
