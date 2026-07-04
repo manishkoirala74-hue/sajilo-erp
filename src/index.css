@@ -154,3 +154,19 @@ input[type='number'] {
   -moz-appearance: textfield;
 }
 
+@layer utilities {
+  .scrollbar-hide-default::-webkit-scrollbar {
+    width: 4px;
+    background-color: transparent;
+  }
+  .scrollbar-hide-default::-webkit-scrollbar-thumb {
+    background-color: transparent;
+    border-radius: 4px;
+  }
+  .scrollbar-hide-default:hover::-webkit-scrollbar-thumb {
+    background-color: rgba(255, 255, 255, 0.2);
+  }
+  .dark .scrollbar-hide-default:hover::-webkit-scrollbar-thumb {
+    background-color: rgba(255, 255, 255, 0.2);
+  }
+}

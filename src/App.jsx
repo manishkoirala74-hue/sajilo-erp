@@ -36,9 +36,33 @@ import SalesOrders from '@/pages/sales/SalesOrders';
 import SalesInvoices from '@/pages/sales/SalesInvoices';
 import SalesReturns from '@/pages/sales/SalesReturns';
 import Quotations from '@/pages/sales/Quotations';
-import Settings from '@/pages/Settings';
+import SettingsLayout from '@/pages/settings/SettingsLayout';
 import PDFTemplatesList from '@/pages/settings/PDFTemplatesList';
 import TemplateBuilder from '@/pages/settings/TemplateBuilder';
+// Company
+import CompanyManagementPage from '@/pages/settings/company/CompanyManagementPage';
+import UserRoles from '@/pages/settings/company/UserRoles';
+import PasswordPolicy from '@/pages/settings/company/PasswordPolicy';
+import ApprovalControl from '@/pages/settings/company/ApprovalControl';
+// Finance
+import FiscalYear from '@/pages/settings/finance/FiscalYear';
+import TaxVatMatrices from '@/pages/settings/finance/TaxVatMatrices';
+import GLMapping from '@/pages/settings/finance/GLMapping';
+import PayrollMapping from '@/pages/settings/finance/PayrollMapping';
+import Depreciation from '@/pages/settings/finance/Depreciation';
+// Operations
+import ReceivableCollections from '@/pages/settings/operations/ReceivableCollections';
+import VoucherSequence from '@/pages/settings/operations/VoucherSequence';
+// Data
+import SystemCutOver from '@/pages/settings/data/SystemCutOver';
+import ItemImportExportPage from '@/pages/settings/data/ItemImportExportPage';
+import DataUtilitiesPage from '@/pages/settings/data/DataUtilitiesPage';
+// Integrations
+import FeatureToggles from '@/pages/settings/integrations/FeatureToggles';
+import RegionalSettings from '@/pages/settings/integrations/RegionalSettings';
+import StorageLimits from '@/pages/settings/integrations/StorageLimits';
+import CommunicationChannels from '@/pages/settings/integrations/CommunicationChannels';
+import PaymentGateways from '@/pages/settings/integrations/PaymentGateways';
 import Reports from '@/pages/Reports.jsx';
 import EmployeeReceivableReport from '@/pages/reports/EmployeeReceivableReport';
 import EmployeePayableReport from '@/pages/reports/EmployeePayableReport';
@@ -164,8 +188,28 @@ const AuthenticatedApp = () => {
           <Route path="/sales/orders" element={<SalesOrders />} />
           <Route path="/sales/invoices" element={<SalesInvoices />} />
           <Route path="/sales/returns" element={<SalesReturns />} />
-          <Route path="/settings" element={<Settings />} />
-          <Route path="/settings/templates" element={<PDFTemplatesList />} />
+          <Route path="/settings/*" element={<SettingsLayout />}>
+            <Route path="company/management" element={<CompanyManagementPage />} />
+            <Route path="company/roles" element={<UserRoles />} />
+            <Route path="company/password" element={<PasswordPolicy />} />
+            <Route path="company/approvals" element={<ApprovalControl />} />
+            <Route path="finance/fiscal-year" element={<FiscalYear />} />
+            <Route path="finance/tax-vat" element={<TaxVatMatrices />} />
+            <Route path="finance/gl-mapping" element={<GLMapping />} />
+            <Route path="finance/payroll-mapping" element={<PayrollMapping />} />
+            <Route path="finance/depreciation" element={<Depreciation />} />
+            <Route path="operations/collections" element={<ReceivableCollections />} />
+            <Route path="operations/vouchers" element={<VoucherSequence />} />
+            <Route path="operations/templates" element={<PDFTemplatesList />} />
+            <Route path="data/cut-over" element={<SystemCutOver />} />
+            <Route path="data/import" element={<ItemImportExportPage />} />
+            <Route path="data/utilities" element={<DataUtilitiesPage />} />
+            <Route path="integrations/features" element={<FeatureToggles />} />
+            <Route path="integrations/regional" element={<RegionalSettings />} />
+            <Route path="integrations/storage" element={<StorageLimits />} />
+            <Route path="integrations/communication" element={<CommunicationChannels />} />
+            <Route path="integrations/payment" element={<PaymentGateways />} />
+          </Route>
           <Route path="/settings/templates/builder/:id" element={<TemplateBuilder />} />
           <Route path="/help-support" element={<HelpSupport />} />
           <Route path="/email/compose" element={<ComposeEmail />} />

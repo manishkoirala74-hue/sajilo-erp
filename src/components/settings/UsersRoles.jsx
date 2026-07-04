@@ -115,19 +115,8 @@ const ROLE_PRESETS = {
   viewer: { label: 'Viewer', color: 'bg-slate-100 dark:bg-slate-500/20 text-muted-foreground border-border', perms: buildDefaultPerms('view') },
 };
 
-// ── Password expiry preset options ────────────────────────────────────────
-const EXPIRY_OPTIONS = [
-  { value: 0,   label: 'Never expire' },
-  { value: 15,  label: 'Every 15 days' },
-  { value: 30,  label: 'Every 30 days (Monthly)' },
-  { value: 60,  label: 'Every 60 days' },
-  { value: 90,  label: 'Every 90 days (Quarterly)' },
-  { value: 180, label: 'Every 180 days (Half-yearly)' },
-  { value: 365, label: 'Every 365 days (Yearly)' },
-];
-
 // ── Main component ─────────────────────────────────────────────────────────
-export default function UsersRoles({ approvalSettings, onApprovalChange }) {
+export default function UsersRoles() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showInvite, setShowInvite] = useState(false);
@@ -141,10 +130,6 @@ export default function UsersRoles({ approvalSettings, onApprovalChange }) {
   const [selectedRole, setSelectedRole] = useState('user');
   const [expandedGroups, setExpandedGroups] = useState(MODULE_PERMISSIONS.map(g => g.group));
 
-  // Password policy state (stored in CompanySettings)
-  const [passwordExpiryDays, setPasswordExpiryDays] = useState(0);
-  const [savingExpiry, setSavingExpiry] = useState(false);
-  const [settingsId, setSettingsId] = useState(null);
 
   // Create user form state
   const [createForm, setCreateForm] = useState({ email: '', full_name: '', role: 'user', temp_password: generateTempPassword() });
@@ -153,23 +138,7 @@ export default function UsersRoles({ approvalSettings, onApprovalChange }) {
 
   useEffect(() => {
     sajilo.entities.User.list().then(data => { setUsers(data); setLoading(false); });
-    // Load password policy from CompanySettings
-    sajilo.entities.CompanySettings.list().then(data => {
-      if (data.length > 0) {
-        setSettingsId(data[0].id);
-        setPasswordExpiryDays(data[0].password_expiry_days ?? 0);
-      }
-    });
   }, []);
-
-  const savePasswordPolicy = async () => {
-    setSavingExpiry(true);
-    if (settingsId) {
-      await sajilo.entities.CompanySettings.update(settingsId, { password_expiry_days: passwordExpiryDays });
-    }
-    toast.success('Password policy saved');
-    setSavingExpiry(false);
-  };
 
   const handleInvite = async () => {
     if (!inviteEmail || !inviteEmail.includes('@')) { toast.error('Enter a valid email'); return; }
@@ -405,64 +374,7 @@ export default function UsersRoles({ approvalSettings, onApprovalChange }) {
         </div>
       </div>
 
-      {/* ── Password Policy ── */}
-      <div className="bg-card border border-border rounded-xl overflow-hidden">
-        <div className="flex items-center gap-2 px-5 py-4 border-b border-border bg-muted/20">
-          <Clock className="w-4 h-4 text-primary" />
-          <h3 className="font-semibold text-foreground text-sm">Password Policy</h3>
-        </div>
-        <div className="p-5 space-y-4">
-          <div>
-            <Label>Password Expiry Frequency</Label>
-            <p className="text-xs text-muted-foreground mb-2 mt-0.5">Users will be required to change their password after this period.</p>
-            <div className="flex gap-3 items-center">
-              <Select value={String(passwordExpiryDays)} onValueChange={v => setPasswordExpiryDays(Number(v))}>
-                <SelectTrigger className="w-64">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {EXPIRY_OPTIONS.map(o => (
-                    <SelectItem key={o.value} value={String(o.value)}>{o.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Button size="sm" onClick={savePasswordPolicy} disabled={savingExpiry}>
-                {savingExpiry ? 'Saving…' : 'Save'}
-              </Button>
-            </div>
-          </div>
-          {passwordExpiryDays > 0 && (
-            <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-lg px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
-              <KeyRound className="w-3.5 h-3.5 inline mr-1" />
-              Users will be prompted to change their password every <strong>{passwordExpiryDays} days</strong>. They cannot access the system until they do so.
-            </div>
-          )}
-        </div>
-      </div>
 
-      {/* ── Approval Settings ── */}
-      <div className="bg-card border border-border rounded-xl overflow-hidden">
-        <div className="flex items-center gap-2 px-5 py-4 border-b border-border bg-muted/20">
-          <Shield className="w-4 h-4 text-primary" />
-          <h3 className="font-semibold text-foreground text-sm">Approval Controls</h3>
-        </div>
-        <div className="p-5 space-y-4">
-          <div className="flex items-center justify-between py-3 border-b border-border">
-            <div>
-              <p className="text-sm font-medium">Enable Purchase Order Approvals</p>
-              <p className="text-xs text-muted-foreground mt-0.5">Require manager approval for POs above the limit</p>
-            </div>
-            <Switch checked={!!approvalSettings?.enable_approvals} onCheckedChange={v => onApprovalChange('enable_approvals', v)} />
-          </div>
-          <div>
-            <Label>Approval Limit Amount (NPR)</Label>
-            <p className="text-xs text-muted-foreground mb-1.5">POs above this value require approval</p>
-            <Input type="number" value={approvalSettings?.approval_limit_amount || 50000}
-              onChange={e => onApprovalChange('approval_limit_amount', Number(e.target.value))}
-              className="h-10 border border-border bg-background px-3 text-sm rounded-md focus:ring-1 focus:ring-primary outline-none mt-1 font-mono text-right" />
-          </div>
-        </div>
-      </div>
 
       {/* ── Create User Dialog ── */}
       <Dialog open={showCreate} onOpenChange={v => { if (!v) resetCreateForm(); }}>

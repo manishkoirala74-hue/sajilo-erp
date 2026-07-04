@@ -248,8 +248,8 @@ export default function CompanyManagement() {
         </form>
       )}
 
-      <div className="bg-card border border-border rounded-lg overflow-hidden">
-        <table className="table-fluid-grid text-sm text-left">
+      <div className="bg-card border border-border rounded-lg overflow-x-auto">
+        <table className="table-fluid-grid text-sm text-left w-full min-w-[800px]">
           <thead className="cell-density bg-muted/50 border-b border-border">
             <tr>
               <th className="cell-density font-medium">Company Name</th>

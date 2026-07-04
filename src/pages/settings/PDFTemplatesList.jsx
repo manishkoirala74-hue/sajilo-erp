@@ -140,10 +140,9 @@ export default function PDFTemplatesList() {
                 </Link>
                 <button 
                   onClick={() => handleSetDefault(template)}
-                  disabled={template.is_default}
-                  className={`flex-1 text-center py-1.5 rounded text-sm border ${template.is_default ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-gray-50 hover:bg-gray-100 text-gray-700'}`}
+                  className={`flex-1 text-center py-1.5 rounded text-sm border ${template.is_default ? 'bg-green-50 text-green-700 border-green-200' : 'bg-gray-50 hover:bg-gray-100 text-gray-700'}`}
                 >
-                  Set Default
+                  {template.is_default ? 'Default' : 'Set Default'}
                 </button>
               </div>
             </div>

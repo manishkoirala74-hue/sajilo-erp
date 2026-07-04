@@ -488,13 +488,15 @@ export default function PurchaseInvoices() {
                   <div>
                     <DateInput label="Due Date" value={form.due_date} onChange={v => setForm(f => ({...f, due_date: v}))} className="mt-1" />
                   </div>
-                  <div>
-                    <Label>Landed Cost (NPR)</Label>
-                    <Input type="number" value={form.landed_cost_total} onChange={e => {
-                      const lc = Number(e.target.value);
-                      setForm(f => ({ ...f, landed_cost_total: lc, grand_total: (f.subtotal || 0) + (f.vat_amount || 0) + lc }));
-                    }} className="mt-1" />
-                  </div>
+                  {settings?.enable_landed_costs && (
+                    <div>
+                      <Label>Landed Cost (NPR)</Label>
+                      <Input type="number" value={form.landed_cost_total} onChange={e => {
+                        const lc = Number(e.target.value);
+                        setForm(f => ({ ...f, landed_cost_total: lc, grand_total: (f.subtotal || 0) + (f.vat_amount || 0) + lc }));
+                      }} className="mt-1" />
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -526,7 +528,7 @@ export default function PurchaseInvoices() {
                     <span className="text-muted-foreground font-medium">VAT Amount</span>
                     <span className="font-semibold">NPR {(form.vat_amount || 0).toLocaleString()}</span>
                   </div>
-                  {form.landed_cost_total > 0 && (
+                  {settings?.enable_landed_costs && form.landed_cost_total > 0 && (
                     <div className="flex justify-between items-center">
                       <span className="text-muted-foreground font-medium">Landed Cost</span>
                       <span className="font-semibold text-orange-600">NPR {(form.landed_cost_total || 0).toLocaleString()}</span>

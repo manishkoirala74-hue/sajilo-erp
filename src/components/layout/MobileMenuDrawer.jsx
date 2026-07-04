@@ -11,6 +11,7 @@ import {
   UserCheck, Truck, X, LifeBuoy
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useSettingsStore } from '@/store/settingsStore';
 
 // Helper to build nav (reused from Sidebar logic or simplified)
 const buildNavGroups = (settings) => {
@@ -75,18 +76,27 @@ export default function MobileMenuDrawer({ isOpen, onClose }) {
   const [navGroups, setNavGroups] = useState([]);
   const [expandedGroups, setExpandedGroups] = useState([]);
 
+  const serverSettings = useSettingsStore(state => state.serverSettings);
+  const [settings, setSettings] = useState(null);
+
   useEffect(() => {
-    sajilo.entities.CompanySettings.list().then(data => {
-      const s = data[0] || {};
-      const groups = buildNavGroups(s);
-      setNavGroups(groups);
-      setExpandedGroups([groups[0].label, groups[1].label]); // Expand first few by default
-    }).catch(() => {
-      const groups = buildNavGroups({});
-      setNavGroups(groups);
-      setExpandedGroups([groups[0].label]);
-    });
-  }, []);
+    if (serverSettings && Object.keys(serverSettings).length > 0) {
+      setSettings(serverSettings);
+    } else {
+      sajilo.entities.CompanySettings.list().then(data => {
+        const s = data[0] || {};
+        setSettings(s);
+      }).catch(() => {
+        setSettings({});
+      });
+    }
+  }, [serverSettings]);
+
+  useEffect(() => {
+    const groups = buildNavGroups(settings);
+    setNavGroups(groups);
+    setExpandedGroups([groups[0].label, groups[1]?.label].filter(Boolean));
+  }, [settings]);
 
   const toggleGroup = (label) => {
     setExpandedGroups(prev =>

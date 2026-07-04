@@ -157,15 +157,16 @@ function AccountsTab({ openingDate }) {
         <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search account code or name…" className="pl-9" />
       </div>
 
-      <div className="bg-card border border-border rounded-xl overflow-hidden">
-        <div className="grid grid-cols-[120px_1fr_160px_140px_140px_100px] bg-muted/30 border-b border-border px-4 py-2.5">
-          <span className="text-xs font-semibold text-muted-foreground">Account Code</span>
-          <span className="text-xs font-semibold text-muted-foreground">Name of Ledger</span>
-          <span className="text-xs font-semibold text-muted-foreground">Account Group</span>
-          <span className="text-xs font-semibold text-muted-foreground">Opening Date</span>
-          <span className="text-xs font-semibold text-muted-foreground text-right">Opening Balance</span>
-          <span className="text-xs font-semibold text-muted-foreground text-center">Dr / Cr</span>
-        </div>
+      <div className="bg-card border border-border rounded-xl overflow-x-auto">
+        <div className="min-w-[900px]">
+          <div className="grid grid-cols-[120px_1fr_160px_140px_140px_100px] bg-muted/30 border-b border-border px-4 py-2.5">
+            <span className="text-xs font-semibold text-muted-foreground">Account Code</span>
+            <span className="text-xs font-semibold text-muted-foreground">Name of Ledger</span>
+            <span className="text-xs font-semibold text-muted-foreground">Account Group</span>
+            <span className="text-xs font-semibold text-muted-foreground">Opening Date</span>
+            <span className="text-xs font-semibold text-muted-foreground text-right">Opening Balance</span>
+            <span className="text-xs font-semibold text-muted-foreground text-center">Dr / Cr</span>
+          </div>
         {loading ? (
           <div className="p-8 space-y-2">{Array(8).fill(0).map((_, i) => <div key={i} className="h-9 bg-muted rounded animate-pulse" />)}</div>
         ) : allTypes.length === 0 ? (
@@ -219,6 +220,7 @@ function AccountsTab({ openingDate }) {
             })}
           </div>
         )}
+        </div>
       </div>
 
       {dirtyCount > 0 && (
@@ -374,15 +376,16 @@ function PartnersTab({ mode, openingDate }) {
         <Input value={search} onChange={e => setSearch(e.target.value)} placeholder={`Search ${label.toLowerCase()} name or code…`} className="pl-9" />
       </div>
 
-      <div className="bg-card border border-border rounded-xl overflow-hidden">
-        <div className="grid grid-cols-[120px_1fr_120px_140px_140px_100px] bg-muted/30 border-b border-border px-4 py-2.5">
-          <span className="text-xs font-semibold text-muted-foreground">Code</span>
-          <span className="text-xs font-semibold text-muted-foreground">Name</span>
-          <span className="text-xs font-semibold text-muted-foreground">Tax ID</span>
-          <span className="text-xs font-semibold text-muted-foreground">Opening Date</span>
-          <span className="text-xs font-semibold text-muted-foreground text-right">Opening Balance</span>
-          <span className="text-xs font-semibold text-muted-foreground text-center">Dr / Cr</span>
-        </div>
+      <div className="bg-card border border-border rounded-xl overflow-x-auto">
+        <div className="min-w-[900px]">
+          <div className="grid grid-cols-[120px_1fr_120px_140px_140px_100px] bg-muted/30 border-b border-border px-4 py-2.5">
+            <span className="text-xs font-semibold text-muted-foreground">Code</span>
+            <span className="text-xs font-semibold text-muted-foreground">Name</span>
+            <span className="text-xs font-semibold text-muted-foreground">Tax ID</span>
+            <span className="text-xs font-semibold text-muted-foreground">Opening Date</span>
+            <span className="text-xs font-semibold text-muted-foreground text-right">Opening Balance</span>
+            <span className="text-xs font-semibold text-muted-foreground text-center">Dr / Cr</span>
+          </div>
         {loading ? (
           <div className="p-8 space-y-2">{Array(6).fill(0).map((_, i) => <div key={i} className="h-9 bg-muted rounded animate-pulse" />)}</div>
         ) : filtered.length === 0 ? (
@@ -421,6 +424,7 @@ function PartnersTab({ mode, openingDate }) {
             })}
           </div>
         )}
+        </div>
       </div>
 
       <div className="text-xs text-muted-foreground bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 rounded-lg px-4 py-2.5">
