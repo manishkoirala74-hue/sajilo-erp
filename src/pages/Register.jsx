@@ -44,16 +44,8 @@ export default function Register() {
     setLoading(true);
     try {
       await verifyOtp(email, otpCode);
-      // Record complete data of the signup user in the User table
-      const currentUser = await sajilo.auth.me();
-      if (currentUser) {
-        await sajilo.entities.User.create({
-          id: currentUser.id,
-          role: 'admin',
-          must_change_password: false
-        });
-      }
-      window.location.href = "/";
+      // Profile creation is deferred to the /onboarding route
+      window.location.href = "/onboarding";
     } catch (err) {
       setError(err.message || "Invalid verification code");
     } finally {

@@ -173,31 +173,34 @@ export const AuthProvider = ({ children }) => {
       const authUser = await sajilo.auth.me();
       
       if (authUser) {
-        let profileData = {};
+        let profileData = null;
         try {
           const existingUsers = await sajilo.entities.User.filter({ id: authUser.id });
-          if (!existingUsers || existingUsers.length === 0) {
-            const newProfile = {
-              id: authUser.id,
-              role: 'admin',
-              company_scope: 'SELECTED',
-              must_change_password: false
-            };
-            await sajilo.entities.User.create(newProfile);
-            profileData = newProfile;
-          } else {
+          if (existingUsers && existingUsers.length > 0) {
             profileData = existingUsers[0];
           }
         } catch (e) {
-          console.error("Failed to sync auth user to public User table:", e);
+          console.error("Failed to fetch public User table:", e);
         }
 
-        const mergedUser = { ...authUser, ...profileData };
-        setUser(mergedUser);
-        setSession({ user: mergedUser });
-        setIsAuthenticated(true);
-        
-        await fetchUserCompanies(mergedUser);
+        if (!profileData) {
+          setAuthError({ type: 'incomplete_profile' });
+          setUser(authUser);
+          setSession({ user: authUser });
+          setIsAuthenticated(true);
+          setAvailableCompanies([]);
+          setActiveCompany(null);
+          setActiveRole(null);
+          setActiveOverrides([]);
+          sajilo.setCompanyId(null);
+        } else {
+          setAuthError(null);
+          const mergedUser = { ...authUser, ...profileData };
+          setUser(mergedUser);
+          setSession({ user: mergedUser });
+          setIsAuthenticated(true);
+          await fetchUserCompanies(mergedUser);
+        }
       } else {
         setUser(null);
         setSession(null);

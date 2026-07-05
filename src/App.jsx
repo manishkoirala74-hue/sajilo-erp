@@ -110,6 +110,7 @@ import Register from '@/pages/Register';
 import ForgotPassword from '@/pages/ForgotPassword';
 import ResetPassword from '@/pages/ResetPassword';
 import ChangePassword from '@/pages/ChangePassword';
+import Onboarding from '@/pages/Onboarding';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin, user, isAuthenticated } = useAuth();
@@ -170,6 +171,7 @@ const AuthenticatedApp = () => {
 
       {/* Protected ERP Routes */}
       <Route element={<ProtectedRoute unauthenticatedElement={<Navigate to="/login" replace />} />}>
+        <Route path="/onboarding" element={<Onboarding />} />
         <Route element={<ERPLayout />}>
           <Route path="/" element={<Dashboard />} />
           <Route path="/partners" element={<BusinessPartners />} />

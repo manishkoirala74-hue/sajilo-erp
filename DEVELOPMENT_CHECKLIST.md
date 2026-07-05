@@ -12,6 +12,11 @@ Review this checklist before starting the development of any new feature or page
 - [ ] **Multi-tenancy:** Do new tables include `company_id`? 
 - [ ] **Foreign Keys & Constraints:** Are foreign keys properly linked with appropriate `ON DELETE` rules? Are NOT NULL, UNIQUE, and CHECK constraints applied?
 - [ ] **RLS Policies:** Are Row Level Security (RLS) policies defined for `SELECT`, `INSERT`, `UPDATE`, and `DELETE` (filtering by `company_id` and user role)?
+- [ ] **No Always-True Policies:** Ensure there are no overly permissive bypasses like `USING (true) WITH CHECK (true)` on tenant-isolated tables.
+- [ ] **Strict Policy Types:** Do RLS policies use strict type casting (e.g., `(auth.uid())::text = created_by::text`) to avoid `UUID` vs `TEXT` mismatch errors?
+- [ ] **RPC Security (search_path):** Do all newly created PostgreSQL functions end with `SET search_path = public, pg_temp;`?
+- [ ] **RPC Permissions:** Are `SECURITY DEFINER` functions explicitly locked down? (`REVOKE EXECUTE ON FUNCTION <name> FROM public, anon;` followed by explicit `GRANT` to `authenticated` or `service_role`).
+- [ ] **RPC Internal Auth:** Do `SECURITY DEFINER` functions explicitly check `auth.uid()` and user roles at the top of the body to enforce permissions?
 - [ ] **Migrations:** Create a sequential SQL migration file (e.g., `XXX_feature_name.sql`).
 
 ## 3. Backend Logic & APIs

@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Outlet, useLocation } from 'react-router-dom';
+import { Outlet, useLocation, Navigate } from 'react-router-dom';
 import { useAuth, usePermissions } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 
@@ -38,6 +38,12 @@ export default function ProtectedRoute({ fallback = <DefaultFallback />, unauthe
   }
 
   if (authError) {
+    if (authError.type === 'incomplete_profile') {
+      if (location.pathname !== '/onboarding') {
+        return <Navigate to="/onboarding" replace />;
+      }
+      return <Outlet />;
+    }
     if (authError.type === 'user_not_registered') {
       return <UserNotRegisteredError />;
     }
