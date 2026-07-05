@@ -227,7 +227,7 @@ export async function postPOSSale(sale, itemsMap, settings, isReversal = false) 
 }
 
 // ─── 2. SALES INVOICE ──────────────────────────────────────────────────────────
-export async function postSalesInvoice(invoice, itemsMap, settings, isReversal = false, idempotencyKey = null) {
+export async function checkoutSalesInvoice(invoice, itemsMap, settings, idempotencyKey = null) {
   const s = settings || await loadSettings();
   const lines = [];
 
@@ -262,26 +262,32 @@ export async function postSalesInvoice(invoice, itemsMap, settings, isReversal =
     lines.push({ account_id: s.gl_vat_payable_id, debit_amount: 0, credit_amount: invoice.total_tax_amount });
   }
 
-  const payload = {
-    p_company_id: invoice.company_id || sajilo.getCompanyId(),
-    p_invoice_id: invoice.id,
-    p_idempotency_key: idempotencyKey,
-    p_gl_lines: lines,
-    p_is_reversal: isReversal
-  };
-
-  const { data, error } = await supabase.rpc('rpc_post_sales_invoice', payload);
-  if (error) handleDBError(error);
-  
-  if (data && data.status === 'duplicate') {
-    toast.info('This transaction was already posted. Recovered successfully.');
+  try {
+    const { data, error } = await supabase.rpc('rpc_checkout_sales_invoice', {
+      p_payload: invoice,
+      p_idempotency_key: idempotencyKey,
+      p_gl_lines: lines
+    });
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    let cleanMessage = error.message;
+    if (cleanMessage?.includes('ERR_INSUFFICIENT_STOCK')) {
+      cleanMessage = 'Checkout failed: Insufficient stock for one or more items in the selected Godown.';
+    } else if (cleanMessage?.includes('ERR_IDEMPOTENCY')) {
+      cleanMessage = 'Checkout failed: This transaction has already been processed.';
+    } else if (cleanMessage?.includes('ERR_ALREADY_POSTED')) {
+      cleanMessage = 'Checkout failed: Invoice is already posted and cannot be modified.';
+    } else {
+      cleanMessage = 'GL Posting Failed: ' + (error.message || 'Unknown database error');
+    }
+    toast.error(cleanMessage, { duration: 8000 });
+    throw new Error(cleanMessage);
   }
-
-  return data?.journal_id;
 }
 
 // ─── 3. PURCHASE INVOICE ──────────────────────────────────────────────────────────
-export async function postPurchaseInvoice(invoice, itemsMap, settings, isReversal = false, idempotencyKey = null) {
+export async function checkoutPurchaseInvoice(invoice, itemsMap, settings, idempotencyKey = null) {
   const s = settings || await loadSettings();
   const lines = [];
 
@@ -315,22 +321,50 @@ export async function postPurchaseInvoice(invoice, itemsMap, settings, isReversa
     lines.push({ account_id: apId, debit_amount: 0, credit_amount: invoice.grand_total, entity_type: 'Supplier', entity_id: partnerId, due_date: invoice.due_date || invoice.invoice_date });
   }
 
-  const payload = {
-    p_company_id: invoice.company_id || sajilo.getCompanyId(),
-    p_invoice_id: invoice.id,
-    p_idempotency_key: idempotencyKey,
-    p_gl_lines: lines,
-    p_is_reversal: isReversal
-  };
-
-  const { data, error } = await supabase.rpc('rpc_post_purchase_invoice', payload);
-  if (error) handleDBError(error);
-
-  if (data && data.status === 'duplicate') {
-    toast.info('This transaction was already posted. Recovered successfully.');
+  try {
+    const { data, error } = await supabase.rpc('rpc_checkout_purchase_invoice', {
+      p_payload: invoice,
+      p_idempotency_key: idempotencyKey,
+      p_gl_lines: lines
+    });
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    let cleanMessage = error.message;
+    if (cleanMessage?.includes('ERR_IDEMPOTENCY')) {
+      cleanMessage = 'Checkout failed: This transaction has already been processed.';
+    } else if (cleanMessage?.includes('ERR_ALREADY_POSTED')) {
+      cleanMessage = 'Checkout failed: Invoice is already posted and cannot be modified.';
+    } else {
+      cleanMessage = 'GL Posting Failed: ' + (error.message || 'Unknown database error');
+    }
+    toast.error(cleanMessage, { duration: 8000 });
+    throw new Error(cleanMessage);
   }
+}
 
-  return data?.journal_id;
+export async function checkoutStockTransfer(transfer, idempotencyKey = null) {
+  try {
+    const { data, error } = await supabase.rpc('rpc_checkout_stock_transfer', {
+      p_payload: transfer,
+      p_idempotency_key: idempotencyKey
+    });
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    let cleanMessage = error.message;
+    if (cleanMessage?.includes('ERR_INSUFFICIENT_STOCK')) {
+      cleanMessage = 'Transfer failed: Insufficient stock in Source Godown.';
+    } else if (cleanMessage?.includes('ERR_IDEMPOTENCY')) {
+      cleanMessage = 'Transfer failed: This transaction has already been processed.';
+    } else if (cleanMessage?.includes('ERR_ALREADY_POSTED')) {
+      cleanMessage = 'Transfer failed: Transfer is already posted and cannot be modified.';
+    } else {
+      cleanMessage = 'Stock Transfer Failed: ' + (error.message || 'Unknown database error');
+    }
+    toast.error(cleanMessage, { duration: 8000 });
+    throw new Error(cleanMessage);
+  }
 }
 
 // ─── 4. FINANCIAL VOUCHERS ──────────────────────────────────────────────────────────

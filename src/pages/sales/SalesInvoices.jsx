@@ -14,7 +14,7 @@ import LineItemsEditor from '@/components/invoices/LineItemsEditor';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import DateInput from '@/components/shared/DateInput';
-import { postSalesInvoice, loadItemsMap, loadSettings } from '@/lib/glPostingService';
+import { checkoutSalesInvoice, loadItemsMap, loadSettings } from '@/lib/glPostingService';
 import { loadActiveTaxTypes, computeTotalTax } from '@/lib/taxService';
 import { useSajiloSync } from '@/hooks/useSajiloSync';
 import { usePermissions, useAuth } from '@/lib/AuthContext';
@@ -82,7 +82,7 @@ export default function SalesInvoices() {
       sajilo.entities.CompanySettings.list(),
       sajilo.entities.ChartOfAccount.filter({ is_active: true }, 'account_code', 500),
       loadActiveTaxTypes(),
-      sajilo.entities.Godown.filter({ is_active: true }),
+      sajilo.entities.Godown.filter({ status: 'Active' }),
     ]).then(([inv, cs, sos, sett, accs, txTypes, gds]) => {
       setInvoices(inv);
       setCustomers(cs.filter(c => c.is_customer || c.treat_as_customer));
@@ -305,43 +305,43 @@ export default function SalesInvoices() {
       delete payload.cash_bank_account_name;
       delete payload._isNew;
 
-      if (!form._isNew && invoices.find(i => i.id === form.id)) {
-        const oldInv = invoices.find(i => i.id === form.id);
-        const isReversal = oldInv && oldInv.status === 'Posted';
+      let docId = form.id;
+      const isAuto = settings && settings.invoice_numbering_method !== 'Manual';
 
-        await sajilo.entities.SalesInvoice.update(form.id, payload);
+      if (postStatus === 'Posted') {
+        const idempotencyKey = crypto.randomUUID();
+        const [itemsMap, glSettings] = await Promise.all([loadItemsMap(form.line_items.map(l => l.item_id)), loadSettings()]);
+        
+        const result = await checkoutSalesInvoice({ ...payload, id: form.id }, itemsMap, glSettings, idempotencyKey);
+        docId = result.invoice_id || form.id;
 
-        if (postStatus === 'Posted') {
-          const [itemsMap, glSettings] = await Promise.all([loadItemsMap(form.line_items.map(l => l.item_id)), loadSettings()]);
-          const idempotencyKey = crypto.randomUUID();
-          await postSalesInvoice({ ...data, id: form.id }, itemsMap, glSettings, isReversal, idempotencyKey);
-          toast.success('Invoice updated and posted — stock deducted & GL updated');
-        } else {
-          toast.success('Invoice updated as draft');
-        }
-      } else {
-        const created = await sajilo.entities.SalesInvoice.create({ ...payload, id: form.id });
-
-        if (settings && settings.invoice_numbering_method !== 'Manual') {
+        if (form._isNew && isAuto) {
           const next = (settings.invoice_next_number || 1) + 1;
           await sajilo.entities.CompanySettings.update(settings.id, { invoice_next_number: next });
           setSettings(s => ({ ...s, invoice_next_number: next }));
         }
-
-        if (postStatus === 'Posted') {
-          const [itemsMap, glSettings] = await Promise.all([loadItemsMap(form.line_items.map(l => l.item_id)), loadSettings()]);
-          const idempotencyKey = crypto.randomUUID();
-          await postSalesInvoice({ ...data, id: created.id }, itemsMap, glSettings, false, idempotencyKey);
-          toast.success('Invoice posted — stock deducted & GL updated');
+      } else {
+        // Standard Draft upsert
+        if (!form._isNew && invoices.find(i => i.id === form.id)) {
+          await sajilo.entities.SalesInvoice.update(form.id, payload);
+          toast.success('Invoice updated as draft');
         } else {
+          const created = await sajilo.entities.SalesInvoice.create({ ...payload, id: form.id });
+          docId = created.id;
+          
+          if (isAuto) {
+            const next = (settings.invoice_next_number || 1) + 1;
+            await sajilo.entities.CompanySettings.update(settings.id, { invoice_next_number: next });
+            setSettings(s => ({ ...s, invoice_next_number: next }));
+          }
           toast.success('Invoice saved as draft');
         }
       }
 
       // Native Vector PDF cache generation
       try {
-        const docId = form.id || created?.id;
-        const fullDoc = { ...data, id: docId, invoice_number: form.invoice_number || created?.invoice_number };
+        const fullDocId = docId || form.id;
+        const fullDoc = { ...data, id: fullDocId, invoice_number: form.invoice_number };
         const partner = customers.find(c => c.id === form.customer_id);
         
         await generateVectorPDF(
@@ -622,7 +622,7 @@ export default function SalesInvoices() {
                     <div>
                       <Label>Godown / Location *</Label>
                       <SearchableSelect
-                        options={(activeGodowns || []).map(g => ({ value: g.id, label: g.name }))}
+                        options={(godowns || []).map(g => ({ value: g.id, label: g.name || g.godown_name }))}
                         value={form.godown_id}
                         onChange={v => setForm(f => ({ ...f, godown_id: v }))}
                         placeholder="Select Godown"

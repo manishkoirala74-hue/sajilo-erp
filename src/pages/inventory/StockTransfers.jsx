@@ -249,7 +249,7 @@ export default function StockTransfers() {
                   </SelectTrigger>
                   <SelectContent>
                     {(localGodowns.length > 0 ? localGodowns : activeGodowns || []).map(g => (
-                      <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
+                      <SelectItem key={g.id} value={g.id}>{g.name || g.godown_name}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -267,7 +267,7 @@ export default function StockTransfers() {
                   </SelectTrigger>
                   <SelectContent>
                     {(localGodowns.length > 0 ? localGodowns : activeGodowns || []).map(g => (
-                      <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
+                      <SelectItem key={g.id} value={g.id}>{g.name || g.godown_name}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>

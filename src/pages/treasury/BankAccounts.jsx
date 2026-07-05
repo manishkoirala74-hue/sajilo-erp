@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { sajilo } from '@/api/sajiloClient';
+import { sajilo, supabase } from '@/api/sajiloClient';
 import { Plus, Pencil, Trash2, Search, Landmark, Banknote, Building, ChevronDown, ChevronRight, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -42,14 +42,54 @@ export default function BankAccounts() {
 
   const fetchAccounts = async () => {
     setLoading(true);
-    const [data, coaAccs] = await Promise.all([
+    // 1. Fetch mapped BankAccounts and raw COA Cash/Bank accounts
+    const [data, coaData] = await Promise.all([
       sajilo.entities.BankAccount.list('-created_date', 500),
-      sajilo.entities.ChartOfAccount.list('account_code', 500),
+      supabase.from('ChartOfAccount').select('id, account_name, account_type, current_balance').in('account_type', ['Cash', 'Bank'])
     ]);
-    setAccounts(data);
-    // Build a map of gl_account_id -> current_balance from COA
-    const map = {};
-    coaAccs.forEach(a => { map[a.id] = a.current_balance ?? 0; });
+
+    let mergedAccounts = [...data];
+    const mappedGlIds = new Set(data.map(a => a.gl_account_id).filter(Boolean));
+
+    // 2. Auto-include any Cash/Bank COA accounts that aren't mapped yet
+    if (coaData && coaData.data) {
+      coaData.data.forEach(coa => {
+        if (!mappedGlIds.has(coa.id)) {
+          mergedAccounts.push({
+            id: coa.id, // using COA id as virtual ID
+            account_name: coa.account_name,
+            account_type: coa.account_type,
+            gl_account_id: coa.id,
+            is_active: true,
+            is_virtual: true // flag so we know it's not a real BankAccount record
+          });
+        }
+      });
+    }
+
+    setAccounts(mergedAccounts);
+
+    // 3. Fetch LIVE General Ledger lines for bulletproof accuracy
+    const glIds = mergedAccounts.map(a => a.gl_account_id).filter(Boolean);
+    let map = {};
+    
+    if (glIds.length > 0) {
+      const { data: glData } = await supabase.from('GeneralLedgerLine').select('account_id, debit_amount, credit_amount').in('account_id', glIds);
+      if (glData) {
+        glData.forEach(line => {
+           if (!map[line.account_id]) map[line.account_id] = 0;
+           map[line.account_id] += (line.debit_amount || 0) - (line.credit_amount || 0);
+        });
+      }
+    }
+    
+    // Fallback to COA cache if no GL lines exist
+    if (coaData && coaData.data) {
+      coaData.data.forEach(coa => {
+        if (map[coa.id] === undefined) map[coa.id] = coa.current_balance || 0;
+      });
+    }
+
     setGlBalances(map);
     setLoading(false);
   };
