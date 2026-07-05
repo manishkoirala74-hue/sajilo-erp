@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import SearchableSelect from '@/components/shared/SearchableSelect';
 import { BookOpen } from 'lucide-react';
 import { postAssetPurchase } from '@/lib/glPostingService';
+import DateInput from '@/components/shared/DateInput';
 
 const fmt = n => `NPR ${Number(n || 0).toLocaleString()}`;
 
@@ -192,10 +193,8 @@ export default function AssetPurchaseModal({ open, onClose, assets, accounts, ba
             </div>
             <div>
               <Label>Purchase Date</Label>
-              <Input
-                type="date"
-                value={purchaseDate}
-                onChange={e => setPurchaseDate(e.target.value)}
+              <DateInput value={purchaseDate}
+                onChange={val => setPurchaseDate(val)}
               />
             </div>
           </div>

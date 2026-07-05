@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import PageHeader from '@/components/shared/PageHeader';
 import DataTable from '@/components/shared/DataTable';
 import StatusBadge from '@/components/shared/StatusBadge';
+import DateInput from '@/components/shared/DateInput';
 
 const empty = {
   contract_reference: '', customer_id: '', customer_name: '', service_name: '',
@@ -147,8 +148,8 @@ export default function ServiceContracts() {
             </div>
             <div><Label>Service Name *</Label><Input value={form.service_name} onChange={e => f('service_name', e.target.value)} /></div>
             <div className="col-span-2"><Label>Description</Label><Input value={form.description} onChange={e => f('description', e.target.value)} /></div>
-            <div><Label>Start Date</Label><Input type="date" value={form.start_date} onChange={e => f('start_date', e.target.value)} /></div>
-            <div><Label>Expiry Date</Label><Input type="date" value={form.expiry_date} onChange={e => f('expiry_date', e.target.value)} /></div>
+            <div><Label>Start Date</Label><DateInput value={form.start_date} onChange={val => f('start_date', val)} /></div>
+            <div><Label>Expiry Date</Label><DateInput value={form.expiry_date} onChange={val => f('expiry_date', val)} /></div>
             <div><Label>Billing Frequency</Label>
               <Select value={form.billing_frequency} onValueChange={v => f('billing_frequency', v)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
@@ -162,7 +163,7 @@ export default function ServiceContracts() {
                 <SelectContent><SelectItem value="Bill in Arrears">Bill in Arrears</SelectItem><SelectItem value="Bill in Advance">Bill in Advance</SelectItem></SelectContent>
               </Select>
             </div>
-            <div><Label>Next Billing Date</Label><Input type="date" value={form.next_billing_date} onChange={e => f('next_billing_date', e.target.value)} /></div>
+            <div><Label>Next Billing Date</Label><DateInput value={form.next_billing_date} onChange={val => f('next_billing_date', val)} /></div>
             <div><Label>Assigned Sales Rep</Label><Input value={form.assigned_sales_rep} onChange={e => f('assigned_sales_rep', e.target.value)} /></div>
             <div className="col-span-2"><Label>Notes</Label><Input value={form.notes} onChange={e => f('notes', e.target.value)} /></div>
           </div>

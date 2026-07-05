@@ -11,6 +11,7 @@ import SearchableSelect from '@/components/shared/SearchableSelect';
 import { toast } from 'sonner';
 import { postFinancialVoucher } from '@/lib/glPostingService';
 import VoucherLink from '@/components/shared/VoucherLink';
+import DateInput from '@/components/shared/DateInput';
 
 const fmt = n => `NPR ${Number(n || 0).toLocaleString()}`;
 
@@ -283,7 +284,7 @@ export default function SupplierBillDue() {
           <div className="space-y-4 mt-2">
             <div>
               <Label>Date</Label>
-              <Input type="date" value={payForm.date} onChange={e => setPayForm({...payForm, date: e.target.value})} className="mt-1" />
+              <DateInput value={payForm.date} onChange={val => setPayForm({...payForm, date: val})} className="mt-1" />
             </div>
             <div>
               <Label>Pay From (Cash/Bank) *</Label>

@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { Lock, Search, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { adToBS, bsToAD, BS_MONTHS, isValidBSDate, formatBS } from '@/lib/nepaliDate';
+import DateInput from '@/components/shared/DateInput';
 
 // ── Inline AD/BS Date Picker ────────────────────────────────────────────────
 function DatePickerWithToggle({ value, onChange, label }) {
@@ -58,7 +59,7 @@ function DatePickerWithToggle({ value, onChange, label }) {
         </div>
       </div>
       {mode === 'AD' ? (
-        <Input type="date" value={value || ''} onChange={e => onChange(e.target.value)} />
+        <DateInput value={value || ''} onChange={val => onChange(val)} />
       ) : (
         <div className="flex gap-1">
           <Input placeholder="YYYY" value={bsY} onChange={e => { setBsY(e.target.value); handleBSChange(e.target.value, bsM, bsD); }} className="w-20 font-mono text-sm" maxLength={4} />

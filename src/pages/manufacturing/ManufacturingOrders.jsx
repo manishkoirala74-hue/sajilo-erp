@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import PageHeader from '@/components/shared/PageHeader';
 import DataTable from '@/components/shared/DataTable';
 import StatusBadge from '@/components/shared/StatusBadge';
+import DateInput from '@/components/shared/DateInput';
 
 const empty = {
   product_name: '', product_item_id: '', bom_description: '',
@@ -151,8 +152,8 @@ export default function ManufacturingOrders() {
               </div>
               <div><Label>Planned Quantity</Label><Input type="number" value={form.planned_quantity} onChange={e => f('planned_quantity', parseFloat(e.target.value) || 1)} /></div>
               <div><Label>Actual Yield</Label><Input type="number" value={form.actual_yield_quantity} onChange={e => f('actual_yield_quantity', parseFloat(e.target.value) || 0)} /></div>
-              <div><Label>Start Date</Label><Input type="date" value={form.start_date} onChange={e => f('start_date', e.target.value)} /></div>
-              <div><Label>Completion Date</Label><Input type="date" value={form.completion_date} onChange={e => f('completion_date', e.target.value)} /></div>
+              <div><Label>Start Date</Label><DateInput value={form.start_date} onChange={val => f('start_date', val)} /></div>
+              <div><Label>Completion Date</Label><DateInput value={form.completion_date} onChange={val => f('completion_date', val)} /></div>
               <div><Label>Batch Number</Label><Input value={form.batch_number} onChange={e => f('batch_number', e.target.value)} /></div>
               <div><Label>BOM Description</Label><Input value={form.bom_description} onChange={e => f('bom_description', e.target.value)} /></div>
             </div>

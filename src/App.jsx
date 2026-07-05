@@ -28,6 +28,7 @@ import DiscountSchemes from '@/pages/inventory/DiscountSchemes';
 import StockAdjustments from '@/pages/inventory/StockAdjustments';
 import Godowns from '@/pages/inventory/Godowns';
 import PriceRevisionWizard from './pages/inventory/PriceRevisionWizard';
+import StockAssemblyList from '@/pages/inventory/StockAssemblyList';
 import POSSales from '@/pages/pos/POSSales';
 import PurchaseOrders from '@/pages/purchase/PurchaseOrders';
 import PurchaseInvoices from '@/pages/purchase/PurchaseInvoices';
@@ -53,6 +54,7 @@ import Depreciation from '@/pages/settings/finance/Depreciation';
 // Operations
 import ReceivableCollections from '@/pages/settings/operations/ReceivableCollections';
 import VoucherSequence from '@/pages/settings/operations/VoucherSequence';
+import InventorySettings from '@/pages/settings/operations/InventorySettings';
 // Data
 import SystemCutOver from '@/pages/settings/data/SystemCutOver';
 import ItemImportExportPage from '@/pages/settings/data/ItemImportExportPage';
@@ -74,6 +76,7 @@ import GrossProfitMarginReport from '@/pages/reports/GrossProfitMarginReport';
 import CustomerBillDue from '@/pages/reports/CustomerBillDue';
 import SupplierBillDue from '@/pages/reports/SupplierBillDue';
 import PurchasePriceChangeHistory from '@/pages/reports/PurchasePriceChangeHistory';
+import NegativeStockExceptionReport from '@/pages/reports/NegativeStockExceptionReport';
 import ComposeEmail from '@/pages/email/ComposeEmail';
 import Profile from '@/pages/Profile';
 import HelpSupport from '@/pages/HelpSupport';
@@ -180,6 +183,7 @@ const AuthenticatedApp = () => {
           <Route path="/inventory/discounts" element={<DiscountSchemes />} />
           <Route path="/inventory/adjustments" element={<StockAdjustments />} />
           <Route path="/inventory/price-revision" element={<PriceRevisionWizard />} />
+          <Route path="/inventory/assembly" element={<StockAssemblyList />} />
           <Route path="/pos" element={<POSSales />} />
           <Route path="/purchase/orders" element={<PurchaseOrders />} />
           <Route path="/purchase/invoices" element={<PurchaseInvoices />} />
@@ -200,6 +204,7 @@ const AuthenticatedApp = () => {
             <Route path="finance/depreciation" element={<Depreciation />} />
             <Route path="operations/collections" element={<ReceivableCollections />} />
             <Route path="operations/vouchers" element={<VoucherSequence />} />
+            <Route path="operations/inventory" element={<InventorySettings />} />
             <Route path="operations/templates" element={<PDFTemplatesList />} />
             <Route path="data/cut-over" element={<SystemCutOver />} />
             <Route path="data/import" element={<ItemImportExportPage />} />
@@ -224,6 +229,7 @@ const AuthenticatedApp = () => {
           <Route path="/reports/customer-bill-due" element={<CustomerBillDue />} />
           <Route path="/reports/supplier-bill-due" element={<SupplierBillDue />} />
           <Route path="/reports/purchase-price-change-history" element={<PurchasePriceChangeHistory />} />
+          <Route path="/reports/inventory/negative-stock-exceptions" element={<NegativeStockExceptionReport />} />
           <Route path="/profile" element={<Profile />} />
 
           {/* Accounting */}

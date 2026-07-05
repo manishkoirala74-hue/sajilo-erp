@@ -16,6 +16,7 @@ import { useSajiloSync } from '@/hooks/useSajiloSync';
 import { postFinancialVoucher } from '@/lib/glPostingService';
 import { generateVectorPDF } from '@/utils/pdfGenerator';
 import VoucherLink from '@/components/shared/VoucherLink';
+import DateInput from '@/components/shared/DateInput';
 
 const emptyVoucher = {
   voucher_type: 'Receipt', voucher_date: new Date().toISOString().split('T')[0],
@@ -536,7 +537,7 @@ export default function FinancialVouchers() {
               </div>
               <div>
                 <Label>Date *</Label>
-                <Input type="date" value={form.voucher_date} onChange={e => setForm({ ...form, voucher_date: e.target.value })} className="mt-1" />
+                <DateInput value={form.voucher_date} onChange={val => setForm({ ...form, voucher_date: val })} className="mt-1" />
               </div>
             </div>
 

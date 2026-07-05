@@ -25,6 +25,7 @@ export const SETTINGS_SUB_CATEGORIES = {
   operations: [
     { id: 'collections', label: 'Receivable Collections', path: '/settings/operations/collections', keywords: ['invoices', 'payment', 'due', 'reminders'] },
     { id: 'vouchers', label: 'Voucher Numbering', path: '/settings/operations/vouchers', keywords: ['sequence', 'prefix', 'invoice number'] },
+    { id: 'inventory', label: 'Inventory Policy', path: '/settings/operations/inventory', keywords: ['stock', 'negative', 'policy'] },
     { id: 'templates', label: 'PDF Document Templates', path: '/settings/operations/templates', keywords: ['print', 'design', 'layout', 'receipt'] },
   ],
   data: [

@@ -46,6 +46,7 @@ const FeatureToggles = () => {
         <ToggleRow label="POS Module" desc="Point of Sale terminal" checked={draftSettings.enable_pos_module} onChange={v => updateDraftSettings({ enable_pos_module: v })} />
         <ToggleRow label="Purchase Orders" desc="Full PO workflow before invoicing" checked={draftSettings.enable_purchase_orders} onChange={v => updateDraftSettings({ enable_purchase_orders: v })} />
         <ToggleRow label="Landed Costs" desc="Add freight/customs to inventory WAC" checked={draftSettings.enable_landed_costs} onChange={v => updateDraftSettings({ enable_landed_costs: v })} />
+        <ToggleRow label="Stock Assembly" desc="Ad-Hoc assembly and production builds" checked={draftSettings.enable_stock_assembly !== false} onChange={v => updateDraftSettings({ enable_stock_assembly: v })} />
         <ToggleRow label="Manufacturing Module" desc="Production orders and BOM" checked={draftSettings.enable_manufacturing_module} onChange={v => updateDraftSettings({ enable_manufacturing_module: v })} />
         <ToggleRow label="HR & Payroll Module" desc="Employees, leave, and payroll" checked={draftSettings.enable_hr_module} onChange={v => updateDraftSettings({ enable_hr_module: v })} />
         <ToggleRow label="Fixed Assets Module" desc="Asset register and depreciation" checked={draftSettings.enable_assets_module} onChange={v => updateDraftSettings({ enable_assets_module: v })} />

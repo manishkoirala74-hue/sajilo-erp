@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { sajilo } from '@/api/sajiloClient';
-import { Search, ShoppingCart, Trash2, Plus, Minus, History, Eye } from 'lucide-react';
+import { Search, ShoppingCart, Trash2, Plus, Minus, History, Eye, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -15,6 +15,7 @@ import POSSaleDetailModal from '@/components/pos/POSSaleDetailModal';
 import { postPOSSale, loadItemsMap, loadSettings } from '@/lib/glPostingService';
 import { loadActiveTaxTypes, computeTotalTax } from '@/lib/taxService';
 import { useSajiloSync } from '@/hooks/useSajiloSync';
+import { useAuth } from '@/lib/AuthContext';
 
 const fmt = n => `NPR ${Number(n || 0).toLocaleString()}`;
 
@@ -39,6 +40,9 @@ export default function POSSales() {
   const [selectedCashAccountId, setSelectedCashAccountId] = useState('');
   const [selectedCashAccountName, setSelectedCashAccountName] = useState('');
   const [taxTypes, setTaxTypes] = useState([]);
+  const { globalSettings, hasAccess } = useAuth();
+  const [showNegativeStockWarning, setShowNegativeStockWarning] = useState(false);
+  const [negativeStockItems, setNegativeStockItems] = useState([]);
 
   const isCredit = paymentMethod === 'Credit';
 
@@ -132,8 +136,32 @@ export default function POSSales() {
   const grandTotal = afterDiscount + vat;
   const change = Math.max(0, amountTendered - grandTotal);
 
-  const processSale = async () => {
+  const processSale = async (skipStockCheck = false) => {
     if (cart.length === 0) return toast.error('Cart is empty');
+    
+    // Negative Stock Policy Check
+    const policy = globalSettings?.negative_stock_policy || 'STRICT_BLOCK';
+    const negatives = [];
+    
+    for (const c of cart) {
+      if (c.is_service) continue;
+      const inventoryItem = items.find(i => i.id === c.item_id);
+      const available = inventoryItem?.quantity_on_hand || 0;
+      if (c.quantity > available) {
+        if (policy === 'STRICT_BLOCK') {
+          return toast.error(`Insufficient stock for ${c.item_name}. Max available is ${available}.`);
+        } else if (policy === 'WARN_AND_ALLOW' && !skipStockCheck) {
+          negatives.push({ name: c.item_name, deficit: c.quantity - available });
+        }
+      }
+    }
+    
+    if (negatives.length > 0) {
+      setNegativeStockItems(negatives);
+      setShowNegativeStockWarning(true);
+      return;
+    }
+
     setProcessing(true);
     const idempotencyKey = crypto.randomUUID();
     const saleNum = `POS-${new Date().getFullYear()}-${String(saleCount + 1).padStart(4, '0')}`;
@@ -407,6 +435,41 @@ export default function POSSales() {
               {history.length === 0 && <tr><td colSpan={7} className="cell-density text-center text-muted-foreground">No sales yet</td></tr>}
             </tbody>
           </table>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── NEGATIVE STOCK WARNING DIALOG ── */}
+      <Dialog open={showNegativeStockWarning} onOpenChange={() => { setShowNegativeStockWarning(false); }}>
+        <DialogContent className="max-w-md" style={{ zIndex: 10000 }}>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <AlertCircle className="w-5 h-5" /> Negative Stock Warning
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-2 text-sm text-muted-foreground space-y-2">
+            <p>This POS sale will result in negative stock for the following items:</p>
+            <ul className="list-disc pl-5 space-y-1 text-red-600 font-medium">
+              {negativeStockItems.map((n, idx) => (
+                <li key={idx}>{n.name} (Shortfall: {n.deficit})</li>
+              ))}
+            </ul>
+            {hasAccess('inventory', 'override_negative_stock') ? (
+              <p className="mt-4 font-semibold text-foreground">Do you wish to proceed and allow negative stock?</p>
+            ) : (
+              <p className="mt-4 font-bold text-red-600">You do not have permission to override negative stock. Please contact an Inventory Manager.</p>
+            )}
+          </div>
+          <div className="flex justify-end gap-3 mt-4">
+            <Button variant="outline" onClick={() => setShowNegativeStockWarning(false)}>Cancel</Button>
+            {hasAccess('inventory', 'override_negative_stock') && (
+              <Button className="bg-red-600 hover:bg-red-700 text-white" onClick={() => { 
+                setShowNegativeStockWarning(false); 
+                processSale(true); 
+              }}>
+                Acknowledge & Proceed
+              </Button>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
     </div>

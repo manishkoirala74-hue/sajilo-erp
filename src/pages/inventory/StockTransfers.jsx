@@ -23,7 +23,9 @@ const emptyForm = {
 };
 
 export default function StockTransfers() {
-  const { activeGodowns } = useAuth();
+  const { activeGodowns, globalSettings, hasAccess } = useAuth();
+  const [showNegativeStockWarning, setShowNegativeStockWarning] = useState(false);
+  const [negativeStockItems, setNegativeStockItems] = useState([]);
   const [transfers, setTransfers] = useState([]);
   const [localGodowns, setLocalGodowns] = useState([]);
   const [items, setItems] = useState([]);
@@ -148,18 +150,32 @@ export default function StockTransfers() {
 
   const removeLine = (idx) => setForm(f => ({ ...f, line_items: f.line_items.filter((_, i) => i !== idx) }));
 
-  const handlePost = async () => {
+  const handlePost = async (skipStockCheck = false) => {
     if (!form.from_godown_id || !form.to_godown_id) return toast.error('Select both locations');
     if (form.from_godown_id === form.to_godown_id) return toast.error('Locations must be different');
     if (form.line_items.length === 0) return toast.error('Add at least one item');
     
-    // UX Safeguard Validation
+    // UX Safeguard Validation & Negative Stock Policy
+    const policy = globalSettings?.negative_stock_policy || 'STRICT_BLOCK';
+    const negatives = [];
+
     for (const item of form.line_items) {
-      const available = currentStockMap[item.item_id] || 0;
-      if (item.quantity > available) {
-        return toast.error(`Insufficient stock for ${item.item_name}. Max available is ${available}.`);
-      }
       if (item.quantity <= 0) return toast.error('Quantity must be positive');
+      const available = currentStockMap[item.item_id] || 0;
+      
+      if (item.quantity > available) {
+        if (policy === 'STRICT_BLOCK') {
+          return toast.error(`Insufficient stock for ${item.item_name}. Max available is ${available}.`);
+        } else if (policy === 'WARN_AND_ALLOW' && !skipStockCheck) {
+          negatives.push({ name: item.item_name, deficit: item.quantity - available });
+        }
+      }
+    }
+
+    if (negatives.length > 0) {
+      setNegativeStockItems(negatives);
+      setShowNegativeStockWarning(true);
+      return;
     }
 
     setSaving(true);
@@ -337,6 +353,41 @@ export default function StockTransfers() {
               </div>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── NEGATIVE STOCK WARNING DIALOG ── */}
+      <Dialog open={showNegativeStockWarning} onOpenChange={() => { setShowNegativeStockWarning(false); }}>
+        <DialogContent className="max-w-md" style={{ zIndex: 10000 }}>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <AlertCircle className="w-5 h-5" /> Negative Stock Warning
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-2 text-sm text-muted-foreground space-y-2">
+            <p>This transfer will result in negative stock in the source godown for the following items:</p>
+            <ul className="list-disc pl-5 space-y-1 text-red-600 font-medium">
+              {negativeStockItems.map((n, idx) => (
+                <li key={idx}>{n.name} (Shortfall: {n.deficit})</li>
+              ))}
+            </ul>
+            {hasAccess('inventory', 'override_negative_stock') ? (
+              <p className="mt-4 font-semibold text-foreground">Do you wish to proceed and allow negative stock?</p>
+            ) : (
+              <p className="mt-4 font-bold text-red-600">You do not have permission to override negative stock. Please contact an Inventory Manager.</p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowNegativeStockWarning(false)}>Cancel</Button>
+            {hasAccess('inventory', 'override_negative_stock') && (
+              <Button className="bg-red-600 hover:bg-red-700 text-white" onClick={() => { 
+                setShowNegativeStockWarning(false); 
+                handlePost(true); 
+              }}>
+                Acknowledge & Proceed
+              </Button>
+            )}
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

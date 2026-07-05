@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { sajilo } from '@/api/sajiloClient';
-import { Eye, TrendingUp, TrendingDown } from 'lucide-react';
+import { Eye, TrendingUp, TrendingDown, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -13,6 +13,7 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 import DateInput from '@/components/shared/DateInput';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/lib/AuthContext';
 import { postStockAdjustment, loadItemsMap, loadSettings } from '@/lib/glPostingService';
 
 const REASONS = ['Physical Count Variance', 'Damage/Wastage', 'Opening Stock', 'Expiry', 'Theft/Loss', 'Other'];
@@ -31,6 +32,10 @@ export default function StockAdjustments() {
   const [viewDetail, setViewDetail] = useState(null);
   const [form, setForm] = useState(emptyAdj);
   const [saving, setSaving] = useState(false);
+  const { globalSettings, hasAccess } = useAuth();
+  const [showNegativeStockWarning, setShowNegativeStockWarning] = useState(false);
+  const [negativeStockItems, setNegativeStockItems] = useState([]);
+  const [pendingStatus, setPendingStatus] = useState(null);
 
   useEffect(() => {
     Promise.all([
@@ -84,8 +89,32 @@ export default function StockAdjustments() {
 
   const removeLine = (idx) => setForm(f => ({ ...f, line_items: f.line_items.filter((_, i) => i !== idx) }));
 
-  const handleSave = async (status) => {
+  const handleSave = async (status, skipStockCheck = false) => {
     if (form.line_items.length === 0) { toast.error('Add at least one item'); return; }
+
+    if (status === 'Posted') {
+      const policy = globalSettings?.negative_stock_policy || 'STRICT_BLOCK';
+      const negatives = [];
+      
+      for (const line of form.line_items) {
+        if (line.adjusted_qty < 0) {
+          if (policy === 'STRICT_BLOCK') {
+            toast.error(`Adjusted quantity cannot be negative for ${line.item_name}.`);
+            return;
+          } else if (policy === 'WARN_AND_ALLOW' && !skipStockCheck) {
+            negatives.push({ name: line.item_name, deficit: Math.abs(line.adjusted_qty) });
+          }
+        }
+      }
+      
+      if (negatives.length > 0) {
+        setNegativeStockItems(negatives);
+        setPendingStatus(status);
+        setShowNegativeStockWarning(true);
+        return;
+      }
+    }
+
     setSaving(true);
     try {
       const idempotencyKey = crypto.randomUUID();
@@ -268,6 +297,41 @@ export default function StockAdjustments() {
               <div className="text-right font-semibold">Total Cost Impact: NPR {Number(viewDetail.total_cost_impact).toLocaleString()}</div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* ── NEGATIVE STOCK WARNING DIALOG ── */}
+      <Dialog open={showNegativeStockWarning} onOpenChange={() => { setShowNegativeStockWarning(false); setPendingStatus(null); }}>
+        <DialogContent className="max-w-md" style={{ zIndex: 10000 }}>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <AlertCircle className="w-5 h-5" /> Negative Stock Warning
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-2 text-sm text-muted-foreground space-y-2">
+            <p>This adjustment will result in negative stock for the following items:</p>
+            <ul className="list-disc pl-5 space-y-1 text-red-600 font-medium">
+              {negativeStockItems.map((n, idx) => (
+                <li key={idx}>{n.name} (Shortfall: {n.deficit})</li>
+              ))}
+            </ul>
+            {hasAccess('inventory', 'override_negative_stock') ? (
+              <p className="mt-4 font-semibold text-foreground">Do you wish to proceed and allow negative stock?</p>
+            ) : (
+              <p className="mt-4 font-bold text-red-600">You do not have permission to override negative stock. Please contact an Inventory Manager.</p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setShowNegativeStockWarning(false); setPendingStatus(null); }}>Cancel</Button>
+            {hasAccess('inventory', 'override_negative_stock') && (
+              <Button className="bg-red-600 hover:bg-red-700 text-white" onClick={() => { 
+                setShowNegativeStockWarning(false); 
+                handleSave(pendingStatus, true); 
+              }}>
+                Acknowledge & Proceed
+              </Button>
+            )}
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

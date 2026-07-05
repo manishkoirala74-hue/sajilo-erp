@@ -6,7 +6,7 @@ import {
   Receipt, ClipboardList, Menu, X, Boxes, Wallet,
   Landmark, ShieldCheck, UserCog, Banknote, Factory, Handshake, BookOpen,
   Ruler, Tag, RotateCcw, SlidersHorizontal, ShoppingBag, BarChart2, TrendingDown, CreditCard,
-  UserCheck, Truck, Plus, Search, LifeBuoy, ArrowRightLeft, Star, LogOut
+  UserCheck, Truck, Plus, Search, LifeBuoy, ArrowRightLeft, Star, LogOut, Layers
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { sajilo } from '@/api/sajiloClient';
@@ -56,6 +56,7 @@ const buildNavGroups = (settings) => {
         { icon: Ruler, label: 'Units of Measure', path: '/inventory/uom' },
         { icon: SlidersHorizontal, label: 'Stock Adjustments', path: '/inventory/adjustments' },
         { icon: Tag, label: 'Discount Schemes', path: '/inventory/discounts' },
+        ...(s.enable_stock_assembly !== false ? [{ icon: Layers, label: 'Stock Assembly', path: '/inventory/assembly' }] : []),
         { icon: Settings, label: 'Price Revision', path: '/inventory/price-revision' },
         ...(s.enable_manufacturing_module !== false ? [{ icon: Factory, label: 'Mfg Orders', path: '/manufacturing/orders' }] : []),
         ...(s.enable_services_module !== false ? [{ icon: Handshake, label: 'Service Contracts', path: '/services/contracts' }] : []),

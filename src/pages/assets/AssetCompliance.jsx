@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import DocumentUploader from '@/components/shared/DocumentUploader';
 import { cn } from '@/lib/utils';
+import DateInput from '@/components/shared/DateInput';
 
 const DEFAULT_EVENT_TYPES = ['Insurance', 'Government Tax', 'Preventative Maintenance', 'Safety Inspection', 'License Renewal'];
 
@@ -133,11 +134,11 @@ function ComplianceForm({ form, f, fixedAssets, eventTypes, isEdit, isRenew }) {
       </div>
       <div>
         <Label>Last Completed Date</Label>
-        <Input type="date" value={form.last_completed_date} onChange={e => f('last_completed_date', e.target.value)} />
+        <DateInput value={form.last_completed_date} onChange={val => f('last_completed_date', val)} />
       </div>
       <div>
         <Label>Next Due Date</Label>
-        <Input type="date" value={form.next_due_date} onChange={e => f('next_due_date', e.target.value)} />
+        <DateInput value={form.next_due_date} onChange={val => f('next_due_date', val)} />
       </div>
       <div>
         <Label>Assigned User</Label>

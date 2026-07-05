@@ -8,6 +8,7 @@ import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import FiscalYearClosingWizard from './FiscalYearClosingWizard';
+import DateInput from '@/components/shared/DateInput';
 
 export default function FiscalYearSettings() {
   const [fiscalYears, setFiscalYears] = useState([]);
@@ -178,19 +179,15 @@ export default function FiscalYearSettings() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label>Start Date *</Label>
-                <Input 
-                  type="date" 
-                  value={form.start_date} 
-                  onChange={e => setForm({...form, start_date: e.target.value})} 
+                <DateInput value={form.start_date} 
+                  onChange={val => setForm({...form, start_date: val})} 
                   className="h-10 border border-border bg-background px-3 text-sm rounded-md focus:ring-1 focus:ring-primary outline-none mt-1 .5"
                 />
               </div>
               <div>
                 <Label>End Date *</Label>
-                <Input 
-                  type="date" 
-                  value={form.end_date} 
-                  onChange={e => setForm({...form, end_date: e.target.value})} 
+                <DateInput value={form.end_date} 
+                  onChange={val => setForm({...form, end_date: val})} 
                   className="h-10 border border-border bg-background px-3 text-sm rounded-md focus:ring-1 focus:ring-primary outline-none mt-1 .5"
                 />
               </div>

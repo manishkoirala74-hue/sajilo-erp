@@ -2,7 +2,7 @@ import { useSearchParams } from 'react-router-dom';
 import { useState, useEffect, useMemo } from 'react';
 import { sajilo } from '@/api/sajiloClient';
 import { loadActiveTaxTypes } from '@/lib/taxService';
-import { Plus, Edit2, Package, AlertTriangle, Upload, X, History, CheckSquare, Square, Minus, Trash2 } from 'lucide-react';
+import { Plus, Edit2, Package, AlertTriangle, Upload, X, History, CheckSquare, Square, Minus, Trash2, Ban } from 'lucide-react';
 import SearchableSelect from '@/components/shared/SearchableSelect';
 import ItemTransactionHistory from '@/components/inventory/ItemTransactionHistory';
 import { Button } from '@/components/ui/button';
@@ -670,10 +670,14 @@ export default function Items() {
                         {item.item_type === 'Service'
                           ? <span className="text-xs text-blue-500 italic">N/A</span>
                           : <div className="flex items-center justify-end gap-1">
-                              <span className={cn('font-semibold', item.quantity_on_hand <= item.reorder_level && item.reorder_level > 0 ? 'text-red-600 dark:text-red-400' : '')}>
+                              <span className={cn('font-semibold', 
+                                item.quantity_on_hand < 0 ? 'text-red-600 dark:text-red-500 bg-red-100 dark:bg-red-900/30 px-1.5 py-0.5 rounded' 
+                                : (item.quantity_on_hand <= item.reorder_level && item.reorder_level > 0 ? 'text-amber-600 dark:text-amber-400' : '')
+                              )}>
                                 {item.quantity_on_hand}
                               </span>
-                              {item.quantity_on_hand <= item.reorder_level && item.reorder_level > 0 && <AlertTriangle className="w-3 h-3 text-red-500" />}
+                              {item.quantity_on_hand < 0 && <Ban className="w-3 h-3 text-red-500" />}
+                              {item.quantity_on_hand >= 0 && item.quantity_on_hand <= item.reorder_level && item.reorder_level > 0 && <AlertTriangle className="w-3 h-3 text-amber-500" />}
                             </div>
                         }
                       </td>

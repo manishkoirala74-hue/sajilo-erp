@@ -90,6 +90,7 @@ const CATEGORIES = [
       { id: 'price_revision_history', label: 'Sales Price Revision History', desc: 'Audit trail of sales price changes', isRoute: true, path: '/reports/price-revision-history' },
       { id: 'inventory_turnover', label: 'Inventory Turnover Ratio', desc: 'Turnover ratio, COGS, and DSI for inventory items', isRoute: true, path: '/reports/inventory-turnover' },
       { id: 'gross_profit_margin', label: 'Gross Profit Margin Report', desc: 'Revenue, COGS, and Gross Margin per item', isRoute: true, path: '/reports/inventory/gross-profit-margin' },
+      { id: 'negative_stock', label: 'Negative Stock Exceptions', desc: 'Items currently below zero quantity', isRoute: true, path: '/reports/inventory/negative-stock-exceptions' },
     ]
   },
   {

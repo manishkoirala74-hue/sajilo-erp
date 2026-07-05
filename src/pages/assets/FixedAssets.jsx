@@ -21,6 +21,7 @@ import { AlertTriangle } from 'lucide-react';
 import AssetDisposalModal from '@/components/assets/AssetDisposalModal';
 import AssetPurchaseModal from '@/components/assets/AssetPurchaseModal';
 import { cn } from '@/lib/utils';
+import DateInput from '@/components/shared/DateInput';
 
 const fmt = n => `NPR ${Number(n || 0).toLocaleString()}`;
 
@@ -706,7 +707,7 @@ export default function FixedAssets() {
                 placeholder="Search asset ledger accounts…"
               />
             </div>
-            <div><Label>Purchase Date</Label><Input type="date" value={form.purchase_date} onChange={e => f('purchase_date', e.target.value)} /></div>
+            <div><Label>Purchase Date</Label><DateInput value={form.purchase_date} onChange={val => f('purchase_date', val)} /></div>
             <div><Label>Gross Purchase Value (NPR)</Label><Input type="number" value={form.gross_purchase_value} onChange={e => f('gross_purchase_value', parseFloat(e.target.value) || 0)} /></div>
             <div><Label>Salvage Value (NPR)</Label><Input type="number" value={form.salvage_value} onChange={e => f('salvage_value', parseFloat(e.target.value) || 0)} /></div>
             <div><Label>Useful Life (months)</Label><Input type="number" value={form.useful_life_months} onChange={e => f('useful_life_months', parseInt(e.target.value) || 0)} /></div>

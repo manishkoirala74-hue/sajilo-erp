@@ -15,6 +15,7 @@ import SearchableSelect from '@/components/shared/SearchableSelect';
 import { AlertTriangle, TrendingUp, TrendingDown, BookOpen } from 'lucide-react';
 import { postAssetDisposal } from '@/lib/glPostingService';
 import { cn } from '@/lib/utils';
+import DateInput from '@/components/shared/DateInput';
 
 const fmt = n => `NPR ${Number(n || 0).toLocaleString()}`;
 const r2  = n => Math.round((n || 0) * 100) / 100;
@@ -126,7 +127,7 @@ export default function AssetDisposalModal({ asset, accounts = [], settings, ope
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1">
               <Label className="text-xs">Disposal Date *</Label>
-              <Input type="date" value={disposalDate} onChange={e => setDisposalDate(e.target.value)} className="h-8 text-sm" />
+              <DateInput value={disposalDate} onChange={val => setDisposalDate(val)} className="h-8 text-sm" />
             </div>
             <div className="space-y-1">
               <Label className="text-xs">Disposal Type</Label>

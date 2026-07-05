@@ -7,6 +7,7 @@ import { Save, RefreshCw, ChevronDown, ChevronRight, Search, CheckCircle } from 
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
+import DateInput from '@/components/shared/DateInput';
 
 const TYPE_META = {
   Asset:    { dot: 'bg-blue-500',    badge: 'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400' },
@@ -197,7 +198,7 @@ function AccountsTab({ openingDate }) {
                         </div>
                         <span className="text-xs text-muted-foreground pr-2 truncate">{acc.account_group}</span>
                         <div className="pr-2">
-                          <input type="date" value={e.opening_date || openingDate} onChange={ev => setEdit(acc.id, 'opening_date', ev.target.value)}
+                          <DateInput value={e.opening_date || openingDate} onChange={val => setEdit(acc.id, 'opening_date', val)}
                             className="w-full h-7 border border-input rounded-md px-2 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring bg-transparent" />
                         </div>
                         <div className="pr-2">
@@ -404,7 +405,7 @@ function PartnersTab({ mode, openingDate }) {
                   </div>
                   <span className="text-xs text-muted-foreground pr-2 truncate">{p.tax_id_number || '—'}</span>
                   <div className="pr-2">
-                    <input type="date" value={e.opening_balance_date || openingDate} onChange={ev => setEdit(p.id, 'opening_balance_date', ev.target.value)}
+                    <DateInput value={e.opening_balance_date || openingDate} onChange={val => setEdit(p.id, 'opening_balance_date', val)}
                       className="w-full h-7 border border-input rounded-md px-2 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring bg-transparent" />
                   </div>
                   <div className="pr-2">

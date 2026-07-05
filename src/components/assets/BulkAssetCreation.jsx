@@ -485,14 +485,12 @@ export default function BulkAssetCreation({ open, onClose, accounts, assets, onS
 
                     {/* Purchase Date */}
                     <td className={cn('px-1.5 py-1 border-r border-border min-w-[140px]', isActive(idx, 'purchase_date') && 'bg-primary/5')}>
-                      <input
-                        type="date"
-                        className={cn(
+                      <DateInput className={cn(
                           'w-full h-8 px-2 text-xs border rounded bg-card focus:outline-none focus:ring-1 focus:ring-primary',
                           isActive(idx, 'purchase_date') ? 'border-primary ring-1 ring-primary' : 'border-border'
                         )}
                         value={row.purchase_date}
-                        onChange={e => updateRow(idx, 'purchase_date', e.target.value)}
+                        onChange={val => updateRow(idx, 'purchase_date', val)}
                         onFocus={() => focus(idx, 'purchase_date')}
                         onPaste={e => handlePaste(e, idx, 'purchase_date')}
                       />
@@ -582,6 +580,7 @@ export default function BulkAssetCreation({ open, onClose, accounts, assets, onS
             <h4 className="text-sm font-semibold mb-2">Double-Entry Journal Validation</h4>
             <p className="text-xs text-muted-foreground mb-3">
               Your import creates a total asset value of <strong className="font-mono">NPR {totalGrossValue.toLocaleString()}</strong>.
+import DateInput from '@/components/shared/DateInput';
               Select an offsetting account to balance the journal entry.
             </p>
             <div className="bg-card border rounded-lg text-sm mb-3">

@@ -12,6 +12,7 @@ export default function FiscalYearClosingWizard() {
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
   const [preFlightDrafts, setPreFlightDrafts] = useState(null);
+  const [preFlightNegativeStock, setPreFlightNegativeStock] = useState(null);
 
   const fetchData = async () => {
     try {
@@ -42,6 +43,16 @@ export default function FiscalYearClosingWizard() {
         
       if (error) throw error;
       setPreFlightDrafts(count || 0);
+
+      // Check for Negative Stock
+      const { count: nsCount, error: nsError } = await sajilo.auth.supabase
+        .from('CurrentStock')
+        .select('*', { count: 'exact', head: true })
+        .lt('current_qty', 0);
+
+      if (nsError) throw nsError;
+      setPreFlightNegativeStock(nsCount || 0);
+
     } catch (e) {
       console.error(e);
       toast.error('Failed to run pre-flight checks');
@@ -63,6 +74,10 @@ export default function FiscalYearClosingWizard() {
     }
     if (preFlightDrafts > 0) {
       toast.error(`Cannot close: there are ${preFlightDrafts} pending vouchers.`);
+      return;
+    }
+    if (preFlightNegativeStock > 0) {
+      toast.error(`Cannot close: there are ${preFlightNegativeStock} items with negative stock.`);
       return;
     }
 
@@ -119,14 +134,14 @@ export default function FiscalYearClosingWizard() {
             </SelectContent>
           </Select>
 
-          {closingYearId && preFlightDrafts !== null && (
-            <div className={`p-3 rounded-lg text-sm flex items-start gap-2 ${preFlightDrafts > 0 ? 'bg-red-50 dark:bg-red-500/10 text-red-800 dark:text-red-300 border border-red-200 dark:border-red-500/20' : 'bg-green-50 dark:bg-green-500/10 text-green-800 dark:text-green-300 border border-green-200 dark:border-green-500/20'}`}>
-              {preFlightDrafts > 0 ? <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" /> : <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />}
-              <div>
+          {closingYearId && (preFlightDrafts !== null || preFlightNegativeStock !== null) && (
+            <div className={`p-3 rounded-lg text-sm flex items-start gap-2 ${preFlightDrafts > 0 || preFlightNegativeStock > 0 ? 'bg-red-50 dark:bg-red-500/10 text-red-800 dark:text-red-300 border border-red-200 dark:border-red-500/20' : 'bg-green-50 dark:bg-green-500/10 text-green-800 dark:text-green-300 border border-green-200 dark:border-green-500/20'}`}>
+              {(preFlightDrafts > 0 || preFlightNegativeStock > 0) ? <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" /> : <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />}
+              <div className="space-y-1">
                 <strong className="block mb-0.5">Pre-flight Check</strong>
-                {preFlightDrafts > 0 
-                  ? `Found ${preFlightDrafts} draft/pending journals. Please post or delete them before closing.`
-                  : 'All journals are posted. Ready for closing.'}
+                {preFlightDrafts > 0 && <div>• Found {preFlightDrafts} pending journals.</div>}
+                {preFlightNegativeStock > 0 && <div>• Found {preFlightNegativeStock} items with negative stock. <a href="/reports/inventory/negative-stock-exceptions" className="underline font-semibold ml-1">View Report</a></div>}
+                {preFlightDrafts === 0 && preFlightNegativeStock === 0 && <div>All journals are posted and inventory is strictly positive. Ready for closing.</div>}
               </div>
             </div>
           )}

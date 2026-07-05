@@ -34,6 +34,7 @@ Review this checklist before starting the development of any new feature or page
 - [ ] **States:** Have you accounted for Loading, Error, Success, and Empty states?
 - [ ] **Form Validation:** Is client-side validation implemented? Are user-friendly error messages displayed?
 - [ ] **Accessibility:** Are we using semantic HTML? Are buttons and forms accessible?
+- [ ] **Date Fields:** Do all date fields use the `DateInput` component to provide the AD/BS Date Switch feature?
 
 ## 6. Security & Performance
 - [ ] **Input Validation:** Ensure all inputs are validated both on the frontend and the database level.
@@ -44,6 +45,7 @@ Review this checklist before starting the development of any new feature or page
 - [ ] **Happy Path:** Does the main flow work as expected?
 - [ ] **Error Path:** Does the system gracefully handle intentional errors or bad inputs?
 - [ ] **Cross-tenant Isolation:** Confirm that a user in Company A absolutely cannot access Company B's data via this new feature.
+- [ ] **Syntax & Compiler Check:** Have you verified that there are no stray JSX tags, unclosed components, or duplicate imports? (Always check the compiler/bundler output for parsing errors after code edits).
 
 ## 8. Implementation Plan Generation
 - [ ] Use the answers to the above questions to formulate a comprehensive step-by-step **Implementation Plan** before writing code.

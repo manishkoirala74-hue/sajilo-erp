@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import PageHeader from '@/components/shared/PageHeader';
 import DataTable from '@/components/shared/DataTable';
 import StatusBadge from '@/components/shared/StatusBadge';
+import DateInput from '@/components/shared/DateInput';
 
 const empty = {
   scheme_name: '', discount_type: 'Percentage', discount_value: 0,
@@ -239,11 +240,11 @@ export default function DiscountSchemes() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label>Valid From</Label>
-                <Input type="date" value={form.valid_from} onChange={e => f('valid_from', e.target.value)} />
+                <DateInput value={form.valid_from} onChange={val => f('valid_from', val)} />
               </div>
               <div>
                 <Label>Valid Until</Label>
-                <Input type="date" value={form.valid_until} onChange={e => f('valid_until', e.target.value)} />
+                <DateInput value={form.valid_until} onChange={val => f('valid_until', val)} />
               </div>
             </div>
 

@@ -57,6 +57,8 @@ export default function SalesInvoices() {
   const [form, setForm] = useState(emptySI);
   const [saving, setSaving] = useState(false);
   const [filterStatus, setFilterStatus] = useState('all');
+  const [showNegativeStockWarning, setShowNegativeStockWarning] = useState(false);
+  const [negativeStockItems, setNegativeStockItems] = useState([]);
 
   // Cancel dialog state
   const [cancelTarget, setCancelTarget] = useState(null);
@@ -231,7 +233,7 @@ export default function SalesInvoices() {
     return invoices.some(inv => inv.invoice_number === invoiceNumber && inv.id !== excludeId);
   };
 
-  const handleSave = async (postStatus = 'Draft') => {
+  const handleSave = async (postStatus = 'Draft', skipStockCheck = false) => {
     if (form.payment_mode === 'Credit' && !form.customer_name) { toast.error('Select a customer'); return; }
     if (['Cash', 'Bank'].includes(form.payment_mode) && !form.cash_bank_account_id) { toast.error('Select a Cash/Bank ledger account'); return; }
     if (!form.invoice_number) { toast.error('Invoice number is required'); return; }
@@ -253,6 +255,34 @@ export default function SalesInvoices() {
         }
         setDupWarning(false);
         setPendingPostStatus(null);
+      }
+    }
+
+    if (postStatus === 'Posted' && settings?.negative_stock_policy === 'WARN_AND_ALLOW' && !skipStockCheck) {
+      try {
+        const itemIds = form.line_items.map(l => l.item_id).filter(Boolean);
+        if (itemIds.length > 0) {
+           const stockData = await sajilo.entities.CurrentStock.filter({ godown_id: form.godown_id, item_id: `in.(${itemIds.join(',')})` });
+           const negatives = [];
+           form.line_items.forEach(line => {
+              if (!line.item_id) return;
+              const stockRec = stockData.find(s => s.item_id === line.item_id);
+              const curQty = stockRec ? parseFloat(stockRec.current_qty) : 0;
+              const dispatchQty = parseFloat(line.quantity || 0);
+              if (curQty - dispatchQty < 0) {
+                 negatives.push({ name: line.item_name || 'Unknown Item', deficit: Math.abs(curQty - dispatchQty) });
+              }
+           });
+           
+           if (negatives.length > 0) {
+              setNegativeStockItems(negatives);
+              setPendingPostStatus(postStatus);
+              setShowNegativeStockWarning(true);
+              return;
+           }
+        }
+      } catch(e) {
+        console.error("Stock check failed", e);
       }
     }
 
@@ -861,6 +891,38 @@ export default function SalesInvoices() {
         </DialogContent>
       </Dialog>
       
+      {/* ── NEGATIVE STOCK WARNING DIALOG ── */}
+      <Dialog open={showNegativeStockWarning} onOpenChange={() => { setShowNegativeStockWarning(false); setPendingPostStatus(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <Ban className="w-5 h-5" /> Negative Stock Warning
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-2 text-sm text-muted-foreground space-y-2">
+            <p>This transaction will result in negative stock for the following items:</p>
+            <ul className="list-disc pl-5 space-y-1 text-red-600 font-medium">
+              {negativeStockItems.map((n, idx) => (
+                <li key={idx}>{n.name} (Shortfall: {n.deficit})</li>
+              ))}
+            </ul>
+            {hasAccess('inventory', 'override_negative_stock') ? (
+              <p className="mt-4 font-semibold text-foreground">Do you wish to proceed and allow negative stock?</p>
+            ) : (
+              <p className="mt-4 font-bold text-red-600">You do not have permission to override negative stock. Please contact an Inventory Manager.</p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setShowNegativeStockWarning(false); setPendingPostStatus(null); }}>Cancel</Button>
+            {hasAccess('inventory', 'override_negative_stock') && (
+              <Button className="bg-red-600 hover:bg-red-700 text-white" onClick={() => { setShowNegativeStockWarning(false); handleSave(pendingPostStatus, true); }}>
+                Acknowledge & Proceed
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <QuickPartnerCreate
         open={showCustomerCreate}
         onOpenChange={setShowCustomerCreate}

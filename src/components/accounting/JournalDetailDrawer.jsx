@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
+import DateInput from '@/components/shared/DateInput';
 
 const MODULE_COLORS = {
   Manufacturing: 'bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-400',
@@ -224,11 +225,9 @@ export default function JournalDetailDrawer({ journal, open, onClose, onRefresh 
 
             <div>
               <Label>Reversal Date</Label>
-              <Input
-                type="date"
-                className="mt-1"
+              <DateInput className="mt-1"
                 value={reverseDate}
-                onChange={e => setReverseDate(e.target.value)}
+                onChange={val => setReverseDate(val)}
               />
             </div>
 
