@@ -66,6 +66,15 @@ export async function seedDefaultChartOfAccounts() {
   const codeToId = {};
   const codeToName = {};
 
+  // Fetch existing system accounts to avoid duplicates
+  const existingAccounts = await sajilo.entities.ChartOfAccount.filter({ is_system_account: true }, 'account_code', 1000);
+  const existingMap = {};
+  if (existingAccounts && existingAccounts.length > 0) {
+    existingAccounts.forEach(acc => {
+      existingMap[acc.account_code] = acc;
+    });
+  }
+
   // Group accounts by level to satisfy foreign key dependencies
   const level0 = DEFAULT_COA.filter(a => !a.parent);
   const level1 = DEFAULT_COA.filter(a => a.parent && level0.some(p => p.code === a.parent));
@@ -76,6 +85,11 @@ export async function seedDefaultChartOfAccounts() {
 
   for (const level of levels) {
     const promises = level.map(async (acc) => {
+      if (existingMap[acc.code]) {
+        return { code: acc.code, id: existingMap[acc.code].id, name: existingMap[acc.code].account_name };
+      }
+
+      const isIncomeStatement = ['Revenue', 'Income', 'Other Income', 'Expense', 'Expenses', 'COGS', 'Cost of Sales', 'OPEX', 'Operating Expense', 'Cost of Goods Sold', 'Other Expense'].includes(acc.type);
       const payload = {
         account_code: acc.code,
         account_name: acc.name,
@@ -83,6 +97,7 @@ export async function seedDefaultChartOfAccounts() {
         account_subtype: acc.subtype,
         ledger_type: acc.ledger_type,
         normal_balance: acc.balance,
+        financial_statement: isIncomeStatement ? 'income_statement' : 'balance_sheet',
         is_active: true,
         is_system_account: true,
         current_balance: 0,

@@ -13,7 +13,7 @@ interface SettingsState {
 export const DEFAULT_SETTINGS = {
   company_name: 'My Company', currency: 'NPR', address: '', phone: '', email: '',
   tax_id: '', vat_rate: 13, tax_charge_type: 'Exclusive', default_payment_term_days: 30,
-  fiscal_year_start: '2026-04-01', date_format: 'AD',
+  fiscal_year_start: '2026-04-01', date_format: 'AD', display_bs_date: false,
   enable_purchase_orders: true, enable_approvals: true, approval_limit_amount: 50000, enable_landed_costs: false,
   item_image_max_size_mb: 2, item_image_max_count: 3,
   invoice_prefix_sales: 'SI', invoice_prefix_purchase: 'PI',

@@ -7,7 +7,9 @@ import FileUpload from '@/components/shared/FileUpload';
 
 const FONT_MAP = { inter: 'Inter, sans-serif', georgia: 'Georgia, serif', mono: 'monospace' };
 
-const formatDate = (d) => d ? d.split('T')[0] : '';
+import { formatDualDateString } from '@/lib/nepaliDate';
+
+const formatDate = (d, displayBs) => d ? formatDualDateString(d.split('T')[0], displayBs) : '';
 
 export default function QuotationPrint({ quotation: q, settings: s = {}, onClose }) {
   const printRef = useRef();
@@ -59,9 +61,9 @@ export default function QuotationPrint({ quotation: q, settings: s = {}, onClose
     try {
       const pdfData = {
         ...q,
-        date: formatDate(q.quotation_date),
+        date: formatDate(q.quotation_date, s.display_bs_date),
         reference_number: q.quotation_number,
-        due_date: formatDate(q.valid_until),
+        due_date: formatDate(q.valid_until, s.display_bs_date),
         company: s,
         customer: { name: q.customer_name, email: q.customer_email, phone: q.customer_phone, address: q.customer_address },
         line_items: (q.line_items || []).map(l => ({
@@ -148,8 +150,8 @@ export default function QuotationPrint({ quotation: q, settings: s = {}, onClose
                 <div style={{ fontSize: 26, fontWeight: 800, color: accent, letterSpacing: -0.5 }}>QUOTATION</div>
                 <div style={{ marginTop: 8, fontSize: 13, lineHeight: 1.7 }}>
                   <div><span style={{ color: '#888' }}>No.: </span><strong>{q.quotation_number}</strong></div>
-                  <div><span style={{ color: '#888' }}>Date: </span>{q.quotation_date}</div>
-                  <div><span style={{ color: '#888' }}>Valid Until: </span>{q.valid_until || '—'}</div>
+                  <div><span style={{ color: '#888' }}>Date: </span>{formatDate(q.quotation_date, s.display_bs_date)}</div>
+                  <div><span style={{ color: '#888' }}>Valid Until: </span>{formatDate(q.valid_until, s.display_bs_date) || '—'}</div>
                 </div>
                 <div style={{ marginTop: 8, display: 'inline-block', padding: '3px 10px', borderRadius: 99, fontSize: 11, fontWeight: 600, background: accent + '22', color: accent, border: `1px solid ${accent}` }}>
                   {q.status}

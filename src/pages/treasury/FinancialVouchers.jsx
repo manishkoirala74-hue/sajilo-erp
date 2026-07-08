@@ -1,6 +1,9 @@
 import { useSearchParams, useLocation, useNavigate } from 'react-router-dom';
+import { useAuth } from '@/lib/AuthContext';
 import { useState, useEffect } from 'react';
 import { sajilo } from '@/api/sajiloClient';
+import DualDateDisplay from '@/components/shared/DualDateDisplay';
+import { formatDualDateString } from '@/lib/nepaliDate';
 import { toast } from 'sonner';
 import { Plus, Eye, Trash2, RotateCcw, TriangleAlert , ListChecks} from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -57,6 +60,7 @@ export default function FinancialVouchers() {
   const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
   const navigate = useNavigate();
+  const { activeCompany } = useAuth();
 
   useEffect(() => {
     const viewId = searchParams.get('view');
@@ -781,7 +785,7 @@ export default function FinancialVouchers() {
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div><span className="text-muted-foreground">Type:</span> <strong>{selected.voucher_type}</strong></div>
-                  <div><span className="text-muted-foreground">Date:</span> <strong>{selected.voucher_date}</strong></div>
+                  <div><span className="text-muted-foreground">Date:</span> <strong><DualDateDisplay date={selected.voucher_date} /></strong></div>
                   <div><span className="text-muted-foreground">Contact:</span> <strong>{selected.contact_name || '—'}</strong></div>
                   <div><span className="text-muted-foreground">Created:</span> <strong>{selected.created_at ? new Date(selected.created_at).toLocaleString() : '—'}</strong></div>
                   <div><span className="text-muted-foreground">Mode:</span> <strong>{selected.payment_mode}</strong></div>
@@ -833,16 +837,43 @@ export default function FinancialVouchers() {
                         doc.setTextColor(100, 100, 100);
                         doc.text(selected.voucher_number, margin, margin + 25);
                         
-                        // Right side
+                        // Right side - Company Details
                         doc.setFont('helvetica', 'bold');
                         doc.setTextColor(40, 40, 40);
-                        const rightText = settings?.company_name || 'Company Name';
+                        const companyObj = activeCompany || settings || {};
+                        const rightText = companyObj.name || companyObj.company_name || 'Company Name';
                         doc.text(rightText, pageWidth - margin - doc.getTextWidth(rightText), margin + 10);
                         
-                        // Details
-                        let currentY = margin + 60;
+                        doc.setFont('helvetica', 'normal');
                         doc.setFontSize(10);
-                        doc.text(`Date: ${selected.voucher_date}`, margin, currentY);
+                        doc.setTextColor(100, 100, 100);
+                        let compY = margin + 22;
+                        if (companyObj.address) {
+                          doc.text(companyObj.address, pageWidth - margin - doc.getTextWidth(companyObj.address), compY);
+                          compY += 12;
+                        }
+                        if (companyObj.email) {
+                          doc.text(companyObj.email, pageWidth - margin - doc.getTextWidth(companyObj.email), compY);
+                          compY += 12;
+                        }
+                        if (companyObj.phone) {
+                          doc.text(companyObj.phone, pageWidth - margin - doc.getTextWidth(companyObj.phone), compY);
+                          compY += 12;
+                        }
+                        if (companyObj.tax_number || companyObj.vat_number) {
+                          const vatText = `VAT/TAX No: ${companyObj.tax_number || companyObj.vat_number}`;
+                          doc.text(vatText, pageWidth - margin - doc.getTextWidth(vatText), compY);
+                        }
+
+                        doc.setTextColor(40, 40, 40);
+                        
+                        // Details
+                        let currentY = Math.max(margin + 60, compY + 20);
+                        doc.setFontSize(10);
+                        // Note: Using settings?.display_bs_date if DateFormatContext is not easily available in this callback
+                        const displayBs = settings?.display_bs_date || false;
+                        const formattedDate = formatDualDateString(selected.voucher_date, displayBs);
+                        doc.text(`Date: ${formattedDate}`, margin, currentY);
                         doc.text(`Type: ${selected.voucher_type}`, margin, currentY + 15);
                         if (selected.contact_name) {
                           doc.text(`Contact: ${selected.contact_name}`, margin, currentY + 30);

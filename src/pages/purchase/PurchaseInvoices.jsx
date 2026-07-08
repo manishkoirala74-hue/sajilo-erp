@@ -14,6 +14,7 @@ import LineItemsEditor from '@/components/invoices/LineItemsEditor';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import DateInput from '@/components/shared/DateInput';
+import DualDateDisplay from '@/components/shared/DualDateDisplay';
 import { checkoutPurchaseInvoice, loadItemsMap, loadSettings } from '@/lib/glPostingService';
 import { computeTotalTax, loadActiveTaxTypes } from '@/lib/taxService';
 import { useSajiloSync } from '@/hooks/useSajiloSync';
@@ -173,7 +174,7 @@ export default function PurchaseInvoices() {
   };
 
   const handleSave = async (postStatus = 'Draft') => {
-    if (form.payment_mode === 'Credit' && !form.vendor_name) { toast.error('Select a vendor'); return; }
+    if (form.payment_mode === 'Credit' && !form.vendor_id) { toast.error('Select a vendor'); return; }
     if (['Cash', 'Bank'].includes(form.payment_mode) && !form.cash_bank_account_id) { toast.error('Select a Cash/Bank ledger account'); return; }
     if (!form.grand_total || form.grand_total <= 0) { toast.error('Total amount cannot be empty or zero'); return; }
     if (settings?.enable_godown_management && !form.godown_id) { toast.error('Godown / Location is required'); return; }
@@ -569,9 +570,9 @@ export default function PurchaseInvoices() {
             <div className="space-y-4 mt-2">
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <div><span className="text-muted-foreground">Vendor:</span> <span className="font-medium">{viewDetail.vendor_name}</span></div>
-                <div><span className="text-muted-foreground">Date:</span> <span className="font-medium">{viewDetail.invoice_date}</span></div>
+                <div><span className="text-muted-foreground">Date:</span> <span className="font-medium"><DualDateDisplay date={viewDetail.invoice_date} /></span></div>
                 <div><span className="text-muted-foreground">Created:</span> <span className="font-medium">{viewDetail.created_at ? new Date(viewDetail.created_at).toLocaleString() : '-'}</span></div>
-                <div><span className="text-muted-foreground">Due Date:</span> <span className="font-medium">{viewDetail.due_date}</span></div>
+                <div><span className="text-muted-foreground">Due Date:</span> <span className="font-medium"><DualDateDisplay date={viewDetail.due_date} /></span></div>
                 <div><span className="text-muted-foreground">Payment:</span> <StatusBadge status={viewDetail.payment_status} /></div>
                 <div><span className="text-muted-foreground">Subtotal:</span> <span className="font-medium">NPR {Number(viewDetail.subtotal).toLocaleString()}</span></div>
                 <div><span className="text-muted-foreground">VAT:</span> <span className="font-medium">NPR {Number(viewDetail.vat_amount).toLocaleString()}</span></div>

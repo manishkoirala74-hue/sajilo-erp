@@ -131,3 +131,34 @@ export function formatBSISO(bsDate) {
   if (!bsDate) return '';
   return `${bsDate.year}-${String(bsDate.month).padStart(2,'0')}-${String(bsDate.day).padStart(2,'0')}`;
 }
+
+export function formatToDmyAD(dateStr) {
+  if (!dateStr) return '';
+  const date = new Date(dateStr);
+  if (isNaN(date.getTime())) return '';
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${d}/${m}/${y}`;
+}
+
+export function formatToDmyBS(dateStr) {
+  if (!dateStr) return '';
+  const date = new Date(dateStr);
+  if (isNaN(date.getTime())) return '';
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  const localAdStr = `${y}-${m}-${d}`;
+  
+  const bsDate = adToBS(localAdStr);
+  if (!bsDate) return '';
+  return `${String(bsDate.day).padStart(2, '0')}/${String(bsDate.month).padStart(2, '0')}/${bsDate.year}`;
+}
+
+export const formatDualDateString = (dateStr, showBS = true) => {
+  if (!dateStr) return '';
+  const adString = `${formatToDmyAD(dateStr)} AD`;
+  if (!showBS) return adString;
+  return `${adString} / ${formatToDmyBS(dateStr)} BS`;
+};

@@ -3,23 +3,28 @@
  * Features arbitrary B.S. date input (day + month + year), column toggles, view switches.
  */
 import { useState, useEffect } from 'react';
-import { Filter, ChevronDown, ChevronUp, Eye, RefreshCw } from 'lucide-react';
+import { Filter, ChevronDown, ChevronUp, Eye, RefreshCw, Calendar } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { adToBS, bsToAD, BS_MONTHS, isValidBSDate } from '@/lib/nepaliDate';
+import { useDateFormat } from '@/lib/DateFormatContext';
 
 const BS_YEARS = [2078, 2079, 2080, 2081, 2082, 2083, 2084, 2085];
 
 // ── Arbitrary BS Date Picker (day + month + year) ─────────────────────────────
 export function BSDatePicker({ label, adValue, onChange }) {
+  const { displayBsDate, dateFormat } = useDateFormat();
   const init = adValue ? adToBS(adValue) : null;
 
+  const [mode, setMode] = useState(dateFormat);
   const [year,  setYear]  = useState(init?.year  || 2082);
   const [month, setMonth] = useState(init?.month || 1);
   const [day,   setDay]   = useState(init?.day   || 1);
   const [error, setError] = useState('');
+
+  useEffect(() => { setMode(dateFormat); }, [dateFormat]);
 
   // Keep local state in sync when adValue changes externally
   useEffect(() => {
@@ -54,10 +59,40 @@ export function BSDatePicker({ label, adValue, onChange }) {
     onChange(ad);
   };
 
+  const toggleMode = () => setMode(m => m === 'AD' ? 'BS' : 'AD');
+  const effectiveMode = displayBsDate ? mode : 'AD';
+
+  if (effectiveMode === 'AD') {
+    return (
+      <div className="flex flex-col gap-1 min-w-[200px]">
+        <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{label} (A.D.)</Label>
+        <div className="flex items-center gap-1">
+          <input
+            type="date"
+            value={adValue || ''}
+            onChange={e => onChange(e.target.value)}
+            className="h-8 rounded-md border border-input bg-card px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring flex-1"
+          />
+          {displayBsDate && (
+            <button
+              type="button"
+              onClick={toggleMode}
+              title="Switch to Nepali (BS)"
+              className="flex items-center gap-1 px-2 py-1.5 rounded-md border border-input bg-muted/50 hover:bg-muted text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors shrink-0 h-8"
+            >
+              <Calendar className="w-3 h-3" />
+              AD
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-1 min-w-[200px]">
       <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{label} (B.S.)</Label>
-      <div className="flex gap-1">
+      <div className="flex items-center gap-1">
         {/* Day */}
         <input
           type="number" min={1} max={maxDays} value={day}
@@ -65,7 +100,6 @@ export function BSDatePicker({ label, adValue, onChange }) {
           className="w-14 h-8 rounded-md border border-input bg-card px-2 text-xs text-center focus:outline-none focus:ring-1 focus:ring-ring tabular-nums"
           placeholder="DD"
         />
-        {/* Month */}
         {/* Month */}
         <Select
           value={String(month)}
@@ -83,13 +117,22 @@ export function BSDatePicker({ label, adValue, onChange }) {
           value={String(year)}
           onValueChange={v => { const y = Number(v); setYear(y); commit(y, month, day); }}
         >
-          <SelectTrigger className="h-8 w-20 bg-card px-2 text-xs">
+          <SelectTrigger className="h-8 w-24 bg-card px-2 text-xs">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
             {BS_YEARS.map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
           </SelectContent>
         </Select>
+        <button
+          type="button"
+          onClick={toggleMode}
+          title="Switch to English (AD)"
+          className="flex items-center gap-1 px-2 py-1.5 rounded-md border border-input bg-muted/50 hover:bg-muted text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors shrink-0 h-8"
+        >
+          <Calendar className="w-3 h-3" />
+          BS
+        </button>
       </div>
       {error
         ? <span className="text-xs text-destructive">{error}</span>

@@ -4,6 +4,7 @@ import SettingPageLayout from '../components/SettingPageLayout';
 import { useSettingsStore } from '@/store/settingsStore';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 
 const RegionalSettings = () => {
@@ -46,6 +47,17 @@ const RegionalSettings = () => {
                 <SelectItem value="BS">BS — Nepali (Bikram Sambat)</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+          <div className="flex flex-col gap-2">
+            <Label className="text-foreground">Display Dual Dates (AD & BS)</Label>
+            <p className="text-xs text-muted-foreground mb-2">Show BS date alongside AD across reports, tables, and PDFs.</p>
+            <div className="flex items-center gap-2">
+              <Switch 
+                checked={!!draftSettings.display_bs_date}
+                onCheckedChange={v => updateDraftSettings({ display_bs_date: v })}
+              />
+              <span className="text-sm font-medium">{draftSettings.display_bs_date ? 'Enabled' : 'Disabled'}</span>
+            </div>
           </div>
         </div>
       </div>

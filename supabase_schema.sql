@@ -180,6 +180,7 @@ CREATE TABLE IF NOT EXISTS "CompanySettings" (
   "approval_limit_amount" NUMERIC DEFAULT 50000,
   "enable_landed_costs" BOOLEAN DEFAULT false,
   "date_format" TEXT DEFAULT 'AD',
+  "display_bs_date" BOOLEAN DEFAULT false,
   "item_image_max_size_mb" NUMERIC DEFAULT 2,
   "item_image_max_count" INTEGER DEFAULT 3,
   "invoice_prefix_sales" TEXT DEFAULT 'SI',

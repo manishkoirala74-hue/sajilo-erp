@@ -1,6 +1,7 @@
 import { useSearchParams, useLocation, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { sajilo } from '@/api/sajiloClient';
+import DualDateDisplay from '@/components/shared/DualDateDisplay';
 import { Plus, Eye, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -279,8 +280,8 @@ export default function SalesOrders() {
             <div className="space-y-4 mt-2">
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <div><span className="text-muted-foreground">Customer:</span> <span className="font-medium">{viewDetail.customer_name}</span></div>
-                <div><span className="text-muted-foreground">Date:</span> <span className="font-medium">{viewDetail.order_date}</span></div>
-                <div><span className="text-muted-foreground">Expected Delivery:</span> <span className="font-medium">{viewDetail.expected_delivery_date || '-'}</span></div>
+                <div><span className="text-muted-foreground">Date:</span> <span className="font-medium"><DualDateDisplay date={viewDetail.order_date} /></span></div>
+                <div><span className="text-muted-foreground">Expected Delivery:</span> <span className="font-medium">{viewDetail.expected_delivery_date ? <DualDateDisplay date={viewDetail.expected_delivery_date} /> : '-'}</span></div>
                 <div><span className="text-muted-foreground">Subtotal:</span> <span className="font-medium">NPR {Number(viewDetail.subtotal).toLocaleString()}</span></div>
                 <div><span className="text-muted-foreground">Tax:</span> <span className="font-medium">NPR {Number(viewDetail.vat_amount).toLocaleString()}</span></div>
                 <div className="col-span-2"><span className="text-muted-foreground">Grand Total:</span> <span className="font-bold text-primary text-base"> NPR {Number(viewDetail.total_amount).toLocaleString()}</span></div>

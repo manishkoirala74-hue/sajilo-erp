@@ -14,6 +14,7 @@ import LineItemsEditor from '@/components/invoices/LineItemsEditor';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import DateInput from '@/components/shared/DateInput';
+import DualDateDisplay from '@/components/shared/DualDateDisplay';
 import { checkoutSalesInvoice, loadItemsMap, loadSettings } from '@/lib/glPostingService';
 import { loadActiveTaxTypes, computeTotalTax } from '@/lib/taxService';
 import { useSajiloSync } from '@/hooks/useSajiloSync';
@@ -744,9 +745,9 @@ export default function SalesInvoices() {
             <div className="space-y-4 mt-2">
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <div><span className="text-muted-foreground">Customer:</span> <span className="font-medium">{viewDetail.customer_name}</span></div>
-                <div><span className="text-muted-foreground">Date:</span> <span className="font-medium">{viewDetail.invoice_date}</span></div>
+                <div><span className="text-muted-foreground">Date:</span> <span className="font-medium"><DualDateDisplay date={viewDetail.invoice_date} /></span></div>
                 <div><span className="text-muted-foreground">Created:</span> <span className="font-medium">{viewDetail.created_at ? new Date(viewDetail.created_at).toLocaleString() : '-'}</span></div>
-                <div><span className="text-muted-foreground">Due Date:</span> <span className="font-medium">{viewDetail.due_date}</span></div>
+                <div><span className="text-muted-foreground">Due Date:</span> <span className="font-medium"><DualDateDisplay date={viewDetail.due_date} /></span></div>
                 <div><span className="text-muted-foreground">Payment:</span> <StatusBadge status={viewDetail.payment_status} /></div>
                 <div><span className="text-muted-foreground">Subtotal:</span> <span className="font-medium">NPR {Number(viewDetail.goods_subtotal).toLocaleString()}</span></div>
                 <div><span className="text-muted-foreground">Tax:</span> <span className="font-medium">NPR {Number(viewDetail.total_tax_amount).toLocaleString()}</span></div>

@@ -16,7 +16,7 @@ import { useDateFormat } from '@/lib/DateFormatContext';
 import { cn } from '@/lib/utils';
 
 export default function DateInput({ value, onChange, label, className, disabled }) {
-  const { dateFormat } = useDateFormat();
+  const { dateFormat, displayBsDate } = useDateFormat();
   const [mode, setMode] = useState(dateFormat);
 
   // Sync mode when global format changes
@@ -59,8 +59,9 @@ export default function DateInput({ value, onChange, label, className, disabled 
   };
 
   const bsDisplay = value ? adToBS(value) : null;
-  const alternateText = mode === 'AD'
-    ? (bsDisplay ? `BS: ${formatBS(bsDisplay)}` : '')
+  const effectiveMode = displayBsDate ? mode : 'AD';
+  const alternateText = effectiveMode === 'AD'
+    ? (displayBsDate && bsDisplay ? `BS: ${formatBS(bsDisplay)}` : '')
     : (value ? `AD: ${formatAD(value)}` : (bsText.length === 10 && (() => { const p = bsText.split('-').map(Number); return !isValidBSDate(p[0],p[1],p[2]); })() ? '⚠ Invalid BS date' : ''));
 
   return (
@@ -77,7 +78,7 @@ export default function DateInput({ value, onChange, label, className, disabled 
         )}
       </div>
       <div className="flex items-center gap-1">
-        {mode === 'AD' ? (
+        {effectiveMode === 'AD' ? (
           <Input
             type="date"
             value={value || ''}
@@ -99,15 +100,17 @@ export default function DateInput({ value, onChange, label, className, disabled 
             )}
           />
         )}
-        <button
-          type="button"
-          onClick={toggleMode}
-          title={mode === 'AD' ? 'Switch to Nepali (BS)' : 'Switch to English (AD)'}
-          className="flex items-center gap-1 px-2 py-1.5 rounded-md border border-input bg-muted/50 hover:bg-muted text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors shrink-0"
-        >
-          <Calendar className="w-3 h-3" />
-          {mode}
-        </button>
+        {displayBsDate && (
+          <button
+            type="button"
+            onClick={toggleMode}
+            title={mode === 'AD' ? 'Switch to Nepali (BS)' : 'Switch to English (AD)'}
+            className="flex items-center gap-1 px-2 py-1.5 rounded-md border border-input bg-muted/50 hover:bg-muted text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors shrink-0"
+          >
+            <Calendar className="w-3 h-3" />
+            {mode}
+          </button>
+        )}
       </div>
     </div>
   );

@@ -8,7 +8,7 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { sajilo } from '@/api/sajiloClient';
 import { toast } from 'sonner';
-import { Lock, Search, ChevronRight } from 'lucide-react';
+import { Lock, Search, ChevronRight, Settings2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { adToBS, bsToAD, BS_MONTHS, isValidBSDate, formatBS } from '@/lib/nepaliDate';
 import DateInput from '@/components/shared/DateInput';
@@ -82,7 +82,12 @@ function DatePickerWithToggle({ value, onChange, label }) {
 const ACCOUNT_TYPES = ['Asset', 'Liability', 'Equity', 'Revenue', 'Expense', 'COGS', 'OPEX'];
 
 const suggestNormalBalance = (type) =>
-  ['Asset', 'COGS', 'OPEX', 'Cost of Goods Sold', 'Expense'].includes(type) ? 'Debit' : 'Credit';
+  ['Asset', 'COGS', 'Cost of Sales', 'OPEX', 'Operating Expense', 'Cost of Goods Sold', 'Expense', 'Expenses', 'Other Expense'].includes(type) ? 'Debit' : 'Credit';
+
+const suggestFinancialStatement = (type) =>
+  ['Revenue', 'Income', 'Other Income', 'Expense', 'Expenses', 'COGS', 'Cost of Sales', 'OPEX', 'Operating Expense', 'Cost of Goods Sold', 'Other Expense'].includes(type)
+    ? 'income_statement'
+    : 'balance_sheet';
 
 // ── Flat searchable group picker ───────────────────────────────────────────────
 function GroupPicker({ groups, value, onChange }) {
@@ -151,6 +156,7 @@ export default function AccountFormModal({ open, onClose, account, parentAccount
 
   const [form,   setForm]   = useState({});
   const [saving, setSaving] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   // Flatten all Group Ledgers with depth for display
   const allGroups = useMemo(() => {
@@ -189,6 +195,7 @@ export default function AccountFormModal({ open, onClose, account, parentAccount
         account_subtype:    '',
         ledger_type:        'Sub Ledger',
         normal_balance:     suggestNormalBalance(parentType),
+        financial_statement: suggestFinancialStatement(parentType),
         parent_account_id:  defaultParent?.id   || '',
         parent_account_name: defaultParent?.account_name || '',
         ifrs_reference:     '',
@@ -213,6 +220,7 @@ export default function AccountFormModal({ open, onClose, account, parentAccount
     if (parent?.account_type) {
       set('account_type', parent.account_type);
       set('normal_balance', suggestNormalBalance(parent.account_type));
+      set('financial_statement', suggestFinancialStatement(parent.account_type));
     }
     // Auto-suggest code
     if (!parentId || !parent?.account_code) return;
@@ -341,7 +349,7 @@ export default function AccountFormModal({ open, onClose, account, parentAccount
                 <Label>Account Type *</Label>
                 <Select
                   value={form.account_type || undefined}
-                  onValueChange={v => { set('account_type', v); set('normal_balance', suggestNormalBalance(v)); }}
+                  onValueChange={v => { set('account_type', v); set('normal_balance', suggestNormalBalance(v)); set('financial_statement', suggestFinancialStatement(v)); }}
                 >
                   <SelectTrigger className="mt-1 w-full h-9 bg-background text-sm">
                     <SelectValue placeholder="Select type" />
@@ -352,6 +360,53 @@ export default function AccountFormModal({ open, onClose, account, parentAccount
                 </Select>
               </div>
             </div>
+
+            {/* Advanced Settings Toggle */}
+            <div className="pt-1">
+              <button 
+                type="button" 
+                onClick={() => setShowAdvanced(!showAdvanced)}
+                className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <Settings2 className="w-3.5 h-3.5" />
+                {showAdvanced ? 'Hide Advanced Settings' : 'Show Advanced Settings'}
+              </button>
+            </div>
+            
+            {showAdvanced && (
+              <div className="grid grid-cols-2 gap-3 p-3 bg-muted/30 border border-border rounded-md mt-1">
+                <div>
+                  <Label className="text-xs">Financial Statement</Label>
+                  <Select
+                    value={form.financial_statement || 'balance_sheet'}
+                    onValueChange={v => set('financial_statement', v)}
+                  >
+                    <SelectTrigger className="mt-1 h-8 text-xs bg-background">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="balance_sheet">Balance Sheet</SelectItem>
+                      <SelectItem value="income_statement">Income Statement</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-xs">Normal Balance</Label>
+                  <Select
+                    value={form.normal_balance || 'Debit'}
+                    onValueChange={v => set('normal_balance', v)}
+                  >
+                    <SelectTrigger className="mt-1 h-8 text-xs bg-background">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Debit">Debit</SelectItem>
+                      <SelectItem value="Credit">Credit</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
 
             {/* Under (parent group) */}
             <div>

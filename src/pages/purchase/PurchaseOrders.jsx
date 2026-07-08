@@ -14,6 +14,7 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 import ItemPurchaseHistory from '@/components/purchase/ItemPurchaseHistory';
 import DateInput from '@/components/shared/DateInput';
+import DualDateDisplay from '@/components/shared/DualDateDisplay';
 import { useSajiloSync } from '@/hooks/useSajiloSync';
 import { loadActiveTaxTypes, computeTotalTax } from '@/lib/taxService';
 import SearchableSelect from '@/components/shared/SearchableSelect';
@@ -307,7 +308,7 @@ export default function PurchaseOrders() {
               <div className="grid grid-cols-2 gap-4 bg-muted/30 rounded-lg p-4">
                 <div><p className="text-xs text-muted-foreground">Vendor</p><p className="font-medium">{viewDetail.vendor_name}</p></div>
                 <div><p className="text-xs text-muted-foreground">Status</p><StatusBadge status={viewDetail.status} /></div>
-                <div><p className="text-xs text-muted-foreground">Order Date</p><p className="font-medium">{viewDetail.order_date}</p></div>
+                <div><p className="text-xs text-muted-foreground">Order Date</p><p className="font-medium"><DualDateDisplay date={viewDetail.order_date} /></p></div>
                 <div><p className="text-xs text-muted-foreground">Created</p><p className="font-medium">{viewDetail.created_at ? new Date(viewDetail.created_at).toLocaleString() : '—'}</p></div>
                 <div><p className="text-xs text-muted-foreground">Grand Total</p><p className="font-bold text-lg">NPR {Number(viewDetail.total_amount).toLocaleString()}</p></div>
               </div>

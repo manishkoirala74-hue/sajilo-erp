@@ -12,7 +12,7 @@ import GlobalSearch from './GlobalSearch';
 
 export default function Topbar({ pageTitle, onMenuClick }) {
   const { user, logout } = useAuth();
-  const { dateFormat, toggleDateFormat } = useDateFormat();
+  const { dateFormat, toggleDateFormat, displayBsDate } = useDateFormat();
   const { theme, resolvedTheme, toggleTheme } = useTheme();
 
   return (
@@ -31,15 +31,17 @@ export default function Topbar({ pageTitle, onMenuClick }) {
         <GlobalSearch />
 
         {/* AD/BS Date Toggle */}
-        <button
-          onClick={toggleDateFormat}
-          className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-input bg-muted/50 hover:bg-muted text-xs font-bold transition-colors"
-          title="Toggle date format between AD and BS"
-        >
-          <span className={dateFormat === 'AD' ? 'text-primary' : 'text-muted-foreground'}>AD</span>
-          <span className="text-muted-foreground">/</span>
-          <span className={dateFormat === 'BS' ? 'text-primary' : 'text-muted-foreground'}>BS</span>
-        </button>
+        {displayBsDate && (
+          <button
+            onClick={toggleDateFormat}
+            className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-input bg-muted/50 hover:bg-muted text-xs font-bold transition-colors"
+            title="Toggle date format between AD and BS"
+          >
+            <span className={dateFormat === 'AD' ? 'text-primary' : 'text-muted-foreground'}>AD</span>
+            <span className="text-muted-foreground">/</span>
+            <span className={dateFormat === 'BS' ? 'text-primary' : 'text-muted-foreground'}>BS</span>
+          </button>
+        )}
 
         {/* Theme Toggle */}
         <Button variant="ghost" size="icon" onClick={toggleTheme} className="relative">

@@ -1,5 +1,6 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { formatDualDateString } from '@/lib/nepaliDate';
 
 /**
  * Generates a PDF document purely on the client side using jsPDF.
@@ -117,16 +118,24 @@ export const generatePDF = async (data, layoutConfig = {}) => {
     }
   }
 
-  // Document Details (Right)
+  // -- 2. Customer Section --
+  let displayBsDate = false;
+  if (layoutConfig && layoutConfig.display_bs_date !== undefined) {
+    displayBsDate = layoutConfig.display_bs_date;
+  } else if (data.company && data.company.display_bs_date !== undefined) {
+    displayBsDate = data.company.display_bs_date;
+  }
+
   startY += 10;
   doc.setFontSize(config.fontSizeBody);
-  doc.text(`Date: ${data.date || new Date().toLocaleDateString()}`, 190, startY, { align: 'right' });
+  const formattedDate = formatDualDateString(data.date || new Date().toISOString(), displayBsDate);
+  doc.text(`Date: ${formattedDate}`, 190, startY, { align: 'right' });
   doc.text(`Reference: ${data.reference_number || 'N/A'}`, 190, startY + 6, { align: 'right' });
   if (config.showDueDate && data.due_date) {
-    doc.text(`Due Date: ${data.due_date}`, 190, startY + 12, { align: 'right' });
+    const formattedDueDate = formatDualDateString(data.due_date, displayBsDate);
+    doc.text(`Due Date: ${formattedDueDate}`, 190, startY + 12, { align: 'right' });
   }
   
-  // -- 2. Customer Section --
   startY += 30;
   doc.setFont(config.fontFamily, 'bold');
   doc.text('Bill To:', 14, startY);

@@ -76,7 +76,7 @@ export async function fetchReportData(reportId, fromDate, toDate, extraParams = 
 
       const allAccounts = all.map(a => {
         const r = tbMap[a.id] || { current_debit: 0, current_credit: 0 };
-        const isDebitNormal = ['Asset', 'Cost of Sales', 'COGS', 'Expense', 'Expenses', 'OPEX', 'Operating Expense', 'Other Expense'].includes(a.account_type);
+        const isDebitNormal = (a.normal_balance || '').toLowerCase() === 'debit';
         const base_ob = Number(a.opening_balance || 0);
         const isBaseObDr = (a.opening_balance_type || (isDebitNormal ? 'Dr' : 'Cr')) === 'Dr';
         let ob_dr = 0, ob_cr = 0;
@@ -87,9 +87,9 @@ export async function fetchReportData(reportId, fromDate, toDate, extraParams = 
         return { ...a, balance: bal };
       });
 
-      const isIncomeStatement = a => ['Revenue', 'Income', 'Other Income', 'Expense', 'Expenses', 'COGS', 'Cost of Sales', 'OPEX', 'Operating Expense', 'Other Expense'].includes(a.account_type);
+      const isIncomeStatement = a => a.financial_statement === 'income_statement';
       const netIncome = allAccounts.filter(isIncomeStatement).reduce((sum, a) => {
-        const isExpense = ['Expense', 'Expenses', 'COGS', 'Cost of Sales', 'OPEX', 'Operating Expense', 'Other Expense'].includes(a.account_type);
+        const isExpense = (a.normal_balance || '').toLowerCase() === 'debit';
         return isExpense ? sum - a.balance : sum + a.balance;
       }, 0);
 
