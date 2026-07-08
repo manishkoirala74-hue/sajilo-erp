@@ -17,6 +17,8 @@ import SearchableSelect from '@/components/shared/SearchableSelect';
 import VoucherLink from '@/components/shared/VoucherLink';
 import CommunicationModal from '@/components/shared/CommunicationModal';
 import { Mail } from 'lucide-react';
+import { useDateFormat } from '@/lib/DateFormatContext';
+import { adToBS, formatBS } from '@/lib/nepaliDate';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function fmtNPR(n) {
@@ -49,6 +51,7 @@ const DEFAULT_FILTERS = {
   showOpeningBalance: true,
   showClosingBalance: true,
   showTransactions:   true,
+  showBsDate:         false,
 };
 
 const filterCache = {};
@@ -347,76 +350,62 @@ function TrialBalanceReport({ initialData, initialFromDate, initialToDate, initi
 // ── Generic partner report (AR / AP) with metadata column picker ──────────────
 
 function CashFlowReport({ initialFromDate, initialToDate }) {
-  const [filters, setFilters] = useCachedFilters('cash_flow', { ...DEFAULT_FILTERS, fromDate: initialFromDate, toDate: initialToDate });
+  const { displayBsDate } = useDateFormat();
+  const [filters, setFilters] = useCachedFilters('cash_flow', { ...DEFAULT_FILTERS, showBsDate: displayBsDate, fromDate: initialFromDate, toDate: initialToDate });
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
 
+  const [hasLoaded, setHasLoaded] = useCachedState('cash_flow_hasLoaded', false);
+
   const load = useCallback(async () => {
+    setHasLoaded(true);
     setLoading(true);
     try {
-      // Direct Method Cashflow: Analyze Journals hitting Cash/Bank accounts
-      const journals = await sajilo.entities.GeneralLedgerJournal.list('-entry_date', 5000);
-      const lines = await sajilo.entities.GeneralLedgerLine.list('', 10000); // Need scalable way in future
-      const accounts = await sajilo.entities.ChartOfAccount.list('', 1000);
-
-      const cashAccounts = accounts.filter(a => a.account_type === 'Cash' || a.account_type === 'Bank');
-      const cashAccIds = new Set(cashAccounts.map(a => a.id));
-
-      let inflows = 0;
-      let outflows = 0;
-      const details = [];
-
-      journals.filter(j => j.status === 'Posted' && j.entry_date >= filters.fromDate && j.entry_date <= filters.toDate).forEach(j => {
-        const jLines = lines.filter(l => l.journal_id === j.id);
-        const cashLines = jLines.filter(l => cashAccIds.has(l.account_id));
-        if (cashLines.length === 0) return;
-
-        // In Direct method, we look at the net change in cash for this journal
-        const netCash = cashLines.reduce((s, l) => s + (l.debit_amount || 0) - (l.credit_amount || 0), 0);
-        
-        if (netCash > 0) {
-          inflows += netCash;
-          details.push({ date: j.entry_date, type: 'Inflow', ref: j.voucher_no, desc: j.description, amount: netCash });
-        } else if (netCash < 0) {
-          outflows += Math.abs(netCash);
-          details.push({ date: j.entry_date, type: 'Outflow', ref: j.voucher_no, desc: j.description, amount: Math.abs(netCash) });
-        }
-      });
-
-      setData({ inflows, outflows, netCashFlow: inflows - outflows, details });
+      const { fetchReportData } = await import('@/lib/reportDataFetcher');
+      const data = await fetchReportData('cash_flow', filters.fromDate, filters.toDate);
+      setData(data);
     } catch (e) {
       console.error(e);
     }
     setLoading(false);
   }, [filters.fromDate, filters.toDate]);
 
-  useEffect(() => { load(); }, [load]);
-
-  if (!data) return <div className="p-8 text-center">Loading Cashflow...</div>;
-
   return (
     <div className="space-y-4">
       <div className="report-no-print">
         <ReportFilterBar filters={filters} onChange={setFilters} onApply={load} showApplyButton />
       </div>
-      <ReportTable
-        title="Cash Flow Summary (Direct Method)"
-        fromDate={filters.fromDate}
-        toDate={filters.toDate}
-        headers={['Date', 'Type', 'Voucher #', 'Description', 'Amount (NPR)']}
-        rows={data.details.map(d => [
-          d.date, 
-          d.type, 
-          <VoucherLink voucherNumber={d.ref}><span className="cursor-pointer text-primary">{d.ref}</span></VoucherLink>, 
-          d.desc, 
-          fmtNPR(d.amount)
-        ])}
-        footer={['', '', '', 'NET CASH FLOW', fmtNPR(data.netCashFlow)]}
-        onExport={() => {}}
-      />
+      {!hasLoaded ? (
+        <div className="py-16 text-center space-y-3">
+          <div className="text-4xl">📊</div>
+          <p className="text-sm font-semibold text-foreground">Select your date range and click <span className="text-primary">Apply</span> to generate.</p>
+        </div>
+      ) : loading ? (
+        <div className="py-10 text-center text-muted-foreground text-sm">Loading Cash Flow...</div>
+      ) : !data ? (
+        <div className="py-10 text-center text-muted-foreground text-sm">No data found.</div>
+      ) : (
+        <ReportTable
+          title="Cash Flow Summary (Direct Method)"
+          fromDate={filters.fromDate}
+          toDate={filters.toDate}
+          headers={['Date', ...(filters.showBsDate ? ['Date (BS)'] : []), 'Type', 'Voucher #', 'Description', 'Amount (NPR)']}
+          rows={data.details.map(d => [
+            d.date, 
+            ...(filters.showBsDate ? [d.bs_date_formatted] : []),
+            d.type, 
+            <VoucherLink voucherNumber={d.ref}><span className="cursor-pointer text-primary">{d.ref}</span></VoucherLink>, 
+            d.desc, 
+            fmtNPR(d.amount)
+          ])}
+          footer={['', ...(filters.showBsDate ? [''] : []), '', '', 'NET CASH FLOW', fmtNPR(data.netCashFlow)]}
+          onExport={() => {}}
+        />
+      )}
     </div>
   );
 }
+
 
 
 function PartnerSummaryReport({ title, mode, reportId, initialFromDate, initialToDate }) {
@@ -549,7 +538,8 @@ function PartnerSummaryReport({ title, mode, reportId, initialFromDate, initialT
 }
 
 function PartnerReport({ title, mode, initialFromDate, initialToDate }) {
-  const [filters,   setFilters]   = useCachedFilters(`partner_report_${mode}`, { ...DEFAULT_FILTERS, fromDate: initialFromDate, toDate: initialToDate });
+  const { displayBsDate } = useDateFormat();
+  const [filters,   setFilters]   = useCachedFilters(`partner_report_${mode}`, { ...DEFAULT_FILTERS, showBsDate: displayBsDate, fromDate: initialFromDate, toDate: initialToDate });
   const [partners,  setPartners]  = useCachedState(`partner_report_partners_${mode}`, []);
   const [invoices,  setInvoices]  = useCachedState(`partner_report_invoices_${mode}`, []);
   const [loading,   setLoading]   = useState(false);
@@ -568,7 +558,7 @@ function PartnerReport({ title, mode, initialFromDate, initialToDate }) {
         : sajilo.entities.PurchaseInvoice.list('-invoice_date', 2000),
     ]);
     setPartners(partnerData);
-    setInvoices(invData);
+    setInvoices(invData.map(i => ({ ...i, bs_date_formatted: adToBS(i.invoice_date || i.bill_date) ? formatBS(adToBS(i.invoice_date || i.bill_date)) : '' })));
     setLoading(false);
   }, [isAR]);
 
@@ -582,7 +572,7 @@ function PartnerReport({ title, mode, initialFromDate, initialToDate }) {
     .filter(i => i.status === 'Posted' && i.payment_status !== 'Paid')
     .filter(i => inRange(isAR ? i.invoice_date : (i.invoice_date || i.bill_date), filters.fromDate, filters.toDate));
 
-  const baseHeaders = [isAR ? 'Customer' : 'Supplier', 'Invoice #', 'Date', 'Due Date', 'Amount (NPR)', 'Days Overdue', 'Status'];
+  const baseHeaders = [isAR ? 'Customer' : 'Supplier', 'Invoice #', 'Date', ...(filters.showBsDate ? ['Date (BS)'] : []), 'Due Date', 'Amount (NPR)', 'Days Overdue', 'Status'];
   const metaHeaders = [
     ...(metaCols.phone   ? ['Contact No.'] : []),
     ...(metaCols.tax_id  ? ['PAN/TAX ID']  : []),
@@ -601,6 +591,7 @@ function PartnerReport({ title, mode, initialFromDate, initialToDate }) {
       partnerName,
       i.invoice_number || i.bill_number || '—',
       date,
+      ...(filters.showBsDate ? [i.bs_date_formatted] : []),
       due,
       fmtNPR(i.grand_total),
       days > 0 ? `${days} days` : 'Current',
@@ -1061,12 +1052,9 @@ function BalanceSheetReport({ initialData, initialFromDate, initialToDate }) {
       const balanceMap = {};
       rpcAccounts.forEach(a => { balanceMap[a.id] = a.closing_balance || 0; });
 
-      // Merge balances into Chart of Accounts (Sub Ledgers only)
+      // Merge balances natively for ALL levels (Sub Ledgers & Group Ledgers)
       const merged = allCoA.map(a => {
-        if (a.ledger_type === 'Sub Ledger') {
-          return { ...a, closing_balance: balanceMap[a.id] || 0 };
-        }
-        return a;
+        return { ...a, closing_balance: balanceMap[a.id] || 0 };
       });
 
       // Inject Current Year Earnings natively into the tree
@@ -1118,7 +1106,8 @@ function BalanceSheetReport({ initialData, initialFromDate, initialToDate }) {
 
 // ── Simple flat report with local filter ──────────────────────────────────────
 function SimpleReport({ title, reportId, initialData, initialFromDate, initialToDate, renderFn }) {
-  const [filters,   setFilters]   = useCachedFilters(`simple_report_${reportId}`, { ...DEFAULT_FILTERS, fromDate: initialFromDate, toDate: initialToDate });
+  const { displayBsDate } = useDateFormat();
+  const [filters,   setFilters]   = useCachedFilters(`simple_report_${reportId}`, { ...DEFAULT_FILTERS, showBsDate: displayBsDate, fromDate: initialFromDate, toDate: initialToDate });
   const [data,      setData]      = useCachedState(`simple_report_data_${reportId}`, initialData);
   const [loading,   setLoading]   = useState(false);
   const [hasLoaded, setHasLoaded] = useCachedState(`simple_report_hasLoaded_${reportId}`, !!initialData);
@@ -1145,14 +1134,15 @@ function SimpleReport({ title, reportId, initialData, initialFromDate, initialTo
       ) : loading ? (
         <div className="py-10 text-center text-muted-foreground text-sm">Loading…</div>
       ) : (
-        renderFn(data || [], filters.fromDate, filters.toDate)
+        renderFn(data || [], filters.fromDate, filters.toDate, filters.showBsDate)
       )}
     </div>
   );
 }
 // ── Detail General Ledger (with Account Picker) ───────────────────────────────
 function GeneralLedgerDetailReport({ initialFromDate, initialToDate }) {
-  const [filters,   setFilters]   = useCachedFilters('general_ledger_detail', { ...DEFAULT_FILTERS, fromDate: initialFromDate, toDate: initialToDate, accountId: '' });
+  const { displayBsDate } = useDateFormat();
+  const [filters,   setFilters]   = useCachedFilters('general_ledger_detail', { ...DEFAULT_FILTERS, showBsDate: displayBsDate, fromDate: initialFromDate, toDate: initialToDate, accountId: '' });
   const [accounts,  setAccounts]  = useState([]);
   const [lines,     setLines]     = useCachedState('general_ledger_detail_lines', []);
   const [summary,   setSummary]   = useCachedState('general_ledger_detail_summary', { ob: 0, cb: 0, obIsDr: true, cbIsDr: true });
@@ -1196,6 +1186,7 @@ function GeneralLedgerDetailReport({ initialFromDate, initialToDate }) {
         return {
           ...l,
           date: l.entry_date,
+          bs_date_formatted: adToBS(l.entry_date) ? formatBS(adToBS(l.entry_date)) : '',
           dr: Number(l.debit_amount || 0),
           cr: Number(l.credit_amount || 0),
           bal: Math.abs(balNum),
@@ -1236,9 +1227,10 @@ function GeneralLedgerDetailReport({ initialFromDate, initialToDate }) {
 
   const tableRows = [
     // OB Row
-    ['', '', 'Opening Balance', '', '', fmtNPR(summary.ob) + (summary.obIsDr ? ' Dr' : ' Cr')],
+    ['', ...(filters.showBsDate ? [''] : []), '', 'Opening Balance', '', '', fmtNPR(summary.ob) + (summary.obIsDr ? ' Dr' : ' Cr')],
     ...lines.map(l => [
       l.date,
+      ...(filters.showBsDate ? [l.bs_date_formatted] : []),
       l.voucher_no ? <VoucherLink voucherNumber={l.voucher_no}><span className="cursor-pointer text-primary">{l.voucher_no}</span></VoucherLink> : '',
       l.description,
       fmtNPR(l.dr),
@@ -1248,11 +1240,12 @@ function GeneralLedgerDetailReport({ initialFromDate, initialToDate }) {
   ];
 
   const handleExport = () => downloadCSV('general_ledger_detail.csv',
-    ['Date', 'Voucher #', 'Description', 'Debit', 'Credit', 'Balance'],
+    ['Date', ...(filters.showBsDate ? ['Date (BS)'] : []), 'Voucher #', 'Description', 'Debit', 'Credit', 'Balance'],
     [
-      ['', '', 'Opening Balance', '', '', fmtNPR(summary.ob) + (summary.obIsDr ? ' Dr' : ' Cr')],
+      ['', ...(filters.showBsDate ? [''] : []), '', 'Opening Balance', '', '', fmtNPR(summary.ob) + (summary.obIsDr ? ' Dr' : ' Cr')],
       ...lines.map(l => [
         l.date,
+        ...(filters.showBsDate ? [l.bs_date_formatted] : []),
         l.voucher_no,
         l.description,
         fmtNPR(l.dr),
@@ -1277,9 +1270,9 @@ function GeneralLedgerDetailReport({ initialFromDate, initialToDate }) {
       ) : (
         <>
           <ReportTable title={title} fromDate={filters.fromDate} toDate={filters.toDate}
-            headers={['Date', 'Voucher #', 'Description', 'Debit (NPR)', 'Credit (NPR)', 'Balance (NPR)']}
+            headers={['Date', ...(filters.showBsDate ? ['Date (BS)'] : []), 'Voucher #', 'Description', 'Debit (NPR)', 'Credit (NPR)', 'Balance (NPR)']}
             rows={tableRows}
-            footer={['', '', 'Closing Balance', fmtNPR(lines.reduce((s,l)=>s+l.dr,0)), fmtNPR(lines.reduce((s,l)=>s+l.cr,0)), fmtNPR(summary.cb) + (summary.cbIsDr ? ' Dr' : ' Cr')]}
+            footer={['', ...(filters.showBsDate ? [''] : []), '', 'Closing Balance', fmtNPR(lines.reduce((s,l)=>s+l.dr,0)), fmtNPR(lines.reduce((s,l)=>s+l.cr,0)), fmtNPR(summary.cb) + (summary.cbIsDr ? ' Dr' : ' Cr')]}
             onExport={handleExport}
             onEmail={() => setShowCommModal(true)}
           />
@@ -1425,47 +1418,74 @@ export default function ReportViewer({ reportId, data, fromDate, toDate, columnS
 
       case 'journal_report':
         return <SimpleReport title="Journal Report" reportId={reportId} initialData={data} initialFromDate={fromDate} initialToDate={toDate}
-          renderFn={(rows, fd, td) => (
+          renderFn={(rows, fd, td, showBs) => (
             <ReportTable title="Journal Report" fromDate={fd} toDate={td}
-              headers={['Date', 'Voucher #', 'Memo', 'Lines', 'Total Amount (NPR)']}
-              rows={rows.map(r => [
-                (r.entry_date || '').substring(0, 10),
-                <VoucherLink voucherNumber={r.voucher_no}><span className="cursor-pointer text-primary">{r.voucher_no}</span></VoucherLink>,
-                r.memo,
-                r.lines?.length || 0,
-                fmtNPR(r.total_amount || (r.lines || []).reduce((s, l) => s + (l.debit_amount || 0), 0))
-              ])}
-              footer={['', '', '', 'TOTAL', fmtNPR(rows.reduce((s, r) => s + (r.total_amount || (r.lines || []).reduce((ls, l) => ls + (l.debit_amount || 0), 0)), 0))]}
-              onExport={() => downloadCSV('journal_report.csv', ['Date','Voucher #','Memo','Lines','Total Amount'], rows.map(r => [(r.entry_date || '').substring(0, 10), r.voucher_no, r.memo, r.lines?.length || 0, (r.total_amount || 0)?.toFixed(2)]))}
+              headers={['Date', ...(showBs ? ['Date (BS)'] : []), 'Voucher #', 'Memo', 'Lines', 'Total Amount (NPR)']}
+              rows={rows.map(r => {
+                const dateAd = (r.entry_date || '').substring(0, 10);
+                const dateBs = adToBS(dateAd) ? formatBS(adToBS(dateAd)) : '';
+                return [
+                  dateAd,
+                  ...(showBs ? [dateBs] : []),
+                  <VoucherLink voucherNumber={r.voucher_no}><span className="cursor-pointer text-primary">{r.voucher_no}</span></VoucherLink>,
+                  r.memo,
+                  r.lines?.length || 0,
+                  fmtNPR(r.total_amount || (r.lines || []).reduce((s, l) => s + (l.debit_amount || 0), 0))
+                ];
+              })}
+              footer={['', ...(showBs ? [''] : []), '', '', 'TOTAL', fmtNPR(rows.reduce((s, r) => s + (r.total_amount || (r.lines || []).reduce((ls, l) => ls + (l.debit_amount || 0), 0)), 0))]}
+              onExport={() => downloadCSV('journal_report.csv', ['Date', ...(showBs ? ['Date (BS)'] : []), 'Voucher #','Memo','Lines','Total Amount'], rows.map(r => {
+                const dateAd = (r.entry_date || '').substring(0, 10);
+                const dateBs = adToBS(dateAd) ? formatBS(adToBS(dateAd)) : '';
+                return [dateAd, ...(showBs ? [dateBs] : []), r.voucher_no, r.memo, r.lines?.length || 0, (r.total_amount || 0)?.toFixed(2)];
+              }))}
             />
           )} />;
 
       case 'txn_list':
         return <SimpleReport title="Transaction List" reportId={reportId} initialData={data} initialFromDate={fromDate} initialToDate={toDate}
-          renderFn={(rows, fd, td) => (
+          renderFn={(rows, fd, td, showBs) => (
             <ReportTable title="Transaction List" fromDate={fd} toDate={td}
-              headers={['Date', 'Voucher #', 'Account', 'Description', 'Debit (NPR)', 'Credit (NPR)']}
-              rows={rows.map(r => [
-                r.entry_date, 
-                <VoucherLink voucherNumber={r.voucher_no}><span className="cursor-pointer text-primary">{r.voucher_no}</span></VoucherLink>, 
-                r.account_name, 
-                r.description || r.journal_memo, 
-                fmtNPR(r.debit_amount), 
-                fmtNPR(r.credit_amount)
-              ])}
-              footer={['', '', '', 'TOTAL', fmtNPR(rows.reduce((s,r)=>s+(r.debit_amount||0),0)), fmtNPR(rows.reduce((s,r)=>s+(r.credit_amount||0),0))]}
-              onExport={() => downloadCSV('txn_list.csv', ['Date','Voucher','Account','Description','Debit','Credit'], rows.map(r=>[r.entry_date, r.voucher_no, r.account_name, r.description || r.journal_memo, r.debit_amount?.toFixed(2), r.credit_amount?.toFixed(2)]))}
+              headers={['Date', ...(showBs ? ['Date (BS)'] : []), 'Voucher #', 'Account', 'Description', 'Debit (NPR)', 'Credit (NPR)']}
+              rows={rows.map(r => {
+                const dateBs = adToBS(r.entry_date) ? formatBS(adToBS(r.entry_date)) : '';
+                return [
+                  r.entry_date, 
+                  ...(showBs ? [dateBs] : []),
+                  <VoucherLink voucherNumber={r.voucher_no}><span className="cursor-pointer text-primary">{r.voucher_no}</span></VoucherLink>, 
+                  r.account_name, 
+                  r.description || r.journal_memo, 
+                  fmtNPR(r.debit_amount), 
+                  fmtNPR(r.credit_amount)
+                ];
+              })}
+              footer={['', ...(showBs ? [''] : []), '', '', 'TOTAL', fmtNPR(rows.reduce((s,r)=>s+(r.debit_amount||0),0)), fmtNPR(rows.reduce((s,r)=>s+(r.credit_amount||0),0))]}
+              onExport={() => downloadCSV('txn_list.csv', ['Date', ...(showBs ? ['Date (BS)'] : []), 'Voucher','Account','Description','Debit','Credit'], rows.map(r => {
+                const dateBs = adToBS(r.entry_date) ? formatBS(adToBS(r.entry_date)) : '';
+                return [r.entry_date, ...(showBs ? [dateBs] : []), r.voucher_no, r.account_name, r.description || r.journal_memo, r.debit_amount?.toFixed(2), r.credit_amount?.toFixed(2)];
+              }))}
             />
           )} />;
 
       case 'purchase_summary':
         return <SimpleReport title="Purchase Summary" reportId={reportId} initialData={data} initialFromDate={fromDate} initialToDate={toDate}
-          renderFn={(rows, fd, td) => (
+          renderFn={(rows, fd, td, showBs) => (
             <ReportTable title="Purchase Summary" fromDate={fd} toDate={td}
-              headers={['Bill #','Date','Supplier','Status','Subtotal (NPR)','VAT (NPR)','Grand Total (NPR)']}
-              rows={rows.map(r => [r.bill_number, r.bill_date, r.vendor_name, r.status, fmtNPR(r.subtotal), fmtNPR(r.vat_amount), fmtNPR(r.grand_total)])}
-              footer={['','','','TOTAL','', fmtNPR(rows.reduce((s,r)=>s+(r.vat_amount||0),0)), fmtNPR(rows.reduce((s,r)=>s+(r.grand_total||0),0))]}
-              onExport={() => downloadCSV('purchase_summary.csv',['Bill #','Date','Supplier','Status','Subtotal','VAT','Grand Total'],rows.map(r=>[r.bill_number,r.bill_date,r.vendor_name,r.status,r.subtotal?.toFixed(2),r.vat_amount?.toFixed(2),r.grand_total?.toFixed(2)]))}
+              headers={['Bill #','Date', ...(showBs ? ['Date (BS)'] : []), 'Supplier','Status','Subtotal (NPR)','VAT (NPR)','Grand Total (NPR)']}
+              rows={rows.map(r => {
+                const dateBs = adToBS(r.invoice_date || r.bill_date) ? formatBS(adToBS(r.invoice_date || r.bill_date)) : '';
+                const dateAd = (r.invoice_date || r.bill_date || '').split('T')[0].split('-').reverse().join('-');
+                return [
+                  <VoucherLink voucherNumber={r.invoice_number || r.bill_number}><span className="cursor-pointer text-primary">{r.invoice_number || r.bill_number}</span></VoucherLink>, 
+                  dateAd, ...(showBs ? [dateBs] : []), r.customer_name || r.vendor_name, r.status, fmtNPR(r.goods_subtotal || r.subtotal), fmtNPR(r.total_tax_amount || r.vat_amount), fmtNPR(r.grand_total)
+                ];
+              })}
+              footer={['','', ...(showBs ? [''] : []), '','TOTAL','', fmtNPR(rows.reduce((s,r)=>s+((r.total_tax_amount || r.vat_amount)||0),0)), fmtNPR(rows.reduce((s,r)=>s+(r.grand_total||0),0))]}
+              onExport={() => downloadCSV('purchase_summary.csv',['Bill #','Date', ...(showBs ? ['Date (BS)'] : []), 'Supplier','Status','Subtotal','VAT','Grand Total'],rows.map(r => {
+                const dateBs = adToBS(r.invoice_date || r.bill_date) ? formatBS(adToBS(r.invoice_date || r.bill_date)) : '';
+                const dateAd = (r.invoice_date || r.bill_date || '').split('T')[0].split('-').reverse().join('-');
+                return [r.invoice_number || r.bill_number, dateAd, ...(showBs ? [dateBs] : []), r.customer_name || r.vendor_name, r.status, (r.goods_subtotal || r.subtotal)?.toFixed(2), (r.total_tax_amount || r.vat_amount)?.toFixed(2), r.grand_total?.toFixed(2)];
+              }))}
             />
           )} />;
 
@@ -1495,12 +1515,23 @@ export default function ReportViewer({ reportId, data, fromDate, toDate, columnS
       // Simple table reports — each gets its own filter bar via SimpleReport
       case 'sales_summary':
         return <SimpleReport title="Sales Summary" reportId={reportId} initialData={data} initialFromDate={fromDate} initialToDate={toDate}
-          renderFn={(rows, fd, td) => (
+          renderFn={(rows, fd, td, showBs) => (
             <ReportTable title="Sales Summary" fromDate={fd} toDate={td}
-              headers={['Invoice #','Date','Customer','Status','Subtotal (NPR)','VAT (NPR)','Grand Total (NPR)']}
-              rows={rows.map(r => [r.invoice_number, r.invoice_date, r.customer_name, r.status, fmtNPR(r.goods_subtotal), fmtNPR(r.total_tax_amount), fmtNPR(r.grand_total)])}
-              footer={['','','','TOTAL','', fmtNPR(rows.reduce((s,r)=>s+(r.total_tax_amount||0),0)), fmtNPR(rows.reduce((s,r)=>s+(r.grand_total||0),0))]}
-              onExport={() => downloadCSV('sales_summary.csv',['Invoice #','Date','Customer','Status','Subtotal','VAT','Grand Total'],rows.map(r=>[r.invoice_number,r.invoice_date,r.customer_name,r.status,r.goods_subtotal?.toFixed(2),r.total_tax_amount?.toFixed(2),r.grand_total?.toFixed(2)]))}
+              headers={['Invoice #','Date', ...(showBs ? ['Date (BS)'] : []), 'Customer','Status','Subtotal (NPR)','VAT (NPR)','Grand Total (NPR)']}
+              rows={rows.map(r => {
+                const dateBs = adToBS(r.invoice_date) ? formatBS(adToBS(r.invoice_date)) : '';
+                const dateAd = (r.invoice_date || '').split('T')[0].split('-').reverse().join('-');
+                return [
+                  <VoucherLink voucherNumber={r.invoice_number}><span className="cursor-pointer text-primary">{r.invoice_number}</span></VoucherLink>,
+                  dateAd, ...(showBs ? [dateBs] : []), r.customer_name, r.status, fmtNPR(r.goods_subtotal), fmtNPR(r.total_tax_amount), fmtNPR(r.grand_total)
+                ];
+              })}
+              footer={['','', ...(showBs ? [''] : []), '','TOTAL','', fmtNPR(rows.reduce((s,r)=>s+(r.total_tax_amount||0),0)), fmtNPR(rows.reduce((s,r)=>s+(r.grand_total||0),0))]}
+              onExport={() => downloadCSV('sales_summary.csv',['Invoice #','Date', ...(showBs ? ['Date (BS)'] : []), 'Customer','Status','Subtotal','VAT','Grand Total'],rows.map(r => {
+                const dateBs = adToBS(r.invoice_date) ? formatBS(adToBS(r.invoice_date)) : '';
+                const dateAd = (r.invoice_date || '').split('T')[0].split('-').reverse().join('-');
+                return [r.invoice_number, dateAd, ...(showBs ? [dateBs] : []), r.customer_name, r.status, r.goods_subtotal?.toFixed(2), r.total_tax_amount?.toFixed(2), r.grand_total?.toFixed(2)];
+              }))}
             />
           )} />;
 
@@ -1575,9 +1606,13 @@ export default function ReportViewer({ reportId, data, fromDate, toDate, columnS
           renderFn={(rows) => (
             <ReportTable title="Unpaid Sales Invoices"
               headers={['Invoice #','Date','Customer','Grand Total (NPR)','Payment Status']}
-              rows={rows.map(r => [r.invoice_number, r.invoice_date, r.customer_name, fmtNPR(r.grand_total), r.payment_status])}
+              rows={rows.map(r => [
+                <VoucherLink voucherNumber={r.invoice_number}><span className="cursor-pointer text-primary">{r.invoice_number}</span></VoucherLink>, 
+                (r.invoice_date || '').split('T')[0].split('-').reverse().join('-'), 
+                r.customer_name, fmtNPR(r.grand_total), r.payment_status
+              ])}
               footer={['','','TOTAL', fmtNPR(rows.reduce((s,r)=>s+(r.grand_total||0),0)), '']}
-              onExport={() => downloadCSV('unpaid_invoices.csv',['Invoice','Date','Customer','Total','Status'],rows.map(r=>[r.invoice_number,r.invoice_date,r.customer_name,r.grand_total?.toFixed(2),r.payment_status]))}
+              onExport={() => downloadCSV('unpaid_invoices.csv',['Invoice','Date','Customer','Total','Status'],rows.map(r=>[r.invoice_number,(r.invoice_date || '').split('T')[0].split('-').reverse().join('-'),r.customer_name,r.grand_total?.toFixed(2),r.payment_status]))}
             />
           )} />;
 
@@ -1586,9 +1621,13 @@ export default function ReportViewer({ reportId, data, fromDate, toDate, columnS
           renderFn={(rows) => (
             <ReportTable title="Unpaid Purchase Invoices"
               headers={['Invoice #','Date','Supplier','Grand Total (NPR)','Payment Status']}
-              rows={rows.map(r => [r.invoice_number, r.invoice_date, r.customer_name||r.vendor_name, fmtNPR(r.grand_total), r.payment_status])}
+              rows={rows.map(r => [
+                <VoucherLink voucherNumber={r.invoice_number}><span className="cursor-pointer text-primary">{r.invoice_number}</span></VoucherLink>, 
+                (r.invoice_date || '').split('T')[0].split('-').reverse().join('-'), 
+                r.customer_name||r.vendor_name, fmtNPR(r.grand_total), r.payment_status
+              ])}
               footer={['','','TOTAL', fmtNPR(rows.reduce((s,r)=>s+(r.grand_total||0),0)), '']}
-              onExport={() => downloadCSV('unpaid_bills.csv',['Invoice','Date','Supplier','Total','Status'],rows.map(r=>[r.invoice_number,r.invoice_date,r.customer_name||r.vendor_name,r.grand_total?.toFixed(2),r.payment_status]))}
+              onExport={() => downloadCSV('unpaid_bills.csv',['Invoice','Date','Supplier','Total','Status'],rows.map(r=>[r.invoice_number,(r.invoice_date || '').split('T')[0].split('-').reverse().join('-'),r.customer_name||r.vendor_name,r.grand_total?.toFixed(2),r.payment_status]))}
             />
           )} />;
 
@@ -1598,9 +1637,13 @@ export default function ReportViewer({ reportId, data, fromDate, toDate, columnS
           renderFn={(rows, fd, td) => (
             <ReportTable title="Sales VAT Register" fromDate={fd} toDate={td}
               headers={['Invoice #','Date','Customer','Subtotal (NPR)','VAT (NPR)','Grand Total (NPR)']}
-              rows={rows.map(r => [r.invoice_number, r.invoice_date, r.customer_name, fmtNPR(r.goods_subtotal), fmtNPR(r.total_tax_amount||r.vat_amount), fmtNPR(r.grand_total)])}
+              rows={rows.map(r => [
+                <VoucherLink voucherNumber={r.invoice_number}><span className="cursor-pointer text-primary">{r.invoice_number}</span></VoucherLink>, 
+                (r.invoice_date || '').split('T')[0].split('-').reverse().join('-'), 
+                r.customer_name, fmtNPR(r.goods_subtotal), fmtNPR(r.total_tax_amount||r.vat_amount), fmtNPR(r.grand_total)
+              ])}
               footer={['','','Total VAT','', fmtNPR(rows.reduce((s,r)=>s+(r.total_tax_amount||r.vat_amount||0),0)),'']}
-              onExport={() => downloadCSV('sales_vat.csv',['Invoice','Date','Customer','Subtotal','VAT','Total'],rows.map(r=>[r.invoice_number,r.invoice_date,r.customer_name,r.goods_subtotal?.toFixed(2),(r.total_tax_amount||r.vat_amount)?.toFixed(2),r.grand_total?.toFixed(2)]))}
+              onExport={() => downloadCSV('sales_vat.csv',['Invoice','Date','Customer','Subtotal','VAT','Total'],rows.map(r=>[r.invoice_number,(r.invoice_date || '').split('T')[0].split('-').reverse().join('-'),r.customer_name,r.goods_subtotal?.toFixed(2),(r.total_tax_amount||r.vat_amount)?.toFixed(2),r.grand_total?.toFixed(2)]))}
             />
           )} />;
 
@@ -1609,9 +1652,13 @@ export default function ReportViewer({ reportId, data, fromDate, toDate, columnS
           renderFn={(rows, fd, td) => (
             <ReportTable title="Purchase VAT Register" fromDate={fd} toDate={td}
               headers={['Invoice #','Date','Supplier','Subtotal (NPR)','VAT (NPR)','Grand Total (NPR)']}
-              rows={rows.map(r => [r.invoice_number||r.bill_number, r.invoice_date||r.bill_date, r.customer_name||r.vendor_name, fmtNPR(r.goods_subtotal||r.subtotal), fmtNPR(r.vat_amount||r.total_tax_amount), fmtNPR(r.grand_total)])}
+              rows={rows.map(r => [
+                <VoucherLink voucherNumber={r.invoice_number||r.bill_number}><span className="cursor-pointer text-primary">{r.invoice_number||r.bill_number}</span></VoucherLink>, 
+                (r.invoice_date||r.bill_date || '').split('T')[0].split('-').reverse().join('-'), 
+                r.customer_name||r.vendor_name, fmtNPR(r.goods_subtotal||r.subtotal), fmtNPR(r.vat_amount||r.total_tax_amount), fmtNPR(r.grand_total)
+              ])}
               footer={['','','Total VAT','', fmtNPR(rows.reduce((s,r)=>s+(r.vat_amount||r.total_tax_amount||0),0)),'']}
-              onExport={() => downloadCSV('purchase_vat.csv',['Invoice','Date','Supplier','Subtotal','VAT','Total'],rows.map(r=>[r.invoice_number||r.bill_number,r.invoice_date||r.bill_date,r.customer_name||r.vendor_name,(r.goods_subtotal||r.subtotal)?.toFixed(2),(r.vat_amount||r.total_tax_amount)?.toFixed(2),r.grand_total?.toFixed(2)]))}
+              onExport={() => downloadCSV('purchase_vat.csv',['Invoice','Date','Supplier','Subtotal','VAT','Total'],rows.map(r=>[r.invoice_number||r.bill_number,(r.invoice_date||r.bill_date || '').split('T')[0].split('-').reverse().join('-'),r.customer_name||r.vendor_name,(r.goods_subtotal||r.subtotal)?.toFixed(2),(r.vat_amount||r.total_tax_amount)?.toFixed(2),r.grand_total?.toFixed(2)]))}
             />
           )} />;
 
@@ -1620,9 +1667,13 @@ export default function ReportViewer({ reportId, data, fromDate, toDate, columnS
           renderFn={(rows, fd, td) => (
             <ReportTable title="Sales Master Report (All Invoices)" fromDate={fd} toDate={td}
               headers={['Invoice #','Date','Customer','Status','Subtotal (NPR)','VAT (NPR)','Grand Total (NPR)']}
-              rows={rows.map(r => [r.invoice_number, r.invoice_date, r.customer_name, r.status, fmtNPR(r.goods_subtotal || r.subtotal), fmtNPR(r.total_tax_amount || r.vat_amount), fmtNPR(r.grand_total)])}
+              rows={rows.map(r => [
+                <VoucherLink voucherNumber={r.invoice_number}><span className="cursor-pointer text-primary">{r.invoice_number}</span></VoucherLink>, 
+                (r.invoice_date || '').split('T')[0].split('-').reverse().join('-'), 
+                r.customer_name, r.status, fmtNPR(r.goods_subtotal || r.subtotal), fmtNPR(r.total_tax_amount || r.vat_amount), fmtNPR(r.grand_total)
+              ])}
               footer={['','','','TOTAL','', fmtNPR(rows.reduce((s,r)=>s+(r.total_tax_amount||r.vat_amount||0),0)), fmtNPR(rows.reduce((s,r)=>s+(r.grand_total||0),0))]}
-              onExport={() => downloadCSV('sales_master_report.csv',['Invoice #','Date','Customer','Status','Subtotal','VAT','Grand Total'],rows.map(r=>[r.invoice_number,r.invoice_date,r.customer_name,r.status,(r.goods_subtotal||r.subtotal)?.toFixed(2),(r.total_tax_amount||r.vat_amount)?.toFixed(2),r.grand_total?.toFixed(2)]))}
+              onExport={() => downloadCSV('sales_master_report.csv',['Invoice #','Date','Customer','Status','Subtotal','VAT','Grand Total'],rows.map(r=>[r.invoice_number,(r.invoice_date || '').split('T')[0].split('-').reverse().join('-'),r.customer_name,r.status,(r.goods_subtotal||r.subtotal)?.toFixed(2),(r.total_tax_amount||r.vat_amount)?.toFixed(2),r.grand_total?.toFixed(2)]))}
             />
           )} />;
 
@@ -1631,9 +1682,13 @@ export default function ReportViewer({ reportId, data, fromDate, toDate, columnS
           renderFn={(rows, fd, td) => (
             <ReportTable title="Stock Movement Report" fromDate={fd} toDate={td}
               headers={['Date','Ref #','Type','Item Code','Item Name','Qty In','Qty Out','Unit Cost (NPR)']}
-              rows={rows.map(r => [r.date, r.ref, r.type, r.item_code, r.item_name, r.qty_in || '—', r.qty_out || '—', fmtNPR(r.unit_cost)])}
+              rows={rows.map(r => [
+                (r.date || '').split('T')[0].split('-').reverse().join('-'), 
+                <VoucherLink voucherNumber={r.ref}><span className="cursor-pointer text-primary">{r.ref}</span></VoucherLink>, 
+                r.type, r.item_code, r.item_name, r.qty_in || '—', r.qty_out || '—', fmtNPR(r.unit_cost)
+              ])}
               footer={['','','','','TOTAL', rows.reduce((s,r)=>s+(r.qty_in||0),0), rows.reduce((s,r)=>s+(r.qty_out||0),0), '']}
-              onExport={() => downloadCSV('stock_movement.csv',['Date','Ref','Type','Code','Item','Qty In','Qty Out','Unit Cost'],rows.map(r=>[r.date,r.ref,r.type,r.item_code,r.item_name,r.qty_in,r.qty_out,r.unit_cost?.toFixed(2)]))}
+              onExport={() => downloadCSV('stock_movement.csv',['Date','Ref','Type','Code','Item','Qty In','Qty Out','Unit Cost'],rows.map(r=>[(r.date || '').split('T')[0].split('-').reverse().join('-'),r.ref,r.type,r.item_code,r.item_name,r.qty_in,r.qty_out,r.unit_cost?.toFixed(2)]))}
             />
           )} />;
 

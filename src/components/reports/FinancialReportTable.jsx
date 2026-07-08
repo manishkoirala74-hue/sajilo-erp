@@ -61,7 +61,14 @@ function collectGroupIds(nodes, ids = []) {
 }
 
 // ── Compute totals recursively from leaf (Sub Ledger) nodes only ──────────────
-function computeSubtreeTotals(node) {
+function computeSubtreeTotals(node, reportType) {
+  if (reportType === 'balance_sheet' && node.ledger_type === 'Group Ledger' && node.closing_balance !== undefined) {
+    return {
+      closing_balance: node.closing_balance,
+      balance: node.balance
+    };
+  }
+
   if (node.ledger_type !== 'Group Ledger') {
     // Leaf node — return its own values
     return {
@@ -71,12 +78,14 @@ function computeSubtreeTotals(node) {
       current_credit: node.current_credit || 0,
       closing_debit:  node.closing_debit  || 0,
       closing_credit: node.closing_credit || 0,
+      closing_balance: node.closing_balance || 0,
+      balance: node.balance || 0,
     };
   }
   // Group node — aggregate children recursively
   return node._children.reduce(
     (acc, child) => {
-      const t = computeSubtreeTotals(child);
+      const t = computeSubtreeTotals(child, reportType);
       return {
         opening_debit:  acc.opening_debit  + t.opening_debit,
         opening_credit: acc.opening_credit + t.opening_credit,
@@ -84,9 +93,11 @@ function computeSubtreeTotals(node) {
         current_credit: acc.current_credit + t.current_credit,
         closing_debit:  acc.closing_debit  + t.closing_debit,
         closing_credit: acc.closing_credit + t.closing_credit,
+        closing_balance: (acc.closing_balance || 0) + (t.closing_balance || 0),
+        balance: (acc.balance || 0) + (t.balance || 0),
       };
     },
-    { opening_debit: 0, opening_credit: 0, current_debit: 0, current_credit: 0, closing_debit: 0, closing_credit: 0 }
+    { opening_debit: 0, opening_credit: 0, current_debit: 0, current_credit: 0, closing_debit: 0, closing_credit: 0, closing_balance: 0, balance: 0 }
   );
 }
 
@@ -118,7 +129,7 @@ function LedgerRow({ account, columns, depth }) {
           </td>
         );
         const raw = account[col.key];
-        const isNumeric = col.key.endsWith('_debit') || col.key.endsWith('_credit') || ['opening_balance','closing_balance','debit','credit'].includes(col.key);
+        const isNumeric = col.key.endsWith('_debit') || col.key.endsWith('_credit') || ['opening_balance','closing_balance','debit','credit','balance'].includes(col.key);
         const formatted = isNumeric ? fmtNPR(raw) : (raw ?? '—');
         return (
           <td key={col.key} className={cn('px-2 py-1.5 text-sm print:text-[10px]', col.align === 'right' && 'text-right tabular-nums font-mono')}>
@@ -131,14 +142,15 @@ function LedgerRow({ account, columns, depth }) {
 }
 
 // ── Group row (recursive, all levels) ────────────────────────────────────────
-function GroupRow({ node, columns, depth, expandedGroups, onToggle, showZeroBalance, partnerRows, onGroupExpand }) {
+function GroupRow({ node, columns, depth, expandedGroups, onToggle, showZeroBalance, partnerRows, onGroupExpand, reportType }) {
   const indent = depth * 20 + 8;
   const isExpanded = expandedGroups.has(node.id);
   const children = node._children || [];
   const hasChildren = children.length > 0;
+  const isControlAccount = node.is_control_account;
 
-  // Totals computed from this subtree's leaves
-  const totals = computeSubtreeTotals(node);
+  // Totals computed from this subtree's leaves (or natively for balance sheet)
+  const totals = computeSubtreeTotals(node, reportType);
 
   const displayTotals = totals;
 
@@ -229,6 +241,7 @@ function GroupRow({ node, columns, depth, expandedGroups, onToggle, showZeroBala
                   showZeroBalance={showZeroBalance}
                   partnerRows={partnerRows}
                   onGroupExpand={onGroupExpand}
+                  reportType={reportType}
                 />
               )
               : (!showZeroBalance && !(child.closing_balance || child.current_balance || child.closing_debit || child.closing_credit || child.opening_debit || child.opening_credit || child.current_debit || child.current_credit) ? null : (
@@ -248,8 +261,10 @@ function GroupRow({ node, columns, depth, expandedGroups, onToggle, showZeroBala
 
 // ── Main Component ────────────────────────────────────────────────────────────
 export default function FinancialReportTable({
-  accounts, columnState, filename, companyName, reportTitle, fromDate, toDate, partnerRows, onGroupExpand
+  accounts,
+  columnState, filename, companyName, reportTitle, fromDate, toDate, partnerRows, onGroupExpand
 }) {
+  const reportType = columnState?.reportType;
   const columns = buildVisibleColumns(columnState);
 
   // Build full recursive tree from flat account list
@@ -289,7 +304,7 @@ export default function FinancialReportTable({
   const grandTotals = useMemo(() => {
     return tree.reduce(
       (acc, root) => {
-        const t = computeSubtreeTotals(root);
+        const t = computeSubtreeTotals(root, reportType);
         return {
           opening_debit:  acc.opening_debit  + t.opening_debit,
           opening_credit: acc.opening_credit + t.opening_credit,
@@ -297,11 +312,13 @@ export default function FinancialReportTable({
           current_credit: acc.current_credit + t.current_credit,
           closing_debit:  acc.closing_debit  + t.closing_debit,
           closing_credit: acc.closing_credit + t.closing_credit,
+          closing_balance: (acc.closing_balance || 0) + (t.closing_balance || 0),
+          balance: (acc.balance || 0) + (t.balance || 0),
         };
       },
-      { opening_debit: 0, opening_credit: 0, current_debit: 0, current_credit: 0, closing_debit: 0, closing_credit: 0 }
+      { opening_debit: 0, opening_credit: 0, current_debit: 0, current_credit: 0, closing_debit: 0, closing_credit: 0, closing_balance: 0, balance: 0 }
     );
-  }, [tree]);
+  }, [tree, reportType]);
 
   // Count leaf ledgers
   const countLeaves = (nodes) => nodes.reduce((s, n) => {
@@ -413,6 +430,7 @@ export default function FinancialReportTable({
                       showZeroBalance={columnState.showZeroBalance}
                       partnerRows={partnerRows}
                       onGroupExpand={onGroupExpand}
+                      reportType={reportType}
                     />
                   )
                   : (

@@ -65,61 +65,136 @@ export async function fetchReportData(reportId, fromDate, toDate, extraParams = 
       const p_company_id = sajilo.getCompanyId();
       const safeToDate   = toDate || new Date().toISOString().slice(0, 10);
 
-      const [all, { data: tbData, error: tbErr }] = await Promise.all([
+      const [all, { data: bsData, error: bsErr }] = await Promise.all([
         sajilo.entities.ChartOfAccount.filter({ is_active: true }, 'account_code', 2000),
-        supabase.rpc('get_trial_balance_rpc', { p_company_id, p_from_date: '1970-01-01', p_to_date: safeToDate })
+        supabase.rpc('get_balance_sheet_rpc', { p_company_id, p_as_of_date: safeToDate })
       ]);
-      if (tbErr) throw tbErr;
+      if (bsErr && bsErr.code !== 'PGRST202') throw bsErr;
 
-      const tbMap = {};
-      (tbData || []).forEach(r => { tbMap[r.id] = r; });
+      // Fallback if RPC doesn't exist yet
+      if (bsErr && bsErr.code === 'PGRST202') {
+        const { data: tbData, error: tbErr } = await supabase.rpc('get_trial_balance_rpc', { p_company_id, p_from_date: '1970-01-01', p_to_date: safeToDate });
+        if (tbErr) throw tbErr;
+        const tbMap = {};
+        (tbData || []).forEach(r => { tbMap[r.id] = r; });
+        const allAccounts = all.map(a => {
+          const r = tbMap[a.id] || { current_debit: 0, current_credit: 0 };
+          const isDebitNormal = (a.normal_balance || '').toLowerCase() === 'debit';
+          const base_ob = Number(a.opening_balance || 0);
+          const isBaseObDr = (a.opening_balance_type || (isDebitNormal ? 'Dr' : 'Cr')) === 'Dr';
+          let ob_dr = 0, ob_cr = 0;
+          if (isBaseObDr) ob_dr = base_ob; else ob_cr = base_ob;
+          const total_dr = ob_dr + Number(r.current_debit || 0);
+          const total_cr = ob_cr + Number(r.current_credit || 0);
+          const bal = isDebitNormal ? (total_dr - total_cr) : (total_cr - total_dr);
+          return { ...a, balance: bal };
+        });
+        const isIncomeStatement = a => a.financial_statement === 'income_statement';
+        const netIncome = allAccounts.filter(isIncomeStatement).reduce((sum, a) => {
+          const isExpense = (a.normal_balance || '').toLowerCase() === 'debit';
+          return isExpense ? sum - a.balance : sum + a.balance;
+        }, 0);
+        const toRow    = a  => ({ ...a, closing_balance: a.balance });
+        const assets      = allAccounts.filter(a => a.account_type === 'Asset').map(toRow);
+        const liabilities = allAccounts.filter(a => a.account_type === 'Liability').map(toRow);
+        const equity      = allAccounts.filter(a => a.account_type === 'Equity').map(toRow);
+        equity.push({
+          id: 'virtual-current-year-earnings', account_code: '—', account_name: 'Current Year Earnings', account_type: 'Equity', ledger_type: 'Sub Ledger', closing_balance: netIncome, balance: netIncome
+        });
+        return {
+          accounts: [...assets, ...liabilities, ...equity], assets, liabilities, equity,
+          total_assets: assets.reduce((s, a) => s + a.balance, 0),
+          total_liabilities: liabilities.reduce((s, a) => s + a.balance, 0),
+          total_equity: equity.reduce((s, a) => s + a.balance, 0),
+        };
+      }
 
-      const allAccounts = all.map(a => {
-        const r = tbMap[a.id] || { current_debit: 0, current_credit: 0 };
-        const isDebitNormal = (a.normal_balance || '').toLowerCase() === 'debit';
-        const base_ob = Number(a.opening_balance || 0);
-        const isBaseObDr = (a.opening_balance_type || (isDebitNormal ? 'Dr' : 'Cr')) === 'Dr';
-        let ob_dr = 0, ob_cr = 0;
-        if (isBaseObDr) ob_dr = base_ob; else ob_cr = base_ob;
-        const total_dr = ob_dr + Number(r.current_debit || 0);
-        const total_cr = ob_cr + Number(r.current_credit || 0);
-        const bal = isDebitNormal ? (total_dr - total_cr) : (total_cr - total_dr);
-        return { ...a, balance: bal };
-      });
+      // If new RPC is available
+      const allMap = {};
+      all.forEach(a => { allMap[a.id] = a; });
+      const bsAccounts = (bsData || []).map(a => ({
+        ...allMap[a.id],
+        closing_balance: Number(a.closing_balance || 0),
+        balance: Number(a.closing_balance || 0)
+      }));
 
       const isIncomeStatement = a => a.financial_statement === 'income_statement';
-      const netIncome = allAccounts.filter(isIncomeStatement).reduce((sum, a) => {
+      const netIncome = bsAccounts.filter(isIncomeStatement).reduce((sum, a) => {
         const isExpense = (a.normal_balance || '').toLowerCase() === 'debit';
         return isExpense ? sum - a.balance : sum + a.balance;
       }, 0);
 
-      const toRow    = a  => ({ ...a, closing_balance: a.balance });
-      const assets      = allAccounts.filter(a => a.account_type === 'Asset').map(toRow);
-      const liabilities = allAccounts.filter(a => a.account_type === 'Liability').map(toRow);
-      const equity      = allAccounts.filter(a => a.account_type === 'Equity').map(toRow);
+      const assets      = bsAccounts.filter(a => a.account_type === 'Asset');
+      const liabilities = bsAccounts.filter(a => a.account_type === 'Liability');
+      const equity      = bsAccounts.filter(a => a.account_type === 'Equity');
 
       equity.push({
-        id: 'virtual-current-year-earnings',
-        account_code: '—',
-        account_name: 'Current Year Earnings',
-        account_type: 'Equity',
-        ledger_type: 'Sub Ledger',
-        closing_balance: netIncome,
-        balance: netIncome
+        id: 'virtual-current-year-earnings', account_code: '—', account_name: 'Current Year Earnings', account_type: 'Equity', ledger_type: 'Sub Ledger', closing_balance: netIncome, balance: netIncome
       });
 
       return {
         accounts:         [...assets, ...liabilities, ...equity],
         assets, liabilities, equity,
-        total_assets:      assets.reduce((s, a) => s + a.balance, 0),
-        total_liabilities: liabilities.reduce((s, a) => s + a.balance, 0),
-        total_equity:      equity.reduce((s, a) => s + a.balance, 0),
+        total_assets:      assets.reduce((s, a) => s + (a.parent_account_id ? 0 : a.balance), 0),
+        total_liabilities: liabilities.reduce((s, a) => s + (a.parent_account_id ? 0 : a.balance), 0),
+        total_equity:      equity.reduce((s, a) => s + (a.parent_account_id ? 0 : a.balance), 0),
       };
     }
 
     case 'cash_flow': {
-      // Handled internally by CashFlowReport component — return [] as placeholder
-      return [];
+      const p_company_id = sajilo.getCompanyId();
+      const { data, error } = await supabase.rpc('get_cash_flow_rpc', {
+        p_company_id, p_from_date: fromDate, p_to_date: toDate
+      });
+      if (error && error.code !== 'PGRST202') throw error;
+      
+      let details = [];
+      let inflows = 0;
+      let outflows = 0;
+
+      if (!error && data) {
+        data.forEach(r => {
+          const net = Number(r.net_amount || 0);
+          if (net > 0) {
+            inflows += net;
+            details.push({ date: (r.entry_date || '').substring(0, 10), type: 'Inflow', ref: r.voucher_no, desc: r.description, amount: net });
+          } else if (net < 0) {
+            outflows += Math.abs(net);
+            details.push({ date: (r.entry_date || '').substring(0, 10), type: 'Outflow', ref: r.voucher_no, desc: r.description, amount: Math.abs(net) });
+          }
+        });
+      } else {
+        // Fallback Direct Method Cashflow logic
+        const journals = await sajilo.entities.GeneralLedgerJournal.list('-entry_date', 5000);
+        const lines = await sajilo.entities.GeneralLedgerLine.list('', 10000); // Need scalable way in future
+        const accounts = await sajilo.entities.ChartOfAccount.list('', 1000);
+
+        const cashAccounts = accounts.filter(a => a.account_type === 'Cash' || a.account_type === 'Bank');
+        const cashAccIds = new Set(cashAccounts.map(a => a.id));
+
+        journals.filter(j => j.status === 'Posted' && inRange(j.entry_date, fromDate, toDate)).forEach(j => {
+          const jLines = lines.filter(l => l.journal_id === j.id);
+          const cashLines = jLines.filter(l => cashAccIds.has(l.account_id));
+          if (cashLines.length === 0) return;
+          const netCash = cashLines.reduce((s, l) => s + (l.debit_amount || 0) - (l.credit_amount || 0), 0);
+          
+          if (netCash > 0) {
+            inflows += netCash;
+            details.push({ date: j.entry_date, type: 'Inflow', ref: j.voucher_no, desc: j.description, amount: netCash });
+          } else if (netCash < 0) {
+            outflows += Math.abs(netCash);
+            details.push({ date: j.entry_date, type: 'Outflow', ref: j.voucher_no, desc: j.description, amount: Math.abs(netCash) });
+          }
+        });
+      }
+
+      const { adToBS, formatBS } = await import('@/lib/nepaliDate');
+      details = details.map(d => ({
+        ...d,
+        bs_date_formatted: adToBS(d.date) ? formatBS(adToBS(d.date)) : ''
+      }));
+
+      return { inflows, outflows, netCashFlow: inflows - outflows, details };
     }
 
     case 'gl_summary': {
@@ -249,12 +324,25 @@ export async function fetchReportData(reportId, fromDate, toDate, extraParams = 
         (inv.line_items || []).forEach(l => {
           const key = l.item_id || l.item_name;
           if (!key) return;
-          if (!map[key]) map[key] = { item_code: l.item_code || '—', item_name: l.item_name, qty_sold: 0, revenue: 0 };
-          map[key].qty_sold += l.quantity || 0;
-          map[key].revenue  += l.line_total || 0;
+          if (!map[key]) map[key] = { item: l.item_name || 'Unknown', qty: 0, total: 0 };
+          map[key].qty   += l.quantity || 0;
+          map[key].total += l.net_amount || (l.quantity * (l.rate || 0));
         });
       });
-      return Object.values(map).sort((a, b) => b.revenue - a.revenue);
+      return Object.values(map).sort((a, b) => b.total - a.total);
+    }
+
+    case 'unpaid_invoices': {
+      const invoices = await sajilo.entities.SalesInvoice.list('-invoice_date', 2000);
+      return (invoices || [])
+        .filter(i => i.status === 'Posted' && i.payment_status !== 'Paid')
+        .map(i => ({
+          invoice_number: i.invoice_number,
+          invoice_date:   i.invoice_date,
+          customer_name:  i.customer_name,
+          grand_total:    i.grand_total || 0,
+          payment_status: i.payment_status,
+        }));
     }
 
     case 'sales_by_customer_monthly': {
@@ -301,29 +389,28 @@ export async function fetchReportData(reportId, fromDate, toDate, extraParams = 
         }));
     }
 
-    // ── PURCHASE ──────────────────────────────────────────────────────────────
+    // ── PURCHASES ─────────────────────────────────────────────────────────────
 
     case 'purchase_summary': {
-      // Fetch directly from PurchaseInvoice — the RPC only returns 3 fields
       const bills = await sajilo.entities.PurchaseInvoice.list('-invoice_date', 2000);
       return (bills || [])
-        .filter(i => i.status === 'Posted' && inRange(i.invoice_date, fromDate, toDate))
+        .filter(i => i.status === 'Posted' && inRange(i.invoice_date || i.bill_date, fromDate, toDate))
         .map(i => ({
-          bill_number:  i.invoice_number || i.bill_number,
-          bill_date:    i.invoice_date   || i.bill_date,
-          vendor_name:  i.vendor_name,
-          status:       i.status,
-          payment_status: i.payment_status,
-          subtotal:     i.subtotal    || 0,
-          vat_amount:   i.vat_amount  || i.total_tax_amount || 0,
-          grand_total:  i.grand_total || 0,
+          invoice_number:   i.invoice_number || i.bill_number,
+          invoice_date:     i.invoice_date   || i.bill_date,
+          customer_name:    i.vendor_name,
+          status:           i.status,
+          payment_status:   i.payment_status,
+          goods_subtotal:   i.subtotal || i.goods_subtotal || 0,
+          total_tax_amount: i.total_tax_amount || i.vat_amount || 0,
+          grand_total:      i.grand_total || 0,
         }));
     }
 
     case 'purchase_by_vendor': {
       const bills = await sajilo.entities.PurchaseInvoice.list('-invoice_date', 2000);
       const map = {};
-      (bills || []).filter(i => i.status === 'Posted' && inRange(i.invoice_date, fromDate, toDate)).forEach(i => {
+      (bills || []).filter(i => i.status === 'Posted' && inRange(i.invoice_date || i.bill_date, fromDate, toDate)).forEach(i => {
         const key = i.vendor_name || 'Unknown';
         if (!map[key]) map[key] = { vendor: key, count: 0, total: 0 };
         map[key].count++;
@@ -335,16 +422,16 @@ export async function fetchReportData(reportId, fromDate, toDate, extraParams = 
     case 'purchase_by_item': {
       const bills = await sajilo.entities.PurchaseInvoice.list('-invoice_date', 2000);
       const map = {};
-      (bills || []).filter(i => i.status === 'Posted' && inRange(i.invoice_date, fromDate, toDate)).forEach(inv => {
+      (bills || []).filter(i => i.status === 'Posted' && inRange(i.invoice_date || i.bill_date, fromDate, toDate)).forEach(inv => {
         (inv.line_items || []).forEach(l => {
           const key = l.item_id || l.item_name;
           if (!key) return;
-          if (!map[key]) map[key] = { item_code: l.item_code || '—', item_name: l.item_name, qty_bought: 0, cost: 0 };
-          map[key].qty_bought += l.quantity   || 0;
-          map[key].cost       += l.line_total || 0;
+          if (!map[key]) map[key] = { item: l.item_name || 'Unknown', qty: 0, total: 0 };
+          map[key].qty   += l.quantity || 0;
+          map[key].total += l.net_amount || (l.quantity * (l.rate || 0));
         });
       });
-      return Object.values(map).sort((a, b) => b.cost - a.cost);
+      return Object.values(map).sort((a, b) => b.total - a.total);
     }
 
     case 'unpaid_bills': {
@@ -364,8 +451,29 @@ export async function fetchReportData(reportId, fromDate, toDate, extraParams = 
 
     case 'ar_aging': {
       const p_company_id = sajilo.getCompanyId();
-      const { data, error } = await supabase.rpc('get_ar_aging_rpc', { p_company_id });
-      if (error) throw error;
+      const { data, error } = await supabase.rpc('get_ar_aging_rpc', { p_company_id, p_as_of_date: toDate || new Date().toISOString().slice(0, 10) });
+      if (error && error.code !== 'PGRST202') throw error;
+      
+      // Fallback
+      if (error && error.code === 'PGRST202') {
+        const invoices = await sajilo.entities.SalesInvoice.list('-invoice_date', 2000);
+        const asOf = new Date(toDate || Date.now());
+        return (invoices || [])
+          .filter(i => i.status === 'Posted' && new Date(i.invoice_date) <= asOf && (i.grand_total - (i.paid_amount || 0)) > 0)
+          .map(i => {
+            const days = Math.floor((asOf - new Date(i.due_date)) / (1000 * 60 * 60 * 24));
+            let bucket = 'Current';
+            if (days >= 1 && days <= 30) bucket = '1–30 days';
+            else if (days >= 31 && days <= 60) bucket = '31–60 days';
+            else if (days > 60) bucket = '60d+';
+            return {
+              customer_name: i.customer_name || 'Unknown',
+              bucket:        bucket,
+              grand_total:   i.grand_total - (i.paid_amount || 0),
+            };
+          }).sort((a, b) => b.grand_total - a.grand_total);
+      }
+
       return (data || []).map(r => ({
         customer_name: r.customer_name || 'Unknown',
         bucket:        r.bucket,
@@ -375,10 +483,27 @@ export async function fetchReportData(reportId, fromDate, toDate, extraParams = 
 
     case 'ar_aging_summary': {
       const p_company_id = sajilo.getCompanyId();
-      const { data, error } = await supabase.rpc('get_ar_aging_rpc', { p_company_id });
-      if (error) throw error;
+      const { data, error } = await supabase.rpc('get_ar_aging_rpc', { p_company_id, p_as_of_date: toDate || new Date().toISOString().slice(0, 10) });
+      if (error && error.code !== 'PGRST202') throw error;
+      
+      let items = data || [];
+      if (error && error.code === 'PGRST202') {
+        const invoices = await sajilo.entities.SalesInvoice.list('-invoice_date', 2000);
+        const asOf = new Date(toDate || Date.now());
+        items = (invoices || [])
+          .filter(i => i.status === 'Posted' && new Date(i.invoice_date) <= asOf && (i.grand_total - (i.paid_amount || 0)) > 0)
+          .map(i => {
+            const days = Math.floor((asOf - new Date(i.due_date)) / (1000 * 60 * 60 * 24));
+            let bucket = 'Current';
+            if (days >= 1 && days <= 30) bucket = '1–30 days';
+            else if (days >= 31 && days <= 60) bucket = '31–60 days';
+            else if (days > 60) bucket = '60d+';
+            return { customer_name: i.customer_name, bucket, balance: i.grand_total - (i.paid_amount || 0) };
+          });
+      }
+
       const map = {};
-      (data || []).forEach(r => {
+      items.forEach(r => {
         const key = r.customer_name || 'Unknown';
         if (!map[key]) map[key] = { customer: key, current: 0, '30d': 0, '60d': 0, '60d+': 0, total: 0 };
         const amt = r.balance || 0;
@@ -396,7 +521,7 @@ export async function fetchReportData(reportId, fromDate, toDate, extraParams = 
       const [{ data: lines, error: lErr }, { data: customers, error: cErr }] = await Promise.all([
         supabase.from('GeneralLedgerLine').select('entity_id, debit_amount, credit_amount')
           .eq('company_id', p_company_id).eq('entity_type', 'Customer'),
-        supabase.from('Customer').select('id, name').eq('company_id', p_company_id)
+        supabase.from('BusinessPartner').select('id, name').eq('company_id', p_company_id)
       ]);
       if (lErr) throw lErr;
 
@@ -426,8 +551,29 @@ export async function fetchReportData(reportId, fromDate, toDate, extraParams = 
 
     case 'ap_aging': {
       const p_company_id = sajilo.getCompanyId();
-      const { data, error } = await supabase.rpc('get_ap_aging_rpc', { p_company_id });
-      if (error) throw error;
+      const { data, error } = await supabase.rpc('get_ap_aging_rpc', { p_company_id, p_as_of_date: toDate || new Date().toISOString().slice(0, 10) });
+      if (error && error.code !== 'PGRST202') throw error;
+      
+      // Fallback
+      if (error && error.code === 'PGRST202') {
+        const invoices = await sajilo.entities.PurchaseInvoice.list('-invoice_date', 2000);
+        const asOf = new Date(toDate || Date.now());
+        return (invoices || [])
+          .filter(i => i.status === 'Posted' && new Date(i.invoice_date || i.bill_date) <= asOf && (i.grand_total - (i.paid_amount || 0)) > 0)
+          .map(i => {
+            const days = Math.floor((asOf - new Date(i.due_date)) / (1000 * 60 * 60 * 24));
+            let bucket = 'Current';
+            if (days >= 1 && days <= 30) bucket = '1–30 days';
+            else if (days >= 31 && days <= 60) bucket = '31–60 days';
+            else if (days > 60) bucket = '60d+';
+            return {
+              customer_name: i.vendor_name || 'Unknown',
+              bucket:        bucket,
+              grand_total:   i.grand_total - (i.paid_amount || 0),
+            };
+          }).sort((a, b) => b.grand_total - a.grand_total);
+      }
+
       return (data || []).map(r => ({
         customer_name: r.vendor_name || 'Unknown',
         bucket:        r.bucket,
@@ -437,10 +583,27 @@ export async function fetchReportData(reportId, fromDate, toDate, extraParams = 
 
     case 'ap_aging_summary': {
       const p_company_id = sajilo.getCompanyId();
-      const { data, error } = await supabase.rpc('get_ap_aging_rpc', { p_company_id });
-      if (error) throw error;
+      const { data, error } = await supabase.rpc('get_ap_aging_rpc', { p_company_id, p_as_of_date: toDate || new Date().toISOString().slice(0, 10) });
+      if (error && error.code !== 'PGRST202') throw error;
+      
+      let items = data || [];
+      if (error && error.code === 'PGRST202') {
+        const invoices = await sajilo.entities.PurchaseInvoice.list('-invoice_date', 2000);
+        const asOf = new Date(toDate || Date.now());
+        items = (invoices || [])
+          .filter(i => i.status === 'Posted' && new Date(i.invoice_date || i.bill_date) <= asOf && (i.grand_total - (i.paid_amount || 0)) > 0)
+          .map(i => {
+            const days = Math.floor((asOf - new Date(i.due_date)) / (1000 * 60 * 60 * 24));
+            let bucket = 'Current';
+            if (days >= 1 && days <= 30) bucket = '1–30 days';
+            else if (days >= 31 && days <= 60) bucket = '31–60 days';
+            else if (days > 60) bucket = '60d+';
+            return { vendor_name: i.vendor_name, bucket, balance: i.grand_total - (i.paid_amount || 0) };
+          });
+      }
+
       const map = {};
-      (data || []).forEach(r => {
+      items.forEach(r => {
         const key = r.vendor_name || 'Unknown';
         if (!map[key]) map[key] = { vendor: key, current: 0, '30d': 0, '60d': 0, '60d+': 0, total: 0 };
         const amt = r.balance || 0;

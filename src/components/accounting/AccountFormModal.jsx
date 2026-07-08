@@ -239,6 +239,8 @@ export default function AccountFormModal({ open, onClose, account, parentAccount
   const handleSave = async () => {
     if (!form.account_name?.trim()) { toast.error('Account name is required'); return; }
     if (!form.account_type)         { toast.error('Account type is required');  return; }
+    if (!form.financial_statement)  { toast.error('Financial Statement routing is required'); return; }
+    if (!form.normal_balance)       { toast.error('Normal Balance is required'); return; }
     setSaving(true);
     try {
       const { 

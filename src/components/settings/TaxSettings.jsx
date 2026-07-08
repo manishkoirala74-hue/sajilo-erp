@@ -87,6 +87,7 @@ export default function TaxSettings() {
           account_type:    'Liability',
           ledger_type:     'Sub Ledger',
           normal_balance:  'Credit',
+          financial_statement: 'balance_sheet',
           parent_account_id:   parent.id,
           parent_account_name: parent.account_name,
           is_active:       true,

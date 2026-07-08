@@ -143,14 +143,7 @@ export default function Reports() {
       navigate(report.path);
       return;
     }
-    setGenerating(report.id);
-    try {
-      const data = await fetchReportData(report.id, fromDate, toDate);
-      setViewer({ reportId: report.id, data });
-    } catch (e) {
-      toast.error('Failed to generate report. Please try again.');
-    }
-    setGenerating(null);
+    setViewer({ reportId: report.id, data: null });
   };
 
   return (

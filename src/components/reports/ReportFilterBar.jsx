@@ -215,6 +215,8 @@ export default function ReportFilterBar({ filters, onChange, onApply, showApplyB
                 checked={filters.showClosingBalance} onCheckedChange={v => set('showClosingBalance', v)} />
               <ToggleRow id="col-txn" label="TRANSACTIONS (Dr / Cr)"
                 checked={filters.showTransactions} onCheckedChange={v => set('showTransactions', v)} />
+              <ToggleRow id="col-bs-date" label="BS DATE COLUMN"
+                checked={filters.showBsDate} onCheckedChange={v => set('showBsDate', v)} />
             </div>
 
             {/* Extra report-specific options slot */}

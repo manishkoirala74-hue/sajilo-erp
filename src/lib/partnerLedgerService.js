@@ -67,6 +67,7 @@ export async function createPartnerLedger({ partnerName, parentGroupId, accountT
     parent_account_id:  parentGroupId,
     parent_account_name: parent.account_name,
     normal_balance:     normalBalance,
+    financial_statement: 'balance_sheet',
     is_active:          true,
     is_system_account:  false,
     current_balance:    0,

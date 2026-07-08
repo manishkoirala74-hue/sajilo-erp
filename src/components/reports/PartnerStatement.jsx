@@ -2,8 +2,9 @@ import { useState, useCallback, useEffect } from 'react';
 import { sajilo } from '@/api/sajiloClient';
 import ReportFilterBar from '@/components/reports/ReportFilterBar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { adToBS } from '@/lib/nepaliDate';
+import { adToBS, formatBS } from '@/lib/nepaliDate';
 import VoucherLink from '@/components/shared/VoucherLink';
+import { useDateFormat } from '@/lib/DateFormatContext';
 
 import { useCachedFilters, useCachedState } from './ReportViewer';
 
@@ -13,6 +14,7 @@ const DEFAULT_FILTERS = {
   showOpeningBalance: true,
   showClosingBalance: true,
   showTransactions: true,
+  showBsDate: false,
 };
 
 function fmtNPR(n) {
@@ -21,7 +23,8 @@ function fmtNPR(n) {
 }
 
 export default function PartnerStatement({ title, mode, initialFromDate, initialToDate }) {
-  const [filters, setFilters] = useCachedFilters(`partner_statement_${mode}_filters`, { ...DEFAULT_FILTERS, fromDate: initialFromDate, toDate: initialToDate });
+  const { displayBsDate } = useDateFormat();
+  const [filters, setFilters] = useCachedFilters(`partner_statement_${mode}_filters`, { ...DEFAULT_FILTERS, showBsDate: displayBsDate, fromDate: initialFromDate, toDate: initialToDate });
   const [partners, setPartners] = useCachedState(`partner_statement_${mode}_partners`, []);
   const [selectedPartnerId, setSelectedPartnerId] = useCachedState(`partner_statement_${mode}_selectedId`, '');
   
@@ -125,6 +128,7 @@ export default function PartnerStatement({ title, mode, initialFromDate, initial
           cur_cr += (line.credit_amount || 0);
           txns.push({
             date: date,
+            bs_date_formatted: adToBS(date) ? formatBS(adToBS(date)) : '',
             voucher: jInfo.voucher,
             reference: line.reference_number || '',
             description: line.description || '',
@@ -181,11 +185,8 @@ export default function PartnerStatement({ title, mode, initialFromDate, initial
 
   const displayDate = (adDateStr) => {
     if (!adDateStr) return '';
-    if (printConfig.dateFormat === 'BS') {
-      const bs = adToBS(adDateStr);
-      if (bs) return `${bs.year}-${String(bs.month).padStart(2, '0')}-${String(bs.day).padStart(2, '0')}`;
-    }
-    return adDateStr;
+    const d = new Date(adDateStr);
+    return isNaN(d) ? adDateStr : `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${d.getFullYear()}`;
   };
 
   const extraOptions = (
@@ -210,18 +211,6 @@ export default function PartnerStatement({ title, mode, initialFromDate, initial
           <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={printConfig.showPartnerInfo} onChange={() => toggle('showPartnerInfo')} /> Partner Info</label>
           <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={printConfig.showSummary} onChange={() => toggle('showSummary')} /> Summary Cards</label>
           <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={printConfig.showRemarks} onChange={() => toggle('showRemarks')} /> Remarks Col</label>
-        </div>
-        <div className="mt-3 flex items-center gap-2">
-          <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Date Format</label>
-          <Select value={printConfig.dateFormat || 'AD'} onValueChange={v => setPrintConfig(p => ({ ...p, dateFormat: v }))}>
-            <SelectTrigger className="h-7 bg-card px-2 text-xs w-20">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="AD">AD</SelectItem>
-              <SelectItem value="BS">BS</SelectItem>
-            </SelectContent>
-          </Select>
         </div>
       </div>
     </div>
@@ -312,7 +301,8 @@ export default function PartnerStatement({ title, mode, initialFromDate, initial
             <table className="table-fluid-grid text-base text-left">
               <thead>
                 <tr className="border-y-2 border-border bg-muted/50/50">
-                  <th className="cell-density font-semibold text-slate-500 text-align-center">Date</th>
+                  <th className="cell-density font-semibold text-slate-500 text-align-center">Date (AD)</th>
+                  {filters.showBsDate && <th className="cell-density font-semibold text-slate-500 text-align-center">Date (BS)</th>}
                   <th className="cell-density font-semibold text-slate-500 text-align-center">Voucher</th>
                   <th className="cell-density font-semibold text-slate-500 text-align-left w-1/3">Description</th>
                   <th className="cell-density font-semibold text-slate-500 amount-cell uppercase">Debit</th>
@@ -325,6 +315,7 @@ export default function PartnerStatement({ title, mode, initialFromDate, initial
               {/* Opening Balance Row */}
               <tr className="bg-muted/50/30">
                 <td className="cell-density py-2.5 px-2 text-slate-400 italic">{displayDate(filters.fromDate)}</td>
+                {filters.showBsDate && <td className="cell-density py-2.5 px-2"></td>}
                 <td colSpan={2} className="cell-density py-2.5 px-2 font-semibold text-muted-foreground">*** Opening Balance ***</td>
                 <td className="cell-density py-2.5 px-2 text-right"></td>
                 <td className="cell-density py-2.5 px-2 text-right"></td>
@@ -336,6 +327,7 @@ export default function PartnerStatement({ title, mode, initialFromDate, initial
               {transactions.map((t, i) => (
                 <tr key={i} className="hover:bg-muted/50/50">
                   <td className="cell-density py-2.5 px-2 whitespace-nowrap text-muted-foreground">{displayDate(t.date)}</td>
+                  {filters.showBsDate && <td className="cell-density py-2.5 px-2 whitespace-nowrap text-muted-foreground">{t.bs_date_formatted}</td>}
                   <td className="cell-density py-2.5 px-2 font-mono text-sm text-primary">
                     <VoucherLink voucherNumber={t.voucher}>
                       <span className="cursor-pointer">{t.voucher}</span>
@@ -351,13 +343,13 @@ export default function PartnerStatement({ title, mode, initialFromDate, initial
               
               {transactions.length === 0 && (
                 <tr>
-                  <td colSpan={printConfig.showRemarks ? 7 : 6} className="cell-density py-8 text-center text-slate-400 italic">No transactions found for this period.</td>
+                  <td colSpan={printConfig.showRemarks ? (filters.showBsDate ? 8 : 7) : (filters.showBsDate ? 7 : 6)} className="cell-density py-8 text-center text-slate-400 italic">No transactions found for this period.</td>
                 </tr>
               )}
             </tbody>
             <tfoot>
               <tr className="border-t-2 border-border bg-muted/50 font-bold">
-                <td colSpan={3} className="cell-density py-3 px-2 text-muted-foreground text-right">Closing Balance as of {displayDate(filters.toDate)}:</td>
+                <td colSpan={filters.showBsDate ? 4 : 3} className="cell-density py-3 px-2 text-muted-foreground text-right">Closing Balance as of {displayDate(filters.toDate)}:</td>
                 <td className="cell-density py-3 px-2 text-right tabular-nums font-mono text-emerald-700 dark:text-emerald-400">{fmtNPR(summary.debit)}</td>
                 <td className="cell-density py-3 px-2 text-right tabular-nums font-mono text-red-700 dark:text-red-400">{fmtNPR(summary.credit)}</td>
                 <td className="cell-density py-3 px-2 text-right tabular-nums font-mono text-primary text-base">{fmtNPR(summary.closing)}</td>
