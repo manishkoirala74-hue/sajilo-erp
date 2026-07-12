@@ -27,6 +27,7 @@ export const SETTINGS_SUB_CATEGORIES = {
     { id: 'vouchers', label: 'Voucher Numbering', path: '/settings/operations/vouchers', keywords: ['sequence', 'prefix', 'invoice number'] },
     { id: 'inventory', label: 'Inventory Policy', path: '/settings/operations/inventory', keywords: ['stock', 'negative', 'policy'] },
     { id: 'templates', label: 'PDF Document Templates', path: '/settings/operations/templates', keywords: ['print', 'design', 'layout', 'receipt'] },
+    { id: 'quick-actions', label: 'Quick Actions Menu', path: '/settings/operations/quick-actions', keywords: ['menu', 'command palette', 'shortcuts'] },
   ],
   data: [
     { id: 'cut-over', label: 'System Cut-Over', path: '/settings/data/cut-over', keywords: ['migration', 'opening balances', 'transition'] },

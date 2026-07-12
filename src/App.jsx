@@ -11,6 +11,8 @@ import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { Toaster as SonnerToaster } from 'sonner';
 import { ThemeProvider } from '@/lib/ThemeContext';
+import ModalRegistry from '@/components/modals/ModalRegistry';
+import { useModalStore } from '@/store/modalStore';
 
 // Layout
 import ERPLayout from '@/components/layout/ERPLayout';
@@ -55,6 +57,7 @@ import Depreciation from '@/pages/settings/finance/Depreciation';
 import ReceivableCollections from '@/pages/settings/operations/ReceivableCollections';
 import VoucherSequence from '@/pages/settings/operations/VoucherSequence';
 import InventorySettings from '@/pages/settings/operations/InventorySettings';
+import QuickActionsSettings from '@/pages/settings/operations/QuickActionsSettings';
 // Data
 import SystemCutOver from '@/pages/settings/data/SystemCutOver';
 import ItemImportExportPage from '@/pages/settings/data/ItemImportExportPage';
@@ -208,6 +211,7 @@ const AuthenticatedApp = () => {
             <Route path="operations/vouchers" element={<VoucherSequence />} />
             <Route path="operations/inventory" element={<InventorySettings />} />
             <Route path="operations/templates" element={<PDFTemplatesList />} />
+            <Route path="operations/quick-actions" element={<QuickActionsSettings />} />
             <Route path="data/cut-over" element={<SystemCutOver />} />
             <Route path="data/import" element={<ItemImportExportPage />} />
             <Route path="data/utilities" element={<DataUtilitiesPage />} />
@@ -269,6 +273,17 @@ import { GlobalVoucherDrawerProvider } from '@/lib/GlobalVoucherContext';
 import GlobalVoucherDrawer from '@/components/shared/GlobalVoucherDrawer';
 
 function App() {
+  React.useEffect(() => {
+    const handleKeyDown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        useModalStore.getState().openModal('COMMAND_PALETTE');
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown); // Critical Cleanup
+  }, []);
+
   return (
     <GlobalVoucherDrawerProvider>
       <AuthProvider>
@@ -277,6 +292,7 @@ function App() {
             <Router>
               <AuthenticatedApp />
               <GlobalVoucherDrawer />
+              <ModalRegistry />
             </Router>
             <Toaster />
             <SonnerToaster position="top-right" richColors />

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   BarChart2, TrendingUp, Users, CreditCard, Receipt,
   FileText, ChevronRight, RefreshCw, History, ShoppingCart, Warehouse, Settings2
@@ -125,9 +125,21 @@ let cachedViewer = null;
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function Reports() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [activeCategory, setActiveCategory] = useState(cachedActiveCategory);
   const [generating, setGenerating]         = useState(null);
   const [viewer, setViewer]                 = useState(cachedViewer);
+
+  // Auto-open report from URL query parameter
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const reportId = params.get('report');
+    if (reportId) {
+      setViewer({ reportId, data: null });
+      // Clear the param so it doesn't reopen if they refresh after closing
+      navigate('/reports', { replace: true });
+    }
+  }, [location.search, navigate]);
 
   // Update cache whenever these states change
   useEffect(() => { cachedActiveCategory = activeCategory; }, [activeCategory]);

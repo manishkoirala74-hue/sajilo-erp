@@ -6,8 +6,9 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+import { ArrowLeft } from 'lucide-react';
 
-export default function QuickItemCreate({ open, onOpenChange, onCreated }) {
+export default function QuickItemCreate({ open, onOpenChange, onCreated, canGoBack, onBack }) {
   const [form, setForm] = useState({
     item_name: '', item_type: 'Product', unit_of_measure: 'PCS',
     selling_price: 0, purchase_price: 0,
@@ -61,8 +62,13 @@ export default function QuickItemCreate({ open, onOpenChange, onCreated }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Quick Create Item</DialogTitle>
+        <DialogHeader className="flex flex-row items-center gap-2">
+          {canGoBack && (
+            <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={onBack}>
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+          )}
+          <DialogTitle className={canGoBack ? "mt-0" : ""}>Quick Create Item</DialogTitle>
         </DialogHeader>
         <div className="grid gap-4 py-4">
           <div className="grid gap-2">

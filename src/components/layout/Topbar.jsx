@@ -8,7 +8,6 @@ import {
   DropdownMenuSeparator, DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu';
 import { CompanySwitcher } from '@/components/CompanySwitcher';
-import GlobalSearch from './GlobalSearch';
 
 export default function Topbar({ pageTitle, onMenuClick }) {
   const { user, logout } = useAuth();
@@ -26,9 +25,6 @@ export default function Topbar({ pageTitle, onMenuClick }) {
 
       <div className="flex items-center gap-3">
         <CompanySwitcher />
-        
-        {/* Search */}
-        <GlobalSearch />
 
         {/* AD/BS Date Toggle */}
         {displayBsDate && (

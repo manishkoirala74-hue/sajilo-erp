@@ -12,11 +12,11 @@ import { cn } from '@/lib/utils';
 import { sajilo } from '@/api/sajiloClient';
 import { usePermissions, useAuth } from '@/lib/AuthContext';
 import { useSettingsStore } from '@/store/settingsStore';
-import QuickCreateModal from './QuickCreateModal';
+import { useModalStore } from '@/store/modalStore';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
 
-const buildNavGroups = (settings) => {
+export const buildNavGroups = (settings) => {
   const s = settings || {};
   
   const groups = [
@@ -115,9 +115,7 @@ export default function Sidebar({ collapsed, onToggle }) {
   const [navGroups, setNavGroups] = useState(buildNavGroups(null));
   const [expandedGroups, setExpandedGroups] = useState([]);
   const [expandedSubGroups, setExpandedSubGroups] = useState([]);
-  const [isQuickCreateOpen, setIsQuickCreateOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const searchInputRef = useRef(null);
+  const openModal = useModalStore(state => state.openModal);
 
   // Favorites state
   const [favoritePaths, setFavoritePaths] = useState(() => {
@@ -154,22 +152,7 @@ export default function Sidebar({ collapsed, onToggle }) {
     });
   }, [settings]);
 
-  // Handle Ctrl+K shortcut
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
-        e.preventDefault();
-        if (collapsed) {
-          onToggle();
-          setTimeout(() => searchInputRef.current?.focus(), 300);
-        } else {
-          searchInputRef.current?.focus();
-        }
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [collapsed, onToggle]);
+  // Global Ctrl+K is now handled in App.jsx
 
   const toggleGroup = (label) => {
     setExpandedGroups(prev =>
@@ -222,7 +205,6 @@ export default function Sidebar({ collapsed, onToggle }) {
 
   // Filter groups
   const filteredGroups = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase();
     const isAdmin = user?.role === 'admin';
     
     return navGroups.map(group => {
@@ -233,10 +215,6 @@ export default function Sidebar({ collapsed, onToggle }) {
           if (!isAdmin) {
              subItems = subItems.filter(sub => sidebarVisibility.includes(sub.path) || sub.path === '/');
           }
-          // Apply Search
-          if (query) {
-             subItems = subItems.filter(sub => sub.label.toLowerCase().includes(query));
-          }
           return subItems.length > 0 ? { ...item, items: subItems } : null;
         }
         
@@ -246,30 +224,26 @@ export default function Sidebar({ collapsed, onToggle }) {
         if (!isAdmin) {
            keep = sidebarVisibility.includes(item.path) || item.path === '/' || item.path === '/settings' || item.path === '/reports';
         }
-        // Apply Search
-        if (keep && query) {
-           keep = item.label.toLowerCase().includes(query);
-        }
         
         return keep ? item : null;
       }).filter(Boolean);
       
-      return items.length > 0 || (query && group.label.toLowerCase().includes(query)) ? { ...group, items: items.length > 0 ? items : group.items } : null;
+      return items.length > 0 ? { ...group, items } : null;
     }).filter(Boolean);
-  }, [navGroups, searchQuery, sidebarVisibility, user]);
+  }, [navGroups, sidebarVisibility, user]);
 
   // Inject favorites group if appropriate
   const displayGroups = useMemo(() => {
-    if (searchQuery || favoriteItems.length === 0) return filteredGroups;
+    if (favoriteItems.length === 0) return filteredGroups;
     return [
       { label: 'FAVORITES', items: favoriteItems, isFavoriteGroup: true },
       ...filteredGroups
     ];
-  }, [filteredGroups, favoriteItems, searchQuery]);
+  }, [filteredGroups, favoriteItems]);
 
   // Auto-expand when searching
-  const effectiveExpandedGroups = searchQuery ? displayGroups.map(g => g.label) : [...expandedGroups, 'FAVORITES'];
-  const effectiveExpandedSubGroups = searchQuery ? displayGroups.flatMap(g => g.items?.filter(i => i?.isSubGroup).map(i => i.label) || []) : expandedSubGroups;
+  const effectiveExpandedGroups = [...expandedGroups, 'FAVORITES'];
+  const effectiveExpandedSubGroups = expandedSubGroups;
 
   // NavItem sub-component for rendering links consistently
   const NavItem = ({ item, isSub = false, isFavoriteGroup = false }) => {
@@ -352,45 +326,31 @@ export default function Sidebar({ collapsed, onToggle }) {
         {/* Search Bar */}
         {!collapsed && (
           <div className="px-3 py-2 shrink-0">
-            <div className="relative group">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-primary transition-colors" />
-              <input
-                ref={searchInputRef}
-                type="text"
-                placeholder="Search (Ctrl+K)"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-slate-800/40 border border-transparent hover:border-slate-700 text-slate-200 text-sm rounded-md pl-9 pr-8 py-1.5 focus:outline-none focus:ring-1 focus:ring-primary focus:bg-slate-800/80 placeholder:text-slate-500 transition-all"
-              />
-              {searchQuery ? (
-                <button 
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200"
-                >
-                  <X className="w-3 h-3" />
-                </button>
-              ) : (
-                <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex gap-0.5 opacity-50 pointer-events-none">
-                  <kbd className="font-sans text-[10px] bg-slate-700 rounded px-1 text-slate-300">Ctrl</kbd>
-                  <kbd className="font-sans text-[10px] bg-slate-700 rounded px-1 text-slate-300">K</kbd>
-                </div>
-              )}
-            </div>
+            <button
+              onClick={() => openModal('COMMAND_PALETTE')}
+              className="w-full flex items-center bg-slate-800/40 hover:bg-slate-800/80 border border-transparent hover:border-slate-700 text-slate-400 text-sm rounded-md px-3 py-1.5 transition-all focus:outline-none focus:ring-1 focus:ring-primary"
+            >
+              <Search className="w-4 h-4 mr-2 shrink-0" />
+              <span className="flex-1 text-left truncate">Search or jump to...</span>
+              <kbd className="hidden sm:inline-flex items-center gap-1 font-sans text-[10px] bg-slate-700 rounded px-1.5 h-5 text-slate-300">
+                <span className="text-xs">⌘</span>K
+              </kbd>
+            </button>
           </div>
         )}
 
-        {/* Quick Create Button */}
+        {/* Quick Action Button */}
         <div className={cn("px-3 py-3 shrink-0", collapsed && "flex justify-center")}>
           <button
-            onClick={() => setIsQuickCreateOpen(true)}
-            title={collapsed ? "Quick Create" : undefined}
+            onClick={() => openModal('COMMAND_PALETTE')}
+            title={collapsed ? "Quick Action" : undefined}
             className={cn(
               "flex items-center justify-center gap-2 bg-primary/10 hover:bg-primary/20 text-primary py-1.5 rounded-lg font-medium text-sm transition-colors border border-primary/20 shadow-sm",
               collapsed ? "w-10 h-10 px-0" : "w-full px-4"
             )}
           >
-            <Plus className="w-4 h-4" />
-            {!collapsed && <span>Quick Create</span>}
+            <Plus className="w-4 h-4 shrink-0" />
+            {!collapsed && <span>Quick Action</span>}
           </button>
         </div>
 
@@ -498,11 +458,6 @@ export default function Sidebar({ collapsed, onToggle }) {
           )}
         </div>
       </div>
-
-      <QuickCreateModal 
-        isOpen={isQuickCreateOpen} 
-        onClose={() => setIsQuickCreateOpen(false)} 
-      />
     </>
   );
 }
