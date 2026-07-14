@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { Component } from 'react';
 import { Toaster } from "@/components/ui/toaster"
 import { QueryClientProvider } from '@tanstack/react-query'
 import { sajilo } from '@/api/sajiloClient';
@@ -272,6 +272,40 @@ const AuthenticatedApp = () => {
 import { GlobalVoucherDrawerProvider } from '@/lib/GlobalVoucherContext';
 import GlobalVoucherDrawer from '@/components/shared/GlobalVoucherDrawer';
 
+class GlobalErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null, errorInfo: null };
+  }
+  
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  
+  componentDidCatch(error, errorInfo) {
+    console.error("Global Error Boundary caught an error:", error, errorInfo);
+    this.setState({ errorInfo });
+  }
+  
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ padding: '20px', background: '#f8d7da', color: '#721c24', fontFamily: 'monospace' }}>
+          <h2>Something went wrong.</h2>
+          <details style={{ whiteSpace: 'pre-wrap' }}>
+            <summary>Click for error details</summary>
+            <br />
+            <strong>{this.state.error && this.state.error.toString()}</strong>
+            <br />
+            {this.state.errorInfo && this.state.errorInfo.componentStack}
+          </details>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 function App() {
   React.useEffect(() => {
     const handleKeyDown = (e) => {
@@ -285,6 +319,7 @@ function App() {
   }, []);
 
   return (
+    <GlobalErrorBoundary>
     <GlobalVoucherDrawerProvider>
       <AuthProvider>
         <DateFormatProvider>
@@ -300,6 +335,7 @@ function App() {
         </DateFormatProvider>
       </AuthProvider>
     </GlobalVoucherDrawerProvider>
+    </GlobalErrorBoundary>
   );
 }
 

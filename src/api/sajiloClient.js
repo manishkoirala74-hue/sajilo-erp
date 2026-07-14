@@ -71,6 +71,10 @@ const validateFiscalYear = async (tableName, payload) => {
     return dateObj >= sDate && dateObj <= eDate;
   });
 
+  if (fyList.length === 0) {
+    throw new Error('No Fiscal Year has been set up for this company. Please create a Fiscal Year in Settings first.');
+  }
+
   if (!matchedFy) {
     throw new Error(`Transaction date ${targetDate.split('T')[0]} is outside all defined Fiscal Year bounds.`);
   }

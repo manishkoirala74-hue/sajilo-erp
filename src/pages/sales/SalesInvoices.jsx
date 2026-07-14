@@ -15,7 +15,7 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 import DateInput from '@/components/shared/DateInput';
 import DualDateDisplay from '@/components/shared/DualDateDisplay';
-import { checkoutSalesInvoice, loadItemsMap, loadSettings } from '@/lib/glPostingService';
+import { checkoutSalesInvoice, cancelSalesInvoice, loadItemsMap, loadSettings } from '@/lib/glPostingService';
 import { loadActiveTaxTypes, computeTotalTax } from '@/lib/taxService';
 import { useSajiloSync } from '@/hooks/useSajiloSync';
 import { usePermissions, useAuth } from '@/lib/AuthContext';
@@ -39,7 +39,7 @@ const emptySI = {
 
 export default function SalesInvoices() {
   const { hasAccess } = usePermissions();
-  const { activeCompany, mainGodownId, activeGodowns } = useAuth();
+  const { activeCompany, mainGodownId, activeGodowns, activeFiscalYear } = useAuth();
   const canCreate = hasAccess('sales_invoices', 'create');
   const canEdit = hasAccess('sales_invoices', 'edit');
   const canReverse = hasAccess('sales_invoices', 'reverse');
@@ -187,10 +187,29 @@ export default function SalesInvoices() {
     return `${prefix}-${year}-${seq}${suffix}`;
   };
 
+  const getSafeDefaultDate = () => {
+    const today = format(new Date(), 'yyyy-MM-dd');
+    if (activeFiscalYear) {
+      if (today > activeFiscalYear.end_date) return activeFiscalYear.end_date;
+      if (today < activeFiscalYear.start_date) return activeFiscalYear.start_date;
+    }
+    return today;
+  };
+
   const openNew = () => {
     const isAuto = !settings || settings.invoice_numbering_method !== 'Manual';
     const invNumber = isAuto ? generateInvoiceNumber() : '';
-    setForm({ ...emptySI, id: crypto.randomUUID(), invoice_number: invNumber, godown_id: mainGodownId || '', _isNew: true });
+    const safeDate = getSafeDefaultDate();
+    
+    setForm({ 
+      ...emptySI, 
+      id: crypto.randomUUID(), 
+      invoice_number: invNumber, 
+      godown_id: mainGodownId || '', 
+      invoice_date: safeDate,
+      due_date: format(new Date(new Date(safeDate).getTime() + 30 * 86400000), 'yyyy-MM-dd'),
+      _isNew: true 
+    });
     setDupWarning(false);
     setPendingPostStatus(null);
     setShowForm(true);
@@ -240,6 +259,7 @@ export default function SalesInvoices() {
     if (!form.invoice_number) { toast.error('Invoice number is required'); return; }
     if (!form.grand_total || form.grand_total <= 0) { toast.error('Total amount cannot be empty or zero'); return; }
     if (settings?.enable_godown_management && !form.godown_id) { toast.error('Godown / Location is required'); return; }
+    if (form.line_items.length === 0) { toast.error('Add at least one item'); return; }
 
     const isManual = settings?.invoice_numbering_method === 'Manual';
 
@@ -313,7 +333,7 @@ export default function SalesInvoices() {
         const idempotencyKey = crypto.randomUUID();
         const [itemsMap, glSettings] = await Promise.all([loadItemsMap(form.line_items.map(l => l.item_id)), loadSettings()]);
         
-        const result = await checkoutSalesInvoice({ ...payload, id: form.id }, itemsMap, glSettings, idempotencyKey);
+        const result = await checkoutSalesInvoice({ ...data, id: form.id }, itemsMap, glSettings, idempotencyKey);
         docId = result.invoice_id || form.id;
 
         if (form._isNew && isAuto) {
@@ -356,13 +376,14 @@ export default function SalesInvoices() {
         console.error('Vector PDF Gen error:', pdfErr);
       }
 
+      setShowForm(false);
+      fetchInvoices();
     } catch (err) {
       toast.error(err.message || 'Error occurred while saving');
+      return; // Do not close the form if there's an error
     } finally {
       setSaving(false);
     }
-    setShowForm(false);
-    fetchInvoices();
   };
 
   const togglePaymentStatus = async (inv) => {
@@ -372,31 +393,26 @@ export default function SalesInvoices() {
     fetchInvoices();
   };
 
-  // ── CANCEL (reverses all transactions, stock restored) ──
+  // ── CANCEL (Atomic cancellation via PostgreSQL RPC) ──
   const handleConfirmCancel = async () => {
     if (!cancelReason.trim()) { toast.error('Please provide a cancellation reason'); return; }
     setCancelling(true);
     const inv = cancelTarget;
 
-    // (Stock reversal is perfectly handled by backend rpc_post_sales_invoice with p_is_reversal: true)
-
-    await sajilo.entities.SalesInvoice.update(inv.id, {
-      status: 'Cancelled',
-      payment_status: 'Unpaid',
-      cancellation_reason: cancelReason,
-      cancelled_date: format(new Date(), 'yyyy-MM-dd'),
-    });
-
-    // GL Reversal
-    if (inv.status === 'Posted') {
-      const [itemsMap, glSettings] = await Promise.all([loadItemsMap((inv.line_items || []).map(l => l.item_id)), loadSettings()]);
-      await postSalesInvoice(inv, itemsMap, glSettings, true);
+    try {
+      await cancelSalesInvoice(inv.id, cancelReason);
+      
+      // Instantly update local React state to reflect the cancelled status without refreshing
+      setInvoices(prev => prev.map(i => i.id === inv.id ? { ...i, status: 'Cancelled', payment_status: 'Unpaid', cancellation_reason: cancelReason, cancelled_date: format(new Date(), 'yyyy-MM-dd') } : i));
+      
+      toast.success('Invoice cancelled — all transactions reversed & GL updated');
+      setCancelTarget(null);
+      setCancelReason('');
+    } catch (err) {
+      // Error handled by cancelSalesInvoice service
+    } finally {
+      setCancelling(false);
     }
-    toast.success('Invoice cancelled — all transactions reversed & GL updated');
-    setCancelling(false);
-    setCancelTarget(null);
-    setCancelReason('');
-    fetchInvoices();
   };
 
   // ── REJECT (no transactions — just reserve & void the number) ──
@@ -476,14 +492,27 @@ export default function SalesInvoices() {
     }
   ];
 
+  const isMissingGL = settings && (!settings.gl_accounts_receivable_id || !settings.gl_vat_payable_id);
+
   return (
     <div>
+      {isMissingGL && (
+        <div className="mb-4 bg-orange-50 border border-orange-200 text-orange-800 px-4 py-3 rounded-lg flex items-start gap-3">
+          <AlertTriangle className="w-5 h-5 text-orange-600 mt-0.5 shrink-0" />
+          <div>
+            <h4 className="font-semibold">Action Required: Missing Global Configuration</h4>
+            <p className="text-sm mt-1">Default Accounts Receivable or VAT Payable GL mappings are missing. Please configure them in Company Settings before generating invoices.</p>
+          </div>
+        </div>
+      )}
+
       <PageHeader
         title="Sales Invoices"
         subtitle="Create and manage customer invoices and track payments"
-        action={canCreate ? openNew : undefined}
+        action={canCreate && !isMissingGL ? openNew : undefined}
         actionLabel={canCreate ? "New Invoice" : undefined}
         actionIcon={canCreate ? Plus : undefined}
+        actionDisabled={!activeFiscalYear || isMissingGL}
       />
 
       <div className="flex gap-2 mb-4 flex-wrap">
@@ -632,7 +661,7 @@ export default function SalesInvoices() {
                     </div>
                   )}
                   <div>
-                    <DateInput label="Invoice Date" value={form.invoice_date} onChange={v => setForm(f => ({...f, invoice_date: v}))} className="mt-1" />
+                    <DateInput label="Invoice Date" value={form.invoice_date} onChange={v => setForm(f => ({...f, invoice_date: v}))} className="mt-1" min={activeFiscalYear?.start_date} max={activeFiscalYear?.end_date} />
                   </div>
                   <div>
                     <DateInput label="Due Date" value={form.due_date} onChange={v => setForm(f => ({...f, due_date: v}))} className="mt-1" />
@@ -699,15 +728,13 @@ export default function SalesInvoices() {
             </div>
           </div>
 
-          {/* STICKY FOOTER */}
           <div className="sticky bottom-0 -mx-6 -mb-6 mt-4 bg-stone-50/90 backdrop-blur-md border-t border-stone-200 p-4 flex justify-between items-center z-50 rounded-b-lg">
             <div className="flex flex-col ml-6">
               <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Invoice Total</span>
               <span className="text-xl font-bold text-foreground leading-none mt-1">NPR {(form.grand_total || 0).toLocaleString()}</span>
             </div>
             <div className="flex gap-3 mr-6 items-center">
-              <span className="text-sm text-green-600 font-medium mr-4 flex items-center gap-1">✓ No changes yet</span>
-              <Button variant="ghost" className="rounded-xl" onClick={() => setShowForm(false)}>Cancel</Button>
+              <Button variant="ghost" className="rounded-xl" onClick={() => setShowForm(false)} disabled={saving}>Cancel</Button>
               <Button variant="outline" className="rounded-xl border-primary text-primary hover:bg-primary/10" onClick={() => handleSave('Draft')} disabled={saving}>Save Draft</Button>
               <Button className="rounded-xl font-bold shadow-sm px-6" onClick={() => handleSave('Posted')} disabled={saving}>
                 {saving ? 'Saving...' : '✓ Save'}

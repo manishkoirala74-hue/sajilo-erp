@@ -50,31 +50,38 @@ export const AuthProvider = ({ children }) => {
   const [globalSettings, setGlobalSettings] = useState(null);
   const [mainGodownId, setMainGodownId] = useState(null);
   const [activeGodowns, setActiveGodowns] = useState([]);
+  const [activeFiscalYear, setActiveFiscalYear] = useState(null);
+  const [fiscalYears, setFiscalYears] = useState([]);
 
   const fetchGlobalSettings = async (companyId) => {
     try {
-      const [settList, godownList] = await Promise.all([
+      const [settList, godownList, fyList] = await Promise.all([
         sajilo.entities.CompanySettings.filter({ company_id: companyId }),
-        sajilo.entities.Godown.filter({ company_id: companyId, status: 'Active' })
+        sajilo.entities.Godown.filter({ company_id: companyId, status: 'Active' }),
+        sajilo.entities.FiscalYear.filter({ company_id: companyId })
       ]);
       setGlobalSettings(settList.length > 0 ? settList[0] : null);
       setActiveGodowns(godownList || []);
       const mainGodown = (godownList || []).find(g => g.is_main === true);
       setMainGodownId(mainGodown ? mainGodown.id : null);
+      
+      setFiscalYears(fyList || []);
+      const activeFy = (fyList || []).find(fy => fy.is_active === true || fy.is_active === 'true' || fy.is_active === 1);
+      setActiveFiscalYear(activeFy || null);
     } catch (e) {
       console.error("Failed to fetch global settings:", e);
     }
   };
 
-  const switchCompany = async (companyId, preloadedCompany = null) => {
+  const switchCompany = async (companyId, preloadedCompany = null, currentUser = user) => {
     setIsSwitchingCompany(true);
     sajilo.setCompanyId(companyId);
     
     const company = preloadedCompany || availableCompanies.find(c => c.id === companyId);
     if (company) {
       setActiveCompany(company);
-      if (user) {
-        await fetchPermissions(user, companyId);
+      if (currentUser) {
+        await fetchPermissions(currentUser, companyId);
         await fetchGlobalSettings(companyId);
       }
     }
@@ -126,7 +133,7 @@ export const AuthProvider = ({ children }) => {
           (defaultUc ? defaultUc.company_id : allowedCompanies[0].id);
           
         const target = allowedCompanies.find(c => c.id === targetId) || allowedCompanies[0];
-        await switchCompany(target.id, target);
+        await switchCompany(target.id, target, userData);
       }
     } catch (e) {
       console.error("Failed to fetch companies cleanly:", e);
@@ -305,6 +312,8 @@ export const AuthProvider = ({ children }) => {
       globalSettings,
       mainGodownId,
       activeGodowns,
+      activeFiscalYear,
+      fiscalYears,
       refreshGlobalSettings
     }}>
       {children}

@@ -8,6 +8,7 @@ import { sajilo } from '@/api/sajiloClient';
 import { useSajiloSync } from '@/hooks/useSajiloSync';
 import { computeItemTaxes } from '@/lib/taxService';
 import { useItemTradingHistory } from '@/hooks/useItemTradingHistory';
+import { useItemsQuery, useSettingsQuery } from '@/hooks/useSajiloQuery';
 
 const emptyLine = {
   item_id: '', item_name: '', item_code: '', hs_code: '',
@@ -27,33 +28,19 @@ const emptyLine = {
  *   taxTypes    : TaxType[]        — pre-loaded list from parent (avoids repeated fetches)
  */
 export default function LineItemsEditor({ value = [], onChange, taxTypes = [], hideTotals = false }) {
-  const [items, setItems] = useState([]);
   const [showItemCreate, setShowItemCreate] = useState(false);
   const [activeLineIdx, setActiveLineIdx] = useState(null);
   
   // ── Trading History State ──
   const [openHistoryRowIdx, setOpenHistoryRowIdx] = useState(null);
   const [historyItemId, setHistoryItemId] = useState(null);
-  const [settings, setSettings] = useState(null);
 
   // ── Fetch Trading History ──
   const { data: tradingHistory, isLoading: isHistoryLoading, error: historyError } = useItemTradingHistory(historyItemId);
 
-  const loadItems = () => {
-    sajilo.entities.Item.filter({ is_active: true }).then(setItems);
-  };
-
-  const loadSettings = () => {
-    sajilo.entities.CompanySettings.list().then(data => {
-      if (data.length > 0) setSettings(data[0]);
-    });
-  };
-
-  useEffect(() => { 
-    loadItems(); 
-    loadSettings();
-  }, []);
-  useSajiloSync(['Item'], loadItems);
+  // ── SWR Queries ──
+  const { data: items = [] } = useItemsQuery();
+  const { data: settings } = useSettingsQuery();
 
   // ── Helpers ────────────────────────────────────────────────────────────────
 

@@ -15,7 +15,7 @@ import { adToBS, bsToAD, isValidBSDate, formatBS, formatAD, formatBSISO } from '
 import { useDateFormat } from '@/lib/DateFormatContext';
 import { cn } from '@/lib/utils';
 
-export default function DateInput({ value, onChange, label, className, disabled }) {
+export default function DateInput({ value, onChange, label, className, disabled, min, max }) {
   const { dateFormat, displayBsDate } = useDateFormat();
   const [mode, setMode] = useState(dateFormat);
 
@@ -36,6 +36,13 @@ export default function DateInput({ value, onChange, label, className, disabled 
     setBsText(ad ? formatBSISO(adToBS(ad)) : '');
   };
 
+  const isOutOfBounds = (adDate) => {
+    if (!adDate) return false;
+    if (min && adDate < min) return true;
+    if (max && adDate > max) return true;
+    return false;
+  };
+
   const handleBSChange = (e) => {
     const raw = e.target.value;
     setBsText(raw); // always update local display immediately
@@ -44,9 +51,9 @@ export default function DateInput({ value, onChange, label, className, disabled 
     const parts = raw.split('-').map(Number);
     if (raw.length === 10 && parts.length === 3 && isValidBSDate(parts[0], parts[1], parts[2])) {
       const ad = bsToAD(parts[0], parts[1], parts[2]);
-      if (ad) onChange(ad);
+      if (ad && !isOutOfBounds(ad)) onChange(ad);
     }
-    // If incomplete / invalid, do NOT call onChange — leave the stored AD value untouched
+    // If incomplete / invalid / out of bounds, do NOT call onChange — leave the stored AD value untouched
   };
 
   const toggleMode = () => {
@@ -60,9 +67,29 @@ export default function DateInput({ value, onChange, label, className, disabled 
 
   const bsDisplay = value ? adToBS(value) : null;
   const effectiveMode = displayBsDate ? mode : 'AD';
-  const alternateText = effectiveMode === 'AD'
-    ? (displayBsDate && bsDisplay ? `BS: ${formatBS(bsDisplay)}` : '')
-    : (value ? `AD: ${formatAD(value)}` : (bsText.length === 10 && (() => { const p = bsText.split('-').map(Number); return !isValidBSDate(p[0],p[1],p[2]); })() ? '⚠ Invalid BS date' : ''));
+  
+  let alternateText = '';
+  if (effectiveMode === 'AD') {
+    alternateText = displayBsDate && bsDisplay ? `BS: ${formatBS(bsDisplay)}` : '';
+  } else {
+    if (value) alternateText = `AD: ${formatAD(value)}`;
+    else if (bsText.length === 10) {
+      const p = bsText.split('-').map(Number);
+      if (!isValidBSDate(p[0],p[1],p[2])) {
+        alternateText = '⚠ Invalid BS date';
+      } else {
+        const ad = bsToAD(p[0],p[1],p[2]);
+        if (isOutOfBounds(ad)) alternateText = `⚠ Out of bounds (${min || 'Any'} to ${max || 'Any'})`;
+      }
+    }
+  }
+
+  const isBsError = effectiveMode === 'BS' && bsText.length === 10 && (() => { 
+    const p = bsText.split('-').map(Number); 
+    if (!isValidBSDate(p[0],p[1],p[2])) return true;
+    const ad = bsToAD(p[0],p[1],p[2]);
+    return isOutOfBounds(ad);
+  })();
 
   return (
     <div className={cn('space-y-1', className)}>
@@ -84,6 +111,8 @@ export default function DateInput({ value, onChange, label, className, disabled 
             value={value || ''}
             onChange={handleADChange}
             disabled={disabled}
+            min={min}
+            max={max}
             className="flex-1 min-w-0"
           />
         ) : (
@@ -96,7 +125,7 @@ export default function DateInput({ value, onChange, label, className, disabled 
             maxLength={10}
             className={cn(
               'flex-1 font-mono min-w-0',
-              bsText.length === 10 && (() => { const p = bsText.split('-').map(Number); return !isValidBSDate(p[0],p[1],p[2]); })() && 'border-destructive focus-visible:ring-destructive'
+              isBsError && 'border-destructive focus-visible:ring-destructive'
             )}
           />
         )}

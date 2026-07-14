@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useAuth } from '@/lib/AuthContext';
 import { useTheme } from '@/lib/ThemeContext';
 import { sajilo } from '@/api/sajiloClient';
@@ -16,7 +16,12 @@ import {
   BarChart, Bar, Legend
 } from 'recharts';
 
-import { fetchReportData } from '@/lib/reportDataFetcher';
+import { 
+  useItemsQuery, 
+  useCustomersQuery, 
+  useVendorsQuery, 
+  useDailyMetricsQuery 
+} from '@/hooks/useSajiloQuery';
 
 
 
@@ -28,97 +33,67 @@ function formatNPR(val) {
 
 export default function Dashboard() {
   const { availableCompanies, isLoadingAuth, activeCompany } = useAuth();
-  const [salesInvoices, setSalesInvoices] = useState([]);
-  const [purchaseInvoices, setPurchaseInvoices] = useState([]);
-  const [items, setItems] = useState([]);
-  const [partners, setPartners] = useState([]);
-  const [purchaseOrders, setPurchaseOrders] = useState([]);
-  const [loading, setLoading] = useState(true);
+  
+  // ── SWR Queries ──
+  const { data: items = [] } = useItemsQuery();
+  const { data: customers = [] } = useCustomersQuery();
+  const { data: vendors = [] } = useVendorsQuery();
+  const { data: metrics = [], isLoading: isLoadingMetrics } = useDailyMetricsQuery();
+  
+  const [recentSales, setRecentSales] = useState([]);
+  const [unpaidSalesCount, setUnpaidSalesCount] = useState(0);
+  const [pendingApprovals, setPendingApprovals] = useState([]);
+  
   const [amountsVisible, setAmountsVisible] = useState(true);
-  const [chartData, setChartData] = useState([]);
   const { theme } = useTheme();
-  // Track the company ID so useEffect re-runs on company switch
   const activeCompanyId = activeCompany?.id || null;
 
   useEffect(() => {
-    if (!activeCompanyId) return; // Don't fetch until company is set
+    if (!activeCompanyId) return;
 
-    // Reset state so stale data from the previous company is cleared immediately
-    setLoading(true);
-    setSalesInvoices([]);
-    setPurchaseInvoices([]);
-    setItems([]);
-    setPartners([]);
-    setPurchaseOrders([]);
-    setChartData([]);
-
-    const td = new Date();
-    const fd = new Date();
-    fd.setMonth(fd.getMonth() - 5);
-    fd.setDate(1);
-    
-    const fromDate = fd.toISOString().slice(0, 10);
-    const toDate = td.toISOString().slice(0, 10);
-
+    // Fetch optimized subsets of data
     Promise.all([
-      sajilo.entities.SalesInvoice.list('-created_date', 1000).catch(e => { console.error(e); return []; }),
-      sajilo.entities.PurchaseInvoice.list('-created_date', 1000).catch(e => { console.error(e); return []; }),
-      sajilo.entities.Item.list('-created_date', 1000).catch(e => { console.error(e); return []; }),
-      sajilo.entities.BusinessPartner.list('-created_date', 1000).catch(e => { console.error(e); return []; }),
-      sajilo.entities.PurchaseOrder.list('-created_date', 50).catch(e => { console.error(e); return []; }),
-      fetchReportData('sales_summary', fromDate, toDate).catch(e => { console.error(e); return []; }),
-      fetchReportData('purchase_summary', fromDate, toDate).catch(e => { console.error(e); return []; })
-    ]).then(([si, pi, it, bp, po, salesSum, purchSum]) => {
-      setSalesInvoices(si);
-      setPurchaseInvoices(pi);
-      setItems(it);
-      setPartners(bp);
-      setPurchaseOrders(po);
-
-      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-      const monthlyMap = {};
-      
-      for (let i = 5; i >= 0; i--) {
-        const d = new Date();
-        d.setMonth(d.getMonth() - i);
-        const mKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-        monthlyMap[mKey] = { month: monthNames[d.getMonth()], sortKey: mKey, sales: 0, purchases: 0 };
-      }
-
-      if (!salesSum || salesSum.length === 0) {
-        salesSum = si.filter(i => i.status === 'Posted' && i.invoice_date >= fromDate && i.invoice_date <= toDate)
-          .map(i => ({ invoice_date: i.invoice_date, grand_total: i.grand_total }));
-      }
-      if (!purchSum || purchSum.length === 0) {
-        purchSum = pi.filter(i => i.status === 'Posted' && i.invoice_date >= fromDate && i.invoice_date <= toDate)
-          .map(i => ({ invoice_date: i.invoice_date, grand_total: i.grand_total }));
-      }
-
-      salesSum.forEach(s => {
-        if (s.invoice_date) {
-          const mKey = s.invoice_date.substring(0, 7);
-          if (monthlyMap[mKey]) monthlyMap[mKey].sales += s.grand_total || 0;
-        }
-      });
-
-      purchSum.forEach(p => {
-        if (p.invoice_date) {
-          const mKey = p.invoice_date.substring(0, 7);
-          if (monthlyMap[mKey]) monthlyMap[mKey].purchases += p.grand_total || 0;
-        }
-      });
-
-      setChartData(Object.values(monthlyMap).sort((a, b) => a.sortKey.localeCompare(b.sortKey)));
-      setLoading(false);
+      sajilo.entities.SalesInvoice.filter({ status: 'Posted' }, '-created_date', 5).catch(e => []),
+      sajilo.entities.SalesInvoice.filter({ payment_status: 'Unpaid', status: 'Posted' }, '-created_date').catch(e => []),
+      sajilo.entities.PurchaseOrder.filter({ status: 'Pending Approval' }).catch(e => []),
+    ]).then(([rs, us, pa]) => {
+      setRecentSales(rs || []);
+      setUnpaidSalesCount((us || []).length);
+      setPendingApprovals(pa || []);
     });
   }, [activeCompanyId]);
 
-  const totalSales = salesInvoices.filter(i => i.status === 'Posted').reduce((s, inv) => s + (inv.grand_total || 0), 0);
-  const totalPurchases = purchaseInvoices.filter(i => i.status === 'Posted').reduce((s, inv) => s + (inv.grand_total || 0), 0);
-  const unpaidSales = salesInvoices.filter(i => i.payment_status === 'Unpaid' && i.status === 'Posted').length;
+  // Aggregate daily metrics into monthly chart data
+  const chartData = useMemo(() => {
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const monthlyMap = {};
+    
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date();
+      d.setMonth(d.getMonth() - i);
+      const mKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      monthlyMap[mKey] = { month: monthNames[d.getMonth()], sortKey: mKey, sales: 0, purchases: 0 };
+    }
+
+    metrics.forEach(m => {
+      if (m.metric_date) {
+        const mKey = m.metric_date.substring(0, 7);
+        if (monthlyMap[mKey]) {
+          monthlyMap[mKey].sales += (parseFloat(m.total_sales_amount) || 0);
+          monthlyMap[mKey].purchases += (parseFloat(m.total_purchases_amount) || 0);
+        }
+      }
+    });
+
+    return Object.values(monthlyMap).sort((a, b) => a.sortKey.localeCompare(b.sortKey));
+  }, [metrics]);
+
+  const totalSales = metrics.reduce((s, m) => s + (parseFloat(m.total_sales_amount) || 0), 0);
+  const totalPurchases = metrics.reduce((s, m) => s + (parseFloat(m.total_purchases_amount) || 0), 0); 
+  
   const lowStockItems = items.filter(i => i.quantity_on_hand <= i.reorder_level && i.reorder_level > 0);
-  const pendingApprovals = purchaseOrders.filter(po => po.status === 'Pending Approval');
-  const recentSales = salesInvoices.filter(i => i.status === 'Posted').slice(0, 5);
+
+  const loading = isLoadingAuth || isLoadingMetrics;
 
   const mask = (val) => amountsVisible ? val : '••••••';
 
@@ -210,7 +185,7 @@ export default function Dashboard() {
         <div className="snap-center shrink-0 w-[85vw] md:w-auto">
           <StatCard
             title="Unpaid Invoices"
-            value={mask(unpaidSales)}
+            value={mask(unpaidSalesCount)}
             subtitle="Accounts receivable"
             icon={FileText}
             color="red"
@@ -218,9 +193,9 @@ export default function Dashboard() {
         </div>
         <div className="snap-center shrink-0 w-[85vw] md:w-auto">
           <StatCard
-            title="Active Partners"
-            value={partners.filter(p => p.is_active !== false).length}
-            subtitle="Customers & vendors"
+            title="Active Customers"
+            value={customers.filter(c => c.is_active !== false).length}
+            subtitle="Registered Customers"
             icon={Users}
             color="blue"
           />
@@ -333,11 +308,11 @@ export default function Dashboard() {
             </div>
             <div className="flex justify-between items-center py-2 border-b border-border">
               <span className="text-sm text-muted-foreground">Total Customers</span>
-              <span className="font-semibold">{partners.filter(p => p.is_customer).length}</span>
+              <span className="font-semibold">{customers.length}</span>
             </div>
             <div className="flex justify-between items-center py-2">
               <span className="text-sm text-muted-foreground">Total Vendors</span>
-              <span className="font-semibold">{partners.filter(p => p.is_vendor).length}</span>
+              <span className="font-semibold">{vendors.length}</span>
             </div>
           </div>
         </div>

@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useDateFormat } from '@/lib/DateFormatContext';
+import { useAuth } from '@/lib/AuthContext';
 import { sajilo } from '@/api/sajiloClient';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -35,6 +36,8 @@ const STATUS_COLORS = {
 
 export default function GeneralLedger() {
   const { formatDate } = useDateFormat();
+  const { activeFiscalYear } = useAuth();
+  
   const [journals, setJournals] = useState([]);
   const [accounts, setAccounts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -45,6 +48,13 @@ export default function GeneralLedger() {
   const [dateTo, setDateTo] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [selectedJournal, setSelectedJournal] = useState(null);
+
+  useEffect(() => {
+    if (activeFiscalYear) {
+      setDateFrom(activeFiscalYear.start_date);
+      setDateTo(activeFiscalYear.end_date);
+    }
+  }, [activeFiscalYear]);
 
   const fetchData = () => {
     setLoading(true);

@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { Outlet, useLocation, Navigate } from 'react-router-dom';
 import { useAuth, usePermissions } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
+import { AlertCircle } from 'lucide-react';
 
 const DefaultFallback = () => (
   <div className="fixed inset-0 flex items-center justify-center">
@@ -22,8 +23,22 @@ const AccessDenied = () => (
   </div>
 );
 
+const FiscalYearRequired = () => (
+  <div className="flex flex-col items-center justify-center min-h-[60vh]">
+    <AlertCircle className="w-16 h-16 text-destructive mb-4" />
+    <h1 className="text-3xl font-bold text-foreground mb-2">Active Fiscal Year Required</h1>
+    <h2 className="text-xl font-medium text-muted-foreground mb-4">Cannot Access Transactions</h2>
+    <p className="text-slate-500 mb-6 max-w-md text-center">
+      To view or create transactions, your company must have an active fiscal year. Please navigate to Settings &gt; Financial Settings &gt; Fiscal Years to create and set an active fiscal year.
+    </p>
+    <a href="/settings/financial/fiscal-years" className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors">
+      Go to Fiscal Year Settings
+    </a>
+  </div>
+);
+
 export default function ProtectedRoute({ fallback = <DefaultFallback />, unauthenticatedElement }) {
-  const { user, isAuthenticated, isLoadingAuth, authChecked, authError, checkUserAuth } = useAuth();
+  const { user, isAuthenticated, isLoadingAuth, authChecked, authError, checkUserAuth, activeFiscalYear } = useAuth();
   const { sidebarVisibility } = usePermissions();
   const location = useLocation();
 
@@ -67,6 +82,15 @@ export default function ProtectedRoute({ fallback = <DefaultFallback />, unauthe
     if (!hasPathAccess && sidebarVisibility.length > 0) {
       return <AccessDenied />;
     }
+  }
+
+  // Global Fiscal Year Guardrail for transactions
+  const transactionRoutes = [
+    '/pos', '/sales/quotations', '/sales/orders', '/sales/invoices', '/sales/returns',
+    '/purchase/orders', '/purchase/invoices', '/purchase/returns', '/treasury/vouchers'
+  ];
+  if (!activeFiscalYear && transactionRoutes.some(route => path.startsWith(route))) {
+    return <FiscalYearRequired />;
   }
 
   return <Outlet />;

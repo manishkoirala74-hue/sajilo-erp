@@ -11,10 +11,14 @@ const GLMapping = () => {
   const { draftSettings, updateDraftSettings, setServerSettings, resetDraft } = useSettingsStore();
 
   const handleSave = async () => {
-    // Merge draft settings with server settings on explicit save
-    // Real implementation would make API call here
-    setServerSettings({ ...draftSettings });
-    toast.success("GL Account Mappings saved successfully");
+    try {
+      await sajilo.entities.CompanySettings.update(draftSettings.id, draftSettings);
+      setServerSettings({ ...draftSettings });
+      toast.success("GL Account Mappings saved successfully");
+    } catch (e) {
+      console.error(e);
+      toast.error("Failed to save GL Account Mappings");
+    }
   };
 
   return (

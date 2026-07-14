@@ -1,7 +1,7 @@
-import { Search, ChevronLeft, ChevronRight } from 'lucide-react';
-import { useState, useMemo } from 'react';
+import { Search } from 'lucide-react';
+import { useState, useMemo, forwardRef } from 'react';
 import { useDateFormat } from '@/lib/DateFormatContext';
-import { Button } from '@/components/ui/button';
+import { TableVirtuoso } from 'react-virtuoso';
 
 const getAlignClass = (key = '', label = '') => {
   const k = String(key + label).toLowerCase();
@@ -14,35 +14,26 @@ const getAlignClass = (key = '', label = '') => {
   return 'text-align-left';
 };
 
-export default function DataTable({ columns, data, searchKey, loading }) {
+export default function DataTable({ columns, data, searchKey, loading, onEndReached }) {
   const { formatDate } = useDateFormat();
   const [search, setSearch] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
-  const rowsPerPage = 50;
 
   const filtered = useMemo(() => {
-    return searchKey
+    return searchKey && search
       ? (data || []).filter(row =>
           String(row[searchKey] || '').toLowerCase().includes(search.toLowerCase())
         )
       : (data || []);
   }, [data, searchKey, search]);
 
-  const totalPages = Math.ceil(filtered.length / rowsPerPage);
-  const paginatedData = useMemo(() => {
-    const startIndex = (currentPage - 1) * rowsPerPage;
-    return filtered.slice(startIndex, startIndex + rowsPerPage);
-  }, [filtered, currentPage]);
-
   const handleSearchChange = (e) => {
     setSearch(e.target.value);
-    setCurrentPage(1); // Reset to first page on search
   };
 
   return (
-    <div className="bg-card rounded-xl border border-border overflow-hidden">
+    <div className="bg-card rounded-xl border border-border overflow-hidden flex flex-col h-full" style={{ minHeight: '400px' }}>
       {searchKey && (
-        <div className="p-4 border-b border-border">
+        <div className="p-4 border-b border-border shrink-0">
           <div className="flex items-center gap-2 bg-muted rounded-lg px-3 py-2 max-w-xs">
             <Search className="w-4 h-4 text-muted-foreground" />
             <input
@@ -55,23 +46,21 @@ export default function DataTable({ columns, data, searchKey, loading }) {
           </div>
         </div>
       )}
-      <div className="table-scroll-container">
-        <table className="table-fluid-grid">
-          <thead>
-            <tr className="bg-muted/50 border-b border-border">
-              {columns.map(col => {
-                const alignClass = getAlignClass(col.key, col.label);
-                return (
-                  <th key={col.key} className={`cell-density text-xs font-semibold text-muted-foreground uppercase tracking-wider ${alignClass}`}>
+      
+      <div className="flex-1 overflow-hidden">
+        {loading && (!data || data.length === 0) ? (
+          <table className="table-fluid-grid w-full">
+            <thead>
+              <tr className="bg-muted/50 border-b border-border">
+                {columns.map(col => (
+                  <th key={col.key} className={`cell-density text-xs font-semibold text-muted-foreground uppercase tracking-wider ${getAlignClass(col.key, col.label)}`}>
                     {col.label}
                   </th>
-                );
-              })}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border">
-            {loading ? (
-              Array(5).fill(0).map((_, i) => (
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {Array(15).fill(0).map((_, i) => (
                 <tr key={i}>
                   {columns.map(col => (
                     <td key={col.key} className="cell-density">
@@ -79,65 +68,59 @@ export default function DataTable({ columns, data, searchKey, loading }) {
                     </td>
                   ))}
                 </tr>
-              ))
-            ) : paginatedData.length === 0 ? (
-              <tr>
-                <td colSpan={columns.length} className="cell-density text-center text-muted-foreground text-sm">
-                  No records found
-                </td>
+              ))}
+            </tbody>
+          </table>
+        ) : filtered.length === 0 ? (
+          <div className="p-8 text-center text-muted-foreground text-sm">
+            No records found
+          </div>
+        ) : (
+          <TableVirtuoso
+            style={{ height: '100%' }}
+            data={filtered}
+            endReached={onEndReached}
+            components={{
+              Table: forwardRef((props, ref) => <table className="table-fluid-grid w-full" {...props} ref={ref} />),
+              TableHead: forwardRef((props, ref) => <thead {...props} ref={ref} />),
+              TableRow: forwardRef((props, ref) => <tr className="hover:bg-muted/30 transition-colors border-b border-border" {...props} ref={ref} />),
+              TableBody: forwardRef((props, ref) => <tbody className="divide-y divide-border" {...props} ref={ref} />),
+            }}
+            fixedHeaderContent={() => (
+              <tr className="bg-muted border-b border-border shadow-sm">
+                {columns.map(col => {
+                  const alignClass = getAlignClass(col.key, col.label);
+                  return (
+                    <th key={col.key} className={`cell-density text-xs font-semibold text-muted-foreground uppercase tracking-wider bg-muted ${alignClass}`}>
+                      {col.label}
+                    </th>
+                  );
+                })}
               </tr>
-            ) : (
-              paginatedData.map((row, idx) => (
-                <tr key={row.id || idx} className="hover:bg-muted/30 transition-colors">
-                  {columns.map(col => {
-                    const alignClass = getAlignClass(col.key, col.label);
-                    return (
-                      <td key={col.key} className={`cell-density text-sm text-foreground ${alignClass}`}>
-                        {col.render
-                          ? col.render(row[col.key], row)
-                          : col.isDate
-                            ? (row[col.key] ? formatDate(row[col.key]) : '—')
-                            : row[col.key] ?? '—'}
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))
             )}
-          </tbody>
-        </table>
+            itemContent={(index, row) => (
+              <>
+                {columns.map(col => {
+                  const alignClass = getAlignClass(col.key, col.label);
+                  return (
+                    <td key={col.key} className={`cell-density text-sm text-foreground bg-card ${alignClass}`}>
+                      {col.render
+                        ? col.render(row[col.key], row)
+                        : col.isDate
+                          ? (row[col.key] ? formatDate(row[col.key]) : '—')
+                          : row[col.key] ?? '—'}
+                    </td>
+                  );
+                })}
+              </>
+            )}
+          />
+        )}
       </div>
-      {!loading && (
-        <div className="px-4 py-3 border-t border-border bg-muted/20 flex items-center justify-between">
-          <p className="text-xs text-muted-foreground">
-            Showing {paginatedData.length > 0 ? (currentPage - 1) * rowsPerPage + 1 : 0} to {Math.min(currentPage * rowsPerPage, filtered.length)} of {filtered.length} entries
-          </p>
-          
-          {totalPages > 1 && (
-            <div className="flex items-center gap-2">
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-                className="h-8 px-2"
-              >
-                <ChevronLeft className="w-4 h-4 mr-1" /> Prev
-              </Button>
-              <span className="text-xs text-muted-foreground">
-                Page {currentPage} of {totalPages}
-              </span>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                disabled={currentPage === totalPages}
-                className="h-8 px-2"
-              >
-                Next <ChevronRight className="w-4 h-4 ml-1" />
-              </Button>
-            </div>
-          )}
+      
+      {loading && data && data.length > 0 && (
+        <div className="p-2 text-center text-xs text-muted-foreground bg-muted/20 shrink-0">
+          Loading more...
         </div>
       )}
     </div>

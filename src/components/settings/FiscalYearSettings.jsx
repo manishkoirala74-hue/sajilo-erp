@@ -9,8 +9,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { toast } from 'sonner';
 import FiscalYearClosingWizard from './FiscalYearClosingWizard';
 import DateInput from '@/components/shared/DateInput';
+import { useAuth } from '@/lib/AuthContext';
 
 export default function FiscalYearSettings() {
+  const { refreshGlobalSettings } = useAuth();
   const [fiscalYears, setFiscalYears] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -54,10 +56,18 @@ export default function FiscalYearSettings() {
 
     setSaving(true);
     try {
+      if (form.is_active) {
+        // Only one can be active, deactivate others
+        const activeOnes = fiscalYears.filter(f => f.is_active);
+        for (const f of activeOnes) {
+          await sajilo.entities.FiscalYear.update(f.id, { is_active: false });
+        }
+      }
       await sajilo.entities.FiscalYear.create(form);
       toast.success('Fiscal Year created successfully');
       setShowForm(false);
-      fetchFiscalYears();
+      await fetchFiscalYears();
+      await refreshGlobalSettings();
     } catch (e) {
       console.error(e);
       toast.error('Failed to create Fiscal Year');
@@ -80,7 +90,8 @@ export default function FiscalYearSettings() {
       toast.success('Fiscal year unlocked and reopened.');
       setReopenDialog(null);
       setReopenReason('');
-      fetchFiscalYears();
+      await fetchFiscalYears();
+      await refreshGlobalSettings();
     } catch (e) {
       console.error(e);
       toast.error('Failed to reopen fiscal year.');
@@ -130,10 +141,28 @@ export default function FiscalYearSettings() {
                   </td>
                   <td className="cell-density ">
                     <div className="flex justify-center">
-                      <span className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium ${fy.is_active ? 'bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400' : 'bg-gray-100 text-gray-600'}`}>
+                      <button 
+                        onClick={async () => {
+                          if (!fy.is_active) {
+                            // Deactivate all others, activate this one
+                            try {
+                              const activeOnes = fiscalYears.filter(f => f.is_active);
+                              for (const f of activeOnes) {
+                                await sajilo.entities.FiscalYear.update(f.id, { is_active: false });
+                              }
+                              await sajilo.entities.FiscalYear.update(fy.id, { is_active: true });
+                              await fetchFiscalYears();
+                              await refreshGlobalSettings();
+                              toast.success('Fiscal Year activated.');
+                            } catch (e) {
+                              toast.error('Failed to activate Fiscal Year.');
+                            }
+                          }
+                        }}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium ${fy.is_active ? 'bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400 cursor-default' : 'bg-gray-100 text-gray-600 hover:bg-gray-200 cursor-pointer transition-colors'}`}>
                         {fy.is_active ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Circle className="w-3.5 h-3.5" />}
-                        {fy.is_active ? 'Active' : 'Inactive'}
-                      </span>
+                        {fy.is_active ? 'Active' : 'Set Active'}
+                      </button>
                     </div>
                   </td>
                   <td className="cell-density ">

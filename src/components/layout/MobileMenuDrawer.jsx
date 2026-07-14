@@ -12,6 +12,8 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useSettingsStore } from '@/store/settingsStore';
+import { useAuth } from '@/lib/AuthContext';
+import { toast } from 'sonner';
 
 // Helper to build nav (reused from Sidebar logic or simplified)
 const buildNavGroups = (settings) => {
@@ -73,6 +75,7 @@ const buildNavGroups = (settings) => {
 
 export default function MobileMenuDrawer({ isOpen, onClose }) {
   const location = useLocation();
+  const { activeFiscalYear } = useAuth();
   const [navGroups, setNavGroups] = useState([]);
   const [expandedGroups, setExpandedGroups] = useState([]);
 
@@ -138,22 +141,38 @@ export default function MobileMenuDrawer({ isOpen, onClose }) {
                 
                 {expandedGroups.includes(group.label) && (
                   <div className="space-y-1 mt-1 mb-3 pl-1">
-                    {group.items.map((item) => (
-                      <Link
-                        key={item.path}
-                        to={item.path}
-                        onClick={onClose}
-                        className={cn(
-                          "flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium transition-all touch-target",
-                          isActive(item.path)
-                            ? "bg-primary text-white shadow-sm"
-                            : "text-slate-400 hover:text-white hover:bg-slate-800/50"
-                        )}
-                      >
-                        <item.icon className="w-5 h-5 shrink-0" />
-                        <span>{item.label}</span>
-                      </Link>
-                    ))}
+                    {group.items.map((item) => {
+                      const disabledPaths = [
+                        '/pos', '/sales/invoices', '/sales/returns', 
+                        '/purchase/invoices', '/purchase/returns', '/treasury/vouchers'
+                      ];
+                      const isDisabled = !activeFiscalYear && disabledPaths.includes(item.path);
+
+                      return (
+                        <Link
+                          key={item.path}
+                          to={isDisabled ? '#' : item.path}
+                          onClick={(e) => {
+                            if (isDisabled) {
+                              e.preventDefault();
+                              toast.error("No active fiscal year. Please create one to access transactions.");
+                            } else {
+                              onClose();
+                            }
+                          }}
+                          className={cn(
+                            "flex items-center gap-3 px-3 py-2.5 rounded-xl text-[15px] font-medium transition-colors",
+                            isActive(item.path)
+                              ? "bg-primary text-primary-foreground"
+                              : "text-slate-600 active:bg-slate-100",
+                            isDisabled && "opacity-50 cursor-not-allowed"
+                          )}
+                        >
+                          <item.icon className="w-5 h-5 shrink-0" />
+                          <span>{item.label}</span>
+                        </Link>
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -164,3 +183,4 @@ export default function MobileMenuDrawer({ isOpen, onClose }) {
     </Drawer.Root>
   );
 }
+

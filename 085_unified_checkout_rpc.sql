@@ -35,38 +35,43 @@ BEGIN
     
     IF v_invoice_id IS NOT NULL THEN
         SELECT status INTO v_existing_status FROM "SalesInvoice" WHERE id = v_invoice_id;
-        IF v_existing_status = 'Posted' THEN
+        IF FOUND AND v_existing_status = 'Posted' THEN
             RAISE EXCEPTION 'ERR_ALREADY_POSTED: Invoice is already posted and cannot be modified.';
         END IF;
-
-        UPDATE "SalesInvoice" SET
-            invoice_number = p_payload->>'invoice_number',
-            customer_id = (p_payload->>'customer_id')::UUID,
-            customer_name = p_payload->>'customer_name',
-            sales_order_id = NULLIF(TRIM(p_payload->>'sales_order_id'), '')::UUID,
-            invoice_date = (p_payload->>'invoice_date')::TIMESTAMP WITH TIME ZONE,
-            due_date = (p_payload->>'due_date')::TIMESTAMP WITH TIME ZONE,
-            status = 'Posted',
-            payment_status = COALESCE(p_payload->>'payment_status', 'Unpaid'),
-            goods_subtotal = (p_payload->>'goods_subtotal')::NUMERIC,
-            sundry_charges_total = (p_payload->>'sundry_charges_total')::NUMERIC,
-            total_tax_amount = (p_payload->>'total_tax_amount')::NUMERIC,
-            grand_total = (p_payload->>'grand_total')::NUMERIC,
-            notes = p_payload->>'notes',
-            line_items = p_payload->'line_items',
-            company_id = (p_payload->>'company_id')::UUID,
-            godown_id = (p_payload->>'godown_id')::UUID
-        WHERE id = v_invoice_id;
     ELSE
-        INSERT INTO "SalesInvoice" (
-            invoice_number, customer_id, customer_name, sales_order_id, invoice_date, due_date, status, payment_status,
-            goods_subtotal, sundry_charges_total, total_tax_amount, grand_total, notes, line_items, company_id, godown_id
-        ) VALUES (
-            p_payload->>'invoice_number', (p_payload->>'customer_id')::UUID, p_payload->>'customer_name', NULLIF(TRIM(p_payload->>'sales_order_id'), '')::UUID,
-            (p_payload->>'invoice_date')::TIMESTAMP WITH TIME ZONE, (p_payload->>'due_date')::TIMESTAMP WITH TIME ZONE, 'Posted', COALESCE(p_payload->>'payment_status', 'Unpaid'),
-            (p_payload->>'goods_subtotal')::NUMERIC, (p_payload->>'sundry_charges_total')::NUMERIC, (p_payload->>'total_tax_amount')::NUMERIC, (p_payload->>'grand_total')::NUMERIC,
-            p_payload->>'notes', p_payload->'line_items', (p_payload->>'company_id')::UUID, (p_payload->>'godown_id')::UUID
-        ) RETURNING id INTO v_invoice_id;
+        v_invoice_id := gen_random_uuid();
+    END IF;
+
+    INSERT INTO "SalesInvoice" (
+        id, invoice_number, customer_id, customer_name, sales_order_id, invoice_date, due_date, status, payment_status,
+        goods_subtotal, sundry_charges_total, total_tax_amount, grand_total, notes, line_items, company_id, godown_id
+    ) VALUES (
+        v_invoice_id, p_payload->>'invoice_number', NULLIF(TRIM(p_payload->>'customer_id'), '')::UUID, p_payload->>'customer_name', NULLIF(TRIM(p_payload->>'sales_order_id'), '')::UUID,
+        (p_payload->>'invoice_date')::TIMESTAMP WITH TIME ZONE, (p_payload->>'due_date')::TIMESTAMP WITH TIME ZONE, 'Posted', COALESCE(p_payload->>'payment_status', 'Unpaid'),
+        (p_payload->>'goods_subtotal')::NUMERIC, (p_payload->>'sundry_charges_total')::NUMERIC, (p_payload->>'total_tax_amount')::NUMERIC, (p_payload->>'grand_total')::NUMERIC,
+        p_payload->>'notes', p_payload->'line_items', NULLIF(TRIM(p_payload->>'company_id'), '')::UUID, NULLIF(TRIM(p_payload->>'godown_id'), '')::UUID
+    )
+    ON CONFLICT (id) DO UPDATE SET
+        invoice_number = EXCLUDED.invoice_number,
+        customer_id = EXCLUDED.customer_id,
+        customer_name = EXCLUDED.customer_name,
+        sales_order_id = EXCLUDED.sales_order_id,
+        invoice_date = EXCLUDED.invoice_date,
+        due_date = EXCLUDED.due_date,
+        status = EXCLUDED.status,
+        payment_status = EXCLUDED.payment_status,
+        goods_subtotal = EXCLUDED.goods_subtotal,
+        sundry_charges_total = EXCLUDED.sundry_charges_total,
+        total_tax_amount = EXCLUDED.total_tax_amount,
+        grand_total = EXCLUDED.grand_total,
+        notes = EXCLUDED.notes,
+        line_items = EXCLUDED.line_items,
+        company_id = EXCLUDED.company_id,
+        godown_id = EXCLUDED.godown_id
+    RETURNING id INTO v_invoice_id;
+
+    IF v_invoice_id IS NULL THEN
+        RAISE EXCEPTION 'ERR_SILENT_FAIL: Failed to insert or update Sales Invoice.';
     END IF;
 
     RETURN v_invoice_id;
@@ -165,38 +170,43 @@ BEGIN
     
     IF v_invoice_id IS NOT NULL THEN
         SELECT status INTO v_existing_status FROM "PurchaseInvoice" WHERE id = v_invoice_id;
-        IF v_existing_status = 'Posted' THEN
+        IF FOUND AND v_existing_status = 'Posted' THEN
             RAISE EXCEPTION 'ERR_ALREADY_POSTED: Invoice is already posted and cannot be modified.';
         END IF;
-
-        UPDATE "PurchaseInvoice" SET
-            invoice_number = p_payload->>'invoice_number',
-            vendor_id = (p_payload->>'vendor_id')::UUID,
-            vendor_name = p_payload->>'vendor_name',
-            purchase_order_id = NULLIF(TRIM(p_payload->>'purchase_order_id'), '')::UUID,
-            invoice_date = (p_payload->>'invoice_date')::TIMESTAMP WITH TIME ZONE,
-            due_date = (p_payload->>'due_date')::TIMESTAMP WITH TIME ZONE,
-            status = 'Posted',
-            payment_status = COALESCE(p_payload->>'payment_status', 'Unpaid'),
-            goods_subtotal = (p_payload->>'goods_subtotal')::NUMERIC,
-            sundry_charges_total = (p_payload->>'sundry_charges_total')::NUMERIC,
-            total_tax_amount = (p_payload->>'total_tax_amount')::NUMERIC,
-            grand_total = (p_payload->>'grand_total')::NUMERIC,
-            notes = p_payload->>'notes',
-            line_items = p_payload->'line_items',
-            company_id = (p_payload->>'company_id')::UUID,
-            godown_id = (p_payload->>'godown_id')::UUID
-        WHERE id = v_invoice_id;
     ELSE
-        INSERT INTO "PurchaseInvoice" (
-            invoice_number, vendor_id, vendor_name, purchase_order_id, invoice_date, due_date, status, payment_status,
-            goods_subtotal, sundry_charges_total, total_tax_amount, grand_total, notes, line_items, company_id, godown_id
-        ) VALUES (
-            p_payload->>'invoice_number', (p_payload->>'vendor_id')::UUID, p_payload->>'vendor_name', NULLIF(TRIM(p_payload->>'purchase_order_id'), '')::UUID,
-            (p_payload->>'invoice_date')::TIMESTAMP WITH TIME ZONE, (p_payload->>'due_date')::TIMESTAMP WITH TIME ZONE, 'Posted', COALESCE(p_payload->>'payment_status', 'Unpaid'),
-            (p_payload->>'goods_subtotal')::NUMERIC, (p_payload->>'sundry_charges_total')::NUMERIC, (p_payload->>'total_tax_amount')::NUMERIC, (p_payload->>'grand_total')::NUMERIC,
-            p_payload->>'notes', p_payload->'line_items', (p_payload->>'company_id')::UUID, (p_payload->>'godown_id')::UUID
-        ) RETURNING id INTO v_invoice_id;
+        v_invoice_id := gen_random_uuid();
+    END IF;
+
+    INSERT INTO "PurchaseInvoice" (
+        id, invoice_number, vendor_id, vendor_name, po_reference_id, invoice_date, due_date, status, payment_status,
+        subtotal, landed_cost_total, vat_amount, grand_total, notes, line_items, company_id, godown_id
+    ) VALUES (
+        v_invoice_id, p_payload->>'invoice_number', NULLIF(TRIM(p_payload->>'vendor_id'), '')::UUID, p_payload->>'vendor_name', NULLIF(TRIM(p_payload->>'po_reference_id'), '')::UUID,
+        (p_payload->>'invoice_date')::TIMESTAMP WITH TIME ZONE, (p_payload->>'due_date')::TIMESTAMP WITH TIME ZONE, 'Posted', COALESCE(p_payload->>'payment_status', 'Unpaid'),
+        (p_payload->>'subtotal')::NUMERIC, (p_payload->>'landed_cost_total')::NUMERIC, (p_payload->>'vat_amount')::NUMERIC, (p_payload->>'grand_total')::NUMERIC,
+        p_payload->>'notes', p_payload->'line_items', NULLIF(TRIM(p_payload->>'company_id'), '')::UUID, NULLIF(TRIM(p_payload->>'godown_id'), '')::UUID
+    )
+    ON CONFLICT (id) DO UPDATE SET
+        invoice_number = EXCLUDED.invoice_number,
+        vendor_id = EXCLUDED.vendor_id,
+        vendor_name = EXCLUDED.vendor_name,
+        po_reference_id = EXCLUDED.po_reference_id,
+        invoice_date = EXCLUDED.invoice_date,
+        due_date = EXCLUDED.due_date,
+        status = EXCLUDED.status,
+        payment_status = EXCLUDED.payment_status,
+        subtotal = EXCLUDED.subtotal,
+        landed_cost_total = EXCLUDED.landed_cost_total,
+        vat_amount = EXCLUDED.vat_amount,
+        grand_total = EXCLUDED.grand_total,
+        notes = EXCLUDED.notes,
+        line_items = EXCLUDED.line_items,
+        company_id = EXCLUDED.company_id,
+        godown_id = EXCLUDED.godown_id
+    RETURNING id INTO v_invoice_id;
+
+    IF v_invoice_id IS NULL THEN
+        RAISE EXCEPTION 'ERR_SILENT_FAIL: Failed to insert or update Purchase Invoice.';
     END IF;
 
     RETURN v_invoice_id;
@@ -286,6 +296,7 @@ CREATE TABLE IF NOT EXISTS public."StockTransfer" (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 ALTER TABLE public."StockTransfer" ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "select_StockTransfer" ON public."StockTransfer";
 CREATE POLICY "select_StockTransfer" ON public."StockTransfer" FOR SELECT USING (auth.role() = 'authenticated');
 
 CREATE OR REPLACE FUNCTION rpc_checkout_stock_transfer(p_payload JSONB, p_idempotency_key UUID)
@@ -330,10 +341,11 @@ BEGIN
             line_items = v_items
         WHERE id = v_transfer_id;
     ELSE
-        INSERT INTO "StockTransfer" (
-            company_id, transfer_number, source_godown_id, dest_godown_id, transfer_date, status, notes, line_items
+        INSERT INTO public."StockTransfer" (
+            id, company_id, transfer_number, source_godown_id, dest_godown_id, transfer_date, status, notes, line_items
         ) VALUES (
-            v_company_id, p_payload->>'transfer_number', v_source_godown_id, v_dest_godown_id, v_transfer_date, 'Transferred', p_payload->>'notes', v_items
+            COALESCE(v_transfer_id, gen_random_uuid()), NULLIF(TRIM(p_payload->>'company_id'), '')::UUID, p_payload->>'transfer_number', NULLIF(TRIM(p_payload->>'source_godown_id'), '')::UUID,
+            NULLIF(TRIM(p_payload->>'dest_godown_id'), '')::UUID, (p_payload->>'transfer_date')::TIMESTAMP WITH TIME ZONE, 'Transferred', p_payload->>'notes', p_payload->'line_items'
         ) RETURNING id INTO v_transfer_id;
     END IF;
 

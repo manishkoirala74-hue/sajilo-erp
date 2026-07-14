@@ -40,7 +40,7 @@ export default function POSSales() {
   const [selectedCashAccountId, setSelectedCashAccountId] = useState('');
   const [selectedCashAccountName, setSelectedCashAccountName] = useState('');
   const [taxTypes, setTaxTypes] = useState([]);
-  const { globalSettings, hasAccess } = useAuth();
+  const { globalSettings, hasAccess, activeFiscalYear } = useAuth();
   const [showNegativeStockWarning, setShowNegativeStockWarning] = useState(false);
   const [negativeStockItems, setNegativeStockItems] = useState([]);
 
@@ -162,12 +162,28 @@ export default function POSSales() {
       return;
     }
 
+    if (['Cash', 'Bank'].includes(paymentMethod) && !selectedCashAccountId) {
+      toast.error('Select a Cash/Bank ledger account for this POS drawer');
+      return;
+    }
+
     setProcessing(true);
-    const idempotencyKey = crypto.randomUUID();
+    try {
+      const idempotencyKey = crypto.randomUUID();
     const saleNum = `POS-${new Date().getFullYear()}-${String(saleCount + 1).padStart(4, '0')}`;
+    
+    const getSafeDefaultDate = () => {
+      const today = format(new Date(), 'yyyy-MM-dd');
+      if (activeFiscalYear) {
+        if (today > activeFiscalYear.end_date) return activeFiscalYear.end_date;
+        if (today < activeFiscalYear.start_date) return activeFiscalYear.start_date;
+      }
+      return today;
+    };
+
     const sale = {
       sale_number: saleNum,
-      sale_date: format(new Date(), 'yyyy-MM-dd'),
+      sale_date: getSafeDefaultDate(),
       customer_name: customerName || 'Walk-in Customer',
       customer_id: customerId || null,
       payment_method: paymentMethod,
@@ -183,22 +199,38 @@ export default function POSSales() {
       line_items: cart,
       idempotency_key: idempotencyKey
     };
-    const createdSale = await sajilo.entities.POSSale.create(sale);
-    const [itemsMap, settings] = await Promise.all([loadItemsMap(cart.map(c => c.item_id)), loadSettings()]);
-    await postPOSSale({ ...sale, id: createdSale.id }, itemsMap, settings);
-    setLastReceipt(sale);
-    setCart([]);
-    setCustomerName('Walk-in Customer');
-    setDiscountPercent(0);
-    setAmountTendered(0);
-    setSaleCount(prev => prev + 1);
-    toast.success(`Sale ${saleNum} completed!`);
-    setProcessing(false);
+      const createdSale = await sajilo.entities.POSSale.create(sale);
+      const [itemsMap, settings] = await Promise.all([loadItemsMap(cart.map(c => c.item_id)), loadSettings()]);
+      await postPOSSale({ ...sale, id: createdSale.id }, itemsMap, settings);
+      setLastReceipt(sale);
+      setCart([]);
+      setCustomerName('Walk-in Customer');
+      setDiscountPercent(0);
+      setAmountTendered(0);
+      setSaleCount(prev => prev + 1);
+      toast.success(`Sale ${saleNum} completed!`);
+    } catch (err) {
+      toast.error(err.message || 'Error occurred while processing POS sale');
+    } finally {
+      setProcessing(false);
+    }
   };
 
+  const isMissingGL = globalSettings && (!globalSettings.gl_accounts_receivable_id || !globalSettings.gl_vat_payable_id || !globalSettings.gl_default_sales_account_id);
+
   return (
-    <div className="flex h-[calc(100vh-8rem)] gap-4">
-      {/* LEFT — Product Grid */}
+    <div className="flex flex-col h-[calc(100vh-8rem)]">
+      {isMissingGL && (
+        <div className="mb-4 bg-orange-50 border border-orange-200 text-orange-800 px-4 py-3 rounded-lg flex items-start gap-3 shrink-0">
+          <AlertCircle className="w-5 h-5 text-orange-600 mt-0.5 shrink-0" />
+          <div>
+            <h4 className="font-semibold">Action Required: Missing Global Configuration</h4>
+            <p className="text-sm mt-1">Default Accounts Receivable, VAT Payable, or Sales GL mappings are missing. Please configure them in Company Settings before using POS.</p>
+          </div>
+        </div>
+      )}
+      <div className="flex flex-1 gap-4 overflow-hidden">
+        {/* LEFT — Product Grid */}
       <div className="flex-1 flex flex-col overflow-hidden">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-xl font-bold text-foreground">Point of Sale</h2>
@@ -359,9 +391,10 @@ export default function POSSales() {
         </div>
 
         <div className="px-4 pb-4">
-          <Button className="w-full h-11 text-base font-semibold" onClick={processSale} disabled={processing || cart.length === 0}>
-            {processing ? 'Processing…' : `Charge ${fmt(grandTotal)}`}
-          </Button>
+            <Button className="w-full mt-4 h-14 text-lg font-bold shadow-lg rounded-xl"
+              onClick={processSale} disabled={cart.length === 0 || processing || isMissingGL}>
+              {processing ? 'Processing...' : 'Complete Sale'}
+            </Button>
         </div>
       </div>
 
@@ -472,6 +505,7 @@ export default function POSSales() {
           </div>
         </DialogContent>
       </Dialog>
+    </div>
     </div>
   );
 }

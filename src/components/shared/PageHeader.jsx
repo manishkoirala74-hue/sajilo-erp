@@ -1,6 +1,6 @@
 import { Button } from '@/components/ui/button';
 
-export default function PageHeader({ title, subtitle, action, actionLabel, actionIcon: Icon }) {
+export default function PageHeader({ title, subtitle, action, actionLabel, actionIcon: Icon, actionDisabled }) {
   return (
     <div className="flex items-start justify-between mb-6">
       <div>
@@ -8,7 +8,7 @@ export default function PageHeader({ title, subtitle, action, actionLabel, actio
         {subtitle && <p className="text-sm text-muted-foreground mt-0.5">{subtitle}</p>}
       </div>
       {action && (
-        <Button onClick={action} className="flex items-center gap-2">
+        <Button onClick={action} disabled={actionDisabled} className="flex items-center gap-2">
           {Icon && <Icon className="w-4 h-4" />}
           {actionLabel}
         </Button>

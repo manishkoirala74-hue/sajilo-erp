@@ -8,18 +8,18 @@ import { RefreshCw } from 'lucide-react';
 
 // Standard GL posting account mappings (Sub Ledger accounts)
 const GL_FIELDS = [
-  { key: 'gl_accounts_receivable',     label: 'Accounts Receivable (AR)',          desc: 'Default control account for customer credit balances' },
-  { key: 'gl_accounts_payable',        label: 'Accounts Payable (AP)',             desc: 'Default control account for vendor credit balances' },
-  { key: 'gl_cash_account',            label: 'Default Cash Account',              desc: 'Used for cash sales and purchases' },
-  { key: 'gl_bank_account',            label: 'Default Bank Account',              desc: 'Used for bank transfers/cheque sales and purchases' },
-  { key: 'gl_vat_payable',             label: 'VAT Payable Account',               desc: 'Control account for input and output VAT' },
-  { key: 'gl_sales_return_account',    label: 'Sales Returns & Allowances',        desc: 'Contra-revenue — debited on sales return' },
-  { key: 'gl_purchase_return_account', label: 'Purchase Returns & Allowances',     desc: 'Contra-COGS — credited on purchase return' },
-  { key: 'gl_default_sales_account',   label: 'Default Sales Revenue',             desc: 'Fallback if item has no sales account' },
-  { key: 'gl_default_cogs_account',    label: 'Default COGS',                      desc: 'Fallback if item has no purchase account' },
-  { key: 'gl_default_inventory_account', label: 'Default Inventory Asset',         desc: 'Fallback if item has no inventory account' },
-  { key: 'gl_stock_variance_account',  label: 'Stock Variance / Write-off',        desc: 'Used for stock adjustment journals & item deletion write-offs' },
-  { key: 'gl_opening_equity_account',  label: 'Opening Balance Equity',            desc: 'Credited when posting opening stock on item import' },
+  { key: 'gl_accounts_receivable',     label: 'Accounts Receivable (AR)',          desc: 'Default control account for customer credit balances', filterTypes: ['Asset'] },
+  { key: 'gl_accounts_payable',        label: 'Accounts Payable (AP)',             desc: 'Default control account for vendor credit balances', filterTypes: ['Liability'] },
+  { key: 'gl_cash_account',            label: 'Default Cash Account',              desc: 'Used for cash sales and purchases', filterTypes: ['Asset'] },
+  { key: 'gl_bank_account',            label: 'Default Bank Account',              desc: 'Used for bank transfers/cheque sales and purchases', filterTypes: ['Asset'] },
+  { key: 'gl_vat_payable',             label: 'VAT Payable Account',               desc: 'Control account for input and output VAT', filterTypes: ['Liability'] },
+  { key: 'gl_sales_return_account',    label: 'Sales Returns & Allowances',        desc: 'Contra-revenue — debited on sales return', filterTypes: ['Revenue'] },
+  { key: 'gl_purchase_return_account', label: 'Purchase Returns & Allowances',     desc: 'Contra-COGS — credited on purchase return', filterTypes: ['Expense'] },
+  { key: 'gl_default_sales_account',   label: 'Default Sales Revenue',             desc: 'Fallback if item has no sales account', filterTypes: ['Revenue'] },
+  { key: 'gl_default_cogs_account',    label: 'Default COGS',                      desc: 'Fallback if item has no purchase account', filterTypes: ['Expense'] },
+  { key: 'gl_default_inventory_account', label: 'Default Inventory Asset',         desc: 'Fallback if item has no inventory account', filterTypes: ['Asset'] },
+  { key: 'gl_stock_variance_account',  label: 'Stock Variance / Write-off',        desc: 'Used for stock adjustment journals & item deletion write-offs', filterTypes: ['Expense'] },
+  { key: 'gl_opening_equity_account',  label: 'Opening Balance Equity',            desc: 'Credited when posting opening stock on item import', filterTypes: ['Equity'] },
 ];
 
 // Ledger Group Parent mappings (Group Ledger accounts only)
@@ -197,34 +197,40 @@ export default function GLAccountSettings({ settings, onChange }) {
           </p>
         </div>
         <div className="grid grid-cols-1 gap-4">
-          {GL_FIELDS.map(f => (
-            <div key={f.key} className="flex items-center gap-4">
-              <div className="w-56 shrink-0">
-                <p className="text-sm font-medium">{f.label}</p>
-                <p className="text-xs text-muted-foreground">{f.desc}</p>
+          {GL_FIELDS.map(f => {
+            const options = f.filterTypes 
+              ? subAccounts.filter(a => f.filterTypes.includes(a.account_type)) 
+              : subAccounts;
+              
+            return (
+              <div key={f.key} className="flex items-center gap-4">
+                <div className="w-56 shrink-0">
+                  <p className="text-sm font-medium">{f.label}</p>
+                  <p className="text-xs text-muted-foreground">{f.desc}</p>
+                </div>
+                <div className="flex-1">
+                  <Select
+                    value={settings[`${f.key}_id`] || ''}
+                    onValueChange={v => handleSubChange(f.key, v)}
+                  >
+                    <SelectTrigger className="h-9">
+                      <SelectValue placeholder="— Select GL account —" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {options.map(a => (
+                        <SelectItem key={a.id} value={a.id}>
+                          {a.account_code} — {a.account_name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {settings[`${f.key}_name`] && (
+                    <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-0.5">✓ {settings[`${f.key}_name`]}</p>
+                  )}
+                </div>
               </div>
-              <div className="flex-1">
-                <Select
-                  value={settings[`${f.key}_id`] || ''}
-                  onValueChange={v => handleSubChange(f.key, v)}
-                >
-                  <SelectTrigger className="h-9">
-                    <SelectValue placeholder="— Select GL account —" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {subAccounts.map(a => (
-                      <SelectItem key={a.id} value={a.id}>
-                        {a.account_code} — {a.account_name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {settings[`${f.key}_name`] && (
-                  <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-0.5">✓ {settings[`${f.key}_name`]}</p>
-                )}
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>

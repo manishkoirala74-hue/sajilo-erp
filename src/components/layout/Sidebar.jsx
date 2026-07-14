@@ -109,7 +109,7 @@ export const buildNavGroups = (settings) => {
 export default function Sidebar({ collapsed, onToggle }) {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const { user, logout, activeFiscalYear } = useAuth();
   const { sidebarVisibility } = usePermissions();
   const [settings, setSettings] = useState(null);
   const [navGroups, setNavGroups] = useState(buildNavGroups(null));
@@ -250,16 +250,29 @@ export default function Sidebar({ collapsed, onToggle }) {
     const active = isActive(item.path);
     const isFav = favoritePaths.includes(item.path);
     
+    const disabledPaths = [
+      '/pos', '/sales/invoices', '/sales/returns', 
+      '/purchase/invoices', '/purchase/returns', '/treasury/vouchers'
+    ];
+    const isDisabled = !activeFiscalYear && disabledPaths.includes(item.path);
+    
     return (
       <Link
-        to={item.path}
+        to={isDisabled ? '#' : item.path}
         title={collapsed ? item.label : undefined}
+        onClick={(e) => {
+          if (isDisabled) {
+            e.preventDefault();
+            toast.error("No active fiscal year. Please create one to access transactions.");
+          }
+        }}
         className={cn(
           "group relative flex items-center gap-3 px-3 py-1.5 min-h-[40px] rounded-lg text-sm font-medium transition-all duration-200",
           active
             ? "bg-primary text-white shadow-sm"
             : "text-slate-400 hover:text-white hover:bg-sidebar-hover",
-          !collapsed && isSub && "ml-2"
+          !collapsed && isSub && "ml-2",
+          isDisabled && "opacity-50 cursor-not-allowed"
         )}
       >
         <item.icon className="w-4 h-4 shrink-0" />

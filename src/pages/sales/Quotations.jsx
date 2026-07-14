@@ -39,7 +39,7 @@ export default function Quotations() {
   const [quotations, setQuotations] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [items, setItems] = useState([]);
-  const { activeCompany } = useAuth();
+  const { activeCompany, activeFiscalYear } = useAuth();
   const [settings, setSettings] = useState(null);
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState('all');
@@ -123,8 +123,17 @@ export default function Quotations() {
     return `${prefix}-${year}-${String(next).padStart(3, '0')}${suffix}`;
   };
 
-  const makeEmpty = () => {
+  const getSafeDefaultDate = () => {
     const today = format(new Date(), 'yyyy-MM-dd');
+    if (activeFiscalYear) {
+      if (today > activeFiscalYear.end_date) return activeFiscalYear.end_date;
+      if (today < activeFiscalYear.start_date) return activeFiscalYear.start_date;
+    }
+    return today;
+  };
+
+  const makeEmpty = () => {
+    const today = getSafeDefaultDate();
     const validDays = settings?.quotation_validity_days || 30;
     return {
       id: crypto.randomUUID(),
@@ -306,6 +315,7 @@ export default function Quotations() {
         action={openNew}
         actionLabel="New Quotation"
         actionIcon={Plus}
+        actionDisabled={!activeFiscalYear}
       />
 
       {/* Status Tabs */}
@@ -366,10 +376,10 @@ export default function Quotations() {
                 <Input value={form.quotation_number || ''} onChange={e => sf('quotation_number', e.target.value)} className="mt-1 font-mono" />
               </div>
               <div>
-                <DateInput label="Quotation Date" value={form.quotation_date} onChange={v => sf('quotation_date', v)} />
+                    <DateInput label="Quotation Date" value={form.quotation_date} onChange={v => sf('quotation_date', v)} className="mt-1" min={activeFiscalYear?.start_date} max={activeFiscalYear?.end_date} />
               </div>
               <div>
-                <DateInput label="Valid Until" value={form.valid_until} onChange={v => sf('valid_until', v)} />
+                <DateInput label="Valid Until" value={form.valid_until} onChange={v => sf('valid_until', v)} className="mt-1" min={activeFiscalYear?.start_date} max={activeFiscalYear?.end_date} />
               </div>
               <div>
                 <Label>Status</Label>

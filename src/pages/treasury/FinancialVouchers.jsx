@@ -40,6 +40,15 @@ export default function FinancialVouchers() {
   const [open, setOpen] = useState(false);
   const [viewOpen, setViewOpen] = useState(false);
   const [selected, setSelected] = useState(null);
+  const getSafeDefaultDate = () => {
+    const today = new Date().toISOString().split('T')[0];
+    if (activeFiscalYear) {
+      if (today > activeFiscalYear.end_date) return activeFiscalYear.end_date;
+      if (today < activeFiscalYear.start_date) return activeFiscalYear.start_date;
+    }
+    return today;
+  };
+
   const [form, setForm] = useState(emptyVoucher);
   const [settings, setSettings] = useState({});
   const [billAllocations, setBillAllocations] = useState([]);
@@ -60,7 +69,7 @@ export default function FinancialVouchers() {
   const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
   const navigate = useNavigate();
-  const { activeCompany } = useAuth();
+  const { activeCompany, activeFiscalYear } = useAuth();
 
   useEffect(() => {
     const viewId = searchParams.get('view');
@@ -506,9 +515,10 @@ export default function FinancialVouchers() {
       <PageHeader
         title="Financial Vouchers"
         subtitle="Receipt, Payment, Journal & Contra entries"
-        action={() => { setForm(emptyVoucher); setBillAllocations([]); setOpen(true); }}
+        action={() => { setForm({ ...emptyVoucher, voucher_date: getSafeDefaultDate() }); setBillAllocations([]); setOpen(true); }}
         actionLabel="New Voucher"
         actionIcon={Plus}
+        actionDisabled={!activeFiscalYear}
       />
 
       {/* Filter Tabs */}
@@ -541,7 +551,7 @@ export default function FinancialVouchers() {
               </div>
               <div>
                 <Label>Date *</Label>
-                <DateInput value={form.voucher_date} onChange={val => setForm({ ...form, voucher_date: val })} className="mt-1" />
+                <DateInput value={form.voucher_date} onChange={val => setForm({ ...form, voucher_date: val })} className="mt-1" min={activeFiscalYear?.start_date} max={activeFiscalYear?.end_date} />
               </div>
             </div>
 

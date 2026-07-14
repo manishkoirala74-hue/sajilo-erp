@@ -9,14 +9,27 @@ import { toast } from 'sonner';
 
 function handleDBError(error) {
   if (!error) return;
-  if (error.message && error.message.includes('ERR_UNBALANCED_JOURNAL')) {
-    toast.error('Posting Blocked: The journal entry is mathematically unbalanced.', { duration: 8000 });
-  } else if (error.message && error.message.includes('ERR_MISSING_ACCOUNT')) {
-    toast.error('Posting Aborted: Missing required control account mapping.', { duration: 8000 });
+  
+  let cleanMessage = error.message || 'Unknown database error';
+
+  if (cleanMessage.includes('ERR_INSUFFICIENT_STOCK')) {
+    cleanMessage = 'Transaction Blocked: Insufficient stock in the selected Godown.';
+  } else if (cleanMessage.includes('ERR_IDEMPOTENCY')) {
+    cleanMessage = 'Transaction Blocked: This entry has already been processed.';
+  } else if (cleanMessage.includes('ERR_ALREADY_POSTED')) {
+    cleanMessage = 'Transaction Blocked: Document is already posted and locked.';
+  } else if (cleanMessage.includes('ERR_UNBALANCED_JOURNAL')) {
+    cleanMessage = 'Posting Blocked: The journal entry is mathematically unbalanced.';
+  } else if (cleanMessage.includes('ERR_STRICT_ACCOUNT_MAPPING') || cleanMessage.includes('ERR_MISSING_ACCOUNT')) {
+    cleanMessage = 'Posting Aborted: Missing required control account mapping.';
+  } else if (cleanMessage.includes('ERR_MISSING_GODOWN')) {
+    cleanMessage = 'Transaction Blocked: A Godown/Branch must be selected for this transaction.';
   } else {
-    toast.error('GL Posting Failed: ' + (error.message || 'Unknown database error'), { duration: 8000 });
+    cleanMessage = 'GL Posting Failed: ' + cleanMessage;
   }
-  throw error;
+
+  toast.error(cleanMessage, { duration: 8000 });
+  throw new Error(cleanMessage);
 }
 
 // Ensure items map and settings are loaded if not passed
@@ -28,15 +41,20 @@ export async function loadItemsMap(itemIds) {
   return map;
 }
 
-export async function loadSettings() {
+let cachedSettings = null;
+
+export async function loadSettings(forceRefresh = false) {
+  if (cachedSettings && !forceRefresh) return cachedSettings;
   const data = await sajilo.entities.CompanySettings.list();
-  return data.length > 0 ? data[0] : {};
+  cachedSettings = data.length > 0 ? data[0] : {};
+  return cachedSettings;
 }
 
 // ─── SECONDARY HUB RPC POSTINGS ───
 export async function postItemDeletionWriteOff(items, settings) { return null; }
-export async function postSalesReturn(returns, itemsMap, settings, isReversal = false) {
+export async function postSalesReturn(returnsData, itemsMap, settings, isReversal = false) {
   if (isReversal) return null; // Reversed handled differently
+  const returns = { ...returnsData, company_id: returnsData.company_id || sajilo.getCompanyId() };
   const payload = {
     ...returns,
     line_items: returns.line_items.map(l => ({
@@ -59,8 +77,9 @@ export async function postSalesReturn(returns, itemsMap, settings, isReversal = 
   return data;
 }
 
-export async function postPurchaseReturn(returns, itemsMap, settings, isReversal = false) {
+export async function postPurchaseReturn(returnsData, itemsMap, settings, isReversal = false) {
   if (isReversal) return null;
+  const returns = { ...returnsData, company_id: returnsData.company_id || sajilo.getCompanyId() };
   const payload = {
     ...returns,
     line_items: returns.line_items.map(l => ({
@@ -82,8 +101,9 @@ export async function postPurchaseReturn(returns, itemsMap, settings, isReversal
   return data;
 }
 
-export async function postStockAdjustment(adjustment, itemsMap, settings, isReversal = false) {
+export async function postStockAdjustment(adjustmentData, itemsMap, settings, isReversal = false) {
   if (isReversal) return null;
+  const adjustment = { ...adjustmentData, company_id: adjustmentData.company_id || sajilo.getCompanyId() };
   const payload = {
     ...adjustment,
     line_items: adjustment.line_items.map(l => ({
@@ -104,8 +124,9 @@ export async function postStockAdjustment(adjustment, itemsMap, settings, isReve
   return data;
 }
 
-export async function postPayroll(payroll, settings, isReversal = false) {
+export async function postPayroll(payrollData, settings, isReversal = false) {
   if (isReversal) return null;
+  const payroll = { ...payrollData, company_id: payrollData.company_id || sajilo.getCompanyId() };
   const { data, error } = await sajilo.client.rpc('rpc_post_payroll_run', {
     p_payload: payroll,
     p_idempotency_key: payroll.idempotency_key,
@@ -203,7 +224,8 @@ export async function resolveDifferenceInTrialBalance(data, settings) { return n
 
 
 // ─── 1. POS SALE (For backwards compatibility if POS is used) ───
-export async function postPOSSale(sale, itemsMap, settings, isReversal = false) {
+export async function postPOSSale(saleData, itemsMap, settings, isReversal = false) {
+  const sale = { ...saleData, company_id: saleData.company_id || sajilo.getCompanyId() };
   const payload = {
     ...sale,
     line_items: sale.line_items.map(l => ({
@@ -227,7 +249,12 @@ export async function postPOSSale(sale, itemsMap, settings, isReversal = false) 
 }
 
 // ─── 2. SALES INVOICE ──────────────────────────────────────────────────────────
-export async function checkoutSalesInvoice(invoice, itemsMap, settings, idempotencyKey = null) {
+export async function checkoutSalesInvoice(invoiceData, itemsMap, settings, idempotencyKey = null) {
+  const invoice = { ...invoiceData, company_id: invoiceData.company_id || sajilo.getCompanyId() };
+  if (!invoice.godown_id) {
+    throw new Error('ERR_MISSING_GODOWN: A Godown/Branch must be selected for this transaction.');
+  }
+
   const s = settings || await loadSettings();
   const lines = [];
 
@@ -236,7 +263,7 @@ export async function checkoutSalesInvoice(invoice, itemsMap, settings, idempote
     const { data: cData } = await supabase.from('BusinessPartner').select('receivable_account_id, payable_account_id').eq('id', invoice.customer_id).maybeSingle();
     if (cData) customerArId = cData.receivable_account_id || cData.payable_account_id;
   }
-  const arId = customerArId || s.gl_accounts_receivable_id || s.gl_accounts_payable_id;
+  const arId = customerArId || s.gl_accounts_receivable_id;
 
   // Determine Payment Mode logic (Cash vs Credit) based on the presence of a cash_bank_account
   const cbId = invoice.cash_bank_account_id;
@@ -244,7 +271,7 @@ export async function checkoutSalesInvoice(invoice, itemsMap, settings, idempote
   if (cbId) {
     lines.push({ account_id: cbId, debit_amount: invoice.grand_total, credit_amount: 0, entity_type: 'Customer', entity_id: invoice.customer_id, due_date: invoice.due_date || invoice.invoice_date });
   } else {
-    if (!arId) throw new Error('ERR_STRICT_ACCOUNT_MAPPING: Missing Accounts Receivable (AR) Account for this Customer');
+    if (!arId) throw new Error('ERR_STRICT_ACCOUNT_MAPPING: Missing Accounts Receivable (AR) Account mapping. Please configure this in Settings.');
     lines.push({ account_id: arId, debit_amount: invoice.grand_total, credit_amount: 0, entity_type: 'Customer', entity_id: invoice.customer_id, due_date: invoice.due_date || invoice.invoice_date });
   }
 
@@ -269,25 +296,20 @@ export async function checkoutSalesInvoice(invoice, itemsMap, settings, idempote
       p_gl_lines: lines
     });
     if (error) throw error;
+    if (!data || !data.invoice_id) throw new Error('ERR_SILENT_FAIL: CRITICAL_SILENT_FAIL - The database failed to return a saved invoice ID.');
     return data;
   } catch (error) {
-    let cleanMessage = error.message;
-    if (cleanMessage?.includes('ERR_INSUFFICIENT_STOCK')) {
-      cleanMessage = 'Checkout failed: Insufficient stock for one or more items in the selected Godown.';
-    } else if (cleanMessage?.includes('ERR_IDEMPOTENCY')) {
-      cleanMessage = 'Checkout failed: This transaction has already been processed.';
-    } else if (cleanMessage?.includes('ERR_ALREADY_POSTED')) {
-      cleanMessage = 'Checkout failed: Invoice is already posted and cannot be modified.';
-    } else {
-      cleanMessage = 'GL Posting Failed: ' + (error.message || 'Unknown database error');
-    }
-    toast.error(cleanMessage, { duration: 8000 });
-    throw new Error(cleanMessage);
+    handleDBError(error);
   }
 }
 
 // ─── 3. PURCHASE INVOICE ──────────────────────────────────────────────────────────
-export async function checkoutPurchaseInvoice(invoice, itemsMap, settings, idempotencyKey = null) {
+export async function checkoutPurchaseInvoice(invoiceData, itemsMap, settings, idempotencyKey = null) {
+  const invoice = { ...invoiceData, company_id: invoiceData.company_id || sajilo.getCompanyId() };
+  if (!invoice.godown_id) {
+    throw new Error('ERR_MISSING_GODOWN: A Godown/Branch must be selected for this transaction.');
+  }
+
   const s = settings || await loadSettings();
   const lines = [];
 
@@ -311,13 +333,13 @@ export async function checkoutPurchaseInvoice(invoice, itemsMap, settings, idemp
     const { data: cData } = await supabase.from('BusinessPartner').select('payable_account_id, receivable_account_id').eq('id', partnerId).maybeSingle();
     if (cData) supplierApId = cData.payable_account_id || cData.receivable_account_id;
   }
-  const apId = supplierApId || s.gl_accounts_payable_id || s.gl_accounts_receivable_id;
+  const apId = supplierApId || s.gl_accounts_payable_id;
 
   const cbId = invoice.cash_bank_account_id;
   if (cbId) {
     lines.push({ account_id: cbId, debit_amount: 0, credit_amount: invoice.grand_total, entity_type: 'Supplier', entity_id: partnerId, due_date: invoice.due_date || invoice.invoice_date });
   } else {
-    if (!apId) throw new Error('ERR_STRICT_ACCOUNT_MAPPING: Missing Accounts Payable (AP) Account for this Supplier');
+    if (!apId) throw new Error('ERR_STRICT_ACCOUNT_MAPPING: Missing Accounts Payable (AP) Account mapping. Please configure this in Settings.');
     lines.push({ account_id: apId, debit_amount: 0, credit_amount: invoice.grand_total, entity_type: 'Supplier', entity_id: partnerId, due_date: invoice.due_date || invoice.invoice_date });
   }
 
@@ -328,22 +350,15 @@ export async function checkoutPurchaseInvoice(invoice, itemsMap, settings, idemp
       p_gl_lines: lines
     });
     if (error) throw error;
+    if (!data || !data.invoice_id) throw new Error('ERR_SILENT_FAIL: CRITICAL_SILENT_FAIL - The database failed to return a saved invoice ID.');
     return data;
   } catch (error) {
-    let cleanMessage = error.message;
-    if (cleanMessage?.includes('ERR_IDEMPOTENCY')) {
-      cleanMessage = 'Checkout failed: This transaction has already been processed.';
-    } else if (cleanMessage?.includes('ERR_ALREADY_POSTED')) {
-      cleanMessage = 'Checkout failed: Invoice is already posted and cannot be modified.';
-    } else {
-      cleanMessage = 'GL Posting Failed: ' + (error.message || 'Unknown database error');
-    }
-    toast.error(cleanMessage, { duration: 8000 });
-    throw new Error(cleanMessage);
+    handleDBError(error);
   }
 }
 
-export async function checkoutStockTransfer(transfer, idempotencyKey = null) {
+export async function checkoutStockTransfer(transferData, idempotencyKey = null) {
+  const transfer = { ...transferData, company_id: transferData.company_id || sajilo.getCompanyId() };
   try {
     const { data, error } = await supabase.rpc('rpc_checkout_stock_transfer', {
       p_payload: transfer,
@@ -352,18 +367,7 @@ export async function checkoutStockTransfer(transfer, idempotencyKey = null) {
     if (error) throw error;
     return data;
   } catch (error) {
-    let cleanMessage = error.message;
-    if (cleanMessage?.includes('ERR_INSUFFICIENT_STOCK')) {
-      cleanMessage = 'Transfer failed: Insufficient stock in Source Godown.';
-    } else if (cleanMessage?.includes('ERR_IDEMPOTENCY')) {
-      cleanMessage = 'Transfer failed: This transaction has already been processed.';
-    } else if (cleanMessage?.includes('ERR_ALREADY_POSTED')) {
-      cleanMessage = 'Transfer failed: Transfer is already posted and cannot be modified.';
-    } else {
-      cleanMessage = 'Stock Transfer Failed: ' + (error.message || 'Unknown database error');
-    }
-    toast.error(cleanMessage, { duration: 8000 });
-    throw new Error(cleanMessage);
+    handleDBError(error);
   }
 }
 
@@ -385,4 +389,29 @@ export async function postFinancialVoucher(voucher, isReversal = false, idempote
   }
 
   return data?.journal_id;
+}
+
+// ─── 5. ATOMIC CANCELLATION ────────────────────────────────────────────────────────
+export async function cancelSalesInvoice(invoiceId, reason) {
+  const { error } = await supabase.rpc('rpc_cancel_document', {
+    p_doc_id: invoiceId,
+    p_doc_type: 'SalesInvoice',
+    p_reason: reason
+  });
+  if (error) {
+    toast.error('Cancellation Failed: ' + (error.message || 'Unknown error'));
+    throw error;
+  }
+}
+
+export async function cancelPurchaseInvoice(invoiceId, reason) {
+  const { error } = await supabase.rpc('rpc_cancel_document', {
+    p_doc_id: invoiceId,
+    p_doc_type: 'PurchaseInvoice',
+    p_reason: reason
+  });
+  if (error) {
+    toast.error('Cancellation Failed: ' + (error.message || 'Unknown error'));
+    throw error;
+  }
 }
