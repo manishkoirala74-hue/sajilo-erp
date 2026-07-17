@@ -17,7 +17,7 @@ import QuotationLineItems from '@/components/quotations/QuotationLineItems';
 import { useSajiloSync } from '@/hooks/useSajiloSync';
 import { loadActiveTaxTypes, computeTotalTax } from '@/lib/taxService';
 import SearchableSelect from '@/components/shared/SearchableSelect';
-import QuickPartnerCreate from '@/components/shared/QuickPartnerCreate';
+import { generateVectorPDF } from '@/utils/pdfGenerator';
 import VoucherLink from '@/components/shared/VoucherLink';
 import DataTable from '@/components/shared/DataTable';
 import StatusBadge from '@/components/shared/StatusBadge';
@@ -44,7 +44,6 @@ export default function Quotations() {
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState('all');
   const [showForm, setShowForm] = useState(false);
-  const [showCustomerCreate, setShowCustomerCreate] = useState(false);
   const [editing, setEditing] = useState(null);
   const [printTarget, setPrintTarget] = useState(null);
   const [form, setForm] = useState({});
@@ -367,7 +366,7 @@ export default function Quotations() {
                   onChange={handleCustomerSelect}
                   placeholder="Select customer…"
                   className="mt-1"
-                  onCreateNew={() => setShowCustomerCreate(true)}
+                  onCreateNew={() => window.open('/sales/customers/new', '_blank')}
                   createNewText="New Customer"
                 />
               </div>
@@ -507,16 +506,6 @@ export default function Quotations() {
           onClose={closePrintTarget}
         />
       )}
-
-      <QuickPartnerCreate
-        open={showCustomerCreate}
-        onOpenChange={setShowCustomerCreate}
-        type="customer"
-        onCreated={(customer) => {
-          setCustomers(prev => [...prev, customer]);
-          setForm(f => ({ ...f, customer_id: customer.id, customer_name: customer.name }));
-        }}
-      />
     </div>
   );
 }

@@ -26,6 +26,19 @@ export async function fetchReportData(reportId, fromDate, toDate, extraParams = 
       return data || [];
     }
 
+    case 'stock_ledger_statement': {
+      if (!extraParams.itemId) return [];
+      const p_company_id = sajilo.getCompanyId();
+      const { data, error } = await supabase.rpc('get_stock_ledger_statement_rpc', {
+        p_company_id,
+        p_item_id: extraParams.itemId,
+        p_from_date: fromDate,
+        p_to_date: toDate
+      });
+      if (error) throw error;
+      return data || [];
+    }
+
     case 'trial_balance': {
       const p_company_id = sajilo.getCompanyId();
       const { data, error } = await supabase.rpc('get_trial_balance_rpc', {

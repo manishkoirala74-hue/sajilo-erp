@@ -20,7 +20,6 @@ import { loadActiveTaxTypes, computeTotalTax } from '@/lib/taxService';
 import { useSajiloSync } from '@/hooks/useSajiloSync';
 import { usePermissions, useAuth } from '@/lib/AuthContext';
 import SearchableSelect from '@/components/shared/SearchableSelect';
-import QuickPartnerCreate from '@/components/shared/QuickPartnerCreate';
 import VoucherLink from '@/components/shared/VoucherLink';
 import { generateVectorPDF } from '@/utils/pdfGenerator';
 import { downloadPDF } from '@/utils/pdf-engine/generator';
@@ -53,7 +52,6 @@ export default function SalesInvoices() {
   const [godowns, setGodowns] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [showCustomerCreate, setShowCustomerCreate] = useState(false);
   const [viewDetail, setViewDetail] = useState(null);
   const [form, setForm] = useState(emptySI);
   const [saving, setSaving] = useState(false);
@@ -75,7 +73,21 @@ export default function SalesInvoices() {
   const [dupWarning, setDupWarning] = useState(false);
   const [pendingPostStatus, setPendingPostStatus] = useState(null);
 
-  const loadData = () => {
+  // Promise-based confirm modal state
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false, message: '', resolve: null });
+
+  const showConfirmModal = (message) => {
+    return new Promise((resolve) => {
+      setConfirmModal({ isOpen: true, message, resolve });
+    });
+  };
+
+  const handleConfirmAction = (isConfirmed) => {
+    if (confirmModal.resolve) confirmModal.resolve(isConfirmed);
+    setConfirmModal({ isOpen: false, message: '', resolve: null });
+  };
+
+  const loadData = async () => {
     Promise.all([
       sajilo.entities.SalesInvoice.list('-created_date', 1000),
       sajilo.entities.BusinessPartner.filter({ is_active: true }),
@@ -283,27 +295,56 @@ export default function SalesInvoices() {
       try {
         const itemIds = form.line_items.map(l => l.item_id).filter(Boolean);
         if (itemIds.length > 0) {
-           const stockData = await sajilo.entities.CurrentStock.filter({ godown_id: form.godown_id, item_id: `in.(${itemIds.join(',')})` });
-           const negatives = [];
-           form.line_items.forEach(line => {
-              if (!line.item_id) return;
-              const stockRec = stockData.find(s => s.item_id === line.item_id);
-              const curQty = stockRec ? parseFloat(stockRec.current_qty) : 0;
-              const dispatchQty = parseFloat(line.quantity || 0);
-              if (curQty - dispatchQty < 0) {
-                 negatives.push({ name: line.item_name || 'Unknown Item', deficit: Math.abs(curQty - dispatchQty) });
+          const { data: stockData } = await sajilo.auth.supabase.rpc('get_current_stock_rpc', {
+            p_company_id: sajilo.getCompanyId(),
+            p_godown_id: form.godown_id,
+            p_item_ids: itemIds
+          });
+          
+          if (stockData) {
+            const stockMap = stockData.reduce((acc, curr) => ({ ...acc, [curr.item_id]: curr.quantity }), {});
+            const negativeItems = [];
+            for (const item of form.line_items) {
+              if (!item.item_id) continue;
+              const currentStock = stockMap[item.item_id] || 0;
+              if (currentStock - (Number(item.quantity) || 0) < 0) {
+                negativeItems.push(item.item_name);
               }
-           });
-           
-           if (negatives.length > 0) {
-              setNegativeStockItems(negatives);
+            }
+            if (negativeItems.length > 0) {
               setPendingPostStatus(postStatus);
+              setNegativeStockItems(negativeItems.map(name => ({ name, deficit: '...' })));
               setShowNegativeStockWarning(true);
               return;
-           }
+            }
+          }
         }
-      } catch(e) {
-        console.error("Stock check failed", e);
+      } catch (err) {
+        console.error("Stock check failed:", err);
+      }
+    }
+
+    if (postStatus === 'Posted') {
+      const itemIds = form.line_items.map(l => l.item_id).filter(Boolean);
+      if (itemIds.length > 0) {
+        const { data: itemsData } = await sajilo.auth.supabase.from('Item').select('id, is_physical, current_unit_cost, weighted_average_cost, item_name').in('id', itemIds);
+        if (itemsData) {
+          const itemsMap = itemsData.reduce((acc, item) => ({ ...acc, [item.id]: item }), {});
+          const zeroCostItems = form.line_items.filter(line => {
+            const itemInfo = itemsMap[line.item_id];
+            if (!itemInfo || !itemInfo.is_physical) return false;
+            const cost = Number(itemInfo.current_unit_cost || itemInfo.weighted_average_cost || 0);
+            return cost === 0;
+          });
+
+          if (zeroCostItems.length > 0) {
+            const itemNames = zeroCostItems.map(i => i.item_name).join(', ');
+            const isConfirmed = await showConfirmModal(`Warning: The following items have a recorded purchase cost of Rs. 0: [${itemNames}]. This will result in a 100% profit margin for these items. Are you sure you want to proceed?`);
+            if (!isConfirmed) {
+              return; // Abort checkout entirely
+            }
+          }
+        }
       }
     }
 
@@ -316,8 +357,14 @@ export default function SalesInvoices() {
         payment_status: isCashOrBank ? 'Paid' : form.payment_status 
       };
 
-      if (isCashOrBank) {
-        data.notes = (data.notes ? data.notes + '\n' : '') + `Payment Mode: ${form.payment_mode} (${form.cash_bank_account_name})`;
+      // Ensure cash_bank_account_id is strictly null if it's Credit
+      if (!isCashOrBank) {
+        data.cash_bank_account_id = null;
+        data.cash_bank_account_name = null;
+      }
+
+      if (isCashOrBank && data.cash_bank_account_name) {
+        data.notes = (data.notes ? data.notes + '\n' : '') + `Payment Mode: ${form.payment_mode} (${data.cash_bank_account_name})`;
       }
 
       let payload = { ...data };
@@ -603,7 +650,7 @@ export default function SalesInvoices() {
                         }}
                         placeholder="Select customer"
                         className="mt-1"
-                        onCreateNew={() => setShowCustomerCreate(true)}
+                        onCreateNew={() => window.open('/sales/customers/new', '_blank')}
                         createNewText="New Customer"
                       />
                     </div>
@@ -734,9 +781,15 @@ export default function SalesInvoices() {
               <span className="text-xl font-bold text-foreground leading-none mt-1">NPR {(form.grand_total || 0).toLocaleString()}</span>
             </div>
             <div className="flex gap-3 mr-6 items-center">
-              <Button variant="ghost" className="rounded-xl" onClick={() => setShowForm(false)} disabled={saving}>Cancel</Button>
-              <Button variant="outline" className="rounded-xl border-primary text-primary hover:bg-primary/10" onClick={() => handleSave('Draft')} disabled={saving}>Save Draft</Button>
-              <Button className="rounded-xl font-bold shadow-sm px-6" onClick={() => handleSave('Posted')} disabled={saving}>
+              <Button type="button" variant="ghost" className="rounded-xl" onClick={() => setShowForm(false)} disabled={saving}>Cancel</Button>
+              <Button type="button" variant="outline" className="rounded-xl border-primary text-primary hover:bg-primary/10" onClick={(e) => {
+                e.preventDefault();
+                handleSave('Draft');
+              }} disabled={saving}>Save Draft</Button>
+              <Button type="button" className="rounded-xl font-bold shadow-sm px-6" onClick={(e) => {
+                e.preventDefault();
+                handleSave('Posted');
+              }} disabled={saving}>
                 {saving ? 'Saving...' : '✓ Save'}
               </Button>
             </div>
@@ -920,7 +973,7 @@ export default function SalesInvoices() {
       </Dialog>
       
       {/* ── NEGATIVE STOCK WARNING DIALOG ── */}
-      <Dialog open={showNegativeStockWarning} onOpenChange={() => { setShowNegativeStockWarning(false); setPendingPostStatus(null); }}>
+      <Dialog open={!!showNegativeStockWarning} onOpenChange={() => { setShowNegativeStockWarning(false); setPendingPostStatus(null); }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-red-600">
@@ -951,15 +1004,27 @@ export default function SalesInvoices() {
         </DialogContent>
       </Dialog>
 
-      <QuickPartnerCreate
-        open={showCustomerCreate}
-        onOpenChange={setShowCustomerCreate}
-        type="customer"
-        onCreated={(customer) => {
-          setCustomers(prev => [...prev, customer]);
-          setForm(f => ({ ...f, customer_id: customer.id, customer_name: customer.name }));
-        }}
-      />
+      {/* ── PROMISE-BASED CONFIRM DIALOG ── */}
+      <Dialog open={confirmModal.isOpen} onOpenChange={(open) => !open && handleConfirmAction(false)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-orange-600">
+              <AlertTriangle className="w-5 h-5" /> Zero Cost Warning
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-4 text-sm text-stone-700">
+            {confirmModal.message}
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0 mt-4 border-t pt-4">
+            <Button variant="outline" onClick={() => handleConfirmAction(false)}>
+              Cancel
+            </Button>
+            <Button className="bg-orange-600 hover:bg-orange-700 text-white" onClick={() => handleConfirmAction(true)}>
+              Proceed
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

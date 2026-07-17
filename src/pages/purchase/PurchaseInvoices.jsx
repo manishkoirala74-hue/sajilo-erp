@@ -20,7 +20,6 @@ import { computeTotalTax, loadActiveTaxTypes } from '@/lib/taxService';
 import { useSajiloSync } from '@/hooks/useSajiloSync';
 import { usePermissions, useAuth } from '@/lib/AuthContext';
 import SearchableSelect from '@/components/shared/SearchableSelect';
-import QuickPartnerCreate from '@/components/shared/QuickPartnerCreate';
 import { Mail } from 'lucide-react';
 import VoucherLink from '@/components/shared/VoucherLink';
 import { generateVectorPDF } from '@/utils/pdfGenerator';
@@ -50,7 +49,6 @@ export default function PurchaseInvoices() {
   const [godowns, setGodowns] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [showVendorCreate, setShowVendorCreate] = useState(false);
   const [viewDetail, setViewDetail] = useState(null);
   const [form, setForm] = useState(emptyPI);
   const [saving, setSaving] = useState(false);
@@ -207,8 +205,14 @@ export default function PurchaseInvoices() {
         payment_status: isCashOrBank ? 'Paid' : form.payment_status 
       };
 
-      if (isCashOrBank) {
-        data.notes = (data.notes ? data.notes + '\n' : '') + `Payment Mode: ${form.payment_mode} (${form.cash_bank_account_name})`;
+      // Ensure cash_bank_account_id is strictly null if it's Credit
+      if (!isCashOrBank) {
+        data.cash_bank_account_id = null;
+        data.cash_bank_account_name = null;
+      }
+
+      if (isCashOrBank && data.cash_bank_account_name) {
+        data.notes = (data.notes ? data.notes + '\n' : '') + `Payment Mode: ${form.payment_mode} (${data.cash_bank_account_name})`;
       }
 
       let payload = { ...data };
@@ -436,7 +440,7 @@ export default function PurchaseInvoices() {
                         }}
                         placeholder="Select vendor"
                         className="mt-1"
-                        onCreateNew={() => setShowVendorCreate(true)}
+                        onCreateNew={() => window.open('/purchase/vendors/new', '_blank')}
                         createNewText="New Vendor"
                       />
                     </div>
@@ -564,9 +568,15 @@ export default function PurchaseInvoices() {
               <span className="text-xl font-bold text-foreground leading-none mt-1">NPR {(form.grand_total || 0).toLocaleString()}</span>
             </div>
             <div className="flex gap-3 mr-6 items-center">
-              <Button variant="ghost" className="rounded-xl" onClick={() => setShowForm(false)} disabled={saving}>Cancel</Button>
-              <Button variant="outline" className="rounded-xl border-primary text-primary hover:bg-primary/10" onClick={() => handleSave('Draft')} disabled={saving}>Save Draft</Button>
-              <Button className="rounded-xl font-bold shadow-sm px-6" onClick={() => handleSave('Posted')} disabled={saving}>
+              <Button type="button" variant="ghost" className="rounded-xl" onClick={() => setShowForm(false)} disabled={saving}>Cancel</Button>
+              <Button type="button" variant="outline" className="rounded-xl border-primary text-primary hover:bg-primary/10" onClick={(e) => {
+                e.preventDefault();
+                handleSave('Draft');
+              }} disabled={saving}>Save Draft</Button>
+              <Button type="button" className="rounded-xl font-bold shadow-sm px-6" onClick={(e) => {
+                e.preventDefault();
+                handleSave('Posted');
+              }} disabled={saving}>
                 {saving ? 'Saving...' : '✓ Save'}
               </Button>
             </div>
@@ -681,16 +691,6 @@ export default function PurchaseInvoices() {
           </div>
         </DialogContent>
       </Dialog>
-      
-      <QuickPartnerCreate
-        open={showVendorCreate}
-        onOpenChange={setShowVendorCreate}
-        type="vendor"
-        onCreated={(vendor) => {
-          setVendors(prev => [...prev, vendor]);
-          setForm(f => ({ ...f, vendor_id: vendor.id, vendor_name: vendor.name }));
-        }}
-      />
     </div>
   );
 }

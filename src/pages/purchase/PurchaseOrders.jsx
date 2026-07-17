@@ -18,7 +18,6 @@ import DualDateDisplay from '@/components/shared/DualDateDisplay';
 import { useSajiloSync } from '@/hooks/useSajiloSync';
 import { loadActiveTaxTypes, computeTotalTax } from '@/lib/taxService';
 import SearchableSelect from '@/components/shared/SearchableSelect';
-import QuickPartnerCreate from '@/components/shared/QuickPartnerCreate';
 import VoucherLink from '@/components/shared/VoucherLink';
 import FileUpload from '@/components/shared/FileUpload';
 
@@ -34,7 +33,6 @@ export default function PurchaseOrders() {
   const [vendors, setVendors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [showVendorCreate, setShowVendorCreate] = useState(false);
   const [viewDetail, setViewDetail] = useState(null);
   const [form, setForm] = useState(emptyPO);
   const [saving, setSaving] = useState(false);
@@ -242,7 +240,7 @@ export default function PurchaseOrders() {
                 }}
                 placeholder="Select vendor"
                 className="mt-1"
-                onCreateNew={() => setShowVendorCreate(true)}
+                onCreateNew={() => window.open('/purchase/vendors/new', '_blank')}
                 createNewText="New Vendor"
               />
             </div>
@@ -352,16 +350,6 @@ export default function PurchaseOrders() {
           </DialogContent>
         </Dialog>
       )}
-
-      <QuickPartnerCreate
-        open={showVendorCreate}
-        onOpenChange={setShowVendorCreate}
-        type="vendor"
-        onCreated={(vendor) => {
-          setVendors(prev => [...prev, vendor]);
-          setForm(f => ({ ...f, vendor_id: vendor.id, vendor_name: vendor.name }));
-        }}
-      />
     </div>
   );
 }

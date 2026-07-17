@@ -250,6 +250,8 @@ function ItemImportCard() {
       try {
         if (isDupe && overrideAll) {
           const existing = existingNameMap[nameLower];
+          delete payload.id;
+          delete payload.is_physical; // Generated column
           await sajilo.entities.Item.update(existing.id, payload);
           updated++;
         } else {

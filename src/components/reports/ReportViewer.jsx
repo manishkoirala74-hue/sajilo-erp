@@ -1297,7 +1297,140 @@ function GeneralLedgerDetailReport({ initialFromDate, initialToDate }) {
   );
 }
 
-// ── Print Portal ──────────────────────────────────────────────────────────────
+// ── Stock Ledger Statement Report ───────────────────────────────────────────────
+function StockLedgerStatementReport({ initialFromDate, initialToDate }) {
+  const { displayBsDate } = useDateFormat();
+  const [filters,   setFilters]   = useCachedFilters('stock_ledger_detail', { ...DEFAULT_FILTERS, showBsDate: displayBsDate, fromDate: initialFromDate, toDate: initialToDate, itemId: '' });
+  const [items,     setItems]     = useState([]);
+  const [lines,     setLines]     = useCachedState('stock_ledger_detail_lines', []);
+  const [loading,   setLoading]   = useState(false);
+  const [hasLoaded, setHasLoaded] = useCachedState('stock_ledger_detail_hasLoaded', false);
+  const [showCommModal, setShowCommModal] = useState(false);
+
+  useEffect(() => {
+    sajilo.entities.Item.filter({ is_physical: true }, 'item_name', 1000).then(res => {
+      setItems(res);
+      if (res.length > 0 && !filters.itemId) {
+        setFilters(p => ({ ...p, itemId: res[0].id }));
+      }
+    });
+  }, []);
+
+  const load = useCallback(async () => {
+    if (!filters.itemId) return;
+    setHasLoaded(true);
+    setLoading(true);
+    try {
+      const { fetchReportData } = await import('@/lib/reportDataFetcher');
+      const data = await fetchReportData('stock_ledger_statement', filters.fromDate, filters.toDate, { itemId: filters.itemId });
+      
+      const dbRows = data || [];
+      const formattedLines = dbRows.map(l => ({
+        ...l,
+        date: l.entry_date,
+        bs_date_formatted: adToBS(l.entry_date) ? formatBS(adToBS(l.entry_date)) : '',
+        qty_in: Number(l.quantity_in || 0),
+        val_in: Number(l.total_amount_in || 0),
+        qty_out: Number(l.quantity_out || 0),
+        val_out: Number(l.total_amount_out || 0),
+        qty_bal: Number(l.quantity_balance || 0),
+        val_bal: Number(l.value_balance || 0),
+      }));
+
+      setLines(formattedLines);
+    } catch (e) {
+      console.error(e);
+    }
+    setLoading(false);
+  }, [filters.itemId, filters.fromDate, filters.toDate, items]);
+
+  const itemPicker = (
+    <div className="flex flex-col gap-1 min-w-[200px]">
+      <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Select Item</label>
+      <SearchableSelect
+        options={items.map(a => ({ value: a.id, label: a.item_code ? `${a.item_name} (${a.item_code})` : a.item_name }))}
+        value={filters.itemId}
+        onChange={val => setFilters(p => ({ ...p, itemId: val }))}
+        placeholder="Select Item..."
+        className="h-8 bg-card text-xs"
+      />
+    </div>
+  );
+
+  const selectedItem = items.find(a => a.id === filters.itemId);
+  const title = `Stock Ledger Statement: ${selectedItem ? selectedItem.item_name : '...'}`;
+
+  const tableRows = lines.map(l => [
+    l.date,
+    ...(filters.showBsDate ? [l.bs_date_formatted] : []),
+    l.transaction_type,
+    l.voucher_no ? <VoucherLink voucherNumber={l.voucher_no}><span className="cursor-pointer text-primary">{l.voucher_no}</span></VoucherLink> : '',
+    l.description,
+    Number(l.qty_in).toLocaleString(),
+    fmtNPR(l.val_in),
+    Number(l.qty_out).toLocaleString(),
+    fmtNPR(l.val_out),
+    Number(l.qty_bal).toLocaleString(),
+    fmtNPR(l.val_bal)
+  ]);
+
+  const handleExport = () => downloadCSV('stock_ledger_statement.csv',
+    ['Date', ...(filters.showBsDate ? ['Date (BS)'] : []), 'Type', 'Voucher #', 'Description', 'Qty In', 'Val In', 'Qty Out', 'Val Out', 'Qty Balance', 'Value Balance'],
+    lines.map(l => [
+      l.date,
+      ...(filters.showBsDate ? [l.bs_date_formatted] : []),
+      l.transaction_type,
+      l.voucher_no,
+      l.description,
+      Number(l.qty_in).toLocaleString(),
+      fmtNPR(l.val_in),
+      Number(l.qty_out).toLocaleString(),
+      fmtNPR(l.val_out),
+      Number(l.qty_bal).toLocaleString(),
+      fmtNPR(l.val_bal)
+    ])
+  );
+
+  return (
+    <div className="space-y-4">
+      <div className="report-no-print">
+        <ReportFilterBar filters={filters} onChange={setFilters} onApply={load} showApplyButton extraOptions={itemPicker} />
+      </div>
+      {!hasLoaded ? (
+        <div className="py-16 text-center space-y-3">
+          <div className="text-4xl">📊</div>
+          <p className="text-sm font-semibold text-foreground">Select an item and click <span className="text-primary">Apply</span>.</p>
+        </div>
+      ) : loading ? (
+        <div className="py-10 text-center text-muted-foreground text-sm">Loading stock statement…</div>
+      ) : (
+        <>
+          <ReportTable title={title} fromDate={filters.fromDate} toDate={filters.toDate}
+            headers={['Date', ...(filters.showBsDate ? ['Date (BS)'] : []), 'Type', 'Voucher #', 'Description', 'Qty In', 'Val In', 'Qty Out', 'Val Out', 'Qty Balance', 'Value Balance']}
+            rows={tableRows}
+            onExport={handleExport}
+            onEmail={() => setShowCommModal(true)}
+          />
+          <CommunicationModal 
+            open={showCommModal} 
+            onOpenChange={setShowCommModal}
+            module="Inventory"
+            referenceId={filters.itemId}
+            partnerId={null}
+            companyId={sajilo.getCompanyId()}
+            payload={{
+              reportTitle: title,
+              fromDate: filters.fromDate,
+              toDate: filters.toDate,
+              linesCount: lines.length
+            }}
+          />
+        </>
+      )}
+    </div>
+  );
+}
+
 // ── Print Portal ──────────────────────────────────────────────────────────────
 // Injects a clean print-only DOM node so window.print() renders ONLY the report
 function usePrintPortal() {
@@ -1348,6 +1481,9 @@ export default function ReportViewer({ reportId, data, fromDate, toDate, columnS
     switch (reportId) {
       case 'ledger_detail':
         return <GeneralLedgerDetailReport initialFromDate={fromDate} initialToDate={toDate} />;
+
+      case 'stock_ledger_statement':
+        return <StockLedgerStatementReport initialFromDate={fromDate} initialToDate={toDate} />;
 
       case 'debtor_statement':
         return <PartnerStatement title="Customer Statement" mode="ar" initialFromDate={fromDate} initialToDate={toDate} />;

@@ -269,15 +269,16 @@ export async function checkoutSalesInvoice(invoiceData, itemsMap, settings, idem
   const cbId = invoice.cash_bank_account_id;
   
   if (cbId) {
-    lines.push({ account_id: cbId, debit_amount: invoice.grand_total, credit_amount: 0, entity_type: 'Customer', entity_id: invoice.customer_id, due_date: invoice.due_date || invoice.invoice_date });
+    lines.push({ account_id: cbId, account_category: 'bank', debit_amount: invoice.grand_total, credit_amount: 0, entity_type: 'Customer', entity_id: invoice.customer_id, due_date: invoice.due_date || invoice.invoice_date });
   } else {
     if (!arId) throw new Error('ERR_STRICT_ACCOUNT_MAPPING: Missing Accounts Receivable (AR) Account mapping. Please configure this in Settings.');
-    lines.push({ account_id: arId, debit_amount: invoice.grand_total, credit_amount: 0, entity_type: 'Customer', entity_id: invoice.customer_id, due_date: invoice.due_date || invoice.invoice_date });
+    lines.push({ account_id: arId, account_category: 'accounts receivable', debit_amount: invoice.grand_total, credit_amount: 0, entity_type: 'Customer', entity_id: invoice.customer_id, due_date: invoice.due_date || invoice.invoice_date });
   }
 
   for (const line of (invoice.line_items || [])) {
+    const item = itemsMap[line.item_id];
     lines.push({ 
-      account_id: itemsMap[line.item_id]?.sales_account_id || s.gl_default_sales_account_id,
+      account_id: item?.sales_account_id || s.gl_default_sales_account_id,
       account_category: 'sales', item_id: line.item_id,
       debit_amount: 0, credit_amount: line.line_total, 
       description: `Sale: ${line.item_name}`
@@ -337,10 +338,10 @@ export async function checkoutPurchaseInvoice(invoiceData, itemsMap, settings, i
 
   const cbId = invoice.cash_bank_account_id;
   if (cbId) {
-    lines.push({ account_id: cbId, debit_amount: 0, credit_amount: invoice.grand_total, entity_type: 'Supplier', entity_id: partnerId, due_date: invoice.due_date || invoice.invoice_date });
+    lines.push({ account_id: cbId, account_category: 'bank', debit_amount: 0, credit_amount: invoice.grand_total, entity_type: 'Supplier', entity_id: partnerId, due_date: invoice.due_date || invoice.invoice_date });
   } else {
     if (!apId) throw new Error('ERR_STRICT_ACCOUNT_MAPPING: Missing Accounts Payable (AP) Account mapping. Please configure this in Settings.');
-    lines.push({ account_id: apId, debit_amount: 0, credit_amount: invoice.grand_total, entity_type: 'Supplier', entity_id: partnerId, due_date: invoice.due_date || invoice.invoice_date });
+    lines.push({ account_id: apId, account_category: 'accounts payable', debit_amount: 0, credit_amount: invoice.grand_total, entity_type: 'Supplier', entity_id: partnerId, due_date: invoice.due_date || invoice.invoice_date });
   }
 
   try {

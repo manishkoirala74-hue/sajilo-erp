@@ -319,6 +319,7 @@ export default function Items() {
           delete payload.selling_price; // Handled by RPC
         }
 
+        delete payload.is_physical; // Generated column
         await sajilo.entities.Item.update(editing.id, payload);
         toast.success('Item updated');
       } else {
@@ -362,7 +363,9 @@ export default function Items() {
   };
 
   const handleBulkUpdate = async (ids, data) => {
-    await Promise.all(ids.map(id => sajilo.entities.Item.update(id, data)));
+    const payload = { ...data };
+    delete payload.is_physical;
+    await Promise.all(ids.map(id => sajilo.entities.Item.update(id, payload)));
     toast.success(`Updated ${ids.length} item(s)`);
     setSelectedIds([]);
     fetchItems();

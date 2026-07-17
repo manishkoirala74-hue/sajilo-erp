@@ -3,7 +3,6 @@ import { Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import SearchableSelect from '@/components/shared/SearchableSelect';
-import QuickItemCreate from '@/components/shared/QuickItemCreate';
 import { sajilo } from '@/api/sajiloClient';
 import { useSajiloSync } from '@/hooks/useSajiloSync';
 import { computeItemTaxes } from '@/lib/taxService';
@@ -28,7 +27,6 @@ const emptyLine = {
  *   taxTypes    : TaxType[]        — pre-loaded list from parent (avoids repeated fetches)
  */
 export default function LineItemsEditor({ value = [], onChange, taxTypes = [], hideTotals = false }) {
-  const [showItemCreate, setShowItemCreate] = useState(false);
   const [activeLineIdx, setActiveLineIdx] = useState(null);
   
   // ── Trading History State ──
@@ -142,8 +140,7 @@ export default function LineItemsEditor({ value = [], onChange, taxTypes = [], h
                       placeholder="Select item..."
                       className="w-full h-8 text-sm bg-card"
                       onCreateNew={() => {
-                        setActiveLineIdx(idx);
-                        setShowItemCreate(true);
+                        window.open('/inventory/items/new', '_blank');
                       }}
                       createNewText="New Item"
                     />
@@ -308,22 +305,6 @@ export default function LineItemsEditor({ value = [], onChange, taxTypes = [], h
           </div>
         )}
       </div>
-      
-      <QuickItemCreate 
-        open={showItemCreate} 
-        onOpenChange={setShowItemCreate}
-        onCreated={(newItem) => {
-          if (activeLineIdx !== null) {
-            // Need to update the items list first to ensure the select shows it
-            setItems(prev => [...prev, newItem]);
-            // Then wait a tick and update the line to use this new item
-            setTimeout(() => {
-              updateLine(activeLineIdx, 'item_id', newItem.id);
-              setActiveLineIdx(null);
-            }, 0);
-          }
-        }}
-      />
     </div>
   );
 }

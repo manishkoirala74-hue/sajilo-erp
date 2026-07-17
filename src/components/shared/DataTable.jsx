@@ -14,7 +14,7 @@ const getAlignClass = (key = '', label = '') => {
   return 'text-align-left';
 };
 
-export default function DataTable({ columns, data, searchKey, loading, onEndReached }) {
+export default function DataTable({ columns, data, searchKey, loading, onEndReached, footerContent }) {
   const { formatDate } = useDateFormat();
   const [search, setSearch] = useState('');
 
@@ -31,7 +31,7 @@ export default function DataTable({ columns, data, searchKey, loading, onEndReac
   };
 
   return (
-    <div className="bg-card rounded-xl border border-border overflow-hidden flex flex-col h-full" style={{ minHeight: '400px' }}>
+    <div className="bg-card rounded-xl border border-border flex flex-col h-[600px] w-full">
       {searchKey && (
         <div className="p-4 border-b border-border shrink-0">
           <div className="flex items-center gap-2 bg-muted rounded-lg px-3 py-2 max-w-xs">
@@ -47,7 +47,7 @@ export default function DataTable({ columns, data, searchKey, loading, onEndReac
         </div>
       )}
       
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 h-0 w-full">
         {loading && (!data || data.length === 0) ? (
           <table className="table-fluid-grid w-full">
             <thead>
@@ -85,6 +85,7 @@ export default function DataTable({ columns, data, searchKey, loading, onEndReac
               TableHead: forwardRef((props, ref) => <thead {...props} ref={ref} />),
               TableRow: forwardRef((props, ref) => <tr className="hover:bg-muted/30 transition-colors border-b border-border" {...props} ref={ref} />),
               TableBody: forwardRef((props, ref) => <tbody className="divide-y divide-border" {...props} ref={ref} />),
+              TableFoot: forwardRef((props, ref) => <tfoot className="bg-muted border-t border-border font-semibold shadow-sm" {...props} ref={ref} />),
             }}
             fixedHeaderContent={() => (
               <tr className="bg-muted border-b border-border shadow-sm">
@@ -98,6 +99,18 @@ export default function DataTable({ columns, data, searchKey, loading, onEndReac
                 })}
               </tr>
             )}
+            fixedFooterContent={footerContent ? () => (
+              <tr>
+                {footerContent.map((col, i) => {
+                  const alignClass = getAlignClass(columns[i]?.key, columns[i]?.label);
+                  return (
+                    <td key={i} className={`cell-density text-sm text-foreground bg-muted ${alignClass}`}>
+                      {col}
+                    </td>
+                  );
+                })}
+              </tr>
+            ) : undefined}
             itemContent={(index, row) => (
               <>
                 {columns.map(col => {

@@ -24,7 +24,6 @@ export default function GrossProfitMarginReport() {
 
   useEffect(() => {
     fetchCategories();
-    generateReport();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -61,43 +60,31 @@ export default function GrossProfitMarginReport() {
         });
       });
 
-      const salesInvoices = await sajilo.entities.SalesInvoice.list('-created_date', 5000);
+      const ledgers = await sajilo.entities.InventoryLedger.list('-transaction_date', 10000);
 
       const toDateStr = toDate.substring(0, 10);
       const fromDateStr = fromDate.substring(0, 10);
 
-      salesInvoices.filter(inv => inv.status === 'Posted').forEach(inv => {
-        const txnDate = (inv.invoice_date || '').substring(0, 10);
+      ledgers.forEach(l => {
+        const txnDate = (l.transaction_date || '').substring(0, 10);
         if (txnDate >= fromDateStr && txnDate <= toDateStr) {
-          (inv.line_items || []).forEach(line => {
-            const itemObj = itemsMap.get(line.item_id);
+          // Only look at outgoing stock from Sales or POS
+          if (l.transaction_type === 'SalesInvoice' || l.transaction_type === 'POSSale') {
+            const itemObj = itemsMap.get(l.item_id);
             if (itemObj) {
-              const qty = Math.abs(line.quantity || 0);
+              const qty = Math.abs(l.quantity_out || 0);
               if (qty === 0) return;
 
-              let rev = 0;
-              if (line.credit_amount !== undefined) {
-                rev = Number(line.credit_amount);
-              } else if (line.line_total !== undefined) {
-                rev = Number(line.line_total);
-              } else {
-                rev = qty * Number(line.unit_price || 0);
-              }
-
-              let cogsVal = 0;
-              if (line.cost_at_sale !== undefined) {
-                // If it's the newer ledger format, cost_at_sale is the total line COGS
-                cogsVal = Number(line.cost_at_sale);
-              } else {
-                const unitCost = Number(itemObj.weighted_average_cost || itemObj.purchase_price || 0);
-                cogsVal = qty * unitCost;
-              }
+              // Use Fat Ledger snapshot values
+              const rev = Number(l.total_amount || 0);
+              const wac = Number(l.wac_at_post || itemObj.weighted_average_cost || itemObj.purchase_price || 0);
+              const cogsVal = qty * wac;
               
               itemObj.qtySold += qty;
               itemObj.revenue += rev;
               itemObj.cogs += cogsVal;
             }
-          });
+          }
         }
       });
 
@@ -150,29 +137,65 @@ export default function GrossProfitMarginReport() {
     window.print();
   };
 
+  const totalQtySold = (data || []).reduce((acc, row) => acc + (row.qtySold || 0), 0);
+  const totalRevenue = (data || []).reduce((acc, row) => acc + (row.revenue || 0), 0);
+  const totalCogs = (data || []).reduce((acc, row) => acc + (row.cogs || 0), 0);
+  const totalGrossProfit = (data || []).reduce((acc, row) => acc + (row.grossProfit || 0), 0);
+  const totalGrossMargin = totalRevenue > 0 ? (totalGrossProfit / totalRevenue) * 100 : 0;
+
+  const footerContent = data?.length > 0 ? [
+    '',
+    'TOTAL',
+    '',
+    totalQtySold.toLocaleString(),
+    totalRevenue.toLocaleString(undefined, {minimumFractionDigits: 2}),
+    totalCogs.toLocaleString(undefined, {minimumFractionDigits: 2}),
+    totalGrossProfit.toLocaleString(undefined, {minimumFractionDigits: 2}),
+    `${totalGrossMargin.toFixed(2)}%`
+  ] : undefined;
+
   return (
     <div className="flex flex-col gap-6 p-6 pb-24 max-w-7xl mx-auto print:p-0 print:pb-0">
-      <div className="print:hidden">
-        <PageHeader 
-          title="Gross Profit Margin" 
-          subtitle="Analyze revenue, COGS, and gross margin per item"
-          actions={
-            <button 
-              onClick={handlePrint}
-              className="flex items-center gap-2 bg-secondary text-secondary-foreground px-4 py-2 rounded-lg text-sm font-medium hover:bg-secondary/80 transition shadow-sm"
-            >
-              <Printer className="w-4 h-4" />
-              Print Report
-            </button>
-          }
-        />
-      </div>
+
       
-      <div className="hidden print:block mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Gross Profit Margin Report</h1>
-        <p className="text-gray-500">Date Between: {fromDate} to {toDate}</p>
+      {/* ── PRINT-ONLY VIEW ── */}
+      <div className="hidden print:block w-full">
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-gray-900">Gross Profit Margin Report</h1>
+          <p className="text-gray-500">Date Between: {fromDate} to {toDate}</p>
+        </div>
+        <table className="w-full text-sm text-left border-collapse border border-gray-200">
+          <thead>
+            <tr className="bg-gray-100">
+              {columns.map(c => (
+                <th key={c.key} className="border border-gray-200 p-2 font-semibold text-gray-700">{c.label}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {(data || []).map((row, i) => (
+              <tr key={i} className="border-b border-gray-200">
+                {columns.map(c => (
+                  <td key={c.key} className="border border-gray-200 p-2">
+                    {c.render ? c.render(row[c.key], row) : row[c.key]}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+          {footerContent && (
+            <tfoot>
+              <tr className="bg-gray-100 font-bold">
+                {footerContent.map((col, i) => (
+                  <td key={i} className="border border-gray-200 p-2">{col}</td>
+                ))}
+              </tr>
+            </tfoot>
+          )}
+        </table>
       </div>
 
+      {/* ── SCREEN VIEW ── */}
       <div className="print:hidden flex items-center justify-between">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" onClick={() => navigate('/reports')} className="rounded-xl">
@@ -186,9 +209,13 @@ export default function GrossProfitMarginReport() {
             <p className="text-sm text-muted-foreground">Analyze revenue, COGS, and gross margin per item</p>
           </div>
         </div>
+        <Button onClick={handlePrint} className="flex items-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white">
+          <Printer className="w-4 h-4" />
+          Print / PDF
+        </Button>
       </div>
 
-      <div className="bg-card rounded-2xl border border-stone-200 p-5 shadow-sm">
+      <div className="bg-card rounded-2xl border border-stone-200 p-5 shadow-sm print:hidden">
         <div className="flex flex-wrap items-end gap-4 mb-6">
           <div className="flex-1 min-w-[200px]">
             <DateInput label="Date Between (Start)" value={fromDate} onChange={setFromDate} />
@@ -222,6 +249,7 @@ export default function GrossProfitMarginReport() {
           loading={loading}
           searchKey="name"
           searchPlaceholder="Search items..."
+          footerContent={footerContent}
         />
       </div>
     </div>

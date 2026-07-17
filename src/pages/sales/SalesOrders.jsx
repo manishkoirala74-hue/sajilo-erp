@@ -17,7 +17,6 @@ import DateInput from '@/components/shared/DateInput';
 import { useSajiloSync } from '@/hooks/useSajiloSync';
 import { loadActiveTaxTypes, computeTotalTax } from '@/lib/taxService';
 import SearchableSelect from '@/components/shared/SearchableSelect';
-import QuickPartnerCreate from '@/components/shared/QuickPartnerCreate';
 import VoucherLink from '@/components/shared/VoucherLink';
 import FileUpload from '@/components/shared/FileUpload';
 
@@ -35,7 +34,6 @@ export default function SalesOrders() {
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [showCustomerCreate, setShowCustomerCreate] = useState(false);
   const [viewDetail, setViewDetail] = useState(null);
   const [form, setForm] = useState(emptySO);
   const [saving, setSaving] = useState(false);
@@ -215,7 +213,7 @@ export default function SalesOrders() {
                 }}
                 placeholder="Select customer"
                 className="mt-1"
-                onCreateNew={() => setShowCustomerCreate(true)}
+                onCreateNew={() => window.open('/sales/customers/new', '_blank')}
                 createNewText="New Customer"
               />
             </div>
@@ -250,15 +248,6 @@ export default function SalesOrders() {
         </DialogContent>
       </Dialog>
 
-      <QuickPartnerCreate
-        open={showCustomerCreate}
-        onOpenChange={setShowCustomerCreate}
-        type="customer"
-        onCreated={(customer) => {
-          setCustomers(prev => [...prev, customer]);
-          setForm(f => ({ ...f, customer_id: customer.id, customer_name: customer.name }));
-        }}
-      />
 
       {/* ── VIEW DETAIL ── */}
       <Dialog open={!!viewDetail} onOpenChange={closeViewDetail}>
