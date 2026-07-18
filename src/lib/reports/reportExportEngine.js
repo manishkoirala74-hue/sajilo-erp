@@ -5,7 +5,6 @@
 
 import { downloadCSV } from './reportColumnUtils';
 import { adToBS, formatBS, formatAD } from '@/lib/nepaliDate';
-import { sajilo } from '@/api/sajiloClient';
 
 /**
  * Build the plain-text business header lines for CSV exports.
