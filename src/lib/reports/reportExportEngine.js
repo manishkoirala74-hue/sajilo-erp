@@ -5,6 +5,7 @@
 
 import { downloadCSV } from './reportColumnUtils';
 import { adToBS, formatBS, formatAD } from '@/lib/nepaliDate';
+import { sajilo } from '@/api/sajiloClient';
 
 /**
  * Build the plain-text business header lines for CSV exports.
@@ -112,10 +113,16 @@ export async function requestPDFExport(reportType, parameters) {
       to: parameters.toDate ? `${parameters.toDate}T23:59:59+05:45` : null,
     };
 
+    const session = await sajilo.auth.supabase.auth.getSession();
+    const token = session.data.session?.access_token;
+
     // Step 3: Cache Miss - Invoke Vercel Serverless Function
     const response = await fetch('/api/generate-pdf', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+      },
       body: JSON.stringify({
         reportType,
         parameters,

@@ -18,10 +18,12 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Missing required parameters' });
     }
 
-    // Initialize Supabase Admin client
     const supabaseUrl = process.env.VITE_SAJILO_APP_BASE_URL || process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SAJILO_APP_ID || process.env.VITE_SUPABASE_ANON_KEY;
-    const supabaseAdmin = createClient(supabaseUrl, supabaseKey);
+    const token = req.headers.authorization?.split(' ')[1];
+    
+    const clientOptions = token ? { global: { headers: { Authorization: `Bearer ${token}` } } } : {};
+    const supabaseAdmin = createClient(supabaseUrl, supabaseKey, clientOptions);
 
     // 1. Get current ledger timestamp
     const { data: ledgerData, error: ledgerError } = await supabaseAdmin
