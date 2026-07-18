@@ -12,13 +12,22 @@ import { toast } from 'sonner';
 import { postFinancialVoucher } from '@/lib/glPostingService';
 import VoucherLink from '@/components/shared/VoucherLink';
 import DateInput from '@/components/shared/DateInput';
+import ReportFilterBar from '@/components/reports/ReportFilterBar';
+import { format } from 'date-fns';
+import { useDateFormat } from '@/lib/DateFormatContext';
+import { formatToDmyAD, formatToDmyBS } from '@/lib/nepaliDate';
 
 const fmt = n => `NPR ${Number(n || 0).toLocaleString()}`;
 
 export default function SupplierBillDue() {
+  const { displayBsDate } = useDateFormat();
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [cashAccounts, setCashAccounts] = useState([]);
+  const [filters, setFilters] = useState({
+    fromDate: format(new Date(new Date().getFullYear(), 0, 1), 'yyyy-MM-dd'),
+    toDate: format(new Date(), 'yyyy-MM-dd'),
+  });
 
   // Quick Payment Modal State
   const [payModalOpen, setPayModalOpen] = useState(false);
@@ -60,12 +69,17 @@ export default function SupplierBillDue() {
 
   async function load() {
     setLoading(true);
-    const { data: invoices } = await supabase
+    let query = supabase
       .from('PurchaseInvoice')
       .select('*')
       .eq('status', 'Posted')
       .neq('payment_status', 'Paid')
       .order('invoice_date', { ascending: true });
+
+    if (filters?.fromDate) query = query.gte('invoice_date', filters.fromDate);
+    if (filters?.toDate) query = query.lte('invoice_date', filters.toDate);
+
+    const { data: invoices } = await query;
 
     const formatted = (invoices || []).map((inv, idx) => {
       const due = inv.grand_total - (inv.paid_amount || 0);
@@ -257,9 +271,11 @@ export default function SupplierBillDue() {
   const columns = [
     { key: 'sn', label: 'S.N.' },
     { key: 'vendor_name', label: 'Supplier' },
-    { key: 'invoice_number', label: 'Invoice No' },
-    { key: 'invoice_date', label: 'Invoice Date', isDate: true },
-    { key: 'due_date', label: 'Due Date', isDate: true },
+    { key: 'invoice_number', label: 'Invoice No', render: (v) => v ? <VoucherLink voucherNumber={v}><span className="text-primary hover:underline cursor-pointer">{v}</span></VoucherLink> : '—' },
+    { key: 'invoice_date', label: 'Invoice Date', render: v => <span className="whitespace-nowrap">{formatToDmyAD(v)}</span> },
+    ...(displayBsDate ? [{ key: 'invoice_date_bs', label: 'Invoice Date (BS)', render: (_, row) => <span className="whitespace-nowrap">{formatToDmyBS(row.invoice_date)}</span> }] : []),
+    { key: 'due_date', label: 'Due Date', render: v => <span className="whitespace-nowrap">{formatToDmyAD(v)}</span> },
+    ...(displayBsDate ? [{ key: 'due_date_bs', label: 'Due Date (BS)', render: (_, row) => <span className="whitespace-nowrap">{formatToDmyBS(row.due_date)}</span> }] : []),
     { key: 'daysOverDue', label: 'Days Over Due', render: v => <span className={v > 0 ? "text-red-600 font-bold" : ""}>{v}</span> },
     { key: 'grand_total', label: 'Bill Total', render: v => fmt(v) },
     { key: 'paid_amount', label: 'Payment', render: v => fmt(v) },
@@ -273,8 +289,9 @@ export default function SupplierBillDue() {
   ];
 
   return (
-    <div>
+    <div className="space-y-4">
       <PageHeader title="Supplier Bill Due" subtitle="Track and make payments for outstanding supplier invoices" icon={FileText}  action={openReconModal} actionLabel="Settle Advances" actionIcon={Activity} />
+      <ReportFilterBar filters={filters} onChange={setFilters} onApply={load} showApplyButton />
       <DataTable columns={columns} data={data} searchKey="vendor_name" loading={loading} />
 
       {/* Pay Modal */}

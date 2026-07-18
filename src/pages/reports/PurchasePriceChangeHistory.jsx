@@ -3,20 +3,28 @@ import { supabase, sajilo } from '@/api/sajiloClient';
 import PageHeader from '@/components/shared/PageHeader';
 import DataTable from '@/components/shared/DataTable';
 import { useDateFormat } from '@/lib/DateFormatContext';
+import { formatToDmyAD, formatToDmyBS } from '@/lib/nepaliDate';
 import { History, Search, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import SearchableSelect from '@/components/shared/SearchableSelect';
+import ReportFilterBar from '@/components/reports/ReportFilterBar';
+import VoucherLink from '@/components/shared/VoucherLink';
+import { format } from 'date-fns';
 
 export default function PurchasePriceChangeHistory() {
-  const { formatDate } = useDateFormat();
+  const { displayBsDate } = useDateFormat();
   const [data, setData] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
+  const [filters, setFilters] = useState({
+    fromDate: format(new Date(new Date().getFullYear(), 0, 1), 'yyyy-MM-dd'),
+    toDate: format(new Date(), 'yyyy-MM-dd'),
+  });
   
   // Detail Modal State
   const [selectedItem, setSelectedItem] = useState(null);
@@ -137,8 +145,13 @@ export default function PurchasePriceChangeHistory() {
     {
       label: 'Latest Purchase Date',
       key: 'invoice_date',
-      render: (v) => <span className="whitespace-nowrap">{formatDate(v, true)}</span>
+      render: (v) => <span className="whitespace-nowrap">{formatToDmyAD(v)}</span>
     },
+    ...(displayBsDate ? [{
+      label: 'Latest Purchase Date (BS)',
+      key: 'invoice_date_bs',
+      render: (_, row) => <span className="whitespace-nowrap">{formatToDmyBS(row.invoice_date)}</span>
+    }] : []),
     {
       label: 'Latest Price',
       key: 'unit_price',
@@ -161,6 +174,7 @@ export default function PurchasePriceChangeHistory() {
         description="Track how the purchase prices of items have changed over time across different suppliers."
         icon={History}
       />
+      <ReportFilterBar filters={filters} onChange={setFilters} onApply={fetchData} showApplyButton />
 
       <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden flex flex-col">
         <div className="p-4 border-b border-border flex items-center justify-between gap-4 flex-wrap">
@@ -224,6 +238,7 @@ export default function PurchasePriceChangeHistory() {
                   <thead className="bg-muted/50 border-b border-border">
                     <tr>
                       <th className="cell-density text-left font-semibold">Date</th>
+                      {displayBsDate && <th className="cell-density text-left font-semibold">Date (BS)</th>}
                       <th className="cell-density text-left font-semibold">Supplier</th>
                       <th className="cell-density text-left font-semibold">Invoice #</th>
                       <th className="cell-density text-right font-semibold">Quantity</th>
@@ -237,9 +252,12 @@ export default function PurchasePriceChangeHistory() {
                       
                       return (
                         <tr key={row.invoice_id || i} className="hover:bg-muted/30 transition-colors">
-                          <td className="cell-density whitespace-nowrap">{formatDate(row.invoice_date, true)}</td>
+                          <td className="cell-density whitespace-nowrap">{formatToDmyAD(row.invoice_date)}</td>
+                          {displayBsDate && <td className="cell-density whitespace-nowrap">{formatToDmyBS(row.invoice_date)}</td>}
                           <td className="cell-density">{row.vendor_name || '-'}</td>
-                          <td className="cell-density text-muted-foreground">{row.invoice_number}</td>
+                          <td className="cell-density text-muted-foreground">
+                            {row.invoice_number ? <VoucherLink voucherNumber={row.invoice_number}><span className="text-primary hover:underline cursor-pointer">{row.invoice_number}</span></VoucherLink> : '—'}
+                          </td>
                           <td className="cell-density text-right">{Number(row.quantity).toLocaleString()}</td>
                           <td className="cell-density text-right font-medium">
                             NPR {Number(row.unit_price).toLocaleString()}

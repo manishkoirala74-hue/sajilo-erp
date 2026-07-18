@@ -587,9 +587,10 @@ function PartnerReport({ title, mode, initialFromDate, initialToDate }) {
     const date        = i.invoice_date || i.bill_date || '';
     const due         = i.due_date || date;
     const days        = due < today ? Math.floor((Date.now() - new Date(due)) / 86400000) : 0;
+    const invoiceNum = i.invoice_number || i.bill_number;
     const base = [
       partnerName,
-      i.invoice_number || i.bill_number || '—',
+      invoiceNum ? <VoucherLink voucherNumber={invoiceNum}><span className="cursor-pointer text-primary hover:underline">{invoiceNum}</span></VoucherLink> : '—',
       date,
       ...(filters.showBsDate ? [i.bs_date_formatted] : []),
       due,
@@ -703,45 +704,47 @@ function ProfitLossReport({ initialData, initialFromDate, initialToDate }) {
     const sections = {
       revenue: { accounts: [], cur: 0, comp: 0 },
       sales_returns: { accounts: [], cur: 0, comp: 0 },
-      opening_stock: { accounts: [], cur: 0, comp: 0 },
-      purchases: { accounts: [], cur: 0, comp: 0 },
-      closing_stock: { accounts: [], cur: 0, comp: 0 },
-      cogs_other: { accounts: [], cur: 0, comp: 0 },
+      cogs: { accounts: [], cur: 0, comp: 0 },
       opex_admin: { accounts: [], cur: 0, comp: 0 },
       opex_selling: { accounts: [], cur: 0, comp: 0 },
       non_op_income: { accounts: [], cur: 0, comp: 0 },
       finance_cost: { accounts: [], cur: 0, comp: 0 },
-      tax: { accounts: [], cur: 0, comp: 0 }
+      tax: { accounts: [], cur: 0, comp: 0 },
+      suspense: { accounts: [], cur: 0, comp: 0 }
     };
 
     accounts.forEach(a => {
       if (!a.parent_account_id) {
-        const name = (a.account_name || '').toLowerCase();
-        
-        if (a.account_type === 'Revenue' || a.account_type === 'Income') {
-          if (name.includes('return') || name.includes('allowance') || name.includes('discount')) {
-            sections.sales_returns.accounts.push(a);
-          } else if (name.includes('interest') || name.includes('dividend') || name.includes('other') || a.account_subtype === 'Other Income') {
+        switch (a.statement_group) {
+          case 'Revenue':
+            if (a.statement_subgroup === 'Sales Returns' || a.statement_subgroup === 'Sales Discounts') {
+              sections.sales_returns.accounts.push(a);
+            } else {
+              sections.revenue.accounts.push(a);
+            }
+            break;
+          case 'Cost of Goods Sold':
+            sections.cogs.accounts.push(a);
+            break;
+          case 'Operating Expenses':
+            if (a.statement_subgroup === 'Selling Expenses') {
+              sections.opex_selling.accounts.push(a);
+            } else {
+              sections.opex_admin.accounts.push(a);
+            }
+            break;
+          case 'Non-Operating Income':
             sections.non_op_income.accounts.push(a);
-          } else {
-            sections.revenue.accounts.push(a);
-          }
-        } 
-        else if (a.account_type === 'Expense' || a.account_type === 'Expenses' || a.account_type === 'Cost of Sales') {
-          if (a.account_type === 'Cost of Sales' || name.includes('cogs') || name.includes('cost of goods') || name.includes('purchase') || name.includes('stock') || name.includes('inventory')) {
-            if (name.includes('opening')) sections.opening_stock.accounts.push(a);
-            else if (name.includes('purchase') && !name.includes('return')) sections.purchases.accounts.push(a);
-            else if (name.includes('closing')) sections.closing_stock.accounts.push(a);
-            else sections.cogs_other.accounts.push(a);
-          } else if (name.includes('interest') || name.includes('bank charge') || name.includes('finance')) {
+            break;
+          case 'Finance Costs':
             sections.finance_cost.accounts.push(a);
-          } else if (name.includes('tax') && !name.includes('property')) {
+            break;
+          case 'Taxes':
             sections.tax.accounts.push(a);
-          } else if (name.includes('sell') || name.includes('market') || name.includes('advertis') || name.includes('commission') || name.includes('freight out')) {
-            sections.opex_selling.accounts.push(a);
-          } else {
-            sections.opex_admin.accounts.push(a);
-          }
+            break;
+          default:
+            sections.suspense.accounts.push(a);
+            break;
         }
       }
     });
@@ -752,28 +755,35 @@ function ProfitLossReport({ initialData, initialFromDate, initialToDate }) {
       s.comp = s.accounts.reduce((sum, a) => sum + a.rollup_comparative, 0);
     });
 
-    const net_sales_cur = sections.revenue.cur - Math.abs(sections.sales_returns.cur);
-    const net_sales_comp = sections.revenue.comp - Math.abs(sections.sales_returns.comp);
+    // Net Sales = Revenue (positive) + Sales Returns (naturally negative, handled by normal balance)
+    const net_sales_cur = sections.revenue.cur + sections.sales_returns.cur;
+    const net_sales_comp = sections.revenue.comp + sections.sales_returns.comp;
     
-    const cogs_total_cur = Math.abs(sections.opening_stock.cur) + Math.abs(sections.purchases.cur) - Math.abs(sections.closing_stock.cur) + Math.abs(sections.cogs_other.cur);
-    const cogs_total_comp = Math.abs(sections.opening_stock.comp) + Math.abs(sections.purchases.comp) - Math.abs(sections.closing_stock.comp) + Math.abs(sections.cogs_other.comp);
+    // Total COGS = simply the sum of COGS accounts (perpetual inventory)
+    const cogs_total_cur = sections.cogs.cur;
+    const cogs_total_comp = sections.cogs.comp;
 
     const gross_profit_cur = net_sales_cur - cogs_total_cur;
     const gross_profit_comp = net_sales_comp - cogs_total_comp;
 
-    const total_opex_cur = Math.abs(sections.opex_admin.cur) + Math.abs(sections.opex_selling.cur);
-    const total_opex_comp = Math.abs(sections.opex_admin.comp) + Math.abs(sections.opex_selling.comp);
+    const total_opex_cur = sections.opex_admin.cur + sections.opex_selling.cur;
+    const total_opex_comp = sections.opex_admin.comp + sections.opex_selling.comp;
     const op_profit_cur = gross_profit_cur - total_opex_cur;
     const op_profit_comp = gross_profit_comp - total_opex_comp;
 
-    const pbt_cur = op_profit_cur + sections.non_op_income.cur - Math.abs(sections.finance_cost.cur);
-    const pbt_comp = op_profit_comp + sections.non_op_income.comp - Math.abs(sections.finance_cost.comp);
+    // We add non-op income and subtract finance costs
+    // Assuming non_op_income normal balance is credit (positive value returned by RPC)
+    // Assuming finance_cost normal balance is debit (positive value returned by RPC)
+    const pbt_cur = op_profit_cur + sections.non_op_income.cur - sections.finance_cost.cur;
+    const pbt_comp = op_profit_comp + sections.non_op_income.comp - sections.finance_cost.comp;
 
-    const net_profit_cur = pbt_cur - Math.abs(sections.tax.cur);
-    const net_profit_comp = pbt_comp - Math.abs(sections.tax.comp);
+    // Assuming tax normal balance is debit (positive value returned by RPC)
+    const net_profit_cur = pbt_cur - sections.tax.cur;
+    const net_profit_comp = pbt_comp - sections.tax.comp;
+
 
     const fmtAcct = (amount, isDeduction = false) => {
-      if (!amount || Math.abs(amount) < 0.01) return '—';
+      if (!amount || amount === 0) return '—';
       const val = Math.abs(amount).toLocaleString('en-NP', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       return (amount < 0 || isDeduction) ? `(${val})` : val;
     };
@@ -911,32 +921,11 @@ function ProfitLossReport({ initialData, initialFromDate, initialToDate }) {
 
               <tr><td colSpan={4} className='px-3 py-2 font-bold text-foreground pt-4'>2. Cost of Goods Sold (COGS)</td></tr>
               
-              <tr><td colSpan={4} className='px-3 py-1.5 font-medium text-muted-foreground pl-4 pt-2'>Opening Stock</td></tr>
-              {sections.opening_stock.accounts.length > 0 ? (
-                <PLSection sectionObj={sections.opening_stock} />
-              ) : (
-                <tr className='text-slate-500'><td className='px-3 py-1.5 pl-8 border-none italic'>(No opening stock recorded)</td><td colSpan={3} className='border-none'></td></tr>
-              )}
-              
-              <tr><td colSpan={4} className='px-3 py-1.5 font-medium text-muted-foreground pl-4 pt-2'>Add: Purchases</td></tr>
-              {sections.purchases.accounts.length > 0 ? (
-                <PLSection sectionObj={sections.purchases} />
-              ) : (
-                <tr className='text-slate-500'><td className='px-3 py-1.5 pl-8 border-none italic'>(No purchases recorded)</td><td colSpan={3} className='border-none'></td></tr>
-              )}
-              
-              <tr><td colSpan={4} className='px-3 py-1.5 font-medium text-muted-foreground pl-4 pt-2'>Add: Direct Expenses</td></tr>
-              {sections.cogs_other.accounts.length > 0 ? (
-                <PLSection sectionObj={sections.cogs_other} />
+              <tr><td colSpan={4} className='px-3 py-1.5 font-medium text-muted-foreground pl-4 pt-2'>Direct Expenses</td></tr>
+              {sections.cogs.accounts.length > 0 ? (
+                <PLSection sectionObj={sections.cogs} />
               ) : (
                 <tr className='text-slate-500'><td className='px-3 py-1.5 pl-8 border-none italic'>(No direct expenses recorded)</td><td colSpan={3} className='border-none'></td></tr>
-              )}
-              
-              <tr><td colSpan={4} className='px-3 py-1.5 font-medium text-muted-foreground pl-4 pt-2'>Less: Closing Stock</td></tr>
-              {sections.closing_stock.accounts.length > 0 ? (
-                <PLSection sectionObj={sections.closing_stock} isDeduction={true} />
-              ) : (
-                <tr className='text-slate-500'><td className='px-3 py-1.5 pl-8 border-none italic'>(No closing stock recorded)</td><td colSpan={3} className='border-none'></td></tr>
               )}
 
               <tr className='border-t border-border bg-muted/50'>
@@ -1011,6 +1000,14 @@ function ProfitLossReport({ initialData, initialFromDate, initialToDate }) {
                 <td className='px-3 py-4 font-black text-right tabular-nums text-foreground text-lg border-double border-b-4 border-slate-800 print:border-b-4'>{fmtAcct(net_profit_cur)}</td>
                 <td className='px-3 py-4 font-black text-right tabular-nums text-muted-foreground text-lg border-double border-b-4 border-slate-500 print:border-b-4'>{fmtAcct(net_profit_comp)}</td>
               </tr>
+              
+              {sections.suspense.accounts.length > 0 && (
+                <>
+                  <tr><td colSpan={4} className='px-3 py-2 font-bold text-red-600 dark:text-red-400 pt-8'>⚠️ Unmapped / Suspense Accounts</td></tr>
+                  <tr><td colSpan={4} className='px-3 py-1.5 text-xs text-muted-foreground pl-4'>These accounts have an unrecognized statement_group and need to be reclassified.</td></tr>
+                  <PLSection sectionObj={sections.suspense} />
+                </>
+              )}
             </tbody>
           </table>
         </div>
@@ -1431,51 +1428,35 @@ function StockLedgerStatementReport({ initialFromDate, initialToDate }) {
   );
 }
 
-// ── Print Portal ──────────────────────────────────────────────────────────────
-// Injects a clean print-only DOM node so window.print() renders ONLY the report
-function usePrintPortal() {
-  const portalRef = useRef(null);
 
-  const openPrint = useCallback((contentEl) => {
-    // Create or reuse the print portal div
-    let portal = document.getElementById('sajilo-print-portal');
-    if (!portal) {
-      portal = document.createElement('div');
-      portal.id = 'sajilo-print-portal';
-      portal.style.cssText = 'position:absolute;top:0;left:-9999px;width:210mm;background:white;padding:10mm 12mm;';
-      document.body.appendChild(portal);
-    }
-    portal.innerHTML = '';
-    if (contentEl) {
-      const clone = contentEl.cloneNode(true);
-      // Remove filter bars, export buttons, and any other screen-only elements
-      clone.querySelectorAll('.report-no-print').forEach(el => el.remove());
-      // Strip scroll constraints so all rows are visible
-      clone.style.overflow = 'visible';
-      clone.style.maxHeight = 'none';
-      clone.style.height = 'auto';
-      portal.appendChild(clone);
-    }
-    // Move into view for print then restore
-    portal.style.left = '0';
-    setTimeout(() => {
-      window.print();
-      portal.style.left = '-9999px';
-      portal.innerHTML = '';
-    }, 400);
-  }, []);
-
-  return { openPrint, portalRef };
-}
 
 // ── Main ReportViewer ─────────────────────────────────────────────────────────
 export default function ReportViewer({ reportId, data, fromDate, toDate, columnState, onClose }) {
-  const printBodyRef = useRef(null);
-  const { openPrint } = usePrintPortal();
+  const [isExporting, setIsExporting] = useState(false);
 
-  const handlePrint = useCallback(() => {
-    openPrint(printBodyRef.current);
-  }, [openPrint]);
+  const handlePrint = useCallback(async () => {
+    setIsExporting(true);
+    try {
+      const { requestPDFExport } = await import('@/lib/reports/reportExportEngine');
+      
+      let extraParams = {};
+      if (reportId === 'ledger_detail') {
+        extraParams = filterCache['general_ledger_detail'] || {};
+      } else if (reportId === 'stock_ledger_statement') {
+        extraParams = filterCache['stock_ledger_detail'] || {};
+      } else if (reportId === 'debtor_statement') {
+        extraParams = filterCache['partner_statement_ar_filters'] || {};
+      } else if (reportId === 'vendor_statement') {
+        extraParams = filterCache['partner_statement_ap_filters'] || {};
+      }
+
+      await requestPDFExport(reportId, { fromDate, toDate, ...columnState, ...extraParams });
+    } catch (err) {
+      alert(err.message || 'Failed to generate PDF');
+    } finally {
+      setIsExporting(false);
+    }
+  }, [reportId, fromDate, toDate, columnState]);
 
   const renderContent = () => {
     switch (reportId) {
@@ -1868,16 +1849,16 @@ export default function ReportViewer({ reportId, data, fromDate, toDate, columnS
               Report Viewer — use filters inside each report to adjust the period
             </p>
             <div className="flex items-center gap-2">
-              <Button size="sm" variant="outline" onClick={handlePrint}>
-                <Printer className="w-3.5 h-3.5 mr-1" /> Print / PDF
+              <Button size="sm" variant="outline" onClick={handlePrint} disabled={isExporting}>
+                <Printer className="w-3.5 h-3.5 mr-1" /> {isExporting ? 'Generating...' : 'Download PDF'}
               </Button>
               <button onClick={onClose} className="text-muted-foreground hover:text-foreground ml-1">
                 <X className="w-5 h-5" />
               </button>
             </div>
           </div>
-          {/* Report Body — ref used for print portal cloning */}
-          <div ref={printBodyRef} className="flex-1 overflow-y-auto p-5">
+          {/* Report Body */}
+          <div className="flex-1 overflow-y-auto p-5">
             {renderContent()}
           </div>
         </div>

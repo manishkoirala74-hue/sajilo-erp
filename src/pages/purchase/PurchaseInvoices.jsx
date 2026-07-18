@@ -211,6 +211,10 @@ export default function PurchaseInvoices() {
         data.cash_bank_account_name = null;
       }
 
+      if (data.notes) {
+        data.notes = data.notes.replace(/Payment Mode: (?:Cash|Bank) \([^\)]+\)\n?/g, '').trim();
+      }
+      
       if (isCashOrBank && data.cash_bank_account_name) {
         data.notes = (data.notes ? data.notes + '\n' : '') + `Payment Mode: ${form.payment_mode} (${data.cash_bank_account_name})`;
       }

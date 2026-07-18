@@ -3,10 +3,16 @@ import { supabase } from '@/api/sajiloClient';
 import PageHeader from '@/components/shared/PageHeader';
 import DataTable from '@/components/shared/DataTable';
 import { toast } from 'sonner';
+import ReportFilterBar from '@/components/reports/ReportFilterBar';
+import { format } from 'date-fns';
 
 export default function NegativeStockExceptionReport() {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [filters, setFilters] = useState({
+    fromDate: format(new Date(new Date().getFullYear(), 0, 1), 'yyyy-MM-dd'),
+    toDate: format(new Date(), 'yyyy-MM-dd'),
+  });
 
   useEffect(() => {
     fetchData();
@@ -65,6 +71,7 @@ export default function NegativeStockExceptionReport() {
         title="Negative Stock Exception Report"
         subtitle="Items with quantity on hand below zero"
       />
+      <ReportFilterBar filters={filters} onChange={setFilters} onApply={fetchData} showApplyButton />
       <div className="bg-card border rounded-xl overflow-hidden shadow-sm">
         <DataTable columns={columns} data={data} loading={loading} searchKey="item_name" />
       </div>

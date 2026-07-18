@@ -82,12 +82,23 @@ function DatePickerWithToggle({ value, onChange, label }) {
 const ACCOUNT_TYPES = ['Asset', 'Liability', 'Equity', 'Revenue', 'Expense', 'COGS', 'OPEX'];
 
 const suggestNormalBalance = (type) =>
-  ['Asset', 'COGS', 'Cost of Sales', 'OPEX', 'Operating Expense', 'Cost of Goods Sold', 'Expense', 'Expenses', 'Other Expense'].includes(type) ? 'Debit' : 'Credit';
+  ['Asset', 'COGS', 'Cost of Sales', 'OPEX', 'Operating Expense', 'Cost of Goods Sold', 'Expense', 'Expenses', 'Other Expense'].includes(type) ? 'debit' : 'credit';
 
 const suggestFinancialStatement = (type) =>
   ['Revenue', 'Income', 'Other Income', 'Expense', 'Expenses', 'COGS', 'Cost of Sales', 'OPEX', 'Operating Expense', 'Cost of Goods Sold', 'Other Expense'].includes(type)
     ? 'income_statement'
     : 'balance_sheet';
+
+const suggestStatementGroup = (type) => {
+  if (['Revenue', 'Income'].includes(type)) return 'Revenue';
+  if (['Other Income'].includes(type)) return 'Non-Operating Income';
+  if (['COGS', 'Cost of Sales', 'Cost of Goods Sold'].includes(type)) return 'Cost of Goods Sold';
+  if (['Expense', 'Expenses', 'OPEX', 'Operating Expense', 'Other Expense'].includes(type)) return 'Operating Expenses';
+  if (type === 'Asset') return 'Assets';
+  if (type === 'Liability') return 'Liabilities';
+  if (type === 'Equity') return 'Equity';
+  return 'Operating Expenses';
+};
 
 // ── Flat searchable group picker ───────────────────────────────────────────────
 function GroupPicker({ groups, value, onChange }) {
@@ -193,6 +204,7 @@ export default function AccountFormModal({ open, onClose, account, parentAccount
         account_name:       '',
         account_type:       parentType,
         account_subtype:    '',
+        statement_group:    suggestStatementGroup(parentType),
         ledger_type:        'Sub Ledger',
         normal_balance:     suggestNormalBalance(parentType),
         financial_statement: suggestFinancialStatement(parentType),
@@ -221,6 +233,7 @@ export default function AccountFormModal({ open, onClose, account, parentAccount
       set('account_type', parent.account_type);
       set('normal_balance', suggestNormalBalance(parent.account_type));
       set('financial_statement', suggestFinancialStatement(parent.account_type));
+      set('statement_group', suggestStatementGroup(parent.account_type));
     }
     // Auto-suggest code
     if (!parentId || !parent?.account_code) return;
@@ -241,6 +254,7 @@ export default function AccountFormModal({ open, onClose, account, parentAccount
     if (!form.account_type)         { toast.error('Account type is required');  return; }
     if (!form.financial_statement)  { toast.error('Financial Statement routing is required'); return; }
     if (!form.normal_balance)       { toast.error('Normal Balance is required'); return; }
+    if (!form.statement_group)      { toast.error('Statement Group is required'); return; }
     setSaving(true);
     try {
       const { 
@@ -255,8 +269,12 @@ export default function AccountFormModal({ open, onClose, account, parentAccount
         opening_date,
         parentAccount,
         _children,
+        financial_statement,
         ...payload 
       } = form;
+
+      // Rename financial_statement to statement_type for DB compatibility
+      payload.statement_type = financial_statement;
 
       if (!isGroup && opening_balance) {
         payload.current_balance = opening_balance;
@@ -351,7 +369,8 @@ export default function AccountFormModal({ open, onClose, account, parentAccount
                 <Label>Account Type *</Label>
                 <Select
                   value={form.account_type || undefined}
-                  onValueChange={v => { set('account_type', v); set('normal_balance', suggestNormalBalance(v)); set('financial_statement', suggestFinancialStatement(v)); }}
+                  onValueChange={v => { set('account_type', v); set('normal_balance', suggestNormalBalance(v)); set('financial_statement', suggestFinancialStatement(v)); set('statement_group', suggestStatementGroup(v)); }}
+                  disabled={form.is_system_account}
                 >
                   <SelectTrigger className="mt-1 w-full h-9 bg-background text-sm">
                     <SelectValue placeholder="Select type" />
@@ -393,17 +412,40 @@ export default function AccountFormModal({ open, onClose, account, parentAccount
                   </Select>
                 </div>
                 <div>
+                  <Label className="text-xs">Statement Group</Label>
+                  <Select
+                    value={form.statement_group || suggestStatementGroup(form.account_type)}
+                    onValueChange={v => set('statement_group', v)}
+                    disabled={form.is_system_account}
+                  >
+                    <SelectTrigger className="mt-1 h-8 text-xs bg-background">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Assets">Assets</SelectItem>
+                      <SelectItem value="Liabilities">Liabilities</SelectItem>
+                      <SelectItem value="Equity">Equity</SelectItem>
+                      <SelectItem value="Revenue">Revenue</SelectItem>
+                      <SelectItem value="Cost of Goods Sold">Cost of Goods Sold</SelectItem>
+                      <SelectItem value="Operating Expenses">Operating Expenses</SelectItem>
+                      <SelectItem value="Non-Operating Income">Non-Operating Income</SelectItem>
+                      <SelectItem value="Finance Costs">Finance Costs</SelectItem>
+                      <SelectItem value="Taxes">Taxes</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
                   <Label className="text-xs">Normal Balance</Label>
                   <Select
-                    value={form.normal_balance || 'Debit'}
+                    value={form.normal_balance || 'debit'}
                     onValueChange={v => set('normal_balance', v)}
                   >
                     <SelectTrigger className="mt-1 h-8 text-xs bg-background">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Debit">Debit</SelectItem>
-                      <SelectItem value="Credit">Credit</SelectItem>
+                      <SelectItem value="debit">Debit</SelectItem>
+                      <SelectItem value="credit">Credit</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

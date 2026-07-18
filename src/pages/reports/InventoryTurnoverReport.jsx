@@ -12,6 +12,7 @@ import { ArrowLeft, Settings2, BarChart2, RefreshCcw, Printer } from 'lucide-rea
 import DateInput from '@/components/shared/DateInput';
 import { format, subMonths, differenceInDays } from 'date-fns';
 import { toast } from 'react-hot-toast';
+import ReportFilterBar from '@/components/reports/ReportFilterBar';
 
 export default function InventoryTurnoverReport() {
   const navigate = useNavigate();
@@ -22,8 +23,10 @@ export default function InventoryTurnoverReport() {
   const [categories, setCategories] = useState([]);
   
   // Filters
-  const [fromDate, setFromDate] = useState(format(subMonths(new Date(), 1), 'yyyy-MM-dd'));
-  const [toDate, setToDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [filters, setFilters] = useState({
+    fromDate: format(subMonths(new Date(), 1), 'yyyy-MM-dd'),
+    toDate: format(new Date(), 'yyyy-MM-dd'),
+  });
   const [selectedCategory, setSelectedCategory] = useState('all');
 
   // Velocity Thresholds (Configurable via UI)
@@ -49,6 +52,7 @@ export default function InventoryTurnoverReport() {
   };
 
   const generateReport = async () => {
+    const { fromDate, toDate } = filters;
     if (!fromDate || !toDate) {
       toast.error('Please select both From and To dates');
       return;
@@ -243,7 +247,7 @@ export default function InventoryTurnoverReport() {
       
       <div className="hidden print:block mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Inventory Turnover Ratio Report</h1>
-        <p className="text-gray-500">Period: {fromDate} to {toDate}</p>
+        <p className="text-gray-500">Period: {filters.fromDate} to {filters.toDate}</p>
       </div>
 
       <div className="print:hidden flex items-center justify-between">
@@ -308,13 +312,10 @@ export default function InventoryTurnoverReport() {
         </Popover>
       </div>
 
-      <div className="bg-card rounded-2xl border border-stone-200 p-5 shadow-sm">
+      <div className="bg-card rounded-2xl border border-stone-200 p-5 shadow-sm print:hidden">
         <div className="flex flex-wrap items-end gap-4 mb-6">
-          <div className="flex-1 min-w-[200px]">
-            <DateInput label="From Date" value={fromDate} onChange={setFromDate} />
-          </div>
-          <div className="flex-1 min-w-[200px]">
-            <DateInput label="To Date" value={toDate} onChange={setToDate} />
+          <div className="flex-1 w-full lg:w-auto">
+             <ReportFilterBar filters={filters} onChange={setFilters} onApply={generateReport} showApplyButton />
           </div>
           <div className="flex-1 min-w-[200px]">
             <Label className="text-xs mb-1.5 block text-muted-foreground">Category Filter</Label>
@@ -330,10 +331,6 @@ export default function InventoryTurnoverReport() {
               </SelectContent>
             </Select>
           </div>
-          <Button onClick={generateReport} disabled={loading} className="rounded-xl px-6">
-            {loading ? <RefreshCcw className="w-4 h-4 mr-2 animate-spin" /> : <BarChart2 className="w-4 h-4 mr-2" />}
-            Generate
-          </Button>
         </div>
 
         <DataTable 

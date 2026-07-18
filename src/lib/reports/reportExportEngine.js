@@ -55,8 +55,95 @@ function exportRawCSV(filename, rows) {
 
 export { exportRawCSV, buildTextHeader };
 
+import { supabase, sajilo } from '@/api/sajiloClient';
+
 /**
- * Trigger browser print with a styled print stylesheet injected.
+ * requestPDFExport - Handles state-driven PDF generation caching and requests
+ */
+export async function requestPDFExport(reportType, parameters) {
+  const companyId = sajilo.getCompanyId();
+  // We need userId for logging
+  const { data: { user } } = await supabase.auth.getUser();
+  const userId = user?.id;
+
+  // Step 1: Ledger State Check - Find MAX(updated_at)
+  const { data: ledgerData, error: ledgerError } = await supabase
+    .from('GeneralLedgerJournal')
+    .select('updated_at')
+    .order('updated_at', { ascending: false })
+    .limit(1);
+
+  if (ledgerError) throw ledgerError;
+  const currentLedgerTimestamp = ledgerData?.[0]?.updated_at || new Date().toISOString();
+
+  // Inject engine version to bust older caches
+  parameters = { ...parameters, engine_version: 'v12' };
+
+  // Step 2: Cache Validation - Check if exact report was generated with same ledger state
+  const { data: cacheData, error: cacheError } = await supabase
+    .from('report_archive')
+    .select('bucket_url')
+    .eq('company_id', companyId)
+    .eq('report_type', reportType)
+    .eq('ledger_timestamp', currentLedgerTimestamp)
+    .contains('parameters', parameters) // Ensure all parameters match
+    .limit(1);
+
+  if (!cacheError && cacheData && cacheData.length > 0) {
+    // Cache HIT! Get signed URL
+    const { data: urlData, error: urlError } = await supabase
+      .storage
+      .from('erp_documents')
+      .createSignedUrl(cacheData[0].bucket_url, 3600);
+      
+    if (!urlError && urlData?.signedUrl) {
+      window.open(urlData.signedUrl, '_blank');
+      return;
+    }
+  }
+
+    const dateStrings = {
+      ad: (parameters.fromDate && parameters.toDate) ? `${formatAD(parameters.fromDate)} — ${formatAD(parameters.toDate)} (A.D)` : '',
+      bs: (parameters.fromDate && parameters.toDate && adToBS(parameters.fromDate) && adToBS(parameters.toDate)) ? `${formatBS(adToBS(parameters.fromDate))} — ${formatBS(adToBS(parameters.toDate))} (B.S)` : ''
+    };
+
+    const isoBoundaries = {
+      from: parameters.fromDate ? `${parameters.fromDate}T00:00:00+05:45` : null,
+      to: parameters.toDate ? `${parameters.toDate}T23:59:59+05:45` : null,
+    };
+
+    // Step 3: Cache Miss - Invoke Vercel Serverless Function
+    const response = await fetch('/api/generate-pdf', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        reportType,
+        parameters,
+        companyId,
+        userId,
+        dateStrings,
+        isoBoundaries
+      })
+    });
+
+  if (!response.ok) {
+    if (response.status === 504) {
+      throw new Error('504 Gateway Timeout: The report is too large to generate synchronously.');
+    }
+    const errData = await response.json().catch(() => ({}));
+    throw new Error(errData.error || `Server responded with status ${response.status}`);
+  }
+
+  const result = await response.json();
+  if (result.success && result.url) {
+    window.open(result.url, '_blank');
+  } else {
+    throw new Error('Failed to generate PDF');
+  }
+}
+
+/**
+ * Trigger browser print (Deprecated)
  */
 export function printReport(printAreaId) {
   window.print();

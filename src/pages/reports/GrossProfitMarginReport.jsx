@@ -7,10 +7,9 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ArrowLeft, BarChart2, RefreshCcw, Printer } from 'lucide-react';
-import DateInput from '@/components/shared/DateInput';
 import { format, subMonths } from 'date-fns';
 import { toast } from 'sonner';
-
+import ReportFilterBar from '@/components/reports/ReportFilterBar';
 export default function GrossProfitMarginReport() {
   const navigate = useNavigate();
 
@@ -18,8 +17,10 @@ export default function GrossProfitMarginReport() {
   const [data, setData] = useState([]);
   const [categories, setCategories] = useState([]);
   
-  const [fromDate, setFromDate] = useState(format(subMonths(new Date(), 1), 'yyyy-MM-dd'));
-  const [toDate, setToDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [filters, setFilters] = useState({
+    fromDate: format(subMonths(new Date(), 1), 'yyyy-MM-dd'),
+    toDate: format(new Date(), 'yyyy-MM-dd'),
+  });
   const [selectedCategory, setSelectedCategory] = useState('all');
 
   useEffect(() => {
@@ -37,6 +38,7 @@ export default function GrossProfitMarginReport() {
   };
 
   const generateReport = async () => {
+    const { fromDate, toDate } = filters;
     if (!fromDate || !toDate) {
       toast.error('Please select both From and To dates');
       return;
@@ -68,21 +70,35 @@ export default function GrossProfitMarginReport() {
       ledgers.forEach(l => {
         const txnDate = (l.transaction_date || '').substring(0, 10);
         if (txnDate >= fromDateStr && txnDate <= toDateStr) {
-          // Only look at outgoing stock from Sales or POS
+          // Process outgoing stock (Sales & POS) and incoming returns
           if (l.transaction_type === 'SalesInvoice' || l.transaction_type === 'POSSale') {
             const itemObj = itemsMap.get(l.item_id);
             if (itemObj) {
               const qty = Math.abs(l.quantity_out || 0);
               if (qty === 0) return;
 
-              // Use Fat Ledger snapshot values
-              const rev = Number(l.total_amount || 0);
+              // Use new strict columns with fallbacks for legacy data
+              const rev = Number(l.net_amount || l.total_amount || 0);
               const wac = Number(l.wac_at_post || itemObj.weighted_average_cost || itemObj.purchase_price || 0);
               const cogsVal = qty * wac;
               
               itemObj.qtySold += qty;
               itemObj.revenue += rev;
               itemObj.cogs += cogsVal;
+            }
+          } else if (l.transaction_type === 'SalesReturn') {
+            const itemObj = itemsMap.get(l.item_id);
+            if (itemObj) {
+              const qty = Math.abs(l.quantity_in || 0);
+              if (qty === 0) return;
+
+              const rev = Number(l.net_amount || l.total_amount || 0);
+              const wac = Number(l.wac_at_post || itemObj.weighted_average_cost || itemObj.purchase_price || 0);
+              const cogsVal = qty * wac;
+              
+              itemObj.qtySold -= qty;
+              itemObj.revenue -= rev;
+              itemObj.cogs -= cogsVal;
             }
           }
         }
@@ -162,7 +178,7 @@ export default function GrossProfitMarginReport() {
       <div className="hidden print:block w-full">
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-gray-900">Gross Profit Margin Report</h1>
-          <p className="text-gray-500">Date Between: {fromDate} to {toDate}</p>
+          <p className="text-gray-500">Date Between: {filters.fromDate} to {filters.toDate}</p>
         </div>
         <table className="w-full text-sm text-left border-collapse border border-gray-200">
           <thead>
@@ -217,11 +233,8 @@ export default function GrossProfitMarginReport() {
 
       <div className="bg-card rounded-2xl border border-stone-200 p-5 shadow-sm print:hidden">
         <div className="flex flex-wrap items-end gap-4 mb-6">
-          <div className="flex-1 min-w-[200px]">
-            <DateInput label="Date Between (Start)" value={fromDate} onChange={setFromDate} />
-          </div>
-          <div className="flex-1 min-w-[200px]">
-            <DateInput label="Date Between (End)" value={toDate} onChange={setToDate} />
+          <div className="flex-1 w-full lg:w-auto">
+             <ReportFilterBar filters={filters} onChange={setFilters} onApply={generateReport} showApplyButton />
           </div>
           <div className="flex-1 min-w-[200px]">
             <Label className="text-xs mb-1.5 block text-muted-foreground">Select All Item or Item Category</Label>
@@ -237,10 +250,6 @@ export default function GrossProfitMarginReport() {
               </SelectContent>
             </Select>
           </div>
-          <Button onClick={generateReport} disabled={loading} className="rounded-xl px-6">
-            {loading ? <RefreshCcw className="w-4 h-4 mr-2 animate-spin" /> : <BarChart2 className="w-4 h-4 mr-2" />}
-            Generate
-          </Button>
         </div>
 
         <DataTable 

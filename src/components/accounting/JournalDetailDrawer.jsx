@@ -63,6 +63,7 @@ export default function JournalDetailDrawer({ journal, open, onClose, onRefresh 
         is_balanced: isBalanced,
         notes: `Reversing journal ID: ${journal.id}`,
         voucher_no: `REV-${journal.voucher_no || journal.id.substring(0,8)}`,
+        reversed_journal_id: journal.id,
       });
 
       const revLines = lines.map(l => ({
@@ -95,7 +96,7 @@ export default function JournalDetailDrawer({ journal, open, onClose, onRefresh 
         return sajilo.entities.ChartOfAccount.update(acc.id, { current_balance: Math.round(((acc.current_balance || 0) + balanceChange) * 100) / 100 });
       }));
 
-      await sajilo.entities.GeneralLedgerJournal.update(journal.id, { status: 'Reversed' });
+      await sajilo.entities.GeneralLedgerJournal.update(journal.id, { is_reversed: true });
       const { toast } = await import('sonner');
       toast.success("Journal reversed successfully");
       setShowReverseDialog(false);
@@ -123,7 +124,10 @@ export default function JournalDetailDrawer({ journal, open, onClose, onRefresh 
           <div className="bg-muted/30 rounded-xl p-4 grid grid-cols-2 gap-3 text-sm">
             <div><p className="text-xs text-muted-foreground">Date</p><p className="font-semibold">{journal.entry_date}</p></div>
             <div><p className="text-xs text-muted-foreground">Status</p>
-              <span className={cn('inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border', STATUS_COLORS[journal.status] || STATUS_COLORS.Draft)}>{journal.status}</span>
+              <div className="flex items-center gap-2">
+                <span className={cn('inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border', STATUS_COLORS[journal.status] || STATUS_COLORS.Draft)}>{journal.status}</span>
+                {journal.is_reversed && <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 border border-red-200 dark:border-red-800">⚠️ Reversed</span>}
+              </div>
             </div>
             <div className="col-span-2"><p className="text-xs text-muted-foreground">Description</p><p className="font-medium">{journal.description}</p></div>
             <div>

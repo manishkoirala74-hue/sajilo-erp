@@ -175,9 +175,16 @@ export default function GeneralLedger() {
                         : <AlertCircle className="w-4 h-4 text-amber-500 mx-auto" />}
                     </td>
                     <td className="cell-density text-center">
-                      <span className={cn('inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border', STATUS_COLORS[j.status] || STATUS_COLORS.Draft)}>
-                        {STATUS_ICON[j.status]}{j.status}
-                      </span>
+                      <div className="flex flex-col items-center gap-1">
+                        <span className={cn('inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border', STATUS_COLORS[j.status] || STATUS_COLORS.Draft)}>
+                          {STATUS_ICON[j.status]}{j.status}
+                        </span>
+                        {j.is_reversed && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 border border-red-200 dark:border-red-800">
+                            ⚠️ Reversed
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="cell-density text-center">
                       <Button variant="ghost" size="icon" className="h-7 w-7" onClick={e => { e.stopPropagation(); setSelectedJournal(j); }}>

@@ -32,6 +32,9 @@ Review this checklist before starting the development of any new feature or page
 - [ ] **Component Reusability:** Can we reuse existing UI components, or do we need to build new generic components?
 - [ ] **Data Fetching:** How is data fetched from Supabase? Ensure proper loading states and error handling during fetch.
 - [ ] **Report Display:** Does this Development or Changes needs to properly display in Reports? Ensure proper loading states and error handling during fetch.
+- [ ] **Global Report Filter:** Does every new standalone report page integrate the Global Report Filter (`ReportFilterBar.jsx`)?
+- [ ] **Date Columns:** Do report data tables separate AD and BS dates into distinct columns (using `formatToDmyAD` and `formatToDmyBS` with `displayBsDate` context) instead of merging them?
+- [ ] **Voucher Links:** Are all Invoice or Voucher numbers rendered using the `<VoucherLink>` component to allow drill-down into voucher details?
 
 ## 5. UI/UX & Aesthetics (Tailwind CSS)
 - [ ] **Responsive Design:** Does the design work well on both mobile and desktop screens?
