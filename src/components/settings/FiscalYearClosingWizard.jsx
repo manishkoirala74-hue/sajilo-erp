@@ -37,7 +37,7 @@ export default function FiscalYearClosingWizard() {
         .from('GeneralLedgerJournal')
         .select('*', { count: 'exact', head: true })
         .eq('company_id', sajilo.getCompanyId())
-        .neq('status', 'Posted')
+        .eq('status', 'Draft')
         .gte('entry_date', fy.start_date)
         .lte('entry_date', fy.end_date);
         
@@ -76,12 +76,9 @@ export default function FiscalYearClosingWizard() {
       toast.error(`Cannot close: there are ${preFlightDrafts} pending vouchers.`);
       return;
     }
-    if (preFlightNegativeStock > 0) {
-      toast.error(`Cannot close: there are ${preFlightNegativeStock} items with negative stock.`);
-      return;
-    }
+    // Negative stock is now a warning, not a hard block.
 
-    if (!window.confirm('WARNING: This will zero out all Revenue and Expense accounts, roll forward Asset/Liability balances, snapshot inventory, and permanently LOCK the closing year. Are you absolutely sure?')) {
+    if (!window.confirm('WARNING: This will zero out all Revenue and Expense accounts, roll forward Asset/Liability balances, snapshot inventory, and transition the closing year to SOFT_CLOSED. Are you absolutely sure?')) {
       return;
     }
 
@@ -109,7 +106,7 @@ export default function FiscalYearClosingWizard() {
 
   if (loading) return null;
 
-  const openYears = fiscalYears.filter(f => !f.is_locked);
+  const eligibleClosingYears = fiscalYears.filter(f => f.status === 'OPEN' || f.status === 'SOFT_CLOSED');
   
   return (
     <div id="closing-wizard" className="bg-card border border-border rounded-xl p-5 mt-6">
@@ -128,19 +125,25 @@ export default function FiscalYearClosingWizard() {
           <Select value={closingYearId} onValueChange={setClosingYearId}>
             <SelectTrigger><SelectValue placeholder="Select Year" /></SelectTrigger>
             <SelectContent>
-              {openYears.map(fy => (
+              {eligibleClosingYears.map(fy => (
                 <SelectItem key={fy.id} value={fy.id}>{fy.fiscal_year_name}</SelectItem>
               ))}
             </SelectContent>
           </Select>
 
           {closingYearId && (preFlightDrafts !== null || preFlightNegativeStock !== null) && (
-            <div className={`p-3 rounded-lg text-sm flex items-start gap-2 ${preFlightDrafts > 0 || preFlightNegativeStock > 0 ? 'bg-red-50 dark:bg-red-500/10 text-red-800 dark:text-red-300 border border-red-200 dark:border-red-500/20' : 'bg-green-50 dark:bg-green-500/10 text-green-800 dark:text-green-300 border border-green-200 dark:border-green-500/20'}`}>
+            <div className={`p-3 rounded-lg text-sm flex items-start gap-2 ${
+              preFlightDrafts > 0 
+                ? 'bg-red-50 dark:bg-red-500/10 text-red-800 dark:text-red-300 border border-red-200 dark:border-red-500/20' 
+                : preFlightNegativeStock > 0 
+                  ? 'bg-yellow-50 dark:bg-yellow-500/10 text-yellow-800 dark:text-yellow-300 border border-yellow-200 dark:border-yellow-500/20'
+                  : 'bg-green-50 dark:bg-green-500/10 text-green-800 dark:text-green-300 border border-green-200 dark:border-green-500/20'
+            }`}>
               {(preFlightDrafts > 0 || preFlightNegativeStock > 0) ? <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" /> : <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />}
               <div className="space-y-1">
                 <strong className="block mb-0.5">Pre-flight Check</strong>
-                {preFlightDrafts > 0 && <div>• Found {preFlightDrafts} pending journals.</div>}
-                {preFlightNegativeStock > 0 && <div>• Found {preFlightNegativeStock} items with negative stock. <a href="/reports/inventory/negative-stock-exceptions" className="underline font-semibold ml-1">View Report</a></div>}
+                {preFlightDrafts > 0 && <div className="text-red-700 dark:text-red-300 font-medium">• Blocked: Found {preFlightDrafts} pending journals.</div>}
+                {preFlightNegativeStock > 0 && <div className="text-yellow-700 dark:text-yellow-300">• Warning: {preFlightNegativeStock} items have a negative stock balance. The system will carry these negative balances forward. You must resolve these discrepancies manually. <a href="/reports/inventory/negative-stock-exceptions" className="underline font-semibold ml-1">View Report</a></div>}
                 {preFlightDrafts === 0 && preFlightNegativeStock === 0 && <div>All journals are posted and inventory is strictly positive. Ready for closing.</div>}
               </div>
             </div>

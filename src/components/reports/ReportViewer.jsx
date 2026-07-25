@@ -227,87 +227,19 @@ function TrialBalanceReport({ initialData, initialFromDate, initialToDate, initi
     setHasLoaded(true);
     setPartnerRows({}); // reset partner data on each reload
     try {
-      const [all, settings, journals, lines] = await Promise.all([
-        sajilo.entities.ChartOfAccount.filter({ is_active: true }, 'account_code', 2000),
-        sajilo.entities.CompanySettings.list(),
-        sajilo.entities.GeneralLedgerJournal.filter({ status: 'Posted' }, 'entry_date', 10000),
-        sajilo.entities.GeneralLedgerLine.list('', 50000)
+      const [{ fetchReportData }, settings] = await Promise.all([
+        import('@/lib/reportDataFetcher'),
+        sajilo.entities.CompanySettings.list()
       ]);
-      allAccountsRef.current = all;
       if (settings.length > 0) setCompany(settings[0]);
 
-      const journalMap = {};
-      journals.forEach(j => { 
-        journalMap[j.id] = j.entry_date ? j.entry_date.split('T')[0] : ''; 
-      });
-      
-      const accountTotals = {};
-      lines.forEach(l => {
-        const date = journalMap[l.journal_id];
-        if (!date) return;
-        
-        if (!accountTotals[l.account_id]) {
-          accountTotals[l.account_id] = { cur_dr: 0, cur_cr: 0, ob_dr: 0, ob_cr: 0 };
-        }
-        
-        if (date < filters.fromDate) {
-          accountTotals[l.account_id].ob_dr += (l.debit_amount || 0);
-          accountTotals[l.account_id].ob_cr += (l.credit_amount || 0);
-        } else if (date >= filters.fromDate && date <= filters.toDate) {
-          accountTotals[l.account_id].cur_dr += (l.debit_amount || 0);
-          accountTotals[l.account_id].cur_cr += (l.credit_amount || 0);
-        }
-      });
-
-      setAccounts(all.map(a => {
-        const t = accountTotals[a.id] || { cur_dr: 0, cur_cr: 0, ob_dr: 0, ob_cr: 0 };
-        const isDebitNormal = ['Asset','COGS','Expense','OPEX','Cost of Goods Sold','Other Expense'].includes(a.account_type);
-        
-        // Start from opening_balance
-        const base_ob = Number(a.opening_balance || 0);
-        const isBaseObDr = (a.opening_balance_type || (isDebitNormal ? 'Dr' : 'Cr')) === 'Dr';
-        
-        let base_ob_dr = 0, base_ob_cr = 0;
-        if (isBaseObDr) base_ob_dr = base_ob; else base_ob_cr = base_ob;
-
-        let total_ob_dr = base_ob_dr + (t.ob_dr || 0);
-        let total_ob_cr = base_ob_cr + (t.ob_cr || 0);
-        
-        let ob_net_dr = total_ob_dr - total_ob_cr;
-        let net_ob_dr = 0, net_ob_cr = 0;
-        if (ob_net_dr >= 0) {
-          net_ob_dr = ob_net_dr;
-        } else {
-          net_ob_cr = -ob_net_dr;
-        }
-        
-        const cur_dr = t.cur_dr || 0;
-        const cur_cr = t.cur_cr || 0;
-        
-        let cb_net_dr = ob_net_dr + cur_dr - cur_cr;
-        let net_cb_dr = 0, net_cb_cr = 0;
-        if (cb_net_dr >= 0) {
-          net_cb_dr = cb_net_dr;
-        } else {
-          net_cb_cr = -cb_net_dr;
-        }
-
-        return {
-          ...a,
-          _isControlAccount:  false, // Disable partner drill-down since partners have native sub-ledgers
-          opening_debit:  net_ob_dr,
-          opening_credit: net_ob_cr,
-          current_debit:  cur_dr,
-          current_credit: cur_cr,
-          closing_debit:  net_cb_dr,
-          closing_credit: net_cb_cr,
-        };
-      }));
+      const data = await fetchReportData('trial_balance', filters.fromDate, filters.toDate);
+      setAccounts(data);
     } catch (err) {
       console.error('[TrialBalance load error]', err);
     }
     setLoading(false);
-  }, []);
+  }, [filters.fromDate, filters.toDate]);
 
   // Partner drill-down disabled: partners are natively in the GL as Sub Ledgers.
 

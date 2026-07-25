@@ -128,20 +128,9 @@ const VoucherSequence = () => {
             </div>
           </div>
           
-          <div className="mt-4 flex items-center justify-between py-3 border-t border-border">
-            <div>
-              <p className="text-sm font-medium text-foreground">Include Fiscal Year Tag</p>
-              <p className="text-xs text-muted-foreground mt-0.5">Automatically inject the active Fiscal Year identifier (e.g. FY26) in the middle of the document number.</p>
-            </div>
-            <Switch 
-              checked={!!draftSettings.include_fy_in_invoice_number} 
-              onCheckedChange={v => updateDraftSettings({ include_fy_in_invoice_number: v })} 
-            />
-          </div>
-          
-          <div className="mt-4 bg-muted/40 rounded-lg px-4 py-3 text-xs font-mono text-muted-foreground">
-            Example: {draftSettings.invoice_prefix_sales || 'SI'}-{draftSettings.include_fy_in_invoice_number ? '[Active FY]-' : ''}{String(draftSettings.invoice_next_number || 1).padStart(5,'0')}{draftSettings.invoice_suffix || ''}
-          </div>
+          <p className="text-xs text-muted-foreground bg-muted/40 p-2 rounded mt-6">
+            Example: {draftSettings.invoice_prefix_sales || 'SI'}-[Active FY]-{String(draftSettings.invoice_next_number || 1).padStart(5,'0')}{draftSettings.invoice_suffix || ''}
+          </p>
         </div>
       </div>
     </SettingPageLayout>

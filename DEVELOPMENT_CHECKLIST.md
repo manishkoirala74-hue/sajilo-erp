@@ -25,6 +25,7 @@ Review this checklist before starting the development of any new feature or page
 - [ ] **Data Types & Casts:** Ensure type safety, particularly handling UUIDs, numerics (for currency/quantity), and JSONB fields.
 - [ ] **Query Optimization:** Do we need indexes on frequently queried columns?
 - [ ] **Proper GL Posting Service Mapping:** Do we need to Map new development to complete GL Posting Servier?
+- [ ] **Financial Reporting RPCs:** When modifying P&L or Balance Sheet RPCs, ensure they always select `statement_group`, `statement_subgroup`, and `normal_balance`, and strictly filter by `a.statement_type` (not `financial_statement`) to prevent unmapped/suspense account groupings in the frontend reports.
 
 ## 4. Frontend Architecture (React/Vite)
 - [ ] **Routing:** Where does this new page sit in the application hierarchy? Is it protected by an auth/role guard?

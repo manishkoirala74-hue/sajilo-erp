@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { sajilo } from '@/api/sajiloClient';
-import { Plus, Calendar, Unlock, CheckCircle2, Circle, KeyRound } from 'lucide-react';
+import { Plus, Calendar, Unlock, CheckCircle2, Circle, KeyRound, ShieldAlert } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -21,8 +21,7 @@ export default function FiscalYearSettings() {
     fiscal_year_name: '',
     start_date: '',
     end_date: '',
-    is_active: false,
-    is_locked: false,
+    status: 'OPEN',
   });
   
   const [reopenDialog, setReopenDialog] = useState(null);
@@ -56,11 +55,11 @@ export default function FiscalYearSettings() {
 
     setSaving(true);
     try {
-      if (form.is_active) {
-        // Only one can be active, deactivate others
-        const activeOnes = fiscalYears.filter(f => f.is_active);
-        for (const f of activeOnes) {
-          await sajilo.entities.FiscalYear.update(f.id, { is_active: false });
+      if (form.status === 'OPEN') {
+        // Only one can be open, soft_close others
+        const openOnes = fiscalYears.filter(f => f.status === 'OPEN');
+        for (const f of openOnes) {
+          await sajilo.entities.FiscalYear.update(f.id, { status: 'SOFT_CLOSED' });
         }
       }
       await sajilo.entities.FiscalYear.create(form);
@@ -87,7 +86,9 @@ export default function FiscalYearSettings() {
         p_fy_id: reopenDialog.id,
         p_reason: reopenReason
       });
-      toast.success('Fiscal year unlocked and reopened.');
+      // The RPC might still set is_locked=false, but we also update status
+      await sajilo.entities.FiscalYear.update(reopenDialog.id, { status: 'SOFT_CLOSED' });
+      toast.success('Fiscal year unlocked to SOFT_CLOSED state.');
       setReopenDialog(null);
       setReopenReason('');
       await fetchFiscalYears();
@@ -95,6 +96,19 @@ export default function FiscalYearSettings() {
     } catch (e) {
       console.error(e);
       toast.error('Failed to reopen fiscal year.');
+    }
+  };
+
+  const handleFinalize = async (fy) => {
+    if (!window.confirm('WARNING: Finalizing this year to HARD_CLOSED will permanently lock all adjusting entries for the Inland Revenue Department. It cannot be reopened. Proceed?')) {
+      return;
+    }
+    try {
+      await sajilo.entities.FiscalYear.update(fy.id, { status: 'HARD_CLOSED' });
+      toast.success('Fiscal year HARD_CLOSED permanently.');
+      await fetchFiscalYears();
+    } catch (e) {
+      toast.error('Failed to finalize fiscal year.');
     }
   };
 
@@ -110,7 +124,7 @@ export default function FiscalYearSettings() {
             <p className="text-xs text-muted-foreground mt-0.5">Define financial periods and control transaction boundaries.</p>
           </div>
         </div>
-        <Button size="sm" onClick={() => { setForm({ fiscal_year_name: '', start_date: '', end_date: '', is_active: false, is_locked: false }); setShowForm(true); }}>
+        <Button size="sm" onClick={() => { setForm({ fiscal_year_name: '', start_date: '', end_date: '', status: 'OPEN' }); setShowForm(true); }}>
           <Plus className="w-4 h-4 mr-1.5" /> New Fiscal Year
         </Button>
       </div>
@@ -119,10 +133,10 @@ export default function FiscalYearSettings() {
         <table className="table-fluid-grid text-sm">
           <thead className="cell-density bg-muted/10 border-b border-border">
             <tr>
-              <th className="cell-density text-left  font-semibold text-muted-foreground">Fiscal Year</th>
-              <th className="cell-density text-left  font-semibold text-muted-foreground">Period</th>
-              <th className="cell-density text-center  font-semibold text-muted-foreground">Active</th>
-              <th className="cell-density text-center  font-semibold text-muted-foreground">Locked</th>
+              <th className="cell-density text-left font-semibold text-muted-foreground">Fiscal Year</th>
+              <th className="cell-density text-left font-semibold text-muted-foreground">Period</th>
+              <th className="cell-density text-center font-semibold text-muted-foreground">State</th>
+              <th className="cell-density text-center font-semibold text-muted-foreground">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
@@ -139,48 +153,55 @@ export default function FiscalYearSettings() {
                   <td className="cell-density text-muted-foreground">
                     {fy.start_date} to {fy.end_date}
                   </td>
-                  <td className="cell-density ">
+                  <td className="cell-density">
                     <div className="flex justify-center">
-                      <button 
-                        onClick={async () => {
-                          if (!fy.is_active) {
-                            // Deactivate all others, activate this one
-                            try {
-                              const activeOnes = fiscalYears.filter(f => f.is_active);
-                              for (const f of activeOnes) {
-                                await sajilo.entities.FiscalYear.update(f.id, { is_active: false });
-                              }
-                              await sajilo.entities.FiscalYear.update(fy.id, { is_active: true });
-                              await fetchFiscalYears();
-                              await refreshGlobalSettings();
-                              toast.success('Fiscal Year activated.');
-                            } catch (e) {
-                              toast.error('Failed to activate Fiscal Year.');
-                            }
-                          }
-                        }}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium ${fy.is_active ? 'bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400 cursor-default' : 'bg-gray-100 text-gray-600 hover:bg-gray-200 cursor-pointer transition-colors'}`}>
-                        {fy.is_active ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Circle className="w-3.5 h-3.5" />}
-                        {fy.is_active ? 'Active' : 'Set Active'}
-                      </button>
+                      <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
+                        fy.status === 'OPEN' ? 'bg-green-100 text-green-700' : 
+                        fy.status === 'SOFT_CLOSED' ? 'bg-yellow-100 text-yellow-700' : 
+                        'bg-red-100 text-red-700'
+                      }`}>
+                        {fy.status}
+                      </span>
                     </div>
                   </td>
-                  <td className="cell-density ">
-                    <div className="flex justify-center">
-                      <button 
-                        onClick={() => {
-                          if (fy.is_locked) {
-                            setReopenDialog(fy);
-                          } else {
+                  <td className="cell-density">
+                    <div className="flex justify-center gap-2">
+                      {fy.status === 'SOFT_CLOSED' && (
+                        <button 
+                          onClick={() => handleFinalize(fy)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
+                        >
+                          <ShieldAlert className="w-3.5 h-3.5" />
+                          Finalize Statutory Audit
+                        </button>
+                      )}
+                      {fy.status !== 'OPEN' && (
+                        <button 
+                          onClick={() => {
+                            if (fy.status === 'HARD_CLOSED') {
+                              setReopenDialog(fy);
+                            } else if (fy.status === 'SOFT_CLOSED') {
+                              setReopenDialog(fy);
+                            }
+                          }}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors bg-blue-50 text-blue-600 hover:bg-blue-100"
+                        >
+                          <Unlock className="w-3.5 h-3.5" />
+                          Re-Open
+                        </button>
+                      )}
+                      {fy.status === 'OPEN' && (
+                        <button 
+                          onClick={() => {
                             document.getElementById('closing-wizard')?.scrollIntoView({ behavior: 'smooth' });
-                            toast.info('Please use the Closing Wizard below to lock a fiscal year.');
-                          }
-                        }}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${fy.is_locked ? 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400 hover:bg-red-200' : 'bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:bg-blue-500/20'}`}
-                      >
-                        {fy.is_locked ? <KeyRound className="w-3.5 h-3.5" /> : <Unlock className="w-3.5 h-3.5" />}
-                        {fy.is_locked ? 'Re-Open' : 'Close Year'}
-                      </button>
+                            toast.info('Please use the Closing Wizard below to close a fiscal year.');
+                          }}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors bg-blue-50 text-blue-600 hover:bg-blue-100"
+                        >
+                          <KeyRound className="w-3.5 h-3.5" />
+                          Close Year
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -223,10 +244,10 @@ export default function FiscalYearSettings() {
             </div>
             <div className="flex items-center justify-between p-3 border border-border rounded-lg bg-muted/20">
               <div>
-                <Label className="text-sm">Set as Active Year</Label>
+                <Label className="text-sm">Set as OPEN Year</Label>
                 <p className="text-xs text-muted-foreground mt-0.5">Transactions will be validated against this year.</p>
               </div>
-              <Switch checked={form.is_active} onCheckedChange={v => setForm({...form, is_active: v})} />
+              <Switch checked={form.status === 'OPEN'} onCheckedChange={v => setForm({...form, status: v ? 'OPEN' : 'SOFT_CLOSED'})} />
             </div>
           </div>
           <div className="flex justify-end gap-3 mt-6">
@@ -239,7 +260,7 @@ export default function FiscalYearSettings() {
       <Dialog open={!!reopenDialog} onOpenChange={(v) => !v && setReopenDialog(null)}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Re-Open Locked Year</DialogTitle>
+            <DialogTitle>Re-Open Closed Year</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 mt-2">
             <div className="bg-red-50 dark:bg-red-500/10 text-red-800 dark:text-red-300 p-3 rounded-lg text-sm border border-red-200 dark:border-red-500/20">

@@ -333,11 +333,7 @@ BEGIN
 
   IF v_prefix != '' THEN v_prefix := v_prefix || '-'; END IF;
 
-  IF COALESCE(v_settings.include_fy_in_invoice_number, false) THEN
-    v_result := v_prefix || v_fy.fiscal_year_name || '-' || LPAD(v_seq.current_number::TEXT, 5, '0') || v_suffix;
-  ELSE
-    v_result := v_prefix || LPAD(v_seq.current_number::TEXT, 5, '0') || v_suffix;
-  END IF;
+  v_result := v_prefix || v_fy.fiscal_year_name || '-' || LPAD(v_seq.current_number::TEXT, 5, '0') || v_suffix;
 
   RETURN v_result;
 END;

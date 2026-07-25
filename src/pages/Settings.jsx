@@ -69,7 +69,7 @@ const DEFAULT_SETTINGS = {
   item_image_max_size_mb: 2, item_image_max_count: 3,
   invoice_prefix_sales: 'SI', invoice_prefix_purchase: 'PI',
   invoice_prefix_sales_order: 'SO', invoice_prefix_purchase_order: 'PO',
-  invoice_suffix: '', invoice_next_number: 1, include_fy_in_invoice_number: true,
+  invoice_suffix: '', invoice_next_number: 1,
   invoice_numbering_method: 'Auto', invoice_duplicate_handling: 'Block',
   show_recent_trading_history: true,
   overdue_reminder_days: 7, send_invoice_reminder_on_due: true, self_reminder_days_before_due: 3,
@@ -314,10 +314,9 @@ export default function Settings() {
                 </div>
               </div>
               <div className="mt-4">
-                <ToggleRow label="Include Fiscal Year Tag" desc="Automatically inject the active Fiscal Year identifier (e.g. FY26) in the middle of the document number." checked={settings.include_fy_in_invoice_number} onChange={v => set('include_fy_in_invoice_number', v)} />
-              </div>
-              <div className="mt-4 bg-muted/40 rounded-lg px-4 py-3 text-xs font-mono text-muted-foreground">
-                Example: {settings.invoice_prefix_sales || 'SI'}-{settings.include_fy_in_invoice_number ? '[Active FY]-' : ''}{String(settings.invoice_next_number || 1).padStart(5,'0')}{settings.invoice_suffix || ''}
+                <p className="text-xs text-muted-foreground mt-2">
+                  Example: {settings.invoice_prefix_sales || 'SI'}-[Active FY]-{String(settings.invoice_next_number || 1).padStart(5,'0')}{settings.invoice_suffix || ''}
+                </p>
               </div>
             </SectionCard>
 
