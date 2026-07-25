@@ -273,7 +273,6 @@ export default function AccountFormModal({ open, onClose, account, parentAccount
         ...payload 
       } = form;
 
-      // Rename financial_statement to statement_type for DB compatibility
       payload.statement_type = financial_statement;
 
       if (!isGroup && opening_balance) {

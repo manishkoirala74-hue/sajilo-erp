@@ -71,7 +71,10 @@ export async function postSalesReturn(returnsData, itemsMap, settings, isReversa
   const { data, error } = await sajilo.client.rpc('rpc_post_sales_return', {
     p_payload: payload,
     p_idempotency_key: returns.idempotency_key,
-    p_gl_settings: settings
+    p_gl_settings: settings,
+    p_options: {
+      is_reversal: isReversal
+    }
   });
   if (error) throw new Error(error.message);
   return data;
@@ -95,7 +98,10 @@ export async function postPurchaseReturn(returnsData, itemsMap, settings, isReve
   const { data, error } = await sajilo.client.rpc('rpc_post_purchase_return', {
     p_payload: payload,
     p_idempotency_key: returns.idempotency_key,
-    p_gl_settings: settings
+    p_gl_settings: settings,
+    p_options: {
+      is_reversal: isReversal
+    }
   });
   if (error) throw new Error(error.message);
   return data;
@@ -118,7 +124,10 @@ export async function postStockAdjustment(adjustmentData, itemsMap, settings, is
   const { data, error } = await sajilo.client.rpc('rpc_post_stock_adjustment', {
     p_payload: payload,
     p_idempotency_key: adjustment.idempotency_key,
-    p_gl_settings: settings
+    p_gl_settings: settings,
+    p_options: {
+      is_reversal: isReversal
+    }
   });
   if (error) throw new Error(error.message);
   return data;
@@ -130,7 +139,10 @@ export async function postPayroll(payrollData, settings, isReversal = false) {
   const { data, error } = await sajilo.client.rpc('rpc_post_payroll_run', {
     p_payload: payroll,
     p_idempotency_key: payroll.idempotency_key,
-    p_gl_settings: settings
+    p_gl_settings: settings,
+    p_options: {
+      is_reversal: isReversal
+    }
   });
   if (error) throw new Error(error.message);
   return data;
@@ -242,7 +254,10 @@ export async function postPOSSale(saleData, itemsMap, settings, isReversal = fal
   const { data, error } = await sajilo.client.rpc('rpc_post_pos_sale', {
     p_payload: payload,
     p_idempotency_key: sale.idempotency_key,
-    p_gl_settings: settings
+    p_gl_settings: settings,
+    p_options: {
+      is_reversal: isReversal
+    }
   });
   if (error) throw new Error(error.message);
   return data;
@@ -379,7 +394,10 @@ export async function postFinancialVoucher(voucher, isReversal = false, idempote
     p_voucher_id: voucher.id,
     p_idempotency_key: idempotencyKey,
     p_gl_lines: voucher.lines || [], // Fallback to empty array to prevent signature mismatch
-    p_is_reversal: isReversal
+    p_options: {
+      is_reversal: isReversal,
+      system_override: false
+    }
   };
 
   const { data, error } = await supabase.rpc('rpc_post_financial_voucher', payload);

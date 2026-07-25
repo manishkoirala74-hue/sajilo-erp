@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { sajilo } from '@/api/sajiloClient';
+import { createSubLedger } from '@/lib/accountFactory';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -69,31 +70,14 @@ export default function TaxSettings() {
         const parent = groupAccounts.find(g => g.id === form._parent_group_id);
         if (!parent) throw new Error('Parent group not found');
 
-        // Derive next code
-        const allAccs = await sajilo.entities.ChartOfAccount.list('account_code', 2000);
-        const prefix  = (parent.account_code || '').replace(/\D/g, '');
-        const children = allAccs.filter(a => {
-          const code = (a.account_code || '').replace(/\D/g, '');
-          return code.startsWith(prefix) && code.length > prefix.length;
-        });
-        const maxNum  = children.length
-          ? Math.max(...children.map(a => parseInt((a.account_code || '').replace(/\D/g, ''), 10) || 0))
-          : parseInt(prefix + '00', 10);
-        const nextCode = String(maxNum + 1);
-
-        const newAcc = await sajilo.entities.ChartOfAccount.create({
-          account_code:    nextCode,
-          account_name:    form.tax_name,
-          account_type:    'Liability',
-          ledger_type:     'Sub Ledger',
-          normal_balance:  'Credit',
-          financial_statement: 'balance_sheet',
-          parent_account_id:   parent.id,
-          parent_account_name: parent.account_name,
-          is_active:       true,
-          is_system_account: false,
-          current_balance: 0,
-          description:     `Auto-created tax payable ledger for ${form.tax_name}`,
+        const newAcc = await createSubLedger({
+          name: form.tax_name,
+          parentGroupId: parent.id,
+          parentGroupName: parent.account_name,
+          accountType: 'Liability',
+          accountSubtype: 'Current Liability',
+          openingBalance: 0,
+          description: `Auto-created tax payable ledger for ${form.tax_name}`
         });
         glAccountId   = newAcc.id;
         glAccountName = newAcc.account_name;

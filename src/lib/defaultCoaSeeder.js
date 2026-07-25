@@ -90,6 +90,18 @@ export async function seedDefaultChartOfAccounts() {
       }
 
       const isIncomeStatement = ['Revenue', 'Income', 'Other Income', 'Expense', 'Expenses', 'COGS', 'Cost of Sales', 'OPEX', 'Operating Expense', 'Cost of Goods Sold', 'Other Expense'].includes(acc.type);
+      
+      const getStatementGroup = (type) => {
+        if (['Revenue', 'Income'].includes(type)) return 'Revenue';
+        if (['Other Income'].includes(type)) return 'Non-Operating Income';
+        if (['COGS', 'Cost of Sales', 'Cost of Goods Sold'].includes(type)) return 'Cost of Goods Sold';
+        if (['Expense', 'Expenses', 'OPEX', 'Operating Expense', 'Other Expense'].includes(type)) return 'Operating Expenses';
+        if (type === 'Asset') return 'Assets';
+        if (type === 'Liability') return 'Liabilities';
+        if (type === 'Equity') return 'Equity';
+        return 'Operating Expenses';
+      };
+
       const payload = {
         account_code: acc.code,
         account_name: acc.name,
@@ -97,7 +109,8 @@ export async function seedDefaultChartOfAccounts() {
         account_subtype: acc.subtype,
         ledger_type: acc.ledger_type,
         normal_balance: acc.balance,
-        financial_statement: isIncomeStatement ? 'income_statement' : 'balance_sheet',
+        statement_type: isIncomeStatement ? 'income_statement' : 'balance_sheet',
+        statement_group: getStatementGroup(acc.type),
         is_active: true,
         is_system_account: true,
         current_balance: 0,

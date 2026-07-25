@@ -102,7 +102,7 @@ export async function fetchReportData(reportId, fromDate, toDate, extraParams = 
           const bal = isDebitNormal ? (total_dr - total_cr) : (total_cr - total_dr);
           return { ...a, balance: bal };
         });
-        const isIncomeStatement = a => a.financial_statement === 'income_statement';
+        const isIncomeStatement = a => a.statement_type === 'income_statement';
         const netIncome = allAccounts.filter(isIncomeStatement).reduce((sum, a) => {
           const isExpense = (a.normal_balance || '').toLowerCase() === 'debit';
           return isExpense ? sum - a.balance : sum + a.balance;
@@ -131,7 +131,7 @@ export async function fetchReportData(reportId, fromDate, toDate, extraParams = 
         balance: Number(a.closing_balance || 0)
       }));
 
-      const isIncomeStatement = a => a.financial_statement === 'income_statement';
+      const isIncomeStatement = a => a.statement_type === 'income_statement';
       const netIncome = bsAccounts.filter(isIncomeStatement).reduce((sum, a) => {
         const isExpense = (a.normal_balance || '').toLowerCase() === 'debit';
         return isExpense ? sum - a.balance : sum + a.balance;

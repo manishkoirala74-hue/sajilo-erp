@@ -275,31 +275,52 @@ function transformProfitLoss(rawData, skipZeroRows) {
 }
 
 /**
- * Transforms flat Trial Balance data into a semantic hierarchy.
+ * Transforms flat Trial Balance data into a semantic hierarchy grouped by account type.
  */
 function transformTrialBalance(rawData, skipZeroRows) {
   let reportNodes = [];
   
+  const sortOrder = { 'Asset': 1, 'Liability': 2, 'Equity': 3, 'Revenue': 4, 'Expense': 5 };
+  const grouped = {};
+  
   rawData.forEach(a => {
-    // Treat each as an account for flat rendering, or build a tree if parent_account_id is used.
-    // Assuming flat for Trial Balance as per original design, but applying semantic styling.
-    reportNodes.push({
+    const type = a.account_type || 'Unclassified';
+    if (!grouped[type]) {
+      grouped[type] = {
+        name: type.toUpperCase(),
+        row_type: 'header',
+        balances: { current: 0 },
+        data: { account_name: type.toUpperCase(), debit: null, credit: null },
+        children: []
+      };
+    }
+    
+    grouped[type].children.push({
       name: a.account_name,
       row_type: 'account',
-      balances: {
-        current: (a.closing_debit || 0) + (a.closing_credit || 0), // Use total volume as representative for pruning
-      },
+      balances: { current: (a.closing_debit || 0) + (a.closing_credit || 0) },
       data: {
-        account_name: a.account_name,
+        account_name: `${a.account_code ? a.account_code + ' - ' : ''}${a.account_name}`,
         debit: a.closing_debit || 0,
         credit: a.closing_credit || 0
       }
     });
+    
+    // Sum balances for pruning
+    grouped[type].balances.current += (a.closing_debit || 0) + (a.closing_credit || 0);
   });
+  
+  Object.keys(grouped)
+    .sort((a, b) => (sortOrder[a] || 99) - (sortOrder[b] || 99))
+    .forEach(type => {
+      // Sort children alphabetically
+      grouped[type].children.sort((a, b) => a.name.localeCompare(b.name));
+      reportNodes.push(grouped[type]);
+    });
 
   // Calculate totals
-  const totalDebit = reportNodes.reduce((sum, n) => sum + n.data.debit, 0);
-  const totalCredit = reportNodes.reduce((sum, n) => sum + n.data.credit, 0);
+  const totalDebit = rawData.reduce((sum, n) => sum + (n.closing_debit || 0), 0);
+  const totalCredit = rawData.reduce((sum, n) => sum + (n.closing_credit || 0), 0);
 
   reportNodes.push({
     name: 'TOTAL',

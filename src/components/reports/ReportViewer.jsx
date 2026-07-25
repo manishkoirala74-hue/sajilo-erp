@@ -234,7 +234,45 @@ function TrialBalanceReport({ initialData, initialFromDate, initialToDate, initi
       if (settings.length > 0) setCompany(settings[0]);
 
       const data = await fetchReportData('trial_balance', filters.fromDate, filters.toDate);
-      setAccounts(data);
+      
+      // Synthesize group nodes by account_type to restore hierarchical grouping
+      const enrichedAccounts = [];
+      const types = ['Asset', 'Liability', 'Equity', 'Revenue', 'Expense', 'COGS'];
+      const sortOrder = { 'Asset': 1, 'Liability': 2, 'Equity': 3, 'Revenue': 4, 'COGS': 5, 'Expense': 6 };
+      
+      types.forEach(type => {
+        enrichedAccounts.push({
+          id: `VIRTUAL_${type}`,
+          account_code: String(sortOrder[type] || 99), // Used for sorting at the root level
+          account_name: type.toUpperCase(),
+          account_type: type,
+          ledger_type: 'Group Ledger',
+          parent_account_id: null,
+          opening_debit: 0, opening_credit: 0,
+          current_debit: 0, current_credit: 0,
+          closing_debit: 0, closing_credit: 0,
+        });
+      });
+      
+      data.forEach(a => {
+        // Map common variations of type
+        let mappedType = a.account_type;
+        if (['Income', 'Other Income'].includes(a.account_type)) mappedType = 'Revenue';
+        if (['Expenses', 'OPEX', 'Operating Expense', 'Other Expense'].includes(a.account_type)) mappedType = 'Expense';
+        if (['Cost of Sales', 'Cost of Goods Sold'].includes(a.account_type)) mappedType = 'COGS';
+
+        if (mappedType && types.includes(mappedType)) {
+          enrichedAccounts.push({
+            ...a,
+            parent_account_id: `VIRTUAL_${mappedType}`
+          });
+        } else {
+          // Unmatched falls to root
+          enrichedAccounts.push(a);
+        }
+      });
+      
+      setAccounts(enrichedAccounts);
     } catch (err) {
       console.error('[TrialBalance load error]', err);
     }

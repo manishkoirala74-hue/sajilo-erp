@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { sajilo } from '@/api/sajiloClient';
+import { createSubLedger } from '@/lib/accountFactory';
 import { X, Landmark, Banknote, Upload, FileText, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -126,24 +127,16 @@ export default function BankAccountFormModal({ account, onSave, onClose }) {
       }
 
       const parentGroup = ledgerGroups.find(g => g.id === form.ledger_group_id);
-      const newCode = generateAccountCode(parentGroup?.account_code || '1100', allAccounts);
-
       const isLiability = form.account_category === 'Overdraft' || form.account_category === 'Cash Credit' || form.account_type === 'Liability';
-      
-      const newGLAccount = await sajilo.entities.ChartOfAccount.create({
-        account_code: newCode,
-        account_name: form.account_name.trim(),
-        account_type: isLiability ? 'Liability' : 'Asset',
-        account_subtype: isLiability ? 'Current Liability' : 'Current Asset',
-        ledger_type: 'Sub Ledger',
-        parent_account_id: form.ledger_group_id,
-        parent_account_name: form.ledger_group_name,
-        normal_balance: isLiability ? 'Credit' : 'Debit',
-        financial_statement: 'balance_sheet',
-        current_balance: form.opening_balance || 0,
-        is_active: true,
-        is_system_account: false,
-        description: `Auto-created for ${form.account_type} account: ${form.account_name.trim()}`,
+
+      const newGLAccount = await createSubLedger({
+        name: form.account_name.trim(),
+        parentGroupId: form.ledger_group_id,
+        parentGroupName: form.ledger_group_name,
+        accountType: isLiability ? 'Liability' : 'Asset',
+        accountSubtype: isLiability ? 'Current Liability' : 'Current Asset',
+        openingBalance: form.opening_balance || 0,
+        description: `Auto-created for ${form.account_type} account: ${form.account_name.trim()}`
       });
 
       await onSave({ ...form, gl_account_id: newGLAccount.id, gl_account_name: newGLAccount.account_name });

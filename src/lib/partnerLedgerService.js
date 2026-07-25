@@ -8,70 +8,22 @@
  * Step D: Create the new ChartOfAccount leaf node and return its id.
  */
 import { sajilo } from '@/api/sajiloClient';
+import { createSubLedger } from './accountFactory';
 
-/**
- * Derives the next sequential account code under a given parent group.
- * Strategy: filters all sub-ledgers whose code starts with the parent's code prefix,
- * finds the max numeric value, and returns max + 1.
- *
- * @param {string} parentCode  e.g. "1020"
- * @param {Array}  allAccounts full COA list (pass to avoid extra fetches)
- * @returns {string} next code e.g. "10200026"
- */
-function deriveNextCode(parentCode, allAccounts) {
-  const prefix = parentCode.replace(/\D/g, ''); // strip non-digits just in case
-  const children = allAccounts.filter(a => {
-    const code = (a.account_code || '').replace(/\D/g, '');
-    return code.startsWith(prefix) && code.length > prefix.length;
-  });
-
-  if (children.length === 0) {
-    // First child: pad parent code + "0001"
-    return `${prefix}0001`;
-  }
-
-  const maxNumeric = Math.max(
-    ...children.map(a => parseInt((a.account_code || '').replace(/\D/g, ''), 10) || 0)
-  );
-  return String(maxNumeric + 1);
-}
-
-/**
- * Creates a sub-ledger account under the specified parent group for a partner.
- *
- * @param {object} params
- * @param {string} params.partnerName        Business name → account_name
- * @param {string} params.parentGroupId      ChartOfAccount id of the group
- * @param {string} params.accountType        'Asset' | 'Liability'
- * @param {string} params.normalBalance      'Debit' | 'Credit'
- * @param {string} params.accountSubtype     e.g. 'Current Asset'
- * @returns {Promise<{id: string, account_code: string, account_name: string}>}
- */
 export async function createPartnerLedger({ partnerName, parentGroupId, accountType, normalBalance, accountSubtype }) {
-  // Fetch parent group to get its account_code prefix
+  // Fetch parent group to get its account_name
   const parentList = await sajilo.entities.ChartOfAccount.filter({ id: parentGroupId, is_active: true });
   if (!parentList.length) throw new Error(`Parent group ${parentGroupId} not found`);
   const parent = parentList[0];
 
-  // Fetch all accounts to find next sequential code
-  const allAccounts = await sajilo.entities.ChartOfAccount.list('account_code', 2000);
-
-  const nextCode = deriveNextCode(parent.account_code, allAccounts);
-
-  const newAccount = await sajilo.entities.ChartOfAccount.create({
-    account_code:       nextCode,
-    account_name:       partnerName,
-    account_type:       accountType,
-    account_subtype:    accountSubtype || '',
-    ledger_type:        'Sub Ledger',
-    parent_account_id:  parentGroupId,
-    parent_account_name: parent.account_name,
-    normal_balance:     normalBalance,
-    financial_statement: 'balance_sheet',
-    is_active:          true,
-    is_system_account:  false,
-    current_balance:    0,
-    description:        `Auto-generated ledger for ${partnerName}`,
+  const newAccount = await createSubLedger({
+    name: partnerName,
+    parentGroupId: parentGroupId,
+    parentGroupName: parent.account_name,
+    accountType: accountType,
+    accountSubtype: accountSubtype || '',
+    openingBalance: 0,
+    description: `Auto-generated ledger for ${partnerName}`
   });
 
   return newAccount;
