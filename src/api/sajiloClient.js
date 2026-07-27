@@ -261,6 +261,14 @@ const buildEntityMethods = (tableName) => {
   };
 };
 export const sajilo = {
+  rpc: async (functionName, payload, invalidateTables = []) => {
+    const { data, error } = await supabase.rpc(functionName, payload);
+    if (error) throw error;
+    
+    // Natively handle cache clearing inside the wrapper
+    invalidateTables.forEach(table => invalidateCache(table));
+    return data;
+  },
   invalidateCache,
   clearCache: () => {
     queryCache.clear();

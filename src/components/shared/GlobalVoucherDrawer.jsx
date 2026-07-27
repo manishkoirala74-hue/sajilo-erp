@@ -6,10 +6,27 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
+// Adapter to normalize diverse voucher structures into a predictable drawer format
+const normalizeVoucherData = (data, lines, fallbackFlag, financialFlag) => {
+  return {
+    raw: data,
+    title: data.voucher_number || data.invoice_number || data.return_number || data.order_number || data.sale_number || data.adjustment_number || data.contract_reference || data.id,
+    status: data.status,
+    date: data.date || data.transaction_date || data.invoice_date || data.order_date || data.entry_date || 'N/A',
+    partnerName: data.partner_name || data.vendor_name || data.customer_name || 'Mapped Partner',
+    hasPartner: !!(data.partner_id || data.vendor_id || data.customer_id),
+    total: data.total_amount ?? data.grand_total ?? data.total_price ?? data.total_debit ?? 0,
+    remarks: data.remarks || data.narration || data.notes || data.description,
+    isFinancial: financialFlag || fallbackFlag,
+    lines: lines || []
+  };
+};
+
 export default function GlobalVoucherDrawer() {
   const { isOpen, activeVoucherNumber, closeVoucher } = useGlobalVoucherDrawer();
   const [data, setData] = useState(null);
   const [lines, setLines] = useState([]);
+  const [normalizedData, setNormalizedData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -21,6 +38,7 @@ export default function GlobalVoucherDrawer() {
     setError(null);
     setData(null);
     setLines([]);
+    setNormalizedData(null);
 
     const fetchVoucher = async () => {
       try {
@@ -28,105 +46,68 @@ export default function GlobalVoucherDrawer() {
         const vNum = cleanVoucherNumber.toUpperCase();
         
         let entityName = '';
-        let lineEntityName = '';
-        let lineFk = '';
         let docNumberField = 'doc_number';
         let isFinancial = false;
 
         if (vNum.startsWith('INV-') || vNum.startsWith('SI-')) {
           entityName = 'SalesInvoice';
-          lineEntityName = 'SalesInvoiceLine';
-          lineFk = 'invoice_id';
           docNumberField = 'invoice_number';
         } else if (vNum.startsWith('PINV-') || vNum.startsWith('PI-')) {
           entityName = 'PurchaseInvoice';
-          lineEntityName = 'PurchaseInvoiceLine';
-          lineFk = 'invoice_id';
           docNumberField = 'invoice_number';
         } else if (vNum.startsWith('SO-')) {
           entityName = 'SalesOrder';
-          lineEntityName = 'SalesOrderLine';
-          lineFk = 'order_id';
           docNumberField = 'order_number';
         } else if (vNum.startsWith('PO-')) {
           entityName = 'PurchaseOrder';
-          lineEntityName = 'PurchaseOrderLine';
-          lineFk = 'order_id';
           docNumberField = 'order_number';
         } else if (vNum.startsWith('POS-')) {
           entityName = 'POSSale';
-          lineEntityName = 'POSSaleLine';
-          lineFk = 'sale_id';
           docNumberField = 'sale_number';
         } else if (vNum.startsWith('QT-')) {
           entityName = 'Quotation';
-          lineEntityName = null; // Handled via line_items JSONB
-          lineFk = 'quotation_id';
           docNumberField = 'quotation_number';
         } else if (vNum.startsWith('SR-') || vNum.startsWith('SRN-')) {
           entityName = 'SalesReturn';
-          lineEntityName = 'SalesReturnLine';
-          lineFk = 'return_id';
           docNumberField = 'return_number';
         } else if (vNum.startsWith('PR-') || vNum.startsWith('PRN-')) {
           entityName = 'PurchaseReturn';
-          lineEntityName = 'PurchaseReturnLine';
-          lineFk = 'return_id';
           docNumberField = 'return_number';
         } else if (vNum.startsWith('RPOS-')) {
           entityName = 'POSReturn';
-          lineEntityName = 'POSReturnLine';
-          lineFk = 'return_id';
           docNumberField = 'return_number';
         } else if (vNum.startsWith('ADJ-')) {
           entityName = 'StockAdjustment';
-          lineEntityName = 'StockAdjustmentLine';
-          lineFk = 'adjustment_id';
           docNumberField = 'adjustment_number';
         } else if (vNum.startsWith('MO-')) {
           entityName = 'ManufacturingOrder';
-          lineEntityName = 'ManufacturingOrderLine';
-          lineFk = 'mo_id';
           docNumberField = 'mo_number';
         } else if (vNum.startsWith('SC-')) {
           entityName = 'ServiceContract';
-          lineEntityName = 'ServiceContractLine'; // assuming this exists, if not it will fallback to line_items JSONB
-          lineFk = 'contract_id';
           docNumberField = 'contract_reference';
         } else if (vNum.startsWith('JV-') || vNum.startsWith('REC-') || vNum.startsWith('PAY-') || vNum.startsWith('APV-') || vNum.startsWith('REV-') || vNum.startsWith('RV-') || vNum.startsWith('PV-') || vNum.startsWith('CV-') || vNum.startsWith('VV-')) {
           entityName = 'FinancialVoucher';
-          lineEntityName = 'JournalEntry';
-          lineFk = 'voucher_id';
           docNumberField = 'voucher_number';
           isFinancial = true;
         } else {
-          // Unknown or custom prefix configured by user in settings.
-          // Do not crash. Set entityName to null so it seamlessly falls back to GeneralLedgerJournal.
           entityName = null;
         }
 
         let headers = null;
         
         if (entityName) {
-          // Try exact match first
           headers = await sajilo.entities[entityName].filter({ [docNumberField]: cleanVoucherNumber });
-          
-          // Fallback to case-insensitive and trimmed ilike match if exact match fails
           if (!headers || !headers.length) {
             const { data, error } = await sajilo.auth.supabase
               .from(entityName)
               .select('*')
               .ilike(docNumberField, cleanVoucherNumber);
-            if (data && data.length > 0) {
-              headers = data;
-            }
+            if (data && data.length > 0) headers = data;
           }
         }
 
         let usedFallback = false;
         if (!headers || !headers.length) {
-          // Attempt to find it directly in GeneralLedgerJournal if the original header is missing
-          // This catches orphans, reversals (-REV), and manual JVs
           let { data: journals } = await sajilo.auth.supabase
             .from('GeneralLedgerJournal')
             .select('*')
@@ -142,10 +123,9 @@ export default function GlobalVoucherDrawer() {
             
           if (journals && journals.length > 0) {
             const j = journals[0];
-            // Fetch lines
             const { data: jLines } = await sajilo.auth.supabase
               .from('GeneralLedgerLine')
-              .select('id, debit_amount, credit_amount, account_id')
+              .select('id, debit_amount, credit_amount, account_id, account_name')
               .eq('journal_id', j.id);
               
             const accIds = [...new Set((jLines || []).map(l => l.account_id).filter(Boolean))];
@@ -159,7 +139,7 @@ export default function GlobalVoucherDrawer() {
             }
               
             const mappedLines = (jLines || []).map(l => ({
-              account_name: accsMap[l.account_id] || 'Unknown Account',
+              account_name: l.account_name || accsMap[l.account_id] || 'Unknown Account',
               debit_amount: l.debit_amount,
               credit_amount: l.credit_amount
             }));
@@ -169,7 +149,8 @@ export default function GlobalVoucherDrawer() {
               voucher_number: j.voucher_no || j.source_document_id || cleanVoucherNumber,
               date: j.entry_date,
               remarks: j.narration || j.notes || j.description || 'Journal Entry',
-              entries: mappedLines
+              entries: mappedLines,
+              total_amount: j.total_debit
             };
             
             headers = [fakeDoc];
@@ -182,12 +163,11 @@ export default function GlobalVoucherDrawer() {
         }
 
         const doc = headers[0];
-        
         let docLines = [];
+        
         if (isFinancial || usedFallback) {
           docLines = doc.entries || [];
         } else {
-          // Filter out completely empty "ghost" rows that have no item assigned and no values
           const rawLines = (doc.line_items || []).filter(l => l.item_id || l.item_name || (l.quantity && l.quantity > 0) || (l.line_total && l.line_total > 0));
           const itemIds = [...new Set(rawLines.map(l => l.item_id).filter(Boolean))];
           let itemsMap = {};
@@ -202,8 +182,9 @@ export default function GlobalVoucherDrawer() {
         }
 
         if (isMounted) {
-          setData({ ...doc, _isFinancial: isFinancial || usedFallback });
+          setData(doc);
           setLines(docLines);
+          setNormalizedData(normalizeVoucherData(doc, docLines, usedFallback, isFinancial));
         }
       } catch (err) {
         if (isMounted) setError(err.message);
@@ -222,15 +203,15 @@ export default function GlobalVoucherDrawer() {
       <SheetContent className="sm:max-w-[700px] w-[90vw] overflow-y-auto">
         <SheetHeader className="mb-6">
           <SheetTitle className="text-2xl font-bold flex items-center justify-between">
-            {activeVoucherNumber}
-            {data?.status && (
+            {normalizedData ? normalizedData.title : activeVoucherNumber}
+            {normalizedData?.status && (
               <span className="text-sm font-medium px-2 py-1 rounded-full bg-slate-100 text-slate-700 uppercase tracking-wider">
-                {data.status}
+                {normalizedData.status}
               </span>
             )}
           </SheetTitle>
           <SheetDescription>
-            {data ? `Date: ${data.date || data.transaction_date || data.invoice_date || data.order_date || data.entry_date || 'N/A'}` : 'Voucher Details View'}
+            {normalizedData ? `Date: ${normalizedData.date}` : 'Voucher Details View'}
           </SheetDescription>
         </SheetHeader>
 
@@ -244,26 +225,26 @@ export default function GlobalVoucherDrawer() {
           <div className="py-10 text-center text-red-500 font-medium">
             Error: {error}
           </div>
-        ) : data ? (
+        ) : normalizedData ? (
           <div className="space-y-6">
             {/* Header Metadata */}
             <div className="grid grid-cols-2 gap-4 text-sm bg-slate-50 dark:bg-slate-900 p-4 rounded-lg border border-border">
-              {data.partner_id && (
+              {normalizedData.hasPartner && (
                 <div>
                   <p className="text-muted-foreground mb-1">Partner / Party</p>
-                  <p className="font-semibold">{data.partner_name || 'Mapped Partner'}</p>
+                  <p className="font-semibold">{normalizedData.partnerName}</p>
                 </div>
               )}
-              {data.total_amount !== undefined && (
+              {normalizedData.total !== undefined && (
                 <div>
                   <p className="text-muted-foreground mb-1">Total Amount</p>
-                  <p className="font-semibold text-lg">NPR {(data.total_amount || 0).toLocaleString()}</p>
+                  <p className="font-semibold text-lg">NPR {(normalizedData.total || 0).toLocaleString()}</p>
                 </div>
               )}
-              {data.remarks && (
+              {normalizedData.remarks && (
                 <div className="col-span-2">
                   <p className="text-muted-foreground mb-1">Remarks</p>
-                  <p className="font-medium">{data.remarks}</p>
+                  <p className="font-medium">{normalizedData.remarks}</p>
                 </div>
               )}
             </div>
@@ -274,7 +255,7 @@ export default function GlobalVoucherDrawer() {
                 <Table>
                   <TableHeader className="bg-muted/50 sticky top-0 z-10">
                     <TableRow>
-                      {data._isFinancial ? (
+                      {normalizedData.isFinancial ? (
                         <>
                           <TableHead>Account</TableHead>
                           <TableHead className="text-right">Debit</TableHead>
@@ -291,14 +272,14 @@ export default function GlobalVoucherDrawer() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {lines.map((line, idx) => {
+                    {normalizedData.lines.map((line, idx) => {
                       const qty = line.quantity ?? line.qty;
                       const rate = line.unit_price ?? line.rate ?? line.price;
                       const total = line.line_total ?? line.amount ?? line.total_price ?? line.total ?? (qty != null && rate != null && !isNaN(qty * rate) ? qty * rate : null);
 
                       return (
                       <TableRow key={line.id || idx}>
-                        {data._isFinancial ? (
+                        {normalizedData.isFinancial ? (
                           <>
                             <TableCell className="font-medium">{line.account_name}</TableCell>
                             <TableCell className="text-right">{line.debit_amount > 0 ? line.debit_amount.toLocaleString() : '-'}</TableCell>
@@ -314,9 +295,9 @@ export default function GlobalVoucherDrawer() {
                         )}
                       </TableRow>
                     )})}
-                    {lines.length === 0 && (
+                    {normalizedData.lines.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={data._isFinancial ? 3 : 4} className="text-center py-6 text-muted-foreground">
+                        <TableCell colSpan={normalizedData.isFinancial ? 3 : 4} className="text-center py-6 text-muted-foreground">
                           No line items found.
                         </TableCell>
                       </TableRow>

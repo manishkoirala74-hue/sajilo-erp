@@ -68,16 +68,14 @@ export async function postSalesReturn(returnsData, itemsMap, settings, isReversa
       cogs_account_id: itemsMap[l.item_id]?.cogs_account_id
     }))
   };
-  const { data, error } = await sajilo.client.rpc('rpc_post_sales_return', {
+  return await sajilo.rpc('rpc_post_sales_return', {
     p_payload: payload,
     p_idempotency_key: returns.idempotency_key,
     p_gl_settings: settings,
     p_options: {
       is_reversal: isReversal
     }
-  });
-  if (error) throw new Error(error.message);
-  return data;
+  }, ['SalesReturn', 'Item', 'GeneralLedgerLine', 'GeneralLedgerJournal', 'InventoryHistory', 'ChartOfAccount']);
 }
 
 export async function postPurchaseReturn(returnsData, itemsMap, settings, isReversal = false) {
@@ -95,16 +93,14 @@ export async function postPurchaseReturn(returnsData, itemsMap, settings, isReve
       cogs_account_id: itemsMap[l.item_id]?.cogs_account_id
     }))
   };
-  const { data, error } = await sajilo.client.rpc('rpc_post_purchase_return', {
+  return await sajilo.rpc('rpc_post_purchase_return', {
     p_payload: payload,
     p_idempotency_key: returns.idempotency_key,
     p_gl_settings: settings,
     p_options: {
       is_reversal: isReversal
     }
-  });
-  if (error) throw new Error(error.message);
-  return data;
+  }, ['PurchaseReturn', 'Item', 'GeneralLedgerLine', 'GeneralLedgerJournal', 'InventoryHistory', 'ChartOfAccount']);
 }
 
 export async function postStockAdjustment(adjustmentData, itemsMap, settings, isReversal = false) {
@@ -121,31 +117,27 @@ export async function postStockAdjustment(adjustmentData, itemsMap, settings, is
       cogs_account_id: itemsMap[l.item_id]?.cogs_account_id
     }))
   };
-  const { data, error } = await sajilo.client.rpc('rpc_post_stock_adjustment', {
+  return await sajilo.rpc('rpc_post_stock_adjustment', {
     p_payload: payload,
     p_idempotency_key: adjustment.idempotency_key,
     p_gl_settings: settings,
     p_options: {
       is_reversal: isReversal
     }
-  });
-  if (error) throw new Error(error.message);
-  return data;
+  }, ['StockAdjustment', 'Item', 'GeneralLedgerLine', 'GeneralLedgerJournal', 'InventoryHistory', 'ChartOfAccount']);
 }
 
 export async function postPayroll(payrollData, settings, isReversal = false) {
   if (isReversal) return null;
   const payroll = { ...payrollData, company_id: payrollData.company_id || sajilo.getCompanyId() };
-  const { data, error } = await sajilo.client.rpc('rpc_post_payroll_run', {
+  return await sajilo.rpc('rpc_post_payroll_run', {
     p_payload: payroll,
     p_idempotency_key: payroll.idempotency_key,
     p_gl_settings: settings,
     p_options: {
       is_reversal: isReversal
     }
-  });
-  if (error) throw new Error(error.message);
-  return data;
+  }, ['Payroll', 'GeneralLedgerLine', 'GeneralLedgerJournal', 'ChartOfAccount']);
 }
 
 export async function postAssetPurchase() { return null; }
@@ -251,16 +243,14 @@ export async function postPOSSale(saleData, itemsMap, settings, isReversal = fal
       cogs_account_id: itemsMap[l.item_id]?.cogs_account_id
     }))
   };
-  const { data, error } = await sajilo.client.rpc('rpc_post_pos_sale', {
+  return await sajilo.rpc('rpc_post_pos_sale', {
     p_payload: payload,
     p_idempotency_key: sale.idempotency_key,
     p_gl_settings: settings,
     p_options: {
       is_reversal: isReversal
     }
-  });
-  if (error) throw new Error(error.message);
-  return data;
+  }, ['POSSale', 'SalesInvoice', 'Item', 'GeneralLedgerLine', 'GeneralLedgerJournal', 'InventoryHistory', 'ChartOfAccount']);
 }
 
 // ─── 2. SALES INVOICE ──────────────────────────────────────────────────────────
@@ -306,12 +296,11 @@ export async function checkoutSalesInvoice(invoiceData, itemsMap, settings, idem
   }
 
   try {
-    const { data, error } = await supabase.rpc('rpc_checkout_sales_invoice', {
+    const data = await sajilo.rpc('rpc_checkout_sales_invoice', {
       p_payload: invoice,
       p_idempotency_key: idempotencyKey,
       p_gl_lines: lines
-    });
-    if (error) throw error;
+    }, ['SalesInvoice', 'Item', 'GeneralLedgerLine', 'GeneralLedgerJournal', 'InventoryHistory', 'ChartOfAccount']);
     if (!data || !data.invoice_id) throw new Error('ERR_SILENT_FAIL: CRITICAL_SILENT_FAIL - The database failed to return a saved invoice ID.');
     return data;
   } catch (error) {
@@ -360,12 +349,11 @@ export async function checkoutPurchaseInvoice(invoiceData, itemsMap, settings, i
   }
 
   try {
-    const { data, error } = await supabase.rpc('rpc_checkout_purchase_invoice', {
+    const data = await sajilo.rpc('rpc_checkout_purchase_invoice', {
       p_payload: invoice,
       p_idempotency_key: idempotencyKey,
       p_gl_lines: lines
-    });
-    if (error) throw error;
+    }, ['PurchaseInvoice', 'Item', 'GeneralLedgerLine', 'GeneralLedgerJournal', 'InventoryHistory', 'ChartOfAccount']);
     if (!data || !data.invoice_id) throw new Error('ERR_SILENT_FAIL: CRITICAL_SILENT_FAIL - The database failed to return a saved invoice ID.');
     return data;
   } catch (error) {
@@ -376,11 +364,10 @@ export async function checkoutPurchaseInvoice(invoiceData, itemsMap, settings, i
 export async function checkoutStockTransfer(transferData, idempotencyKey = null) {
   const transfer = { ...transferData, company_id: transferData.company_id || sajilo.getCompanyId() };
   try {
-    const { data, error } = await supabase.rpc('rpc_checkout_stock_transfer', {
+    const data = await sajilo.rpc('rpc_checkout_stock_transfer', {
       p_payload: transfer,
       p_idempotency_key: idempotencyKey
-    });
-    if (error) throw error;
+    }, ['StockTransfer', 'Item', 'GeneralLedgerLine', 'GeneralLedgerJournal', 'InventoryHistory', 'ChartOfAccount']);
     return data;
   } catch (error) {
     handleDBError(error);
@@ -400,36 +387,39 @@ export async function postFinancialVoucher(voucher, isReversal = false, idempote
     }
   };
 
-  const { data, error } = await supabase.rpc('rpc_post_financial_voucher', payload);
-  if (error) handleDBError(error);
-
-  if (data && data.status === 'duplicate') {
-    toast.info('This transaction was already posted. Recovered successfully.');
+  try {
+    const data = await sajilo.rpc('rpc_post_financial_voucher', payload, ['FinancialVoucher', 'GeneralLedgerLine', 'GeneralLedgerJournal', 'ChartOfAccount']);
+    if (data && data.status === 'duplicate') {
+      toast.info('This transaction was already posted. Recovered successfully.');
+    }
+    return data?.journal_id;
+  } catch (error) {
+    handleDBError(error);
   }
-
-  return data?.journal_id;
 }
 
 // ─── 5. ATOMIC CANCELLATION ────────────────────────────────────────────────────────
 export async function cancelSalesInvoice(invoiceId, reason) {
-  const { error } = await supabase.rpc('rpc_cancel_document', {
-    p_doc_id: invoiceId,
-    p_doc_type: 'SalesInvoice',
-    p_reason: reason
-  });
-  if (error) {
+  try {
+    await sajilo.rpc('rpc_cancel_document', {
+      p_doc_id: invoiceId,
+      p_doc_type: 'SalesInvoice',
+      p_reason: reason
+    }, ['SalesInvoice', 'GeneralLedgerJournal', 'GeneralLedgerLine', 'Item', 'InventoryHistory']);
+  } catch (error) {
     toast.error('Cancellation Failed: ' + (error.message || 'Unknown error'));
     throw error;
   }
 }
 
 export async function cancelPurchaseInvoice(invoiceId, reason) {
-  const { error } = await supabase.rpc('rpc_cancel_document', {
-    p_doc_id: invoiceId,
-    p_doc_type: 'PurchaseInvoice',
-    p_reason: reason
-  });
-  if (error) {
+  try {
+    await sajilo.rpc('rpc_cancel_document', {
+      p_doc_id: invoiceId,
+      p_doc_type: 'PurchaseInvoice',
+      p_reason: reason
+    }, ['PurchaseInvoice', 'GeneralLedgerJournal', 'GeneralLedgerLine', 'Item', 'InventoryHistory']);
+  } catch (error) {
     toast.error('Cancellation Failed: ' + (error.message || 'Unknown error'));
     throw error;
   }
