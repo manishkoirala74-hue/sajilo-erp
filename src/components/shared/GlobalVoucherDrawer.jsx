@@ -250,65 +250,116 @@ export default function GlobalVoucherDrawer() {
             </div>
 
             {/* Matrix View */}
-            <div className="border border-border rounded-lg overflow-hidden">
+            <div className="border border-border rounded-lg overflow-hidden bg-card">
               <ScrollArea className="h-auto max-h-[50vh]">
-                <Table>
-                  <TableHeader className="bg-muted/50 sticky top-0 z-10">
-                    <TableRow>
-                      {normalizedData.isFinancial ? (
-                        <>
-                          <TableHead>Account</TableHead>
-                          <TableHead className="text-right">Debit</TableHead>
-                          <TableHead className="text-right">Credit</TableHead>
-                        </>
-                      ) : (
-                        <>
-                          <TableHead>Item Name</TableHead>
-                          <TableHead className="text-right">Qty</TableHead>
-                          <TableHead className="text-right">Rate</TableHead>
-                          <TableHead className="text-right">Total</TableHead>
-                        </>
-                      )}
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {normalizedData.lines.map((line, idx) => {
-                      const qty = line.quantity ?? line.qty;
-                      const rate = line.unit_price ?? line.rate ?? line.price;
-                      const total = line.line_total ?? line.amount ?? line.total_price ?? line.total ?? (qty != null && rate != null && !isNaN(qty * rate) ? qty * rate : null);
-
-                      return (
-                      <TableRow key={line.id || idx}>
+                {/* Desktop Table View */}
+                <div className="hidden md:block">
+                  <Table>
+                    <TableHeader className="bg-muted/50 sticky top-0 z-10">
+                      <TableRow>
                         {normalizedData.isFinancial ? (
                           <>
-                            <TableCell className="font-medium">{line.account_name}</TableCell>
-                            <TableCell className="text-right">{line.debit_amount > 0 ? line.debit_amount.toLocaleString() : '-'}</TableCell>
-                            <TableCell className="text-right">{line.credit_amount > 0 ? line.credit_amount.toLocaleString() : '-'}</TableCell>
+                            <TableHead>Account</TableHead>
+                            <TableHead className="text-right">Debit</TableHead>
+                            <TableHead className="text-right">Credit</TableHead>
                           </>
                         ) : (
                           <>
-                            <TableCell className="font-medium">{line.item_name}</TableCell>
-                            <TableCell className="text-right">{qty != null ? qty : '-'}</TableCell>
-                            <TableCell className="text-right">{rate != null ? Number(rate).toLocaleString() : '-'}</TableCell>
-                            <TableCell className="text-right">{total != null ? Number(total).toLocaleString() : '-'}</TableCell>
+                            <TableHead>Item Name</TableHead>
+                            <TableHead className="text-right">Qty</TableHead>
+                            <TableHead className="text-right">Rate</TableHead>
+                            <TableHead className="text-right">Total</TableHead>
                           </>
                         )}
                       </TableRow>
-                    )})}
-                    {normalizedData.lines.length === 0 && (
-                      <TableRow>
-                        <TableCell colSpan={normalizedData.isFinancial ? 3 : 4} className="text-center py-6 text-muted-foreground">
-                          No line items found.
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {normalizedData.lines.map((line, idx) => {
+                        const qty = line.quantity ?? line.qty;
+                        const rate = line.unit_price ?? line.rate ?? line.price;
+                        const total = line.line_total ?? line.amount ?? line.total_price ?? line.total ?? (qty != null && rate != null && !isNaN(qty * rate) ? qty * rate : null);
+
+                        return (
+                        <TableRow key={line.id || idx}>
+                          {normalizedData.isFinancial ? (
+                            <>
+                              <TableCell className="font-medium">{line.account_name}</TableCell>
+                              <TableCell className="text-right">{line.debit_amount > 0 ? line.debit_amount.toLocaleString() : '-'}</TableCell>
+                              <TableCell className="text-right">{line.credit_amount > 0 ? line.credit_amount.toLocaleString() : '-'}</TableCell>
+                            </>
+                          ) : (
+                            <>
+                              <TableCell className="font-medium">{line.item_name}</TableCell>
+                              <TableCell className="text-right">{qty != null ? qty : '-'}</TableCell>
+                              <TableCell className="text-right">{rate != null ? Number(rate).toLocaleString() : '-'}</TableCell>
+                              <TableCell className="text-right">{total != null ? Number(total).toLocaleString() : '-'}</TableCell>
+                            </>
+                          )}
+                        </TableRow>
+                      )})}
+                      {normalizedData.lines.length === 0 && (
+                        <TableRow>
+                          <TableCell colSpan={normalizedData.isFinancial ? 3 : 4} className="text-center py-6 text-muted-foreground">
+                            No line items found.
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+
+                {/* Mobile Card View */}
+                <div className="block md:hidden divide-y divide-border">
+                  {normalizedData.lines.map((line, idx) => {
+                    const qty = line.quantity ?? line.qty;
+                    const rate = line.unit_price ?? line.rate ?? line.price;
+                    const total = line.line_total ?? line.amount ?? line.total_price ?? line.total ?? (qty != null && rate != null && !isNaN(qty * rate) ? qty * rate : null);
+
+                    return (
+                      <div key={line.id || idx} className="p-4 space-y-2">
+                        {normalizedData.isFinancial ? (
+                          <>
+                            <div className="font-medium text-foreground">{line.account_name}</div>
+                            <div className="flex justify-between text-sm">
+                              <span className="text-muted-foreground">Debit</span>
+                              <span className="font-semibold">{line.debit_amount > 0 ? line.debit_amount.toLocaleString() : '-'}</span>
+                            </div>
+                            <div className="flex justify-between text-sm">
+                              <span className="text-muted-foreground">Credit</span>
+                              <span className="font-semibold">{line.credit_amount > 0 ? line.credit_amount.toLocaleString() : '-'}</span>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <div className="font-medium text-foreground">{line.item_name}</div>
+                            <div className="flex justify-between text-sm">
+                              <span className="text-muted-foreground">Quantity</span>
+                              <span>{qty != null ? qty : '-'}</span>
+                            </div>
+                            <div className="flex justify-between text-sm">
+                              <span className="text-muted-foreground">Rate</span>
+                              <span>{rate != null ? Number(rate).toLocaleString() : '-'}</span>
+                            </div>
+                            <div className="flex justify-between text-sm border-t border-border pt-2 mt-2">
+                              <span className="font-semibold">Total</span>
+                              <span className="font-semibold text-primary">{total != null ? Number(total).toLocaleString() : '-'}</span>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    );
+                  })}
+                  {normalizedData.lines.length === 0 && (
+                    <div className="p-6 text-center text-muted-foreground">
+                      No line items found.
+                    </div>
+                  )}
+                </div>
               </ScrollArea>
             </div>
           </div>
         ) : (
-          <div className="py-10 text-center text-muted-foreground">
+          <div className="py-10 text-center text-muted-foreground" role="status" aria-label="No data loaded">
             No data loaded.
           </div>
         )}

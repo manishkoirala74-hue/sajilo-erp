@@ -89,7 +89,7 @@ export default function SalesInvoices() {
 
   const loadData = async () => {
     Promise.all([
-      sajilo.entities.SalesInvoice.list('-created_date', 1000),
+      sajilo.entities.SalesInvoice.list('-created_date', 50),
       sajilo.entities.BusinessPartner.filter({ is_active: true }),
       sajilo.entities.SalesOrder.filter({ fulfillment_status: 'Confirmed' }),
       sajilo.entities.CompanySettings.list(),
@@ -186,7 +186,7 @@ export default function SalesInvoices() {
   useSajiloSync(['BusinessPartner', 'SalesOrder', 'CompanySettings'], loadData);
 
   const fetchInvoices = async () => {
-    const data = await sajilo.entities.SalesInvoice.list('-created_date', 1000);
+    const data = await sajilo.entities.SalesInvoice.list('-created_date', 50);
     setInvoices(data);
   };
 

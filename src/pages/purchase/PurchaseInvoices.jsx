@@ -61,7 +61,7 @@ export default function PurchaseInvoices() {
 
   const loadData = () => {
     Promise.all([
-      sajilo.entities.PurchaseInvoice.list('-created_date', 1000),
+      sajilo.entities.PurchaseInvoice.list('-created_date', 50),
       sajilo.entities.BusinessPartner.filter({ is_active: true }),
       sajilo.entities.PurchaseOrder.filter({ status: 'Approved' }),
       sajilo.entities.ChartOfAccount.filter({ is_active: true }, 'account_code', 500),
@@ -122,7 +122,7 @@ export default function PurchaseInvoices() {
   useSajiloSync(['BusinessPartner', 'PurchaseOrder'], loadData);
 
   const fetchInvoices = async () => {
-    const data = await sajilo.entities.PurchaseInvoice.list('-created_date', 1000);
+    const data = await sajilo.entities.PurchaseInvoice.list('-created_date', 50);
     setInvoices(data);
   };
 
