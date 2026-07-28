@@ -20,6 +20,8 @@ import { postAssetPurchase, postAssetDepreciation, resolveDifferenceInTrialBalan
 import { AlertTriangle } from 'lucide-react';
 import AssetDisposalModal from '@/components/assets/AssetDisposalModal';
 import AssetPurchaseModal from '@/components/assets/AssetPurchaseModal';
+import FormGrid from '@/components/layout/FormGrid';
+import FormRow from '@/components/layout/FormRow';
 import { cn } from '@/lib/utils';
 import DateInput from '@/components/shared/DateInput';
 
@@ -692,9 +694,9 @@ export default function FixedAssets() {
           <DialogHeader>
             <DialogTitle>{editing ? 'Edit Asset' : 'New Fixed Asset'}</DialogTitle>
           </DialogHeader>
-          <div className="grid grid-cols-2 gap-4">
-            <div><Label>Asset Name *</Label><Input value={form.asset_name} onChange={e => f('asset_name', e.target.value)} /></div>
-            <div>
+          <FormGrid>
+            <FormRow><Label>Asset Name *</Label><Input value={form.asset_name} onChange={e => f('asset_name', e.target.value)} /></FormRow>
+            <FormRow>
               <Label>Assets Ledger *</Label>
               <SearchableSelect
                 options={assetLedgerOptions}
@@ -706,12 +708,12 @@ export default function FixedAssets() {
                 }}
                 placeholder="Search asset ledger accounts…"
               />
-            </div>
-            <div><Label>Purchase Date</Label><DateInput value={form.purchase_date} onChange={val => f('purchase_date', val)} /></div>
-            <div><Label>Gross Purchase Value (NPR)</Label><Input type="number" value={form.gross_purchase_value} onChange={e => f('gross_purchase_value', parseFloat(e.target.value) || 0)} /></div>
-            <div><Label>Salvage Value (NPR)</Label><Input type="number" value={form.salvage_value} onChange={e => f('salvage_value', parseFloat(e.target.value) || 0)} /></div>
-            <div><Label>Useful Life (months)</Label><Input type="number" value={form.useful_life_months} onChange={e => f('useful_life_months', parseInt(e.target.value) || 0)} /></div>
-            <div>
+            </FormRow>
+            <FormRow><Label>Purchase Date</Label><DateInput value={form.purchase_date} onChange={val => f('purchase_date', val)} /></FormRow>
+            <FormRow><Label>Gross Purchase Value (NPR)</Label><Input type="number" value={form.gross_purchase_value} onChange={e => f('gross_purchase_value', parseFloat(e.target.value) || 0)} /></FormRow>
+            <FormRow><Label>Salvage Value (NPR)</Label><Input type="number" value={form.salvage_value} onChange={e => f('salvage_value', parseFloat(e.target.value) || 0)} /></FormRow>
+            <FormRow><Label>Useful Life (months)</Label><Input type="number" value={form.useful_life_months} onChange={e => f('useful_life_months', parseInt(e.target.value) || 0)} /></FormRow>
+            <FormRow>
               <Label>Depreciation Method</Label>
               <Select value={form.depreciation_method} onValueChange={v => f('depreciation_method', v)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
@@ -720,8 +722,8 @@ export default function FixedAssets() {
                   <SelectItem value="Written-Down Value">Written-Down Value (WDV)</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
-            <div>
+            </FormRow>
+            <FormRow>
               <Label>Status</Label>
               <Select value={form.status} onValueChange={v => f('status', v)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
@@ -729,16 +731,16 @@ export default function FixedAssets() {
                   {['Active', 'In Repair', 'Disposed', 'Sold'].map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                 </SelectContent>
               </Select>
-            </div>
-            <div><Label>Location</Label><Input value={form.location} onChange={e => f('location', e.target.value)} /></div>
-            <div><Label>Assigned To</Label><Input value={form.assigned_to} onChange={e => f('assigned_to', e.target.value)} /></div>
-            <div className="col-span-2"><Label>Notes</Label><Input value={form.notes} onChange={e => f('notes', e.target.value)} /></div>
+            </FormRow>
+            <FormRow><Label>Location</Label><Input value={form.location} onChange={e => f('location', e.target.value)} /></FormRow>
+            <FormRow><Label>Assigned To</Label><Input value={form.assigned_to} onChange={e => f('assigned_to', e.target.value)} /></FormRow>
+            <FormRow fullWidth><Label>Notes</Label><Input value={form.notes} onChange={e => f('notes', e.target.value)} /></FormRow>
 
             {/* ── Payment Method ── */}
-            <div className="col-span-2 border-t border-border pt-4">
+            <FormRow fullWidth className="border-t border-border pt-4">
               <Label className="text-sm font-semibold text-foreground mb-3 block">Post Payment for this Asset?</Label>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
+              <FormGrid>
+                <FormRow>
                   <Label>Payment Method</Label>
                   <Select value={form.payment_method_type} onValueChange={v => {
                     f('payment_method_type', v);
@@ -751,8 +753,8 @@ export default function FixedAssets() {
                       <SelectItem value="party_ledger">Post to Party Ledger (Supplier)</SelectItem>
                     </SelectContent>
                   </Select>
-                </div>
-                <div>
+                </FormRow>
+                <FormRow>
                   <Label>{form.payment_method_type === 'party_ledger' ? 'Supplier Ledger' : 'Cash / Bank Account'}</Label>
                   {form.payment_method_type === 'cash_bank' ? (
                     <Select
@@ -791,18 +793,21 @@ export default function FixedAssets() {
                       </SelectContent>
                     </Select>
                   )}
-                </div>
-              </div>
-            </div>
+                </FormRow>
+              </FormGrid>
+            </FormRow>
 
-            <div className="col-span-2 border-t border-border pt-4">
+            <FormRow fullWidth className="border-t border-border pt-4">
               <DocumentUploader
                 label="Supporting Documents"
                 urls={form.document_urls || []}
                 onChange={urls => f('document_urls', urls)}
+                companyId={sajilo.getCompanyId()}
+                moduleName="FixedAsset"
+                recordId={form.id} 
               />
-            </div>
-          </div>
+            </FormRow>
+          </FormGrid>
 
           {form.gross_purchase_value > 0 && (
             <div className="mt-3 bg-muted/40 rounded-lg px-4 py-3 text-xs text-muted-foreground font-mono">
@@ -861,7 +866,7 @@ export default function FixedAssets() {
           </DialogHeader>
           {selected && (
             <div className="space-y-4">
-              <div className="grid grid-cols-4 gap-3 text-sm bg-muted/30 rounded-lg p-3">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm bg-muted/30 rounded-lg p-3">
                 <div><p className="text-xs text-muted-foreground">Gross Value</p><p className="font-semibold">{fmt(selected.gross_purchase_value)}</p></div>
                 <div><p className="text-xs text-muted-foreground">Accumulated</p><p className="font-semibold text-amber-600 dark:text-amber-400">{fmt(selected.accumulated_depreciation)}</p></div>
                 <div><p className="text-xs text-muted-foreground">Net Book Value</p><p className="font-semibold text-emerald-700 dark:text-emerald-400">{fmt(selected.net_book_value)}</p></div>

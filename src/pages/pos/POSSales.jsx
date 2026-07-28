@@ -7,6 +7,8 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import SearchableSelect from '@/components/shared/SearchableSelect';
+import VoucherLink from '@/components/shared/VoucherLink';
+import FormGrid from '@/components/layout/FormGrid';
 import StatusBadge from '@/components/shared/StatusBadge';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -267,7 +269,7 @@ export default function POSSales() {
 
       {/* Customer & Payment */}
       <div className="border-t border-border px-3 py-3 space-y-2 shrink-0">
-        <div className="grid grid-cols-2 gap-2">
+        <FormGrid className="gap-2 gap-y-2">
           <div>
             <Label className="text-xs">{isCredit ? 'Customer *' : 'Customer'}</Label>
             {isCredit ? (
@@ -298,7 +300,7 @@ export default function POSSales() {
               ]}
             />
           </div>
-        </div>
+        </FormGrid>
         {/* Cash drawer selector */}
         {!isCredit && cashAccounts.length > 0 && (
           <div>
@@ -315,7 +317,7 @@ export default function POSSales() {
             />
           </div>
         )}
-        <div className="grid grid-cols-2 gap-2">
+        <FormGrid className="gap-2 gap-y-2">
           <div>
             <Label className="text-xs">Global Discount %</Label>
             <Input type="number" inputMode="decimal" pattern="[0-9]*" onWheel={(e) => e.target.blur()} min={0} max={100} value={discountPercent} onChange={e => setDiscountPercent(parseFloat(e.target.value) || 0)} className="h-8 text-sm" />
@@ -324,7 +326,7 @@ export default function POSSales() {
             <Label className="text-xs">Amount Tendered</Label>
             <Input type="number" inputMode="decimal" pattern="[0-9]*" onWheel={(e) => e.target.blur()} min={0} value={amountTendered} onChange={e => setAmountTendered(parseFloat(e.target.value) || 0)} className="h-8 text-sm" />
           </div>
-        </div>
+        </FormGrid>
       </div>
 
       {/* Totals */}
@@ -373,7 +375,7 @@ export default function POSSales() {
               placeholder="Search items by name or code…" value={search} onChange={e => setSearch(e.target.value)} />
           </div>
           <div className="flex-1 overflow-y-auto">
-            <div className="grid grid-cols-2 xl:grid-cols-3 gap-3 pb-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 pb-4">
               {filteredItems.map(item => (
                 <button key={item.id} onClick={() => addToCart(item)}
                   className="bg-card border border-border rounded-xl p-3 text-left hover:border-primary hover:shadow-md transition-all group relative">

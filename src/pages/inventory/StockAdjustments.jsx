@@ -12,6 +12,7 @@ import DataTable from '@/components/shared/DataTable';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import DateInput from '@/components/shared/DateInput';
+import FormGrid from '@/components/layout/FormGrid';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/AuthContext';
 import { postStockAdjustment, loadItemsMap, loadSettings } from '@/lib/glPostingService';
@@ -177,7 +178,7 @@ export default function StockAdjustments() {
               Stock {form.adjustment_type} — {form.adjustment_number}
             </DialogTitle>
           </DialogHeader>
-          <div className="grid grid-cols-3 gap-4 mt-4">
+          <FormGrid className="mt-4">
             <div>
               <DateInput label="Date" value={form.adjustment_date} onChange={v => setForm(f => ({ ...f, adjustment_date: v }))} />
             </div>
@@ -192,7 +193,7 @@ export default function StockAdjustments() {
               <Label>Notes</Label>
               <Input value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} placeholder="Optional" />
             </div>
-          </div>
+          </FormGrid>
 
           {/* Add item */}
           <div className="mt-5">
@@ -267,11 +268,11 @@ export default function StockAdjustments() {
           <DialogHeader><DialogTitle>Adjustment — {viewDetail?.adjustment_number}</DialogTitle></DialogHeader>
           {viewDetail && (
             <div className="space-y-4">
-              <div className="grid grid-cols-3 gap-3 bg-muted/30 rounded-lg p-4 text-sm">
+              <FormGrid className="bg-muted/30 rounded-lg p-4 text-sm">
                 <div><span className="text-muted-foreground">Type:</span> <strong>{viewDetail.adjustment_type}</strong></div>
                 <div><span className="text-muted-foreground">Reason:</span> <strong>{viewDetail.reason}</strong></div>
                 <div><span className="text-muted-foreground">Status:</span> <StatusBadge status={viewDetail.status} /></div>
-              </div>
+              </FormGrid>
               <table className="table-fluid-grid text-sm border rounded-lg overflow-hidden">
                 <thead className="cell-density bg-muted/50"><tr>
                   <th className="cell-density text-left">Item</th>

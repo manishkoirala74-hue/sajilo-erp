@@ -15,6 +15,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import PageHeader from '@/components/shared/PageHeader';
 import StatusBadge from '@/components/shared/StatusBadge';
 import { toast } from 'sonner';
+import FormGrid from '@/components/layout/FormGrid';
+import FormRow from '@/components/layout/FormRow';
 import { cn } from '@/lib/utils';
 import { postItemDeletionWriteOff, loadSettings, postOpeningStock } from '@/lib/glPostingService';
 
@@ -732,7 +734,7 @@ export default function Items() {
 
           <div className="space-y-6 mt-2">
             <Section title="Basic Information">
-              <div className="grid grid-cols-2 gap-4">
+              <FormGrid>
                 <div><Label>Item Code</Label><Input value={form.item_code} onChange={e => sf('item_code', e.target.value)} placeholder="SKU-001" /></div>
                 <div><Label>Item Name *</Label><Input value={form.item_name} onChange={e => sf('item_name', e.target.value)} placeholder="Product name" /></div>
                 <div>
@@ -762,18 +764,18 @@ export default function Items() {
                 </div>
                 <div><Label>Barcode</Label><Input value={form.barcode || ''} onChange={e => sf('barcode', e.target.value)} placeholder="Barcode / SKU" /></div>
                 <div><Label>HS Code</Label><Input value={form.hs_code || ''} onChange={e => sf('hs_code', e.target.value)} placeholder="e.g. 8471.30" /></div>
-                <div className="col-span-2"><Label>Description</Label><Input value={form.description} onChange={e => sf('description', e.target.value)} placeholder="Optional" /></div>
-              </div>
+                <FormRow fullWidth><Label>Description</Label><Input value={form.description} onChange={e => sf('description', e.target.value)} placeholder="Optional" /></FormRow>
+              </FormGrid>
             </Section>
 
             <Section title="Advanced Specifications / Additional Attributes">
-              <div className="grid grid-cols-2 gap-4">
+              <FormGrid>
                 <div><Label>Model</Label><Input value={form.attributes?.model || ''} onChange={e => setForm(p => ({ ...p, attributes: { ...p.attributes, model: e.target.value } }))} placeholder="Model number/name" /></div>
                 <div><Label>Color</Label><Input value={form.attributes?.color || ''} onChange={e => setForm(p => ({ ...p, attributes: { ...p.attributes, color: e.target.value } }))} placeholder="Color variant" /></div>
                 <div><Label>Size</Label><Input value={form.attributes?.size || ''} onChange={e => setForm(p => ({ ...p, attributes: { ...p.attributes, size: e.target.value } }))} placeholder="Size dimensions" /></div>
                 <div><Label>Weight</Label><Input value={form.attributes?.weight || ''} onChange={e => setForm(p => ({ ...p, attributes: { ...p.attributes, weight: e.target.value } }))} placeholder="Weight" /></div>
-                <div className="col-span-2"><Label>Specifications</Label><Input value={form.attributes?.specifications || ''} onChange={e => setForm(p => ({ ...p, attributes: { ...p.attributes, specifications: e.target.value } }))} placeholder="Detailed specs" /></div>
-                <div className="col-span-2">
+                <FormRow fullWidth><Label>Specifications</Label><Input value={form.attributes?.specifications || ''} onChange={e => setForm(p => ({ ...p, attributes: { ...p.attributes, specifications: e.target.value } }))} placeholder="Detailed specs" /></FormRow>
+                <FormRow fullWidth>
                   <div className="flex items-center justify-between mb-2">
                     <Label>Custom Metadata</Label>
                     <Button type="button" variant="outline" size="sm" className="h-7 text-xs" onClick={() => {
@@ -810,12 +812,12 @@ export default function Items() {
                       </div>
                     )}
                   </div>
-                </div>
-              </div>
+                </FormRow>
+              </FormGrid>
             </Section>
 
             <Section title="Units of Measure">
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <Label>Stock UOM</Label>
                   <Select value={form.unit_of_measure} onValueChange={v => sf('unit_of_measure', v)}>
@@ -844,17 +846,17 @@ export default function Items() {
             </Section>
 
             <Section title="Pricing & Stock">
-              <div className="grid grid-cols-2 gap-4">
+              <FormGrid>
                 <div><Label>Selling Price (NPR)</Label><Input type="number" value={form.selling_price} onChange={e => sf('selling_price', Number(e.target.value))} /></div>
                 <div><Label>Purchase Price (NPR)</Label><Input type="number" value={form.purchase_price} onChange={e => sf('purchase_price', Number(e.target.value))} /></div>
                 <div><Label>Opening Stock Qty</Label><Input type="number" value={form.quantity_on_hand} onChange={e => sf('quantity_on_hand', Number(e.target.value))} /></div>
                 <div><Label>Reorder Level</Label><Input type="number" value={form.reorder_level} onChange={e => sf('reorder_level', Number(e.target.value))} /></div>
-              </div>
+              </FormGrid>
             </Section>
 
             <Section title="Account Mapping">
               <p className="text-xs text-muted-foreground mb-3">Link this item to Chart of Accounts for automatic journal entries.</p>
-              <div className="grid grid-cols-2 gap-x-4 gap-y-6">
+              <FormGrid>
                 <div>
                   <Label>Purchase / COGS Account</Label>
                   <SearchableSelect 
@@ -923,7 +925,7 @@ export default function Items() {
                   />
                   <p className="text-xs text-muted-foreground mt-1">Applied automatically on sales</p>
                 </div>
-              </div>
+              </FormGrid>
             </Section>
 
             <Section title={`Item Images (max ${imgSettings.max_count} images, ${imgSettings.max_size_mb}MB each)`}>
@@ -963,7 +965,7 @@ export default function Items() {
                   No tax types configured. Go to Settings → Tax & VAT to create them.
                 </p>
               ) : (
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                   {taxTypes.map(tt => {
                     const selected = (form.tax_type_ids || []).includes(tt.id);
                     const toggle = () => {

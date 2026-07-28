@@ -10,6 +10,8 @@ import { Switch } from '@/components/ui/switch';
 import PageHeader from '@/components/shared/PageHeader';
 import StatusBadge from '@/components/shared/StatusBadge';
 import DataTable from '@/components/shared/DataTable';
+import FormGrid from '@/components/layout/FormGrid';
+import FormRow from '@/components/layout/FormRow';
 import { toast } from 'sonner';
 
 const emptyPartner = {
@@ -169,11 +171,11 @@ export default function BusinessPartners() {
           <DialogHeader>
             <DialogTitle>{editing ? 'Edit Partner' : 'New Business Partner'}</DialogTitle>
           </DialogHeader>
-          <div className="grid grid-cols-2 gap-4 mt-4">
-            <div className="col-span-2">
+          <FormGrid className="mt-4">
+            <FormRow fullWidth>
               <Label>Full Name / Company Name *</Label>
               <Input value={form.name} onChange={e => setForm({...form, name: e.target.value})} placeholder="e.g. Tech Solutions Pvt Ltd" className="mt-1" />
-            </div>
+            </FormRow>
             <div>
               <Label>Partner Type</Label>
               <Select value={form.partner_type} onValueChange={v => setForm({...form, partner_type: v})}>
@@ -204,10 +206,10 @@ export default function BusinessPartners() {
               <Label>Country</Label>
               <Input value={form.country} onChange={e => setForm({...form, country: e.target.value})} className="mt-1" />
             </div>
-            <div className="col-span-2">
+            <FormRow fullWidth>
               <Label>Address</Label>
               <Input value={form.address} onChange={e => setForm({...form, address: e.target.value})} placeholder="Street address" className="mt-1" />
-            </div>
+            </FormRow>
             <div>
               <Label>Credit Limit (NPR)</Label>
               <Input type="number" value={form.credit_limit_amount} onChange={e => setForm({...form, credit_limit_amount: Number(e.target.value)})} className="mt-1" />
@@ -216,7 +218,7 @@ export default function BusinessPartners() {
               <Label>Payment Terms (days)</Label>
               <Input type="number" value={form.default_payment_term_days} onChange={e => setForm({...form, default_payment_term_days: Number(e.target.value)})} className="mt-1" />
             </div>
-            <div className="flex items-center gap-6 col-span-2 bg-muted/50 rounded-lg p-4">
+            <FormRow fullWidth className="flex flex-col sm:flex-row items-start sm:items-center gap-6 bg-muted/50 rounded-lg p-4">
               <div className="flex items-center gap-3">
                 <Switch checked={form.is_customer} onCheckedChange={v => setForm({...form, is_customer: v})} />
                 <Label>Is Customer</Label>
@@ -229,9 +231,9 @@ export default function BusinessPartners() {
                 <Switch checked={form.is_active} onCheckedChange={v => setForm({...form, is_active: v})} />
                 <Label>Active</Label>
               </div>
-            </div>
-          </div>
-          <div className="flex justify-end gap-3 mt-4">
+            </FormRow>
+          </FormGrid>
+          <div className="flex justify-end gap-3 mt-6">
             <Button variant="outline" onClick={() => setShowForm(false)}>Cancel</Button>
             <Button onClick={handleSave} disabled={saving}>{saving ? 'Saving...' : editing ? 'Update' : 'Create'}</Button>
           </div>

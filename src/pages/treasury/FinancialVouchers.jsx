@@ -15,6 +15,8 @@ import SearchableSelect from '@/components/shared/SearchableSelect';
 import PageHeader from '@/components/shared/PageHeader';
 import DataTable from '@/components/shared/DataTable';
 import StatusBadge from '@/components/shared/StatusBadge';
+import FormGrid from '@/components/layout/FormGrid';
+import FormRow from '@/components/layout/FormRow';
 import { useSajiloSync } from '@/hooks/useSajiloSync';
 import { postFinancialVoucher } from '@/lib/glPostingService';
 import { generateVectorPDF } from '@/utils/pdfGenerator';
@@ -537,7 +539,7 @@ export default function FinancialVouchers() {
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>New Financial Voucher</DialogTitle></DialogHeader>
           <div className="space-y-4 mt-2">
-            <div className="grid grid-cols-2 gap-4">
+            <FormGrid>
               <div>
                 <Label>Voucher Type *</Label>
                 <Select value={form.voucher_type} onValueChange={v => setForm({ ...emptyVoucher, voucher_type: v, voucher_date: form.voucher_date })}>
@@ -553,10 +555,10 @@ export default function FinancialVouchers() {
                 <Label>Date *</Label>
                 <DateInput value={form.voucher_date} onChange={val => setForm({ ...form, voucher_date: val })} className="mt-1" min={activeFiscalYear?.start_date} max={activeFiscalYear?.end_date} />
               </div>
-            </div>
+            </FormGrid>
 
             {isPaymentType && (
-              <div className="grid grid-cols-2 gap-4 bg-muted/30 p-3 rounded-lg border border-border">
+              <FormGrid className="bg-muted/30 p-3 rounded-lg border border-border">
                 <div>
                   <Label>Payment Source / Dest *</Label>
                   <SearchableSelect
@@ -587,10 +589,10 @@ export default function FinancialVouchers() {
                     </SelectContent>
                   </Select>
                 </div>
-              </div>
+              </FormGrid>
             )}
 
-            <div className="grid grid-cols-2 gap-4">
+            <FormGrid>
               <div>
                 <Label>Contact Name</Label>
                 <Input value={form.contact_name} onChange={e => setForm({ ...form, contact_name: e.target.value })} placeholder="Vendor, Customer, or Employee" className="mt-1" />
@@ -599,11 +601,11 @@ export default function FinancialVouchers() {
                 <Label>Reference No / Cheque No</Label>
                 <Input value={form.reference_no} onChange={e => setForm({ ...form, reference_no: e.target.value })} placeholder="Optional" className="mt-1" />
               </div>
-              <div className="col-span-2">
+              <FormRow fullWidth>
                 <Label>Narration / Memo</Label>
                 <Input value={form.narration} onChange={e => setForm({ ...form, narration: e.target.value })} placeholder="Overall voucher description" className="mt-1" />
-              </div>
-            </div>
+              </FormRow>
+            </FormGrid>
 
             
 

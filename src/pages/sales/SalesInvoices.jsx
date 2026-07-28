@@ -10,6 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import PageHeader from '@/components/shared/PageHeader';
 import StatusBadge from '@/components/shared/StatusBadge';
 import DataTable from '@/components/shared/DataTable';
+import FormGrid from '@/components/layout/FormGrid';
+import FormRow from '@/components/layout/FormRow';
 import LineItemsEditor from '@/components/invoices/LineItemsEditor';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -604,8 +606,8 @@ export default function SalesInvoices() {
             <div className="lg:col-span-2 space-y-6">
               <div className="bg-card rounded-2xl border border-stone-200 p-5 shadow-sm">
                 <h3 className="font-semibold text-lg text-foreground mb-4">Customer & invoice context</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
-                  <div className="col-span-2">
+                <FormGrid>
+                  <FormRow fullWidth>
                     <Label>Payment Mode</Label>
                     <div className="flex gap-2 mt-1">
                       {['Credit', 'Cash', 'Bank'].map(mode => (
@@ -620,8 +622,8 @@ export default function SalesInvoices() {
                         </Button>
                       ))}
                     </div>
-                  </div>
-                  <div className="col-span-2">
+                  </FormRow>
+                  <FormRow fullWidth>
                     <Label>Invoice Number *</Label>
                     <div className="flex gap-2 mt-1">
                       <Input
@@ -640,7 +642,7 @@ export default function SalesInvoices() {
                         Manual mode — {settings?.invoice_duplicate_handling === 'Warn' ? 'Duplicate numbers will trigger a warning' : 'Duplicate numbers are blocked'}
                       </p>
                     )}
-                  </div>
+                  </FormRow>
                   
                   {form.payment_mode === 'Credit' ? (
                     <div>
@@ -728,7 +730,7 @@ export default function SalesInvoices() {
                     <Label>Notes</Label>
                     <Input value={form.notes} onChange={e => setForm(f => ({...f, notes: e.target.value}))} placeholder="Optional" className="mt-1" />
                   </div>
-                </div>
+                </FormGrid>
               </div>
 
               <div className="bg-card rounded-2xl border border-stone-200 p-5 shadow-sm">

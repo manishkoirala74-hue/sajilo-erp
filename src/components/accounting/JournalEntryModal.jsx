@@ -10,6 +10,8 @@ import { toast } from 'sonner';
 import { Plus, Trash2, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import DateInput from '@/components/shared/DateInput';
+import FormGrid from '@/components/layout/FormGrid';
+import FormRow from '@/components/layout/FormRow';
 
 const MODULES = ['General', 'Sales', 'Purchase', 'Manufacturing', 'Payroll', 'Assets', 'Stock'];
 
@@ -105,7 +107,7 @@ export default function JournalEntryModal({ open, onClose, accounts, onSaved }) 
         <DialogHeader>
           <DialogTitle>New Journal Entry</DialogTitle>
         </DialogHeader>
-        <div className="grid grid-cols-3 gap-4 mt-2">
+        <FormGrid className="mt-2">
           <div>
             <DateInput label="Entry Date *" value={form.entry_date} onChange={v => setForm(f => ({ ...f, entry_date: v }))} className="mt-1" />
           </div>
@@ -118,11 +120,11 @@ export default function JournalEntryModal({ open, onClose, accounts, onSaved }) 
               options={MODULES.map(m => ({ value: m, label: m }))}
             />
           </div>
-          <div>
+          <FormRow fullWidth>
             <Label>Description *</Label>
             <Input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} className="mt-1" placeholder="Journal narration" />
-          </div>
-        </div>
+          </FormRow>
+        </FormGrid>
 
         {/* Lines */}
         <div className="mt-4">

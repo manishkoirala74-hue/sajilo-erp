@@ -14,6 +14,8 @@ import StatusBadge from '@/components/shared/StatusBadge';
 import { toast } from 'sonner';
 import { provisionPartnerLedgers, createPartnerLedger } from '@/lib/partnerLedgerService';
 import PartnerBatchActions from '@/components/partners/PartnerBatchActions';
+import FormGrid from '@/components/layout/FormGrid';
+import FormRow from '@/components/layout/FormRow';
 import PartnerTransactionHistory from '@/components/partners/PartnerTransactionHistory';
 import FileUpload from '@/components/shared/FileUpload';
 
@@ -370,8 +372,8 @@ export default function Suppliers() {
           <DialogHeader>
             <DialogTitle>{editing ? 'Edit Supplier' : 'New Supplier'}</DialogTitle>
           </DialogHeader>
-          <div className="grid grid-cols-2 gap-4 mt-4">
-            <div className="col-span-2 flex flex-col items-center gap-4 mb-4">
+          <FormGrid className="mt-4">
+            <FormRow fullWidth className="flex flex-col items-center gap-4 mb-4">
               <div className="relative w-32 h-32 rounded-full overflow-hidden bg-muted flex items-center justify-center border-4 border-background shadow-md">
                 {form.profile_picture_url ? (
                   <img src={form.profile_picture_url} alt="Profile" className="w-full h-full object-cover" />
@@ -423,12 +425,12 @@ export default function Suppliers() {
               <p className="text-xs text-muted-foreground text-center">
                 JPG, GIF or PNG. {maxFileSize ? formatBytes(maxFileSize) : '200KB'} max.
               </p>
-            </div>
-            <div className="col-span-2">
+            </FormRow>
+            <FormRow>
               <Label>Full Name / Company Name *</Label>
               <Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="e.g. Nepal Supplies Pvt Ltd" className="mt-1" />
-            </div>
-            <div>
+            </FormRow>
+            <FormRow>
               <Label>Partner Type</Label>
               <Select value={form.partner_type} onValueChange={v => setForm({ ...form, partner_type: v })}>
                 <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
@@ -437,44 +439,44 @@ export default function Suppliers() {
                   <SelectItem value="Individual">Individual</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
-            <div>
+            </FormRow>
+            <FormRow>
               <Label>VAT/PAN Number</Label>
               <Input value={form.tax_id_number} onChange={e => setForm({ ...form, tax_id_number: e.target.value })} placeholder="e.g. 608734567" className="mt-1" />
-            </div>
-            <div>
+            </FormRow>
+            <FormRow>
               <Label>Email</Label>
               <Input value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="contact@supplier.com" className="mt-1" />
-            </div>
-            <div>
+            </FormRow>
+            <FormRow>
               <Label>Phone</Label>
               <Input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} placeholder="+977 9800000000" className="mt-1" />
-            </div>
-            <div>
+            </FormRow>
+            <FormRow>
               <Label>City</Label>
               <Input value={form.city} onChange={e => setForm({ ...form, city: e.target.value })} placeholder="Kathmandu" className="mt-1" />
-            </div>
-            <div>
+            </FormRow>
+            <FormRow>
               <Label>Country</Label>
               <Input value={form.country} onChange={e => setForm({ ...form, country: e.target.value })} className="mt-1" />
-            </div>
-            <div className="col-span-2">
+            </FormRow>
+            <FormRow fullWidth>
               <Label>Address</Label>
               <Input value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} placeholder="Street address" className="mt-1" />
-            </div>
-            <div>
+            </FormRow>
+            <FormRow>
               <Label>Credit Limit (NPR)</Label>
               <Input type="number" value={form.credit_limit_amount} onChange={e => setForm({ ...form, credit_limit_amount: Number(e.target.value) })} className="mt-1" />
-            </div>
-            <div>
+            </FormRow>
+            <FormRow>
               <Label>Payment Terms (days)</Label>
               <Input type="number" value={form.default_payment_term_days} onChange={e => setForm({ ...form, default_payment_term_days: Number(e.target.value) })} className="mt-1" />
-            </div>
-            <div className="col-span-2">
+            </FormRow>
+            <FormRow fullWidth>
               <Label>Notes</Label>
               <Input value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} placeholder="Optional" className="mt-1" />
-            </div>
-            <div className="col-span-2 bg-muted/50 rounded-lg p-4 space-y-3">
+            </FormRow>
+            <FormRow fullWidth className="bg-muted/50 rounded-lg p-4 space-y-3">
               <div className="flex items-center gap-3">
                 <Switch checked={!!form.treat_as_customer} onCheckedChange={v => setForm({ ...form, treat_as_customer: v, is_customer: v })} />
                 <div>
@@ -486,23 +488,22 @@ export default function Suppliers() {
                 <Switch checked={form.is_active} onCheckedChange={v => setForm({ ...form, is_active: v })} />
                 <Label>Active</Label>
               </div>
-            </div>
+            </FormRow>
             {editing?.payable_account_name && (
-              <div className="col-span-2 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 rounded-lg px-3 py-2 text-xs text-emerald-700 dark:text-emerald-400">
+              <FormRow fullWidth className="bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 rounded-lg px-3 py-2 text-xs text-emerald-700 dark:text-emerald-400">
                 AP Ledger: <span className="font-mono font-semibold">{editing.payable_account_code && `${editing.payable_account_code} — `}{editing.payable_account_name}</span>
-              </div>
+              </FormRow>
             )}
-            
-            <div className="col-span-2 mt-2">
+            <FormRow fullWidth className="mt-2">
               <Label className="text-base font-semibold mb-3 block">Attachments</Label>
               <FileUpload 
                 companyId={sajilo.getCompanyId()} 
                 moduleName="Supplier" 
                 recordId={form.id} 
               />
-            </div>
-          </div>
-          <div className="flex justify-end gap-3 mt-4">
+            </FormRow>
+          </FormGrid>
+          <div className="flex justify-end gap-3 mt-6">
             <Button variant="outline" onClick={() => setShowForm(false)}>Cancel</Button>
             <Button onClick={handleSave} disabled={saving}>{saving ? 'Saving...' : editing ? 'Update' : 'Create Supplier'}</Button>
           </div>
