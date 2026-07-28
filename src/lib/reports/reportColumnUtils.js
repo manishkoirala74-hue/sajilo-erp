@@ -48,7 +48,7 @@ export function buildVisibleColumns(columnState) {
  */
 export function fmtNPR(n) {
   const num = Number(n || 0);
-  if (num === 0) return '—';
+  if (num === 0) return '0.00';
   return num.toLocaleString('en-NP', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
