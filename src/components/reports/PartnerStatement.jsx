@@ -301,10 +301,8 @@ export default function PartnerStatement({ title, mode, initialFromDate, initial
             <table className="table-fluid-grid text-base text-left">
               <thead>
                 <tr className="border-y-2 border-border bg-muted/50/50">
-                  <th className="cell-density font-semibold text-slate-500 text-align-center">Date (AD)</th>
-                  {filters.showBsDate && <th className="cell-density font-semibold text-slate-500 text-align-center">Date (BS)</th>}
-                  <th className="cell-density font-semibold text-slate-500 text-align-center">Voucher</th>
-                  <th className="cell-density font-semibold text-slate-500 text-align-left w-1/3">Description</th>
+                  <th className="cell-density font-semibold text-slate-500 text-left sticky left-0 bg-slate-100 dark:bg-[#1e293b] z-20 border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">Transaction Details</th>
+                  <th className="cell-density font-semibold text-slate-500 text-left w-1/3">Description</th>
                   <th className="cell-density font-semibold text-slate-500 amount-cell uppercase">Debit</th>
                   <th className="cell-density font-semibold text-slate-500 amount-cell uppercase">Credit</th>
                   <th className="cell-density font-semibold text-slate-500 amount-cell uppercase">Balance</th>
@@ -314,9 +312,10 @@ export default function PartnerStatement({ title, mode, initialFromDate, initial
             <tbody className="divide-y divide-slate-100">
               {/* Opening Balance Row */}
               <tr className="bg-muted/50/30">
-                <td className="cell-density py-2.5 px-2 text-slate-400 italic">{displayDate(filters.fromDate)}</td>
-                {filters.showBsDate && <td className="cell-density py-2.5 px-2"></td>}
-                <td colSpan={2} className="cell-density py-2.5 px-2 font-semibold text-muted-foreground">*** Opening Balance ***</td>
+                <td className="cell-density py-2.5 px-2 text-slate-400 italic sticky left-0 bg-card z-10 border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">
+                  <span className="text-[10px] uppercase tracking-widest">{displayDate(filters.fromDate)}</span>
+                </td>
+                <td className="cell-density py-2.5 px-2 font-semibold text-muted-foreground">*** Opening Balance ***</td>
                 <td className="cell-density py-2.5 px-2 text-right"></td>
                 <td className="cell-density py-2.5 px-2 text-right"></td>
                 <td className="cell-density py-2.5 px-2 text-right font-bold tabular-nums font-mono">{fmtNPR(summary.opening)}</td>
@@ -326,12 +325,13 @@ export default function PartnerStatement({ title, mode, initialFromDate, initial
               {/* Transactions */}
               {transactions.map((t, i) => (
                 <tr key={i} className="hover:bg-muted/50/50">
-                  <td className="cell-density py-2.5 px-2 whitespace-nowrap text-muted-foreground">{displayDate(t.date)}</td>
-                  {filters.showBsDate && <td className="cell-density py-2.5 px-2 whitespace-nowrap text-muted-foreground">{t.bs_date_formatted}</td>}
-                  <td className="cell-density py-2.5 px-2 font-mono text-sm text-primary">
-                    <VoucherLink voucherNumber={t.voucher}>
-                      <span className="cursor-pointer">{t.voucher}</span>
-                    </VoucherLink>
+                  <td className="cell-density py-2 px-2 whitespace-nowrap sticky left-0 bg-card z-10 border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">
+                    <div className="flex flex-col">
+                      <span className="text-muted-foreground text-[10px] uppercase tracking-widest">{displayDate(t.date)}{filters.showBsDate && t.bs_date_formatted ? ` | ${t.bs_date_formatted}` : ''}</span>
+                      <VoucherLink voucherNumber={t.voucher}>
+                        <span className="font-mono text-sm text-primary cursor-pointer hover:underline">{t.voucher}</span>
+                      </VoucherLink>
+                    </div>
                   </td>
                   <td className="cell-density py-2.5 px-2 text-muted-foreground">{t.description} {t.reference && <span className="text-slate-400 text-xs ml-1">(Ref: {t.reference})</span>}</td>
                   <td className="cell-density py-2.5 px-2 text-right tabular-nums font-mono">{t.debit > 0 ? fmtNPR(t.debit) : ''}</td>
@@ -343,13 +343,14 @@ export default function PartnerStatement({ title, mode, initialFromDate, initial
               
               {transactions.length === 0 && (
                 <tr>
-                  <td colSpan={printConfig.showRemarks ? (filters.showBsDate ? 8 : 7) : (filters.showBsDate ? 7 : 6)} className="cell-density py-8 text-center text-slate-400 italic">No transactions found for this period.</td>
+                  <td colSpan={printConfig.showRemarks ? 6 : 5} className="cell-density py-8 text-center text-slate-400 italic">No transactions found for this period.</td>
                 </tr>
               )}
             </tbody>
             <tfoot>
               <tr className="border-t-2 border-border bg-muted/50 font-bold">
-                <td colSpan={filters.showBsDate ? 4 : 3} className="cell-density py-3 px-2 text-muted-foreground text-right">Closing Balance as of {displayDate(filters.toDate)}:</td>
+                <td className="cell-density py-3 px-2 sticky left-0 bg-slate-100 dark:bg-[#1e293b] z-10 border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]"></td>
+                <td className="cell-density py-3 px-2 text-muted-foreground text-right">Closing Balance as of {displayDate(filters.toDate)}:</td>
                 <td className="cell-density py-3 px-2 text-right tabular-nums font-mono text-emerald-700 dark:text-emerald-400">{fmtNPR(summary.debit)}</td>
                 <td className="cell-density py-3 px-2 text-right tabular-nums font-mono text-red-700 dark:text-red-400">{fmtNPR(summary.credit)}</td>
                 <td className="cell-density py-3 px-2 text-right tabular-nums font-mono text-primary text-base">{fmtNPR(summary.closing)}</td>

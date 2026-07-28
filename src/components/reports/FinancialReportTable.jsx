@@ -108,19 +108,18 @@ function LedgerRow({ account, columns, depth }) {
     <tr className="hover:bg-muted/50 transition-colors print:hover:bg-transparent">
       {columns.map(col => {
         if (col.key === 'account_code') return (
-          <td key={col.key} className="cell-density py-1.5 font-mono text-xs text-muted-foreground whitespace-nowrap print:text-[9px]"
+          <td key={col.key} className="cell-density py-1.5 whitespace-nowrap sticky left-0 bg-card z-10 border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] print:text-[9px]"
             style={{ paddingLeft: `${indent}px`, paddingRight: '8px' }}>
             <div className="flex items-center gap-1.5">
               <span className="text-muted-foreground/30 text-xs select-none shrink-0">└</span>
               <FileText className="w-3 h-3 text-muted-foreground/50 shrink-0" />
-              <span>{account.account_code || '—'}</span>
+              <div className="flex flex-col">
+                <span className="text-xs text-muted-foreground font-mono">{account.account_code || '—'}</span>
+                <span className="text-sm font-medium text-foreground print:text-[10px]" style={{ wordBreak: 'break-word' }}>
+                  {account.account_name}
+                </span>
+              </div>
             </div>
-          </td>
-        );
-        if (col.key === 'account_name') return (
-          <td key={col.key} className="cell-density text-sm text-foreground print:text-[10px]"
-            style={{ wordBreak: 'break-word' }}>
-            {account.account_name}
           </td>
         );
         if (col.key === 'account_type') return (
@@ -183,7 +182,7 @@ function GroupRow({ node, columns, depth, expandedGroups, onToggle, showZeroBala
       >
         {columns.map(col => {
           if (col.key === 'account_code') return (
-            <td key={col.key} className="cell-density py-2 font-mono text-xs font-bold text-muted-foreground whitespace-nowrap print:text-[9px]"
+            <td key={col.key} className="cell-density py-2 whitespace-nowrap sticky left-0 bg-card z-10 border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] print:text-[9px]"
               style={{ paddingLeft: `${indent}px`, paddingRight: '8px' }}>
               <div className="flex items-center gap-1.5">
                 {hasChildren || isControlAccount
@@ -197,18 +196,18 @@ function GroupRow({ node, columns, depth, expandedGroups, onToggle, showZeroBala
                   : <Folder className="w-3.5 h-3.5 text-primary/50 shrink-0" />
                 }
                 {node.is_system_account && <Lock className="w-3 h-3 text-slate-400 shrink-0" />}
-                <span>{node.account_code || '—'}</span>
+                <div className="flex flex-col">
+                  <span className="text-xs font-bold text-muted-foreground font-mono">{node.account_code || '—'}</span>
+                  <span className={cn('print:text-[10px]', fontClass)} style={{ wordBreak: 'break-word' }}>
+                    {node.account_name}
+                    {hasChildren && (
+                      <span className="ml-1.5 text-[10px] font-normal text-muted-foreground report-no-print">
+                        ({children.length})
+                      </span>
+                    )}
+                  </span>
+                </div>
               </div>
-            </td>
-          );
-          if (col.key === 'account_name') return (
-            <td key={col.key} className={cn('px-2 py-2 print:text-[10px]', fontClass)} style={{ wordBreak: 'break-word' }}>
-              {node.account_name}
-              {hasChildren && (
-                <span className="ml-1.5 text-[10px] font-normal text-muted-foreground report-no-print">
-                  ({children.length})
-                </span>
-              )}
             </td>
           );
           if (col.key === 'account_type') return (
@@ -265,7 +264,11 @@ export default function FinancialReportTable({
   columnState, filename, companyName, reportTitle, fromDate, toDate, partnerRows, onGroupExpand
 }) {
   const reportType = columnState?.reportType;
-  const columns = buildVisibleColumns(columnState);
+  const exportColumns = buildVisibleColumns(columnState);
+  const columns = exportColumns.filter(c => c.key !== 'account_name');
+  
+  const accCodeCol = columns.find(c => c.key === 'account_code');
+  if (accCodeCol) accCodeCol.label = 'Account Details';
 
   // Build full recursive tree from flat account list
   const tree = useMemo(() => buildTree(accounts || []), [accounts]);
@@ -336,7 +339,7 @@ export default function FinancialReportTable({
     try {
       exportFinancialXLSX({
         groups: exportGroups,
-        columns,
+        columns: exportColumns,
         columnState,
         companyName: companyName || '',
         reportTitle: reportTitle || 'Financial Report',
@@ -387,18 +390,19 @@ export default function FinancialReportTable({
               })}
             </colgroup>
 
-            <thead className="cell-density bg-slate-800 border-b-2 border-slate-600 sticky top-0 z-10">
+            <thead className="cell-density bg-muted border-b-2 border-border sticky top-0 z-10">
               <tr>
                 {columns.map(col => {
-                  if (col.key === 'opening_debit') return <th key="opening_grp" colSpan={2} className="cell-density text-center text-[11px] font-bold text-slate-100 uppercase tracking-wider print:text-[9px] border-b border-slate-600">Opening Balance</th>;
-                  if (col.key === 'current_debit') return <th key="current_grp" colSpan={2} className="cell-density text-center text-[11px] font-bold text-slate-100 uppercase tracking-wider print:text-[9px] border-b border-slate-600 border-l border-slate-700">Current Period</th>;
-                  if (col.key === 'closing_debit') return <th key="closing_grp" colSpan={2} className="cell-density text-center text-[11px] font-bold text-slate-100 uppercase tracking-wider print:text-[9px] border-b border-slate-600 border-l border-slate-700">Closing Balance</th>;
+                  if (col.key === 'opening_debit') return <th key="opening_grp" colSpan={2} className="cell-density text-center text-[11px] font-bold text-foreground uppercase tracking-wider print:text-[9px] border-b border-border">Opening Balance</th>;
+                  if (col.key === 'current_debit') return <th key="current_grp" colSpan={2} className="cell-density text-center text-[11px] font-bold text-foreground uppercase tracking-wider print:text-[9px] border-b border-border border-l">Current Period</th>;
+                  if (col.key === 'closing_debit') return <th key="closing_grp" colSpan={2} className="cell-density text-center text-[11px] font-bold text-foreground uppercase tracking-wider print:text-[9px] border-b border-border border-l">Closing Balance</th>;
                   if (col.key.endsWith('_credit')) return null;
                   
                   return <th key={col.key} rowSpan={2} className={cn(
-                      'px-3 py-2.5 text-[11px] font-bold text-slate-100 uppercase tracking-wider whitespace-nowrap print:text-[9px]',
+                      'px-3 py-2.5 text-[11px] font-bold text-foreground uppercase tracking-wider whitespace-nowrap print:text-[9px]',
                       col.align === 'right' ? 'text-right' : 'text-left',
-                      col.key === 'account_type' && 'print:hidden'
+                      col.key === 'account_type' && 'print:hidden',
+                      col.key === 'account_code' && 'sticky left-0 bg-card z-20 border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]'
                     )}>{col.label}</th>;
                 })}
               </tr>
@@ -406,9 +410,9 @@ export default function FinancialReportTable({
                 {columns.map(col => {
                   if (col.key.endsWith('_debit') || col.key.endsWith('_credit')) {
                     return <th key={col.key} className={cn(
-                      'px-3 py-2 text-[11px] font-bold text-slate-300 uppercase tracking-wider whitespace-nowrap print:text-[9px]',
+                      'px-3 py-2 text-[11px] font-bold text-muted-foreground uppercase tracking-wider whitespace-nowrap print:text-[9px]',
                       col.align === 'right' ? 'text-right' : 'text-left',
-                      col.key.endsWith('_debit') && 'border-l border-slate-700'
+                      col.key.endsWith('_debit') && 'border-l border-border'
                     )}>{col.label}</th>;
                   }
                   return null;
@@ -444,19 +448,19 @@ export default function FinancialReportTable({
               )}
             </tbody>
 
-            <tfoot className="bg-slate-700 border-t-2 border-slate-500 print:bg-slate-200">
+            <tfoot className="bg-secondary border-t-2 border-border print:bg-slate-200">
               <tr>
                 {columns.map(col => {
                   if (col.key === 'account_code') return (
-                    <td key={col.key} className="cell-density font-bold text-xs text-white uppercase tracking-wider print:text-[9px] print:text-foreground">
+                    <td key={col.key} className="cell-density font-bold text-xs text-foreground uppercase tracking-wider sticky left-0 bg-secondary z-10 border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] print:text-[9px] print:text-foreground">
                       GRAND TOTAL
                     </td>
                   );
-                  if (col.key === 'account_name' || col.key === 'account_type') return (
-                    <td key={col.key} className={cn('px-3 py-2.5', col.key === 'account_type' && 'print:hidden')} />
+                  if (col.key === 'account_type') return (
+                    <td key={col.key} className={cn('px-3 py-2.5 print:hidden')} />
                   );
                   return (
-                    <td key={col.key} className="cell-density text-right font-bold text-sm tabular-nums font-mono text-white print:text-[10px] print:text-foreground">
+                    <td key={col.key} className="cell-density text-right font-bold text-sm tabular-nums font-mono text-foreground print:text-[10px] print:text-foreground">
                       {fmtNPR(grandTotals[col.key])}
                     </td>
                   );

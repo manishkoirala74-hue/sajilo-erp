@@ -149,8 +149,9 @@ function ReportTable({ title, subtitle, headers, rows, footer, onExport, onEmail
               <tr>
                 {headers.map((h, i) => {
                   const isNum = rightCols.has(i);
+                  const stickyClasses = i === 0 ? 'sticky left-0 bg-slate-100 dark:bg-[#1e293b] z-20 border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]' : '';
                   return (
-                    <th key={i} className={`cell-density font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider ${isNum ? 'amount-cell' : 'text-align-left'}`}>
+                    <th key={i} className={`cell-density font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider ${isNum ? 'amount-cell tabular-nums' : 'text-align-left'} ${stickyClasses}`}>
                       {h}
                     </th>
                   );
@@ -164,8 +165,9 @@ function ReportTable({ title, subtitle, headers, rows, footer, onExport, onEmail
                   <tr key={i} className="hover:bg-muted/20 print:hover:bg-transparent">
                     {row.map((cell, j) => {
                       const isNum = rightCols.has(j);
+                      const stickyClasses = j === 0 ? 'sticky left-0 bg-card z-10 border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]' : '';
                       return (
-                        <td key={j} className={`cell-density print:text-[10pt] ${isNum ? 'amount-cell' : 'text-align-left'}`}>
+                        <td key={j} className={`cell-density print:text-[10pt] ${isNum ? 'amount-cell tabular-nums' : 'text-align-left'} ${stickyClasses}`}>
                           {cell}
                         </td>
                       );
@@ -178,8 +180,9 @@ function ReportTable({ title, subtitle, headers, rows, footer, onExport, onEmail
                 <tr>
                   {footer.map((cell, j) => {
                     const isNum = rightCols.has(j);
+                    const stickyClasses = j === 0 ? 'sticky left-0 bg-slate-100 dark:bg-[#1e293b] z-10 border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]' : '';
                     return (
-                      <td key={j} className={`cell-density print:text-[10pt] font-bold ${isNum ? 'amount-cell' : 'text-align-left'}`}>
+                      <td key={j} className={`cell-density print:text-[10pt] font-bold ${isNum ? 'amount-cell tabular-nums' : 'text-align-left'} ${stickyClasses}`}>
                         {cell}
                       </td>
                     );
@@ -768,7 +771,7 @@ function ProfitLossReport({ initialData, initialFromDate, initialToDate }) {
       return (
         <React.Fragment key={account.id}>
           <tr className={`hover:bg-muted/20 print:hover:bg-transparent ${isGroup ? 'font-semibold text-foreground' : 'text-muted-foreground'}`}>
-            <td className='px-3 py-1.5 border-none' style={{ paddingLeft: `${16 + level * 20}px` }}>
+            <td className='px-3 py-1.5 border-none sticky left-0 bg-card z-10 border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]' style={{ paddingLeft: `${16 + level * 20}px` }}>
               {isGroup ? (
                 <button onClick={() => toggleExpand(account.id)} className='flex items-center gap-1.5 hover:text-primary transition-colors text-left w-full'>
                   <span className='w-3 inline-block text-center text-[10px] text-slate-400'>{isExpanded ? '▼' : '▶'}</span>
@@ -798,7 +801,7 @@ function ProfitLossReport({ initialData, initialFromDate, initialToDate }) {
         <React.Fragment>
           {title && (
             <tr>
-              <td className='px-3 py-2 font-semibold text-foreground bg-muted/50' colSpan={4}>{title}</td>
+              <td className='px-3 py-2 font-semibold text-foreground bg-muted/50 sticky left-0 z-10 border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]' colSpan={4}>{title}</td>
             </tr>
           )}
           {accounts.map(a => renderTree(a, 0, isDeduction))}
@@ -860,126 +863,135 @@ function ProfitLossReport({ initialData, initialFromDate, initialToDate }) {
             </Button>
           </div>
 
-          <table className="table-fluid-grid text-sm">
-            <thead>
-              <tr className='border-b border-border'>
-                <th className='px-3 py-2 text-left font-semibold text-foreground w-[50%]'>Financial Particulars</th>
-                <th className='px-3 py-2 text-center font-semibold text-foreground w-[10%]'>Notes</th>
-                <th className='px-3 py-2 text-right font-semibold text-foreground w-[20%]'>Current Period<br/><span className='text-xs text-slate-500 font-normal'>NPR</span></th>
-                <th className='px-3 py-2 text-right font-semibold text-foreground w-[20%]'>Comparative<br/><span className='text-xs text-slate-500 font-normal'>NPR</span></th>
-              </tr>
-            </thead>
-            
-            <tbody className='divide-y divide-slate-100'>
-              <tr className='bg-slate-100 dark:bg-slate-500/20'><td colSpan={4} className='px-3 py-2 font-bold text-foreground'>1. Gross Operating Revenue</td></tr>
+          <div className="table-scroll-container">
+            <table className="table-fluid-grid text-sm">
+              <thead>
+                <tr className='border-b border-border'>
+                  <th className='px-3 py-2 text-left font-semibold text-foreground w-[50%] sticky left-0 bg-slate-100 dark:bg-[#1e293b] z-20 border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]'>Financial Particulars</th>
+                  <th className='px-3 py-2 text-center font-semibold text-foreground w-[10%]'>Notes</th>
+                  <th className='px-3 py-2 text-right font-semibold text-foreground w-[20%]'>Current Period<br/><span className='text-xs text-slate-500 font-normal'>NPR</span></th>
+                  <th className='px-3 py-2 text-right font-semibold text-foreground w-[20%]'>Comparative<br/><span className='text-xs text-slate-500 font-normal'>NPR</span></th>
+                </tr>
+              </thead>
               
-              <tr><td colSpan={4} className='px-3 py-1.5 font-medium text-muted-foreground pl-4'>Sales Revenue</td></tr>
-              <PLSection sectionObj={sections.revenue} />
-              
-              {sections.sales_returns.accounts.length > 0 && (
-                <>
-                  <tr><td colSpan={4} className='px-3 py-1.5 font-medium italic text-muted-foreground pl-4'>Less: Sales Returns & Allowances</td></tr>
-                  <PLSection sectionObj={sections.sales_returns} isDeduction={true} />
-                </>
-              )}
-              
-              <tr className='border-t border-border bg-muted/50'>
-                <td className='px-3 py-2 font-bold text-foreground text-right' colSpan={2}>Net Sales Revenue</td>
-                <td className='px-3 py-2 font-bold text-right tabular-nums'>{fmtAcct(net_sales_cur)}</td>
-                <td className='px-3 py-2 font-bold text-right tabular-nums text-muted-foreground'>{fmtAcct(net_sales_comp)}</td>
-              </tr>
+              <tbody className='divide-y divide-slate-100'>
+                <tr className='bg-slate-100 dark:bg-slate-500/20'><td colSpan={4} className='px-3 py-2 font-bold text-foreground sticky left-0 bg-slate-100 dark:bg-[#1e293b] z-10 border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]'>1. Gross Operating Revenue</td></tr>
+                
+                <tr><td colSpan={4} className='px-3 py-1.5 font-medium text-muted-foreground pl-4 sticky left-0 bg-card z-10 border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]'>Sales Revenue</td></tr>
+                <PLSection sectionObj={sections.revenue} />
+                
+                {sections.sales_returns.accounts.length > 0 && (
+                  <>
+                    <tr><td colSpan={4} className='px-3 py-1.5 font-medium italic text-muted-foreground pl-4 sticky left-0 bg-card z-10 border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]'>Less: Sales Returns & Allowances</td></tr>
+                    <PLSection sectionObj={sections.sales_returns} isDeduction={true} />
+                  </>
+                )}
+                
+                <tr className='border-t border-border bg-muted/50'>
+                  <td className='px-3 py-2 font-bold text-foreground text-right sticky left-0 bg-slate-100 dark:bg-[#1e293b] z-10 border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]'>Net Sales Revenue</td>
+                  <td></td>
+                  <td className='px-3 py-2 font-bold text-right tabular-nums'>{fmtAcct(net_sales_cur)}</td>
+                  <td className='px-3 py-2 font-bold text-right tabular-nums text-muted-foreground'>{fmtAcct(net_sales_comp)}</td>
+                </tr>
 
-              <tr><td colSpan={4} className='px-3 py-2 font-bold text-foreground pt-4'>2. Cost of Goods Sold (COGS)</td></tr>
-              
-              <tr><td colSpan={4} className='px-3 py-1.5 font-medium text-muted-foreground pl-4 pt-2'>Direct Expenses</td></tr>
-              {sections.cogs.accounts.length > 0 ? (
-                <PLSection sectionObj={sections.cogs} />
-              ) : (
-                <tr className='text-slate-500'><td className='px-3 py-1.5 pl-8 border-none italic'>(No direct expenses recorded)</td><td colSpan={3} className='border-none'></td></tr>
-              )}
+                <tr><td colSpan={4} className='px-3 py-2 font-bold text-foreground pt-4 sticky left-0 bg-card z-10 border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]'>2. Cost of Goods Sold (COGS)</td></tr>
+                
+                <tr><td colSpan={4} className='px-3 py-1.5 font-medium text-muted-foreground pl-4 pt-2 sticky left-0 bg-card z-10 border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]'>Direct Expenses</td></tr>
+                {sections.cogs.accounts.length > 0 ? (
+                  <PLSection sectionObj={sections.cogs} />
+                ) : (
+                  <tr className='text-slate-500'><td className='px-3 py-1.5 pl-8 border-none italic sticky left-0 bg-card z-10 border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]'>(No direct expenses recorded)</td><td colSpan={3} className='border-none'></td></tr>
+                )}
 
-              <tr className='border-t border-border bg-muted/50'>
-                <td className='px-3 py-2 font-bold text-foreground text-right' colSpan={2}>Total Cost of Goods Sold</td>
-                <td className='px-3 py-2 font-bold text-right tabular-nums'>{fmtAcct(cogs_total_cur, true)}</td>
-                <td className='px-3 py-2 font-bold text-right tabular-nums text-muted-foreground'>{fmtAcct(cogs_total_comp, true)}</td>
-              </tr>
-              
-              <tr className='border-t border-border bg-indigo-50 dark:bg-indigo-500/10/50'>
-                <td className='px-3 py-3 font-bold text-indigo-900 text-right uppercase tracking-wider' colSpan={2}>Gross Profit</td>
-                <td className='px-3 py-3 font-bold text-right tabular-nums text-indigo-900 text-base border-double border-b-4 border-indigo-200 dark:border-indigo-500/20'>{fmtAcct(gross_profit_cur)}</td>
-                <td className='px-3 py-3 font-bold text-right tabular-nums text-indigo-700 dark:text-indigo-400 text-base border-double border-b-4 border-indigo-100'>{fmtAcct(gross_profit_comp)}</td>
-              </tr>
+                <tr className='border-t border-border bg-muted/50'>
+                  <td className='px-3 py-2 font-bold text-foreground text-right sticky left-0 bg-slate-100 dark:bg-[#1e293b] z-10 border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]'>Total Cost of Goods Sold</td>
+                  <td></td>
+                  <td className='px-3 py-2 font-bold text-right tabular-nums'>{fmtAcct(cogs_total_cur, true)}</td>
+                  <td className='px-3 py-2 font-bold text-right tabular-nums text-muted-foreground'>{fmtAcct(cogs_total_comp, true)}</td>
+                </tr>
+                
+                <tr className='border-t border-border bg-indigo-50 dark:bg-indigo-500/10/50'>
+                  <td className='px-3 py-3 font-bold text-indigo-900 text-right uppercase tracking-wider sticky left-0 bg-indigo-50 dark:bg-[#1e1b4b] z-10 border-r border-indigo-200 dark:border-indigo-800 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]'>Gross Profit</td>
+                  <td></td>
+                  <td className='px-3 py-3 font-bold text-right tabular-nums text-indigo-900 text-base border-double border-b-4 border-indigo-200 dark:border-indigo-500/20'>{fmtAcct(gross_profit_cur)}</td>
+                  <td className='px-3 py-3 font-bold text-right tabular-nums text-indigo-700 dark:text-indigo-400 text-base border-double border-b-4 border-indigo-100'>{fmtAcct(gross_profit_comp)}</td>
+                </tr>
 
-              <tr><td colSpan={4} className='px-3 py-2 font-bold text-foreground pt-6'>3. Operating Expenses</td></tr>
-              
-              {sections.opex_selling.accounts.length > 0 && (
-                <>
-                  <tr><td colSpan={4} className='px-3 py-1.5 font-medium text-muted-foreground pl-4 pt-3'>Selling & Distribution Expenses</td></tr>
-                  <PLSection sectionObj={sections.opex_selling} isDeduction={true} />
-                </>
-              )}
-              
-              {sections.opex_admin.accounts.length > 0 && (
-                <>
-                  <tr><td colSpan={4} className='px-3 py-1.5 font-medium text-muted-foreground pl-4 pt-3'>General & Administrative Expenses</td></tr>
-                  <PLSection sectionObj={sections.opex_admin} isDeduction={true} />
-                </>
-              )}
+                <tr><td colSpan={4} className='px-3 py-2 font-bold text-foreground pt-6 sticky left-0 bg-card z-10 border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]'>3. Operating Expenses</td></tr>
+                
+                {sections.opex_selling.accounts.length > 0 && (
+                  <>
+                    <tr><td colSpan={4} className='px-3 py-1.5 font-medium text-muted-foreground pl-4 pt-3 sticky left-0 bg-card z-10 border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]'>Selling & Distribution Expenses</td></tr>
+                    <PLSection sectionObj={sections.opex_selling} isDeduction={true} />
+                  </>
+                )}
+                
+                {sections.opex_admin.accounts.length > 0 && (
+                  <>
+                    <tr><td colSpan={4} className='px-3 py-1.5 font-medium text-muted-foreground pl-4 pt-3 sticky left-0 bg-card z-10 border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]'>General & Administrative Expenses</td></tr>
+                    <PLSection sectionObj={sections.opex_admin} isDeduction={true} />
+                  </>
+                )}
 
-              <tr className='border-t border-border bg-muted/50'>
-                <td className='px-3 py-2 font-bold text-foreground text-right' colSpan={2}>Total Operating Expenses</td>
-                <td className='px-3 py-2 font-bold text-right tabular-nums text-red-600 dark:text-red-400'>{fmtAcct(total_opex_cur, true)}</td>
-                <td className='px-3 py-2 font-bold text-right tabular-nums text-red-400'>{fmtAcct(total_opex_comp, true)}</td>
-              </tr>
+                <tr className='border-t border-border bg-muted/50'>
+                  <td className='px-3 py-2 font-bold text-foreground text-right sticky left-0 bg-slate-100 dark:bg-[#1e293b] z-10 border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]'>Total Operating Expenses</td>
+                  <td></td>
+                  <td className='px-3 py-2 font-bold text-right tabular-nums text-red-600 dark:text-red-400'>{fmtAcct(total_opex_cur, true)}</td>
+                  <td className='px-3 py-2 font-bold text-right tabular-nums text-red-400'>{fmtAcct(total_opex_comp, true)}</td>
+                </tr>
 
-              <tr className='border-t border-border bg-emerald-50 dark:bg-emerald-500/10/50'>
-                <td className='px-3 py-3 font-bold text-emerald-900 text-right uppercase tracking-wider' colSpan={2}>Operating Profit (EBIT)</td>
-                <td className='px-3 py-3 font-bold text-right tabular-nums text-emerald-900 text-base'>{fmtAcct(op_profit_cur)}</td>
-                <td className='px-3 py-3 font-bold text-right tabular-nums text-emerald-700 dark:text-emerald-400 text-base'>{fmtAcct(op_profit_comp)}</td>
-              </tr>
+                <tr className='border-t border-border bg-emerald-50 dark:bg-emerald-500/10/50'>
+                  <td className='px-3 py-3 font-bold text-emerald-900 text-right uppercase tracking-wider sticky left-0 bg-emerald-50 dark:bg-[#064e3b] z-10 border-r border-emerald-200 dark:border-emerald-800 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]'>Operating Profit (EBIT)</td>
+                  <td></td>
+                  <td className='px-3 py-3 font-bold text-right tabular-nums text-emerald-900 text-base'>{fmtAcct(op_profit_cur)}</td>
+                  <td className='px-3 py-3 font-bold text-right tabular-nums text-emerald-700 dark:text-emerald-400 text-base'>{fmtAcct(op_profit_comp)}</td>
+                </tr>
 
-              {(sections.non_op_income.accounts.length > 0 || sections.finance_cost.accounts.length > 0) && (
-                <tr><td colSpan={4} className='px-3 py-2 font-bold text-foreground pt-6'>4. Non-Operating Income & Expenses</td></tr>
-              )}
-              
-              {sections.non_op_income.accounts.length > 0 && (
-                <>
-                  <tr><td colSpan={4} className='px-3 py-1.5 font-medium text-muted-foreground pl-4 pt-3'>Add: Other Income</td></tr>
-                  <PLSection sectionObj={sections.non_op_income} />
-                </>
-              )}
+                {(sections.non_op_income.accounts.length > 0 || sections.finance_cost.accounts.length > 0) && (
+                  <tr><td colSpan={4} className='px-3 py-2 font-bold text-foreground pt-6 sticky left-0 bg-card z-10 border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]'>4. Non-Operating Income & Expenses</td></tr>
+                )}
+                
+                {sections.non_op_income.accounts.length > 0 && (
+                  <>
+                    <tr><td colSpan={4} className='px-3 py-1.5 font-medium text-muted-foreground pl-4 pt-3 sticky left-0 bg-card z-10 border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]'>Add: Other Income</td></tr>
+                    <PLSection sectionObj={sections.non_op_income} />
+                  </>
+                )}
 
-              {sections.finance_cost.accounts.length > 0 && (
-                <>
-                  <tr><td colSpan={4} className='px-3 py-1.5 font-medium text-muted-foreground pl-4 pt-3'>Less: Finance Costs</td></tr>
-                  <PLSection sectionObj={sections.finance_cost} isDeduction={true} />
-                </>
-              )}
+                {sections.finance_cost.accounts.length > 0 && (
+                  <>
+                    <tr><td colSpan={4} className='px-3 py-1.5 font-medium text-muted-foreground pl-4 pt-3 sticky left-0 bg-card z-10 border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]'>Less: Finance Costs</td></tr>
+                    <PLSection sectionObj={sections.finance_cost} isDeduction={true} />
+                  </>
+                )}
 
-              <tr className='border-t border-border'>
-                <td className='px-3 py-3 font-bold text-foreground text-right uppercase tracking-wider' colSpan={2}>Net Profit Before Tax</td>
-                <td className='px-3 py-3 font-bold text-right tabular-nums text-foreground text-base'>{fmtAcct(pbt_cur)}</td>
-                <td className='px-3 py-3 font-bold text-right tabular-nums text-muted-foreground text-base'>{fmtAcct(pbt_comp)}</td>
-              </tr>
+                <tr className='border-t border-border'>
+                  <td className='px-3 py-3 font-bold text-foreground text-right uppercase tracking-wider sticky left-0 bg-card z-10 border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]'>Net Profit Before Tax</td>
+                  <td></td>
+                  <td className='px-3 py-3 font-bold text-right tabular-nums text-foreground text-base'>{fmtAcct(pbt_cur)}</td>
+                  <td className='px-3 py-3 font-bold text-right tabular-nums text-muted-foreground text-base'>{fmtAcct(pbt_comp)}</td>
+                </tr>
 
-              <tr><td colSpan={4} className='px-3 py-1.5 font-medium text-muted-foreground pl-4 pt-3'>Less: Provision for Corporate Income Tax</td></tr>
-              <PLSection sectionObj={sections.tax} isDeduction={true} />
-              
-              <tr className='border-t border-slate-800 bg-muted/50 print:border-t-2'>
-                <td className='px-3 py-4 font-black text-foreground text-right uppercase tracking-widest text-base' colSpan={2}>Net Income For The Period</td>
-                <td className='px-3 py-4 font-black text-right tabular-nums text-foreground text-lg border-double border-b-4 border-slate-800 print:border-b-4'>{fmtAcct(net_profit_cur)}</td>
-                <td className='px-3 py-4 font-black text-right tabular-nums text-muted-foreground text-lg border-double border-b-4 border-slate-500 print:border-b-4'>{fmtAcct(net_profit_comp)}</td>
-              </tr>
-              
-              {sections.suspense.accounts.length > 0 && (
-                <>
-                  <tr><td colSpan={4} className='px-3 py-2 font-bold text-red-600 dark:text-red-400 pt-8'>⚠️ Unmapped / Suspense Accounts</td></tr>
-                  <tr><td colSpan={4} className='px-3 py-1.5 text-xs text-muted-foreground pl-4'>These accounts have an unrecognized statement_group and need to be reclassified.</td></tr>
-                  <PLSection sectionObj={sections.suspense} />
-                </>
-              )}
-            </tbody>
-          </table>
+                <tr><td colSpan={4} className='px-3 py-1.5 font-medium text-muted-foreground pl-4 pt-3 sticky left-0 bg-card z-10 border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]'>Less: Provision for Corporate Income Tax</td></tr>
+                <PLSection sectionObj={sections.tax} isDeduction={true} />
+                
+                <tr className='border-t border-slate-800 bg-muted/50 print:border-t-2'>
+                  <td className='px-3 py-4 font-black text-foreground text-right uppercase tracking-widest text-base sticky left-0 bg-slate-100 dark:bg-[#1e293b] z-10 border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]'>Net Income For The Period</td>
+                  <td></td>
+                  <td className='px-3 py-4 font-black text-right tabular-nums text-foreground text-lg border-double border-b-4 border-slate-800 print:border-b-4'>{fmtAcct(net_profit_cur)}</td>
+                  <td className='px-3 py-4 font-black text-right tabular-nums text-muted-foreground text-lg border-double border-b-4 border-slate-500 print:border-b-4'>{fmtAcct(net_profit_comp)}</td>
+                </tr>
+                
+                {sections.suspense.accounts.length > 0 && (
+                  <>
+                    <tr><td colSpan={4} className='px-3 py-2 font-bold text-red-600 dark:text-red-400 pt-8 sticky left-0 bg-card z-10 border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]'>⚠️ Unmapped / Suspense Accounts</td></tr>
+                    <tr><td colSpan={4} className='px-3 py-1.5 text-xs text-muted-foreground pl-4 sticky left-0 bg-card z-10 border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]'>These accounts have an unrecognized statement_group and need to be reclassified.</td></tr>
+                    <PLSection sectionObj={sections.suspense} />
+                  </>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
         </>
         )}
