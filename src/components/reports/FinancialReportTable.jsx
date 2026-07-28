@@ -62,13 +62,6 @@ function collectGroupIds(nodes, ids = []) {
 
 // ── Compute totals recursively from leaf (Sub Ledger) nodes only ──────────────
 function computeSubtreeTotals(node, reportType) {
-  if (reportType === 'balance_sheet' && node.ledger_type === 'Group Ledger' && node.closing_balance !== undefined) {
-    return {
-      closing_balance: node.closing_balance,
-      balance: node.balance
-    };
-  }
-
   if (node.ledger_type !== 'Group Ledger') {
     // Leaf node — return its own values
     return {
@@ -108,17 +101,13 @@ function LedgerRow({ account, columns, depth }) {
     <tr className="hover:bg-muted/50 transition-colors print:hover:bg-transparent">
       {columns.map(col => {
         if (col.key === 'account_code') return (
-          <td key={col.key} className="cell-density py-1.5 whitespace-nowrap sticky left-0 bg-card z-10 border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] print:text-[9px]"
+          <td key={col.key} className="cell-density py-1.5 min-w-[220px] max-w-[75vw] sm:max-w-[400px] whitespace-normal sticky left-0 bg-card z-10 border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] print:text-[9px]"
             style={{ paddingLeft: `${indent}px`, paddingRight: '8px' }}>
-            <div className="flex items-center gap-1.5">
-              <span className="text-muted-foreground/30 text-xs select-none shrink-0">└</span>
-              <FileText className="w-3 h-3 text-muted-foreground/50 shrink-0" />
-              <div className="flex flex-col">
-                <span className="text-xs text-muted-foreground font-mono">{account.account_code || '—'}</span>
-                <span className="text-sm font-medium text-foreground print:text-[10px]" style={{ wordBreak: 'break-word' }}>
-                  {account.account_name}
-                </span>
-              </div>
+            <div className="flex flex-col">
+              <span className="text-xs text-muted-foreground font-mono">{account.account_code || '—'}</span>
+              <span className="text-sm font-normal text-muted-foreground print:text-[10px]" style={{ wordBreak: 'break-word' }}>
+                {account.account_name}
+              </span>
             </div>
           </td>
         );
@@ -154,17 +143,9 @@ function GroupRow({ node, columns, depth, expandedGroups, onToggle, showZeroBala
   const displayTotals = totals;
 
   // Determine depth-based styling
-  const bgClass = depth === 0
-    ? 'bg-slate-200/80 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700'
-    : depth === 1
-    ? 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800/50 dark:hover:bg-slate-700/50'
-    : 'bg-muted/50 hover:bg-muted dark:bg-muted/10 dark:hover:bg-muted/20';
-
   const fontClass = depth === 0
-    ? 'font-bold text-foreground'
-    : depth === 1
-    ? 'font-semibold text-foreground'
-    : 'font-medium text-muted-foreground';
+    ? 'text-sm font-bold uppercase tracking-wider text-foreground'
+    : 'text-sm font-semibold text-foreground';
 
   const handleToggle = useCallback((e) => {
     e.stopPropagation();
@@ -177,34 +158,25 @@ function GroupRow({ node, columns, depth, expandedGroups, onToggle, showZeroBala
   return (
     <>
       <tr
-        className={cn('cursor-pointer select-none border-t border-border/60 print-group-row', bgClass)}
+        className="cursor-pointer select-none border-b border-border/50 bg-card hover:bg-muted/30 print-group-row"
         onClick={handleToggle}
       >
         {columns.map(col => {
           if (col.key === 'account_code') return (
-            <td key={col.key} className="cell-density py-2 whitespace-nowrap sticky left-0 bg-card z-10 border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] print:text-[9px]"
+            <td key={col.key} className="cell-density py-3 min-w-[220px] max-w-[75vw] sm:max-w-[400px] whitespace-normal sticky left-0 bg-card z-10 border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] print:text-[9px]"
               style={{ paddingLeft: `${indent}px`, paddingRight: '8px' }}>
               <div className="flex items-center gap-1.5">
                 {hasChildren || isControlAccount
                   ? isExpanded
-                    ? <ChevronDown className="w-3.5 h-3.5 text-primary shrink-0 report-no-print" />
-                    : <ChevronRight className="w-3.5 h-3.5 text-muted-foreground shrink-0 report-no-print" />
-                  : <span className="w-3.5 shrink-0" />
-                }
-                {isExpanded
-                  ? <FolderOpen className="w-3.5 h-3.5 text-primary/70 shrink-0" />
-                  : <Folder className="w-3.5 h-3.5 text-primary/50 shrink-0" />
+                    ? <ChevronDown className="w-4 h-4 text-primary shrink-0 report-no-print" />
+                    : <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0 report-no-print" />
+                  : <span className="w-4 shrink-0" />
                 }
                 {node.is_system_account && <Lock className="w-3 h-3 text-slate-400 shrink-0" />}
                 <div className="flex flex-col">
-                  <span className="text-xs font-bold text-muted-foreground font-mono">{node.account_code || '—'}</span>
+                  <span className="text-xs text-muted-foreground font-mono">{node.account_code || '—'}</span>
                   <span className={cn('print:text-[10px]', fontClass)} style={{ wordBreak: 'break-word' }}>
                     {node.account_name}
-                    {hasChildren && (
-                      <span className="ml-1.5 text-[10px] font-normal text-muted-foreground report-no-print">
-                        ({children.length})
-                      </span>
-                    )}
                   </span>
                 </div>
               </div>
@@ -217,7 +189,7 @@ function GroupRow({ node, columns, depth, expandedGroups, onToggle, showZeroBala
           );
           const val = displayTotals[col.key];
           return (
-            <td key={col.key} className={cn('px-2 py-2 text-sm tabular-nums font-mono print:text-[10px]', fontClass, col.align === 'right' && 'text-right')}>
+            <td key={col.key} className={cn('px-2 py-3 text-sm tabular-nums font-mono print:text-[10px]', fontClass, col.align === 'right' && 'text-right')}>
               {val !== undefined ? fmtNPR(val) : '—'}
             </td>
           );
@@ -264,8 +236,10 @@ export default function FinancialReportTable({
   columnState, filename, companyName, reportTitle, fromDate, toDate, partnerRows, onGroupExpand
 }) {
   const reportType = columnState?.reportType;
-  const exportColumns = buildVisibleColumns(columnState);
-  const columns = exportColumns.filter(c => c.key !== 'account_name');
+  const columns = useMemo(() => {
+    const cols = buildVisibleColumns(columnState);
+    return cols.filter(c => c.key !== 'account_name' && c.key !== 'account_type');
+  }, [columnState]);
   
   const accCodeCol = columns.find(c => c.key === 'account_code');
   if (accCodeCol) accCodeCol.label = 'Account Details';
@@ -339,7 +313,7 @@ export default function FinancialReportTable({
     try {
       exportFinancialXLSX({
         groups: exportGroups,
-        columns: exportColumns,
+        columns: buildVisibleColumns(columnState),
         columnState,
         companyName: companyName || '',
         reportTitle: reportTitle || 'Financial Report',
@@ -351,7 +325,7 @@ export default function FinancialReportTable({
       console.error('[XLSX Export Error]', err);
       alert('Export failed: ' + err.message);
     }
-  }, [tree, columns, columnState, filename, companyName, reportTitle, fromDate, toDate]);
+  }, [tree, columnState, filename, companyName, reportTitle, fromDate, toDate]);
 
   if (!accounts || accounts.length === 0) {
     return <div className="text-center py-12 text-muted-foreground text-sm">No accounts found for the selected filters.</div>;
@@ -393,15 +367,14 @@ export default function FinancialReportTable({
             <thead className="cell-density bg-muted border-b-2 border-border sticky top-0 z-10">
               <tr>
                 {columns.map(col => {
-                  if (col.key === 'opening_debit') return <th key="opening_grp" colSpan={2} className="cell-density text-center text-[11px] font-bold text-foreground uppercase tracking-wider print:text-[9px] border-b border-border">Opening Balance</th>;
-                  if (col.key === 'current_debit') return <th key="current_grp" colSpan={2} className="cell-density text-center text-[11px] font-bold text-foreground uppercase tracking-wider print:text-[9px] border-b border-border border-l">Current Period</th>;
-                  if (col.key === 'closing_debit') return <th key="closing_grp" colSpan={2} className="cell-density text-center text-[11px] font-bold text-foreground uppercase tracking-wider print:text-[9px] border-b border-border border-l">Closing Balance</th>;
+                  if (col.key === 'opening_debit') return <th key="opening_grp" colSpan={2} className="cell-density text-right text-[11px] font-bold text-foreground uppercase tracking-wider print:text-[9px] border-b border-border">Opening Balance</th>;
+                  if (col.key === 'current_debit') return <th key="current_grp" colSpan={2} className="cell-density text-right text-[11px] font-bold text-foreground uppercase tracking-wider print:text-[9px] border-b border-border border-l">Current Period</th>;
+                  if (col.key === 'closing_debit') return <th key="closing_grp" colSpan={2} className="cell-density text-right text-[11px] font-bold text-foreground uppercase tracking-wider print:text-[9px] border-b border-border border-l">Closing Balance</th>;
                   if (col.key.endsWith('_credit')) return null;
                   
                   return <th key={col.key} rowSpan={2} className={cn(
                       'px-3 py-2.5 text-[11px] font-bold text-foreground uppercase tracking-wider whitespace-nowrap print:text-[9px]',
                       col.align === 'right' ? 'text-right' : 'text-left',
-                      col.key === 'account_type' && 'print:hidden',
                       col.key === 'account_code' && 'sticky left-0 bg-card z-20 border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]'
                     )}>{col.label}</th>;
                 })}
@@ -411,7 +384,7 @@ export default function FinancialReportTable({
                   if (col.key.endsWith('_debit') || col.key.endsWith('_credit')) {
                     return <th key={col.key} className={cn(
                       'px-3 py-2 text-[11px] font-bold text-muted-foreground uppercase tracking-wider whitespace-nowrap print:text-[9px]',
-                      col.align === 'right' ? 'text-right' : 'text-left',
+                      'text-right',
                       col.key.endsWith('_debit') && 'border-l border-border'
                     )}>{col.label}</th>;
                   }
@@ -455,9 +428,6 @@ export default function FinancialReportTable({
                     <td key={col.key} className="cell-density font-bold text-xs text-foreground uppercase tracking-wider sticky left-0 bg-secondary z-10 border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] print:text-[9px] print:text-foreground">
                       GRAND TOTAL
                     </td>
-                  );
-                  if (col.key === 'account_type') return (
-                    <td key={col.key} className={cn('px-3 py-2.5 print:hidden')} />
                   );
                   return (
                     <td key={col.key} className="cell-density text-right font-bold text-sm tabular-nums font-mono text-foreground print:text-[10px] print:text-foreground">
