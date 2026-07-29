@@ -112,36 +112,59 @@
 }
 
 @media print {
-  @page {
-    size: A4;
-    margin: 1.5cm;
+  /* Target both the root and the dark class to force light mode variables */
+  :root, .dark {
+    --background: 40 33% 98%;
+    --foreground: 20 14% 16%;
+    --card: 0 0% 100%;
+    --card-foreground: 20 14% 16%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 20 14% 16%;
+    --primary: 239 84% 67%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 40 10% 96%;
+    --secondary-foreground: 20 14% 16%;
+    --muted: 40 10% 96%;
+    --muted-foreground: 20 5% 45%;
+    --accent: 40 10% 96%;
+    --accent-foreground: 20 14% 16%;
+    --border: 20 10% 90%;
+    --input: 20 10% 90%;
+    --ring: 239 84% 67%;
   }
-  body {
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-    background-color: white !important;
-    font-size: 10pt;
+
+  /* Force browsers to print essential background colors */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
-  html, body, main, table, .card {
-    background: #ffffff !important;
-    color: #000000 !important;
-    border-color: #e5e7eb !important;
+
+  /* Prevent scrolling containers from clipping wide tables on paper */
+  .table-scroll-container,
+  .overflow-x-auto,
+  .overflow-auto {
+    overflow: visible !important;
   }
-  .report-no-print {
-    display: none !important;
-  }
-  table {
-    page-break-inside: auto;
-  }
-  tr {
-    page-break-inside: avoid;
-    page-break-after: auto;
-  }
+
+  /* 1. Ensure table headers repeat at the top of every new printed page */
   thead {
     display: table-header-group;
   }
+
+  /* 2. Ensure table footers (Grand Totals) stay anchored at the bottom */
   tfoot {
     display: table-footer-group;
+  }
+
+  /* 3. Prevent the browser from slicing a row in half across two pages */
+  tr, img, svg {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  @page {
+    size: A4;
+    margin: 1.5cm;
   }
 }
 /* Remove spin buttons from number inputs globally */

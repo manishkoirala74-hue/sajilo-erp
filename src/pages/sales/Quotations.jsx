@@ -269,35 +269,35 @@ export default function Quotations() {
             <Eye className="w-4 h-4" />
           </Button>
           {row.status === 'Draft' && (
-            <Button variant="ghost" size="icon" className="text-primary" title="Edit Quotation" onClick={() => openEdit(row)}>
+            <Button variant="ghost" size="icon" className="text-primary print:hidden" title="Edit Quotation" onClick={() => openEdit(row)}>
               <Pencil className="w-4 h-4" />
             </Button>
           )}
           {row.status === 'Draft' && (
-            <Button variant="ghost" size="icon" className="text-blue-500" title="Mark as Final" onClick={() => updateStatus(row, 'Final')}>
+            <Button variant="ghost" size="icon" className="text-blue-500 print:hidden" title="Mark as Final" onClick={() => updateStatus(row, 'Final')}>
               <Send className="w-4 h-4" />
             </Button>
           )}
           {row.status === 'Final' && (
-            <Button variant="ghost" size="icon" className="text-green-500" title="Accept" onClick={() => updateStatus(row, 'Accepted')}>
+            <Button variant="ghost" size="icon" className="text-green-500 print:hidden" title="Accept" onClick={() => updateStatus(row, 'Accepted')}>
               <CheckCircle className="w-4 h-4" />
             </Button>
           )}
           {row.status === 'Final' && (
-            <Button variant="ghost" size="icon" className="text-red-500" title="Reject" onClick={() => updateStatus(row, 'Rejected')}>
+            <Button variant="ghost" size="icon" className="text-red-500 print:hidden" title="Reject" onClick={() => updateStatus(row, 'Rejected')}>
               <Ban className="w-4 h-4" />
             </Button>
           )}
           {row.status === 'Accepted' && (
-            <Button variant="ghost" size="icon" className="text-purple-500" title="Convert to Sales Order" onClick={() => convertToOrder(row)}>
+            <Button variant="ghost" size="icon" className="text-purple-500 print:hidden" title="Convert to Sales Order" onClick={() => convertToOrder(row)}>
               <ArrowRight className="w-4 h-4" />
             </Button>
           )}
-          <Button variant="ghost" size="icon" className="text-muted-foreground" title="Duplicate" onClick={() => duplicate(row)}>
+          <Button variant="ghost" size="icon" className="text-muted-foreground print:hidden" title="Duplicate" onClick={() => duplicate(row)}>
             <Copy className="w-4 h-4" />
           </Button>
           {(row.status === 'Draft' || row.status === 'Final') && (
-            <Button variant="ghost" size="icon" className="text-destructive" title="Cancel Quotation" onClick={() => updateStatus(row, 'Cancelled')}>
+            <Button variant="ghost" size="icon" className="text-destructive print:hidden" title="Cancel Quotation" onClick={() => updateStatus(row, 'Cancelled')}>
               <XCircle className="w-4 h-4" />
             </Button>
           )}
@@ -338,7 +338,7 @@ export default function Quotations() {
           <div className="text-center py-16">
             <FileText className="w-10 h-10 text-muted-foreground/30 mx-auto mb-3" />
             <p className="text-muted-foreground text-sm">No quotations found</p>
-            <Button className="mt-4" onClick={openNew}><Plus className="w-4 h-4 mr-1" /> New Quotation</Button>
+            <Button className="mt-4 print:hidden" onClick={openNew}><Plus className="w-4 h-4 mr-1" /> New Quotation</Button>
           </div>
         ) : (
           <DataTable columns={columns} data={filtered} searchKey="quotation_number" />
@@ -492,7 +492,7 @@ export default function Quotations() {
             </Button>
             <div className="flex gap-3">
               <Button variant="outline" onClick={() => setShowForm(false)}>Cancel</Button>
-              <Button onClick={handleSave} disabled={saving}>{saving ? 'Saving…' : editing ? 'Update' : 'Create'}</Button>
+              <Button onClick={handleSave} disabled={saving} className="print:hidden">{saving ? 'Saving…' : editing ? 'Update' : 'Create'}</Button>
             </div>
           </div>
         </DialogContent>

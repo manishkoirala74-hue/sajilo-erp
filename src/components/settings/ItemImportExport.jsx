@@ -323,15 +323,15 @@ function ItemImportCard() {
         {/* Action Buttons */}
         <div className="flex items-center gap-3 flex-wrap">
           <span className="text-sm font-medium text-muted-foreground mr-1">Products</span>
-          <Button variant="outline" className="border-blue-200 dark:border-blue-500/20 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:bg-blue-500/10"
+          <Button variant="outline" className="border-blue-200 dark:border-blue-500/20 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:bg-blue-500/10 print:hidden"
             onClick={() => fileRef.current?.click()} disabled={step === 'validating' || step === 'importing'}>
             <Upload className="w-4 h-4 mr-1.5" /> Import
           </Button>
-          <Button variant="outline" className="border-green-200 dark:border-green-500/20 text-green-600 dark:text-green-400 hover:bg-green-50 dark:bg-green-500/10"
+          <Button variant="outline" className="border-green-200 dark:border-green-500/20 text-green-600 dark:text-green-400 hover:bg-green-50 dark:bg-green-500/10 print:hidden"
             onClick={handleDownloadTemplate}>
             <Download className="w-4 h-4 mr-1.5" /> Download Template
           </Button>
-          <Button variant="outline" className="border-pink-200 dark:border-pink-500/20 text-pink-600 dark:text-pink-400 hover:bg-pink-50 dark:bg-pink-500/10"
+          <Button variant="outline" className="border-pink-200 dark:border-pink-500/20 text-pink-600 dark:text-pink-400 hover:bg-pink-50 dark:bg-pink-500/10 print:hidden"
             onClick={handleExport}>
             <FileSpreadsheet className="w-4 h-4 mr-1.5" /> Export
           </Button>
@@ -364,7 +364,7 @@ function ItemImportCard() {
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h4 className="text-sm font-semibold">Review: {fileName}</h4>
-              <Button variant="ghost" size="sm" onClick={reset}><X className="w-4 h-4 mr-1" /> Cancel</Button>
+              <Button variant="ghost" size="sm" onClick={reset} className="print:hidden"><X className="w-4 h-4 mr-1" /> Cancel</Button>
             </div>
 
             {/* Summary */}
@@ -466,13 +466,13 @@ function ItemImportCard() {
 
             {/* Proceed button — only if no validation errors */}
             {validationErrors.length === 0 ? (
-              <Button onClick={handleImport} className="w-full" disabled={!isBalanced}>
+              <Button onClick={handleImport} className="w-full print:hidden" disabled={!isBalanced}>
                 <Upload className="w-4 h-4 mr-2" />
                 Import {parsedRows.length - (overrideAll ? 0 : duplicates.length)} Item(s)
                 {!overrideAll && duplicates.length > 0 && ` (${duplicates.length} skipped)`}
               </Button>
             ) : (
-              <Button variant="outline" onClick={reset} className="w-full">
+              <Button variant="outline" onClick={reset} className="w-full print:hidden">
                 Fix errors in your file and re-upload
               </Button>
             )}
@@ -503,7 +503,7 @@ function ItemImportCard() {
                 {result.errors.map((e, i) => <p key={i} className="text-xs text-red-600 dark:text-red-400">• {e}</p>)}
               </div>
             )}
-            <Button variant="outline" onClick={reset} className="w-full">Import Another File</Button>
+            <Button variant="outline" onClick={reset} className="w-full print:hidden">Import Another File</Button>
           </div>
         )}
       </div>

@@ -218,7 +218,7 @@ export default function PartnerStatement({ title, mode, initialFromDate, initial
 
   return (
     <div className="space-y-4">
-      <div className="report-no-print">
+      <div className="print:hidden">
         <ReportFilterBar filters={filters} onChange={setFilters} onApply={load} showApplyButton extraOptions={extraOptions} />
       </div>
 

@@ -101,7 +101,7 @@ function LedgerRow({ account, columns, depth }) {
     <tr className="hover:bg-muted/50 transition-colors print:hover:bg-transparent">
       {columns.map(col => {
         if (col.key === 'account_code') return (
-          <td key={col.key} className="cell-density py-1.5 min-w-[220px] max-w-[75vw] sm:max-w-[400px] whitespace-normal sticky left-0 bg-card z-10 border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] print:text-[9px]"
+          <td key={col.key} className="cell-density py-1.5 min-w-[140px] max-w-[45vw] sm:min-w-[220px] sm:max-w-[400px] whitespace-normal sticky left-0 bg-card z-10 border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] print:text-[9px]"
             style={{ paddingLeft: `${indent}px`, paddingRight: '8px' }}>
             <div className="flex flex-col">
               <span className="text-xs text-muted-foreground font-mono">{account.account_code || '—'}</span>
@@ -163,13 +163,13 @@ function GroupRow({ node, columns, depth, expandedGroups, onToggle, showZeroBala
       >
         {columns.map(col => {
           if (col.key === 'account_code') return (
-            <td key={col.key} className="cell-density py-3 min-w-[220px] max-w-[75vw] sm:max-w-[400px] whitespace-normal sticky left-0 bg-card z-10 border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] print:text-[9px]"
+            <td key={col.key} className="cell-density py-3 min-w-[140px] max-w-[45vw] sm:min-w-[220px] sm:max-w-[400px] whitespace-normal sticky left-0 bg-card z-10 border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] print:text-[9px]"
               style={{ paddingLeft: `${indent}px`, paddingRight: '8px' }}>
               <div className="flex items-center gap-1.5">
                 {hasChildren || isControlAccount
                   ? isExpanded
-                    ? <ChevronDown className="w-4 h-4 text-primary shrink-0 report-no-print" />
-                    : <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0 report-no-print" />
+                    ? <ChevronDown className="w-4 h-4 text-primary shrink-0 print:hidden" />
+                    : <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0 print:hidden" />
                   : <span className="w-4 shrink-0" />
                 }
                 {node.is_system_account && <Lock className="w-3 h-3 text-slate-400 shrink-0" />}
@@ -334,7 +334,7 @@ export default function FinancialReportTable({
   return (
     <div className="space-y-2">
       {/* Export Button */}
-      <div className="report-no-print flex justify-end">
+      <div className="print:hidden flex justify-end">
         <button
           onClick={handleExportXLSX}
           className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 border border-emerald-300 dark:border-emerald-500/30 rounded-lg bg-emerald-50 dark:bg-emerald-500/10 hover:bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 transition-colors"
@@ -346,7 +346,7 @@ export default function FinancialReportTable({
 
       <div className="border border-border rounded-xl overflow-hidden print:border-0 print:rounded-none">
         <div className="table-scroll-container">
-          <table className="table-fluid-grid text-sm border-collapse print:text-[10px]">
+          <table className={cn("text-sm border-collapse print:text-[10px]", columns.length > 4 ? "table-fluid-grid" : "w-full")}>
             <colgroup>
               {columns.map(col => {
                 const widths = {
@@ -425,7 +425,7 @@ export default function FinancialReportTable({
               <tr>
                 {columns.map(col => {
                   if (col.key === 'account_code') return (
-                    <td key={col.key} className="cell-density font-bold text-xs text-foreground uppercase tracking-wider sticky left-0 bg-secondary z-10 border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] print:text-[9px] print:text-foreground">
+                    <td key={col.key} className="cell-density font-bold text-xs text-foreground uppercase tracking-wider sticky left-0 bg-secondary z-10 border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] print:text-[9px] print:text-foreground min-w-[140px] sm:min-w-[220px] max-w-[45vw]">
                       GRAND TOTAL
                     </td>
                   );
@@ -440,7 +440,7 @@ export default function FinancialReportTable({
           </table>
         </div>
 
-        <div className="report-no-print px-4 py-1.5 border-t border-border text-xs text-muted-foreground bg-muted/10">
+        <div className="print:hidden px-4 py-1.5 border-t border-border text-xs text-muted-foreground bg-muted/10">
           {totalLeaves} ledger account{totalLeaves !== 1 ? 's' : ''} · {allGroupIds.length} group{allGroupIds.length !== 1 ? 's' : ''} ·{' '}
           <span className="text-primary font-medium">{expandedGroups.size} expanded</span>
         </div>

@@ -199,10 +199,10 @@ export default function PurchasePriceChangeHistory() {
           </div>
           
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={fetchData} disabled={loading}>
+            <Button variant="outline" size="sm" onClick={fetchData} disabled={loading} className="print:hidden">
               Refresh
             </Button>
-            <Button variant="outline" size="sm" className="hidden sm:flex">
+            <Button variant="outline" size="sm" className="hidden sm:flex print:hidden">
               <Download className="w-4 h-4 mr-2" />
               Export CSV
             </Button>

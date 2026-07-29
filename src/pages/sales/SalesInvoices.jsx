@@ -526,17 +526,17 @@ export default function SalesInvoices() {
             </Button>
           )}
           {(row.status === 'Draft' || row.status === 'Posted') && canEdit && (
-            <Button variant="ghost" size="icon" className="text-primary" title="Edit Invoice" onClick={() => openEdit(row)}>
+            <Button variant="ghost" size="icon" className="text-primary print:hidden" title="Edit Invoice" onClick={() => openEdit(row)}>
               <Pencil className="w-4 h-4" />
             </Button>
           )}
           {(row.status === 'Draft' || row.status === 'Posted') && canReverse && (
-            <Button variant="ghost" size="icon" className="text-destructive" title="Cancel Invoice (reverse transactions)" onClick={() => { setCancelTarget(row); setCancelReason(''); }}>
+            <Button variant="ghost" size="icon" className="text-destructive print:hidden" title="Cancel Invoice (reverse transactions)" onClick={() => { setCancelTarget(row); setCancelReason(''); }}>
               <XCircle className="w-4 h-4" />
             </Button>
           )}
           {row.status === 'Draft' && (
-            <Button variant="ghost" size="icon" className="text-orange-500" title="Reject Invoice Number (no transactions)" onClick={() => { setRejectTarget(row); setRejectReason(''); }}>
+            <Button variant="ghost" size="icon" className="text-orange-500 print:hidden" title="Reject Invoice Number (no transactions)" onClick={() => { setRejectTarget(row); setRejectReason(''); }}>
               <Ban className="w-4 h-4" />
             </Button>
           )}
@@ -787,12 +787,12 @@ export default function SalesInvoices() {
               <span className="text-xl font-bold text-foreground leading-none mt-1">NPR {(form.grand_total || 0).toLocaleString()}</span>
             </div>
             <div className="flex gap-3 mr-6 items-center">
-              <Button type="button" variant="ghost" className="rounded-xl" onClick={() => setShowForm(false)} disabled={saving}>Cancel</Button>
-              <Button type="button" variant="outline" className="rounded-xl border-primary text-primary hover:bg-primary/10" onClick={(e) => {
+              <Button type="button" variant="ghost" className="rounded-xl print:hidden" onClick={() => setShowForm(false)} disabled={saving}>Cancel</Button>
+              <Button type="button" variant="outline" className="rounded-xl border-primary text-primary hover:bg-primary/10 print:hidden" onClick={(e) => {
                 e.preventDefault();
                 handleSave('Draft');
               }} disabled={saving}>Save Draft</Button>
-              <Button type="button" className="rounded-xl font-bold shadow-sm px-6" onClick={(e) => {
+              <Button type="button" className="rounded-xl font-bold shadow-sm px-6 print:hidden" onClick={(e) => {
                 e.preventDefault();
                 handleSave('Posted');
               }} disabled={saving}>
@@ -814,10 +814,10 @@ export default function SalesInvoices() {
               </div>
               {viewDetail && (
                 <div className="flex items-center gap-2">
-                  <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => handleDownloadPDF(viewDetail)}>
+                  <Button variant="outline" size="sm" className="h-7 text-xs print:hidden" onClick={() => handleDownloadPDF(viewDetail)}>
                     <Download className="w-3.5 h-3.5 mr-1.5" /> Download PDF
                   </Button>
-                  <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => navigate(`/email/compose?module=SalesInvoice&id=${viewDetail.id}`)}>
+                  <Button variant="outline" size="sm" className="h-7 text-xs print:hidden" onClick={() => navigate(`/email/compose?module=SalesInvoice&id=${viewDetail.id}`)}>
                     <Mail className="w-3.5 h-3.5 mr-1.5" /> Email Invoice
                   </Button>
                   <span className="text-xs font-semibold bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 px-2 py-1 rounded border border-blue-200 dark:border-blue-800">
@@ -915,7 +915,7 @@ export default function SalesInvoices() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setCancelTarget(null)}>Back</Button>
-            <Button variant="destructive" disabled={cancelling || !cancelReason.trim()} onClick={handleConfirmCancel}>
+            <Button variant="destructive" disabled={cancelling || !cancelReason.trim()} onClick={handleConfirmCancel} className="print:hidden">
               {cancelling ? 'Cancelling...' : 'Confirm Cancellation'}
             </Button>
           </DialogFooter>
@@ -951,7 +951,7 @@ export default function SalesInvoices() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setRejectTarget(null)}>Back</Button>
-            <Button className="bg-orange-600 hover:bg-orange-700 text-white" disabled={rejecting || !rejectReason.trim()} onClick={handleConfirmReject}>
+            <Button className="bg-orange-600 hover:bg-orange-700 text-white print:hidden" disabled={rejecting || !rejectReason.trim()} onClick={handleConfirmReject}>
               {rejecting ? 'Rejecting...' : 'Confirm Rejection'}
             </Button>
           </DialogFooter>
@@ -971,7 +971,7 @@ export default function SalesInvoices() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => { setDupWarning(false); setPendingPostStatus(null); }}>Go Back</Button>
-            <Button className="bg-yellow-600 hover:bg-yellow-700 text-white" onClick={() => handleSave(pendingPostStatus)}>
+            <Button className="bg-yellow-600 hover:bg-yellow-700 text-white print:hidden" onClick={() => handleSave(pendingPostStatus)}>
               Proceed Anyway
             </Button>
           </DialogFooter>
@@ -1002,7 +1002,7 @@ export default function SalesInvoices() {
           <DialogFooter>
             <Button variant="outline" onClick={() => { setShowNegativeStockWarning(false); setPendingPostStatus(null); }}>Cancel</Button>
             {hasAccess('inventory', 'override_negative_stock') && (
-              <Button className="bg-red-600 hover:bg-red-700 text-white" onClick={() => { setShowNegativeStockWarning(false); handleSave(pendingPostStatus, true); }}>
+              <Button className="bg-red-600 hover:bg-red-700 text-white print:hidden" onClick={() => { setShowNegativeStockWarning(false); handleSave(pendingPostStatus, true); }}>
                 Acknowledge & Proceed
               </Button>
             )}
@@ -1025,7 +1025,7 @@ export default function SalesInvoices() {
             <Button variant="outline" onClick={() => handleConfirmAction(false)}>
               Cancel
             </Button>
-            <Button className="bg-orange-600 hover:bg-orange-700 text-white" onClick={() => handleConfirmAction(true)}>
+            <Button className="bg-orange-600 hover:bg-orange-700 text-white print:hidden" onClick={() => handleConfirmAction(true)}>
               Proceed
             </Button>
           </DialogFooter>

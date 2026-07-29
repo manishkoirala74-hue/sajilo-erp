@@ -95,7 +95,7 @@ export default function Dashboard() {
           Before you can start managing your business, you need to set up your first company.
         </p>
         <Link to="/settings">
-          <Button className="mt-4 shadow-lg hover:shadow-xl transition-shadow" size="lg">
+          <Button className="mt-4 shadow-lg hover:shadow-xl transition-shadow print:hidden" size="lg">
             Create Your First Company
           </Button>
         </Link>
@@ -123,15 +123,15 @@ export default function Dashboard() {
               {saveStatus === 'error' && (
                 <span className="text-xs text-destructive mr-1">Could not save. Try again.</span>
               )}
-              <Button variant="outline" size="sm" className="rounded-xl h-9 text-xs" onClick={handleCancelEdit} disabled={saveStatus === 'saving'}>
+              <Button variant="outline" size="sm" className="rounded-xl h-9 text-xs print:hidden" onClick={handleCancelEdit} disabled={saveStatus === 'saving'}>
                 <X className="w-4 h-4 mr-1.5" /> Cancel
               </Button>
-              <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl h-9 text-xs" onClick={handleSaveLayout} disabled={saveStatus === 'saving'}>
+              <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl h-9 text-xs print:hidden" onClick={handleSaveLayout} disabled={saveStatus === 'saving'}>
                 {saveStatus === 'saving' ? 'Saving Blueprint…' : 'Save Blueprint'}
               </Button>
             </>
           ) : (
-            <Button variant="outline" size="sm" className="rounded-xl h-9 border-stone-200 text-stone-700 text-xs" onClick={() => { setSaveStatus(null); setIsEditing(true); }}>
+            <Button variant="outline" size="sm" className="rounded-xl h-9 border-stone-200 text-stone-700 text-xs print:hidden" onClick={() => { setSaveStatus(null); setIsEditing(true); }}>
               <Settings className="w-4 h-4 mr-1.5" /> Customize Layout
             </Button>
           )}
@@ -176,7 +176,7 @@ export default function Dashboard() {
                 {isEditing && (
                   <button
                     type="button"
-                    className="global-dashboard-drag-handle"
+                    className="global-dashboard-drag-handle print:hidden"
                     title="Drag to reposition card"
                     style={{
                       position: 'absolute',

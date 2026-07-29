@@ -614,7 +614,7 @@ export default function FinancialVouchers() {
             <div>
               <div className="flex justify-between items-end mb-2">
                 <Label>Ledger Entries *</Label>
-                <Button variant="outline" size="sm" onClick={addEntry}><Plus className="w-4 h-4 mr-1" /> Add Row</Button>
+                <Button variant="outline" size="sm" onClick={addEntry} className="print:hidden"><Plus className="w-4 h-4 mr-1" /> Add Row</Button>
               </div>
               <div className="border border-border rounded-lg overflow-x-auto">
                 <table className="table-fluid-grid text-sm">
@@ -653,7 +653,7 @@ export default function FinancialVouchers() {
                                 const showIcon = partnerAccounts.has(e.account_id);
                                 if (showIcon) {
                                   return (
-                                    <Button type="button" variant="outline" size="icon" className="h-8 w-8 shrink-0 text-blue-600 border-blue-200 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors focus:ring-2 focus:ring-blue-500" onClick={() => openPendingBills(i)} title="Bill-Wise Allocation">
+                                    <Button type="button" variant="outline" size="icon" className="h-8 w-8 shrink-0 text-blue-600 border-blue-200 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors focus:ring-2 focus:ring-blue-500 print:hidden" onClick={() => openPendingBills(i)} title="Bill-Wise Allocation">
                                       <ListChecks className="w-4 h-4" />
                                     </Button>
                                   );
@@ -676,7 +676,7 @@ export default function FinancialVouchers() {
                             <Input value={e.narration || ''} onChange={ev => handleEntry(i, 'narration', ev.target.value)} className="h-8" placeholder="Line note" />
                           </td>
                           <td className="cell-density text-center">
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => removeEntry(i)}><Trash2 className="w-4 h-4" /></Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive print:hidden" onClick={() => removeEntry(i)}><Trash2 className="w-4 h-4" /></Button>
                           </td>
                         </tr>
                       )
@@ -709,7 +709,7 @@ export default function FinancialVouchers() {
             <div className="flex justify-between items-center text-sm">
               <div>Voucher Total: <strong>{fmt(form.total_amount)}</strong></div>
               <div>Allocated: <strong>{fmt(billAllocations.reduce((s, a) => s + a.allocated_amount, 0))}</strong></div>
-              <Button size="sm" variant="outline" onClick={autoAllocate}>Auto Allocate (FIFO)</Button>
+              <Button size="sm" variant="outline" onClick={autoAllocate} className="print:hidden">Auto Allocate (FIFO)</Button>
             </div>
             
             {loadingBills ? <div className="p-4 text-center">Loading...</div> : (
@@ -938,7 +938,7 @@ export default function FinancialVouchers() {
                     <Button
                       variant="outline"
                       size="sm"
-                      className="gap-1.5 text-amber-600 dark:text-amber-400 border-amber-300 dark:border-amber-500/30 hover:bg-amber-50 dark:bg-amber-500/10"
+                      className="gap-1.5 text-amber-600 dark:text-amber-400 border-amber-300 dark:border-amber-500/30 hover:bg-amber-50 dark:bg-amber-500/10 print:hidden"
                       onClick={() => { setActionReason(''); setActionDialog('reverse'); }}
                     >
                       <RotateCcw className="w-3.5 h-3.5" /> Reverse Voucher
@@ -946,7 +946,7 @@ export default function FinancialVouchers() {
                     <Button
                       variant="outline"
                       size="sm"
-                      className="gap-1.5 text-red-600 dark:text-red-400 border-red-300 dark:border-red-500/30 hover:bg-red-50 dark:bg-red-500/10"
+                      className="gap-1.5 text-red-600 dark:text-red-400 border-red-300 dark:border-red-500/30 hover:bg-red-50 dark:bg-red-500/10 print:hidden"
                       onClick={() => { setActionReason(''); setActionDialog('delete'); }}
                     >
                       <Trash2 className="w-3.5 h-3.5" /> Delete Voucher

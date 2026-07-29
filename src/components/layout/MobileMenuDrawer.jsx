@@ -113,7 +113,7 @@ export default function MobileMenuDrawer({ isOpen, onClose }) {
     <Drawer.Root open={isOpen} onOpenChange={(open) => !open && onClose()} direction="left">
       <Drawer.Portal>
         <Drawer.Overlay className="fixed inset-0 bg-black/40 z-50 backdrop-blur-sm" />
-        <Drawer.Content className="bg-sidebar flex flex-col h-full w-[280px] fixed bottom-0 left-0 top-0 z-50 outline-none border-r border-slate-700/50">
+        <Drawer.Content className="bg-sidebar flex flex-col h-full w-[280px] fixed bottom-0 left-0 top-0 z-50 outline-none border-r border-slate-700/50 print:hidden">
           <div className="flex items-center justify-between h-16 px-4 border-b border-slate-700/50 shrink-0">
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shrink-0">

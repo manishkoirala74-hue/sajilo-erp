@@ -117,7 +117,7 @@ const PRINT_STYLE = `
   tr.print-group-row { background: #f1f5f9 !important; font-weight: 700 !important; }
   .text-right, .tabular-nums { text-align: right !important; }
   .print-hide { display: none !important; }
-  .report-no-print { display: none !important; }
+  .print:hidden { display: none !important; }
 }
 `;
 
@@ -128,7 +128,7 @@ function ReportTable({ title, subtitle, headers, rows, footer, onExport, onEmail
   return (
     <div className="space-y-3">
       <BusinessHeader reportTitle={title} fromDate={fromDate} toDate={toDate} subtitle={subtitle} />
-      <div className="report-no-print flex justify-end gap-2">
+      <div className="print:hidden flex justify-end gap-2">
         {onEmail && (
           <button onClick={onEmail}
             className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 border border-blue-300 dark:border-blue-500/30 rounded-lg bg-blue-50 dark:bg-blue-500/10 hover:bg-blue-100 dark:bg-blue-500/20 text-blue-800 dark:text-blue-300 transition-colors">
@@ -289,7 +289,7 @@ function TrialBalanceReport({ initialData, initialFromDate, initialToDate, initi
 
   return (
     <div className="space-y-4">
-      <div className="report-no-print">
+      <div className="print:hidden">
         <ReportFilterBar filters={filters} onChange={setFilters} onApply={load} showApplyButton />
       </div>
       {!hasLoaded ? (
@@ -345,7 +345,7 @@ function CashFlowReport({ initialFromDate, initialToDate }) {
 
   return (
     <div className="space-y-4">
-      <div className="report-no-print">
+      <div className="print:hidden">
         <ReportFilterBar filters={filters} onChange={setFilters} onApply={load} showApplyButton />
       </div>
       {!hasLoaded ? (
@@ -485,7 +485,7 @@ function PartnerSummaryReport({ title, mode, reportId, initialFromDate, initialT
 
   return (
     <div className="space-y-4">
-      <div className="report-no-print">
+      <div className="print:hidden">
         <ReportFilterBar filters={filters} onChange={setFilters} onApply={load} showApplyButton extraOptions={extraOptions} />
       </div>
       {!hasLoaded ? (
@@ -603,7 +603,7 @@ function PartnerReport({ title, mode, initialFromDate, initialToDate }) {
 
   return (
     <div className="space-y-4">
-      <div className="report-no-print">
+      <div className="print:hidden">
         <ReportFilterBar filters={filters} onChange={setFilters} onApply={load} showApplyButton extraOptions={extraOptions} />
       </div>
       {!hasLoaded ? (
@@ -810,7 +810,7 @@ function ProfitLossReport({ initialData, initialFromDate, initialToDate }) {
     };
 
     const KPICard = ({ title, amount, percentage }) => (
-      <div className='bg-card border border-border rounded-xl p-4 shadow-sm flex flex-col justify-between report-no-print'>
+      <div className='bg-card border border-border rounded-xl p-4 shadow-sm flex flex-col justify-between print:hidden'>
         <span className='text-xs font-semibold text-slate-500 uppercase tracking-wider'>{title}</span>
         <div className='mt-2 flex items-baseline gap-2'>
           <span className={`text-xl font-bold tabular-nums ${amount < 0 ? 'text-red-600 dark:text-red-400' : 'text-foreground'}`}>
@@ -832,7 +832,7 @@ function ProfitLossReport({ initialData, initialFromDate, initialToDate }) {
 
     return (
       <div className='space-y-4'>
-        <div className='report-no-print'>
+        <div className='print:hidden'>
           <ReportFilterBar filters={filters} onChange={setFilters} onApply={load} showApplyButton />
         </div>
         {!hasLoaded ? (
@@ -844,7 +844,7 @@ function ProfitLossReport({ initialData, initialFromDate, initialToDate }) {
           <div className='py-10 text-center text-muted-foreground text-sm'>Loading…</div>
         ) : (
         <>
-        <div className='grid grid-cols-4 gap-4 report-no-print'>
+        <div className='grid grid-cols-4 gap-4 print:hidden'>
           <KPICard title='Net Sales Revenue' amount={net_sales_cur} />
           <KPICard title='Gross Profit' amount={gross_profit_cur} percentage={net_sales_cur ? ((gross_profit_cur / net_sales_cur)*100).toFixed(1) : 0} />
           <KPICard title='Operating Profit' amount={op_profit_cur} percentage={net_sales_cur ? ((op_profit_cur / net_sales_cur)*100).toFixed(1) : 0} />
@@ -854,7 +854,7 @@ function ProfitLossReport({ initialData, initialFromDate, initialToDate }) {
         <div className='bg-card border border-border rounded-xl shadow-sm overflow-hidden p-6 print:p-0 print:border-none print:shadow-none'>
           <BusinessHeader reportTitle='INCOME STATEMENT' subtitle='(Profit & Loss Statement)' fromDate={filters.fromDate} toDate={filters.toDate} />
           
-          <div className='report-no-print flex justify-end gap-2 mb-6'>
+          <div className='print:hidden flex justify-end gap-2 mb-6'>
             <Button variant='outline' size='sm' onClick={() => setFilters(f => ({ ...f, expandAll: !f.expandAll }))}>
               {filters.expandAll ? 'Collapse All' : 'Expand All'}
             </Button>
@@ -1056,7 +1056,7 @@ function BalanceSheetReport({ initialData, initialFromDate, initialToDate }) {
 
   return (
     <div className="space-y-4">
-      <div className="report-no-print">
+      <div className="print:hidden">
         <ReportFilterBar filters={filters} onChange={setFilters} onApply={load} showApplyButton />
       </div>
       {!hasLoaded ? (
@@ -1102,7 +1102,7 @@ function SimpleReport({ title, reportId, initialData, initialFromDate, initialTo
 
   return (
     <div className="space-y-4">
-      <div className="report-no-print">
+      <div className="print:hidden">
         <ReportFilterBar filters={filters} onChange={setFilters} onApply={load} showApplyButton />
       </div>
       {!hasLoaded ? (
@@ -1236,7 +1236,7 @@ function GeneralLedgerDetailReport({ initialFromDate, initialToDate }) {
 
   return (
     <div className="space-y-4">
-      <div className="report-no-print">
+      <div className="print:hidden">
         <ReportFilterBar filters={filters} onChange={setFilters} onApply={load} showApplyButton extraOptions={accPicker} />
       </div>
       {!hasLoaded ? (
@@ -1372,7 +1372,7 @@ function StockLedgerStatementReport({ initialFromDate, initialToDate }) {
 
   return (
     <div className="space-y-4">
-      <div className="report-no-print">
+      <div className="print:hidden">
         <ReportFilterBar filters={filters} onChange={setFilters} onApply={load} showApplyButton extraOptions={itemPicker} />
       </div>
       {!hasLoaded ? (

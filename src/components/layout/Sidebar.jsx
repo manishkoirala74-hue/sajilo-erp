@@ -309,7 +309,7 @@ export default function Sidebar({ collapsed, onToggle }) {
   return (
     <>
       <div className={cn(
-        "hidden md:flex flex-col h-full bg-sidebar transition-all duration-300 border-r border-slate-700/30 shadow-[4px_0_24px_rgba(0,0,0,0.02)] relative z-40",
+        "hidden md:flex flex-col h-full bg-sidebar transition-all duration-300 border-r border-slate-700/30 shadow-[4px_0_24px_rgba(0,0,0,0.02)] relative z-40 print:hidden",
         collapsed ? "w-[72px]" : "w-64"
       )}>
         {/* Logo */}
