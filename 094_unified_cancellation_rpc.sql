@@ -1,6 +1,6 @@
 -- 094_unified_cancellation_rpc.sql
 -- Unified RPC to atomically cancel Sales and Purchase Invoices
--- This function handles status updates, GL deletion, and Inventory deletion.
+-- This function handles status updates, GL reversals (contra-entries), and Inventory reversals.
 
 CREATE OR REPLACE FUNCTION rpc_cancel_document(p_doc_id UUID, p_doc_type TEXT, p_reason TEXT)
 RETURNS VOID
@@ -11,6 +11,7 @@ AS $$
 DECLARE
     v_existing_status VARCHAR;
     v_affected_items UUID[];
+    v_journal_record RECORD;
 BEGIN
     -- Check permissions (must be authenticated)
     IF auth.role() != 'authenticated' AND auth.role() != 'service_role' THEN
@@ -40,17 +41,35 @@ BEGIN
         RAISE EXCEPTION 'ERR_INVALID_DOC_TYPE: Document type % is not supported for cancellation.', p_doc_type;
     END IF;
 
-    -- 2. GL Deletion (Hard Delete as per Sajilo ERP standard, audit trail remains in invoice row)
-    PERFORM public.rpc_delete_gl_journals(p_doc_id, p_doc_type);
+    -- 2. GL Reversal (Append-Only Ledger standard: create contra-entries)
+    FOR v_journal_record IN 
+        SELECT id, company_id FROM public."GeneralLedgerJournal" 
+        WHERE source_document_id = p_doc_id AND source_document_type = p_doc_type
+    LOOP
+        PERFORM public.rpc_reverse_gl_journal(v_journal_record.company_id, v_journal_record.id, CURRENT_DATE, p_reason);
+    END LOOP;
 
-    -- 3. Inventory Deletion (Triggers update_current_stock automatically)
+    -- 3. Inventory Reversal (Append-Only standard: create stock contra-entries)
     -- First, gather the items affected so we can resync their global quantity_on_hand
     SELECT array_agg(DISTINCT item_id) INTO v_affected_items 
     FROM public."InventoryLedger" 
     WHERE reference_id = p_doc_id AND reference_type = p_doc_type;
 
     IF v_affected_items IS NOT NULL THEN
-        DELETE FROM public."InventoryLedger" 
+        INSERT INTO public."InventoryLedger" (
+            company_id, item_id, transaction_type, godown_id, 
+            quantity_in, quantity_out, transaction_date, reference_id, reference_type, 
+            total_amount, description, voucher_no, wac_at_post
+        )
+        SELECT 
+            company_id, item_id, transaction_type, godown_id, 
+            quantity_out, -- Swapped to negate movement
+            quantity_in,  -- Swapped to negate movement
+            CURRENT_TIMESTAMP, reference_id, reference_type, 
+            total_amount, CONCAT('Cancelled: ', p_reason), 
+            CONCAT(voucher_no, '-REV'), -- Appended suffix for strict audit visibility
+            wac_at_post
+        FROM public."InventoryLedger"
         WHERE reference_id = p_doc_id AND reference_type = p_doc_type;
 
         -- 4. Resync the global Item.quantity_on_hand cache with CurrentStock

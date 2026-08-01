@@ -1,12 +1,13 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { sajilo } from '@/api/sajiloClient';
-import { postOpeningStock, loadSettings } from '@/lib/glPostingService';
-import { Upload, Download, FileSpreadsheet, CheckCircle2, XCircle, AlertTriangle, X, RefreshCw, AlertCircle as AlertCircleIcon } from 'lucide-react';
+import { postBulkOpeningStock, rollbackBulkImport, loadSettings } from '@/lib/glPostingService';
+import { Upload, Download, FileSpreadsheet, CheckCircle2, XCircle, AlertTriangle, X, RefreshCw, AlertCircle as AlertCircleIcon, Undo2, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import SearchableSelect from '@/components/shared/SearchableSelect';
 import PartnerImportExport from '@/components/settings/PartnerImportExport';
+import { format } from 'date-fns';
 
 // CSV template columns - matches Item entity
 const TEMPLATE_HEADERS = [
@@ -90,7 +91,7 @@ function validateRow(row, index, existingNames, existingCodes, catMap, uomSet) {
   return errors;
 }
 
-function ItemImportCard() {
+function ItemImportCard({ onImportCompleted }) {
   const [step, setStep] = useState('idle'); // idle | validating | review | importing | done
   const [parsedRows, setParsedRows] = useState([]);
   const [validationErrors, setValidationErrors] = useState([]);
@@ -102,6 +103,9 @@ function ItemImportCard() {
   const [offsetAccountId, setOffsetAccountId] = useState('');
   const [inventoryAccountId, setInventoryAccountId] = useState('');
   const fileRef = useRef();
+
+  const [showUndoConfirm, setShowUndoConfirm] = useState(false);
+  const [isUndoing, setIsUndoing] = useState(false);
 
   const totalOpeningStockValue = parsedRows.reduce((sum, row) => {
     if (validationErrors.some(e => e.includes(`Row ${parsedRows.indexOf(row) + 2}:`))) return sum;
@@ -213,6 +217,9 @@ function ItemImportCard() {
     const errorLog = [...validationErrors];
     const errorRows = new Set(validationErrors.map(e => { const m = e.match(/^Row (\d+):/); return m ? Number(m[1]) - 2 : -1; }));
 
+    const created_item_ids = [];
+    const newItemsWithStock = [];
+
     for (let i = 0; i < parsedRows.length; i++) {
       if (errorRows.has(i)) { failed++; continue; }
       const row = parsedRows[i];
@@ -252,57 +259,80 @@ function ItemImportCard() {
           const existing = existingNameMap[nameLower];
           delete payload.id;
           delete payload.is_physical; // Generated column
+          delete payload.quantity_on_hand; // STRICT COMPLIANCE: Prevent duplicate stock journals
           await sajilo.entities.Item.update(existing.id, payload);
           updated++;
         } else {
-          await sajilo.entities.Item.create(payload);
+          const newItem = await sajilo.entities.Item.create(payload);
           created++;
+          if (newItem && newItem.id) {
+            created_item_ids.push(newItem.id);
+            if (payload.quantity_on_hand > 0) {
+               newItemsWithStock.push({
+                 id: newItem.id,
+                 quantity_on_hand: payload.quantity_on_hand,
+                 purchase_price: payload.purchase_price
+               });
+            }
+          }
         }
-      } catch {
+      } catch (err) {
         failed++;
-        errorLog.push(`Row ${i + 2}: Failed to save item "${row.item_name}". Please check the data.`);
+        errorLog.push(`Row ${i + 2}: Failed to save item "${row.item_name}". ${err.message || ''}`);
       }
     }
 
-    // Post opening stock GL entries for newly created/updated items with qty > 0
-    const processedNames = new Set();
-    const dupeNameSet = new Set(duplicates.map(d => d.item_name.toLowerCase()));
-    for (let i = 0; i < parsedRows.length; i++) {
-      if (errorRows.has(i)) continue;
-      const row = parsedRows[i];
-      const nameLower = row.item_name?.toLowerCase();
-      if (dupeNameSet.has(nameLower) && !overrideAll) continue;
-      if (Number(row.quantity_on_hand) > 0) processedNames.add(row.item_name?.trim());
-    }
-
-    if (processedNames.size > 0) {
-      // Fetch all items once after import is complete
-      const allFreshItems = await sajilo.entities.Item.list('-created_date', 5000);
-      const itemsWithStock = allFreshItems.filter(it => processedNames.has(it.item_name) && (it.quantity_on_hand || 0) > 0);
-      if (itemsWithStock.length > 0) {
+    // Post opening stock GL entries for newly created items with qty > 0 via Bulk RPC
+    let journal_id = null;
+    if (newItemsWithStock.length > 0) {
+      try {
         const glSettings = await loadSettings();
-        const offsetAccount = accounts.find(a => a.id === offsetAccountId);
-        const inventoryAccount = accounts.find(a => a.id === inventoryAccountId);
-        await postOpeningStock(itemsWithStock, glSettings, new Date().toISOString().slice(0, 10), offsetAccount, inventoryAccount);
+        journal_id = await postBulkOpeningStock(newItemsWithStock, glSettings, new Date().toISOString().slice(0, 10), offsetAccountId, inventoryAccountId);
+      } catch (err) {
+        errorLog.push(`Failed to post bulk opening stock: ${err.message}`);
+        failed++; // Mark overall process as partial or failed if financials failed
       }
     }
 
     const status = failed > 0 && created + updated === 0 ? 'Failed' : failed > 0 ? 'Partial' : 'Success';
-    await sajilo.entities.ItemImportLog.create({
-      file_name: fileName,
-      imported_by: user?.email || 'Unknown',
-      import_date: new Date().toISOString(),
-      total_rows: parsedRows.length,
-      items_created: created,
-      items_updated: updated,
-      items_skipped: skipped,
-      items_failed: failed,
-      status,
-      errors: errorLog.slice(0, 50),
-    });
+    let log_id = null;
+    try {
+      const logEntry = await sajilo.entities.ItemImportLog.create({
+        file_name: fileName,
+        imported_by: user?.email || 'Unknown',
+        import_date: new Date().toISOString(),
+        total_rows: parsedRows.length,
+        items_created: created,
+        items_updated: updated,
+        items_skipped: skipped,
+        items_failed: failed,
+        status,
+        errors: errorLog.slice(0, 50),
+        metadata: { created_item_ids, journal_id }
+      });
+      log_id = logEntry?.id;
+    } catch (e) {
+      console.error("Failed to write import log", e);
+    }
 
-    setResult({ created, updated, skipped, failed, status, errors: errorLog });
+    setResult({ created, updated, skipped, failed, status, errors: errorLog, log_id, metadata: { created_item_ids, journal_id } });
     setStep('done');
+    if (onImportCompleted) onImportCompleted();
+  };
+
+  const executeUndo = async () => {
+    if (!result?.log_id) return;
+    setIsUndoing(true);
+    try {
+      await rollbackBulkImport(result.log_id);
+      setResult(prev => ({ ...prev, status: 'Rolled Back' }));
+      setShowUndoConfirm(false);
+      if (onImportCompleted) onImportCompleted();
+    } catch (err) {
+      // Error handled by service toast
+    } finally {
+      setIsUndoing(false);
+    }
   };
 
   const reset = () => {
@@ -311,6 +341,8 @@ function ItemImportCard() {
     setOffsetAccountId('');
     setInventoryAccountId('');
   };
+
+  const canUndo = result && (result.status === 'Success' || result.status === 'Partial') && result.metadata?.created_item_ids?.length > 0;
 
   return (
     <div className="bg-card border border-border rounded-xl overflow-hidden">
@@ -484,14 +516,17 @@ function ItemImportCard() {
           <div className="space-y-4">
             <div className={cn('flex items-center gap-3 p-4 rounded-lg border',
               result.status === 'Success' ? 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/20'
+              : result.status === 'Rolled Back' ? 'bg-muted border-border'
               : result.status === 'Partial' ? 'bg-yellow-50 dark:bg-yellow-500/10 border-yellow-200 dark:border-yellow-500/20'
               : 'bg-red-50 dark:bg-red-500/10 border-red-200 dark:border-red-500/20')}>
               {result.status === 'Success'
                 ? <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                : result.status === 'Rolled Back' 
+                ? <Undo2 className="w-5 h-5 text-muted-foreground shrink-0" />
                 : <AlertTriangle className="w-5 h-5 text-yellow-600 dark:text-yellow-400 shrink-0" />}
               <div>
                 <p className="text-sm font-semibold">
-                  {result.status === 'Success' ? 'Import completed successfully!' : result.status === 'Partial' ? 'Import completed with some issues.' : 'Import failed.'}
+                  {result.status === 'Success' ? 'Import completed successfully!' : result.status === 'Rolled Back' ? 'Import was rolled back.' : result.status === 'Partial' ? 'Import completed with some issues.' : 'Import failed.'}
                 </p>
                 <p className="text-xs text-muted-foreground mt-0.5">
                   {result.created} created · {result.updated} updated · {result.skipped} skipped · {result.failed} failed
@@ -503,7 +538,38 @@ function ItemImportCard() {
                 {result.errors.map((e, i) => <p key={i} className="text-xs text-red-600 dark:text-red-400">• {e}</p>)}
               </div>
             )}
-            <Button variant="outline" onClick={reset} className="w-full print:hidden">Import Another File</Button>
+            
+            <div className="flex gap-3 print:hidden">
+              <Button variant="outline" onClick={reset} className="flex-1">Import Another File</Button>
+              {canUndo && (
+                <Button variant="destructive" onClick={() => setShowUndoConfirm(true)} className="flex-1" disabled={isUndoing}>
+                  <Undo2 className="w-4 h-4 mr-2" /> Undo this Import
+                </Button>
+              )}
+            </div>
+
+            {/* Undo Confirmation Modal */}
+            {showUndoConfirm && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+                <div className="bg-background rounded-xl p-6 max-w-md w-full shadow-xl border border-border">
+                  <div className="flex items-center gap-3 text-red-600 dark:text-red-400 mb-4">
+                    <AlertTriangle className="w-6 h-6" />
+                    <h3 className="text-lg font-bold">Undo Bulk Import?</h3>
+                  </div>
+                  <p className="text-sm text-muted-foreground mb-6">
+                    This action will permanently delete the imported items and reverse the associated Opening Stock financial journals. 
+                    If any of these items have already been sold or moved, the rollback will be aborted by the system to protect accounting integrity.
+                  </p>
+                  <div className="flex justify-end gap-3">
+                    <Button variant="outline" onClick={() => setShowUndoConfirm(false)} disabled={isUndoing}>Cancel</Button>
+                    <Button variant="destructive" onClick={executeUndo} disabled={isUndoing}>
+                      {isUndoing ? <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> : null}
+                      Yes, Undo Import
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -511,10 +577,136 @@ function ItemImportCard() {
   );
 }
 
+function ImportHistoryTable({ refreshTrigger }) {
+  const [logs, setLogs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [undoLogId, setUndoLogId] = useState(null);
+  const [isUndoing, setIsUndoing] = useState(false);
+
+  const fetchLogs = async () => {
+    setLoading(true);
+    try {
+      const data = await sajilo.entities.ItemImportLog.list('-created_at', 20);
+      setLogs(data || []);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchLogs();
+  }, [refreshTrigger]);
+
+  const handleUndoClick = (logId) => {
+    setUndoLogId(logId);
+  };
+
+  const executeUndo = async () => {
+    if (!undoLogId) return;
+    setIsUndoing(true);
+    try {
+      await rollbackBulkImport(undoLogId);
+      await fetchLogs();
+      setUndoLogId(null);
+    } catch (err) {
+      // Error handled by service toast
+    } finally {
+      setIsUndoing(false);
+    }
+  };
+
+  return (
+    <div className="bg-card border border-border rounded-xl overflow-hidden mt-6">
+      <div className="flex items-center gap-2 px-5 py-4 border-b border-border bg-muted/20">
+        <RotateCcw className="w-4 h-4 text-primary" />
+        <h3 className="font-semibold text-foreground text-sm">Import History</h3>
+      </div>
+      <div className="p-0 overflow-x-auto">
+        <table className="w-full text-sm text-left">
+          <thead className="bg-muted/30 text-xs uppercase text-muted-foreground border-b border-border">
+            <tr>
+              <th className="px-5 py-3 font-medium">Date</th>
+              <th className="px-5 py-3 font-medium">File Name</th>
+              <th className="px-5 py-3 font-medium">Imported By</th>
+              <th className="px-5 py-3 font-medium">Total Rows</th>
+              <th className="px-5 py-3 font-medium">Status</th>
+              <th className="px-5 py-3 font-medium text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border">
+            {loading ? (
+              <tr><td colSpan={6} className="text-center py-6 text-muted-foreground">Loading...</td></tr>
+            ) : logs.length === 0 ? (
+              <tr><td colSpan={6} className="text-center py-6 text-muted-foreground">No import history found.</td></tr>
+            ) : (
+              logs.map(log => {
+                const canUndo = (log.status === 'Success' || log.status === 'Partial') && log.metadata?.created_item_ids?.length > 0;
+                return (
+                  <tr key={log.id} className="hover:bg-muted/10">
+                    <td className="px-5 py-3 text-muted-foreground">{format(new Date(log.created_at), 'MMM dd, yyyy HH:mm')}</td>
+                    <td className="px-5 py-3 font-medium">{log.file_name}</td>
+                    <td className="px-5 py-3">{log.imported_by}</td>
+                    <td className="px-5 py-3">{log.total_rows}</td>
+                    <td className="px-5 py-3">
+                      <span className={cn('px-2 py-1 rounded-full text-[10px] font-semibold tracking-wide',
+                        log.status === 'Success' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400'
+                        : log.status === 'Rolled Back' ? 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400'
+                        : log.status === 'Partial' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-500/20 dark:text-yellow-400'
+                        : 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400'
+                      )}>
+                        {log.status}
+                      </span>
+                    </td>
+                    <td className="px-5 py-3 text-right">
+                      {canUndo && (
+                        <Button variant="ghost" size="sm" onClick={() => handleUndoClick(log.id)} className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-500/10 h-8 px-2">
+                          <Undo2 className="w-3.5 h-3.5 mr-1" /> Undo
+                        </Button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Undo Confirmation Modal (Shared styling) */}
+      {undoLogId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-background rounded-xl p-6 max-w-md w-full shadow-xl border border-border">
+            <div className="flex items-center gap-3 text-red-600 dark:text-red-400 mb-4">
+              <AlertTriangle className="w-6 h-6" />
+              <h3 className="text-lg font-bold">Undo Bulk Import?</h3>
+            </div>
+            <p className="text-sm text-muted-foreground mb-6">
+              This action will permanently delete the imported items and reverse the associated Opening Stock financial journals. 
+              If any of these items have already been sold or moved, the rollback will be aborted by the system to protect accounting integrity.
+            </p>
+            <div className="flex justify-end gap-3">
+              <Button variant="outline" onClick={() => setUndoLogId(null)} disabled={isUndoing}>Cancel</Button>
+              <Button variant="destructive" onClick={executeUndo} disabled={isUndoing}>
+                {isUndoing ? <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> : null}
+                Yes, Undo Import
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ItemImportExport() {
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+
   return (
     <div className="space-y-6">
-      <ItemImportCard />
+      <ItemImportCard onImportCompleted={() => setRefreshTrigger(v => v + 1)} />
+      <ImportHistoryTable refreshTrigger={refreshTrigger} />
       <PartnerImportExport />
     </div>
   );

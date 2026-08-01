@@ -67,7 +67,11 @@ CREATE OR REPLACE FUNCTION rpc_reverse_gl_journal(
     p_original_journal_id UUID,
     p_reversal_date DATE,
     p_reason TEXT
-) RETURNS UUID AS $$
+) RETURNS UUID 
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
 DECLARE
     v_original "GeneralLedgerJournal"%ROWTYPE;
     v_line "GeneralLedgerLine"%ROWTYPE;
@@ -90,13 +94,13 @@ BEGIN
     ) RETURNING id INTO v_new_journal_id;
 
     -- Flip debits and credits for lines
-    FOR v_line IN SELECT * FROM "GeneralLedgerLine" WHERE journal_id = p_original_journal_id::TEXT
+    FOR v_line IN SELECT * FROM "GeneralLedgerLine" WHERE journal_id = p_original_journal_id
     LOOP
         INSERT INTO "GeneralLedgerLine" (
             company_id, journal_id, account_id, account_code, account_name, account_type,
             debit_amount, credit_amount, description, entity_type, entity_id, due_date
         ) VALUES (
-            p_company_id, v_new_journal_id::TEXT, v_line.account_id, v_line.account_code, v_line.account_name, v_line.account_type,
+            p_company_id, v_new_journal_id, v_line.account_id, v_line.account_code, v_line.account_name, v_line.account_type,
             v_line.credit_amount, v_line.debit_amount, 'Reversal: ' || v_line.description, v_line.entity_type, v_line.entity_id, v_line.due_date
         );
     END LOOP;
@@ -108,7 +112,7 @@ BEGIN
 
     RETURN v_new_journal_id;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
 -- 5. Anti-Tamper Trigger on GeneralLedgerJournal
 CREATE OR REPLACE FUNCTION trg_gl_journal_anti_tamper()

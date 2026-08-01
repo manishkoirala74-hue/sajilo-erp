@@ -5,9 +5,12 @@ const prisma = new PrismaClient();
 
 async function run() {
     try {
-        const sql = fs.readFileSync('094_unified_cancellation_rpc.sql', 'utf8');
+        const file = process.argv[2];
+        if (!file) throw new Error("Please provide a SQL file path");
+        
+        const sql = fs.readFileSync(file, 'utf8');
         await prisma.$executeRawUnsafe(sql);
-        console.log("Migration executed successfully!");
+        console.log(`Migration ${file} executed successfully!`);
     } catch (e) {
         console.error("Migration failed:", e);
     } finally {

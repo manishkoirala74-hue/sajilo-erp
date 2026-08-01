@@ -227,6 +227,74 @@ export async function postOpeningStock(item, settings) {
 export async function resolveDifferenceInTrialBalance(data, settings) { return null; }
 
 
+// ─── BULK OPENING STOCK POSTING ───
+export async function postBulkOpeningStock(items, settings, date, explicitOffsetAccount, explicitInventoryAccount) {
+  if (!items || items.length === 0) return null;
+  
+  const s = settings || await loadSettings();
+  const compId = items[0].company_id || s.company_id || sajilo.getCompanyId();
+  
+  let invAccId = explicitInventoryAccount || s.gl_default_inventory_account_id;
+  if (!invAccId) {
+    const { data: invAcc } = await supabase.from('ChartOfAccount').select('id').eq('account_code', '1130').eq('company_id', compId).maybeSingle();
+    if (invAcc) invAccId = invAcc.id;
+  }
+
+  let equityAccId = explicitOffsetAccount || s.gl_opening_equity_account_id;
+  if (!equityAccId) {
+    const { data: eqAcc } = await supabase.from('ChartOfAccount').select('id').eq('account_type', 'Equity').eq('ledger_type', 'Sub Ledger').eq('company_id', compId).limit(1).maybeSingle();
+    if (eqAcc) equityAccId = eqAcc.id;
+  }
+
+  if (!invAccId || !equityAccId) {
+    console.warn('Skipping bulk opening stock GL posting: Inventory or Opening Equity account mapping missing.');
+    return null;
+  }
+
+  const payloadItems = items.map(it => ({
+    item_id: it.id,
+    quantity: Number(it.quantity_on_hand || 0),
+    rate: Number(it.purchase_price || 0),
+    total_value: Number(it.quantity_on_hand || 0) * Number(it.purchase_price || 0)
+  })).filter(it => it.quantity > 0 && it.rate > 0);
+  
+  if (payloadItems.length === 0) return null;
+
+  try {
+    const user = await sajilo.auth.me();
+    const { data: journal_id, error } = await supabase.rpc('rpc_post_bulk_opening_stock', {
+      p_items: payloadItems,
+      p_inventory_account_id: invAccId,
+      p_offset_account_id: equityAccId,
+      p_date: date || new Date().toISOString().split('T')[0],
+      p_company_id: compId,
+      p_user_id: user?.id || null
+    });
+    
+    if (error) throw error;
+    return journal_id;
+  } catch (error) {
+    handleDBError(error);
+  }
+}
+
+export async function rollbackBulkImport(logId) {
+  try {
+    const user = await sajilo.auth.me();
+    const { error } = await supabase.rpc('rpc_rollback_bulk_import', {
+      p_log_id: logId,
+      p_user_id: user?.id || null
+    });
+    
+    if (error) throw error;
+    toast.success('Import rolled back successfully.');
+    return true;
+  } catch (error) {
+    toast.error('Rollback Failed: ' + (error.message || 'Unknown error'));
+    throw error;
+  }
+}
+
 // ─── 1. POS SALE (For backwards compatibility if POS is used) ───
 export async function postPOSSale(saleData, itemsMap, settings, isReversal = false) {
   const sale = { ...saleData, company_id: saleData.company_id || sajilo.getCompanyId() };
