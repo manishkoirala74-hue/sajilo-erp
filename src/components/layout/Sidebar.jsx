@@ -94,6 +94,17 @@ export const buildNavGroups = (settings) => {
     });
   }
 
+  if (s.enable_construction_module) {
+    groups.push({
+      label: 'CONSTRUCTION',
+      items: [
+        { icon: Building2, label: 'Projects', path: '/construction/projects' },
+        { icon: Truck, label: 'Delivery Challans', path: '/construction/delivery-challans' },
+        { icon: Receipt, label: 'Consolidated Billing', path: '/construction/consolidated-billing' },
+      ]
+    });
+  }
+
   groups.push({
     label: 'SYSTEM & ANALYTICS',
     items: [

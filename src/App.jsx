@@ -107,6 +107,11 @@ import ManufacturingOrders from '@/pages/manufacturing/ManufacturingOrders';
 // Services
 import ServiceContracts from '@/pages/services/ServiceContracts';
 
+// Construction
+import ProjectMaster from '@/pages/construction/ProjectMaster';
+import DeliveryChallans from '@/pages/construction/DeliveryChallans';
+import ConsolidatedBilling from '@/pages/construction/ConsolidatedBilling';
+
 // Auth pages
 import Login from '@/pages/Login';
 import Register from '@/pages/Register';
@@ -260,6 +265,11 @@ const AuthenticatedApp = () => {
 
           {/* Services */}
           <Route path="/services/contracts" element={<ServiceContracts />} />
+
+          {/* Construction */}
+          <Route path="/construction/projects" element={<ProjectMaster />} />
+          <Route path="/construction/delivery-challans" element={<DeliveryChallans />} />
+          <Route path="/construction/consolidated-billing" element={<ConsolidatedBilling />} />
         </Route>
       </Route>
 

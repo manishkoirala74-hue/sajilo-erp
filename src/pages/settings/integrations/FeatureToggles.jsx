@@ -49,8 +49,8 @@ const FeatureToggles = () => {
         <ToggleRow label="Stock Assembly" desc="Ad-Hoc assembly and production builds" checked={draftSettings.enable_stock_assembly !== false} onChange={v => updateDraftSettings({ enable_stock_assembly: v })} />
         <ToggleRow label="Manufacturing Module" desc="Production orders and BOM" checked={draftSettings.enable_manufacturing_module} onChange={v => updateDraftSettings({ enable_manufacturing_module: v })} />
         <ToggleRow label="HR & Payroll Module" desc="Employees, leave, and payroll" checked={draftSettings.enable_hr_module} onChange={v => updateDraftSettings({ enable_hr_module: v })} />
-        <ToggleRow label="Fixed Assets Module" desc="Asset register and depreciation" checked={draftSettings.enable_assets_module} onChange={v => updateDraftSettings({ enable_assets_module: v })} />
         <ToggleRow label="Services Module" desc="Service contracts and recurring billing" checked={draftSettings.enable_services_module} onChange={v => updateDraftSettings({ enable_services_module: v })} />
+        <ToggleRow label="Construction Management" desc="Construction projects, materials delivery, and billing" checked={draftSettings.enable_construction_module} onChange={v => updateDraftSettings({ enable_construction_module: v })} />
         <ToggleRow label="Bill-wise Entry" desc="Track partial and full payments against specific customer or supplier invoices during Receipt/Payment" checked={draftSettings.enable_bill_wise_entry !== false} onChange={v => updateDraftSettings({ enable_bill_wise_entry: v })} />
         <ToggleRow label="Trading History" desc="Allow display of transaction history while making purchase/sales transactions" checked={draftSettings.show_recent_trading_history} onChange={v => updateDraftSettings({ show_recent_trading_history: v })} />
       </div>

@@ -74,31 +74,51 @@ export default function GrossProfitMarginReport() {
           if (l.transaction_type === 'SalesInvoice' || l.transaction_type === 'POSSale') {
             const itemObj = itemsMap.get(l.item_id);
             if (itemObj) {
-              const qty = Math.abs(l.quantity_out || 0);
-              if (qty === 0) return;
+              const qtyOut = Math.abs(l.quantity_out || 0);
+              const qtyIn = Math.abs(l.quantity_in || 0);
+              
+              if (qtyOut === 0 && qtyIn === 0) return;
 
               // Use new strict columns with fallbacks for legacy data
               const rev = Number(l.net_amount || l.total_amount || 0);
               const wac = Number(l.wac_at_post || itemObj.weighted_average_cost || itemObj.purchase_price || 0);
-              const cogsVal = qty * wac;
               
-              itemObj.qtySold += qty;
-              itemObj.revenue += rev;
-              itemObj.cogs += cogsVal;
+              if (qtyOut > 0) {
+                itemObj.qtySold += qtyOut;
+                itemObj.revenue += rev;
+                itemObj.cogs += qtyOut * wac;
+              }
+              
+              // Handle cancellation reversals
+              if (qtyIn > 0) {
+                itemObj.qtySold -= qtyIn;
+                itemObj.revenue -= rev;
+                itemObj.cogs -= qtyIn * wac;
+              }
             }
           } else if (l.transaction_type === 'SalesReturn') {
             const itemObj = itemsMap.get(l.item_id);
             if (itemObj) {
-              const qty = Math.abs(l.quantity_in || 0);
-              if (qty === 0) return;
+              const qtyIn = Math.abs(l.quantity_in || 0);
+              const qtyOut = Math.abs(l.quantity_out || 0);
+              
+              if (qtyIn === 0 && qtyOut === 0) return;
 
               const rev = Number(l.net_amount || l.total_amount || 0);
               const wac = Number(l.wac_at_post || itemObj.weighted_average_cost || itemObj.purchase_price || 0);
-              const cogsVal = qty * wac;
               
-              itemObj.qtySold -= qty;
-              itemObj.revenue -= rev;
-              itemObj.cogs -= cogsVal;
+              if (qtyIn > 0) {
+                itemObj.qtySold -= qtyIn;
+                itemObj.revenue -= rev;
+                itemObj.cogs -= qtyIn * wac;
+              }
+              
+              // Handle cancellation reversals
+              if (qtyOut > 0) {
+                itemObj.qtySold += qtyOut;
+                itemObj.revenue += rev;
+                itemObj.cogs += qtyOut * wac;
+              }
             }
           }
         }
