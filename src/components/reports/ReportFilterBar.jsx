@@ -33,8 +33,7 @@ export function BSDatePicker({ label, adValue, onChange }) {
     if (bs) { setYear(bs.year); setMonth(bs.month); setDay(bs.day); }
   }, [adValue]);
 
-  // Max days for the currently-selected year+month
-  const maxDays = (() => {
+  const getTargetMonthMaxDays = (y, m) => {
     const BS_CALENDAR_MAP = [
       { year: 2078, months: [31,32,31,32,31,30,31,30,29,30,29,30] },
       { year: 2079, months: [31,32,31,32,31,30,31,30,29,30,29,31] },
@@ -45,11 +44,12 @@ export function BSDatePicker({ label, adValue, onChange }) {
       { year: 2084, months: [31,32,31,32,31,30,30,30,30,29,30,30] },
       { year: 2085, months: [31,32,31,32,31,31,29,30,30,29,30,30] },
     ];
-    const row = BS_CALENDAR_MAP.find(r => r.year === year);
-    return row ? row.months[month - 1] : 32;
-  })();
+    const row = BS_CALENDAR_MAP.find(r => r.year === y);
+    return row ? row.months[m - 1] : 32;
+  };
 
   const commit = (y, m, d) => {
+    const maxDays = getTargetMonthMaxDays(y, m);
     const clampedDay = Math.min(d, maxDays);
     if (!isValidBSDate(y, m, clampedDay)) { setError('Invalid B.S. date'); return; }
     const ad = bsToAD(y, m, clampedDay);
@@ -95,7 +95,7 @@ export function BSDatePicker({ label, adValue, onChange }) {
       <div className="flex items-center gap-1">
         {/* Day */}
         <input
-          type="number" min={1} max={maxDays} value={day}
+          type="number" min={1} max={getTargetMonthMaxDays(year, month)} value={day}
           onChange={e => { const d = Number(e.target.value); setDay(d); commit(year, month, d); }}
           className="w-14 h-8 rounded-md border border-input bg-card px-2 text-xs text-center focus:outline-none focus:ring-1 focus:ring-ring tabular-nums"
           placeholder="DD"
