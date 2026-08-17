@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { sajilo } from '@/api/sajiloClient';
+import { sajilo, supabase } from '@/api/sajiloClient';
 import { createSubLedger } from '@/lib/accountFactory';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -62,31 +62,36 @@ export default function TaxSettings() {
     setSaving(true);
 
     try {
+      const companyId = sajilo.getCompanyId();
       let glAccountId   = form.gl_account_id   || null;
       let glAccountName = form.gl_account_name || '';
+      let ledgerPayload = null;
 
-      // Auto-create a GL Sub Ledger if the user toggled the option
-      if (form._create_ledger && form._parent_group_id) {
+      // Prepare ledger payload if auto-creating
+      if (form._create_ledger && form._parent_group_id && !form.id) {
         const parent = groupAccounts.find(g => g.id === form._parent_group_id);
         if (!parent) throw new Error('Parent group not found');
 
-        const newAcc = await createSubLedger({
-          name: form.tax_name,
-          parentGroupId: parent.id,
-          parentGroupName: parent.account_name,
-          accountType: 'Liability',
-          accountSubtype: 'Current Liability',
-          openingBalance: 0,
+        ledgerPayload = {
+          company_id: companyId,
+          account_name: form.tax_name,
+          parent_account_id: parent.id,
+          parent_account_name: parent.account_name,
+          account_type: 'Liability',
+          account_subtype: 'Current Liability',
+          normal_balance: 'Credit',
+          statement_type: 'balance_sheet',
+          statement_group: 'Liabilities',
+          current_balance: 0,
           description: `Auto-created tax payable ledger for ${form.tax_name}`
-        });
-        glAccountId   = newAcc.id;
-        glAccountName = newAcc.account_name;
+        };
       } else if (form.gl_account_id) {
         const acc = subAccounts.find(a => a.id === form.gl_account_id);
         glAccountName = acc?.account_name || form.gl_account_name || '';
       }
 
       const payload = {
+        company_id:    companyId,
         tax_name:      form.tax_name.trim(),
         tax_code:      form.tax_code.trim() || null,
         tax_rate:      parseFloat(form.tax_rate),
@@ -102,10 +107,23 @@ export default function TaxSettings() {
       };
 
       if (form.id) {
+        // Update existing
         await sajilo.entities.TaxType.update(form.id, payload);
         toast.success('Tax type updated');
       } else {
-        await sajilo.entities.TaxType.create(payload);
+        // Create new (with or without ledger, atomically via RPC)
+        const { data, error } = await supabase.rpc('create_tax_with_ledger', {
+          p_tax_payload: payload,
+          p_ledger_payload: ledgerPayload
+        });
+        
+        if (error) {
+          // If it's the specific type mismatch error, provide a cleaner message
+          if (error.message?.includes('violates row-level security policy')) {
+             throw new Error('Access Denied or Schema Error (RLS Check Failed)');
+          }
+          throw error;
+        }
         toast.success('Tax type created');
       }
 

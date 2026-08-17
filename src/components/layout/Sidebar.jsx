@@ -11,6 +11,7 @@ import {
 import { cn } from '@/lib/utils';
 import { sajilo } from '@/api/sajiloClient';
 import { usePermissions, useAuth } from '@/lib/AuthContext';
+import { ADMIN_ROLES } from '@/lib/rbac';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useModalStore } from '@/store/modalStore';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
@@ -216,7 +217,7 @@ export default function Sidebar({ collapsed, onToggle }) {
 
   // Filter groups
   const filteredGroups = useMemo(() => {
-    const isAdmin = user?.role === 'admin';
+    const isAdmin = ADMIN_ROLES.includes(user?.role);
     
     return navGroups.map(group => {
       let items = group.items.map(item => {

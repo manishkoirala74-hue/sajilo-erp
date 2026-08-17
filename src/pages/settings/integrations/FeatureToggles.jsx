@@ -23,10 +23,14 @@ const FeatureToggles = () => {
 
   const handleSave = async () => {
     try {
-      if (draftSettings.id) {
-        await sajilo.entities.CompanySettings.update(draftSettings.id, draftSettings);
-      }
-      setServerSettings({ ...draftSettings });
+      const currentCompanyId = sajilo.getCompanyId();
+      const updatedSettings = await sajilo.entities.CompanySettings.upsert(
+        { ...draftSettings, company_id: currentCompanyId },
+        { onConflict: 'company_id' }
+      );
+      
+      // Instantly sync the global UI state so Sidebar re-renders without refresh
+      setServerSettings(updatedSettings || { ...draftSettings, company_id: currentCompanyId });
       toast.success("Feature toggles saved successfully");
     } catch (e) {
       console.error(e);

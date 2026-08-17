@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { sajilo } from '@/api/sajiloClient';
 import { Plus, Calendar, Unlock, CheckCircle2, Circle, KeyRound, ShieldAlert } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -12,11 +13,19 @@ import DateInput from '@/components/shared/DateInput';
 import { useAuth } from '@/lib/AuthContext';
 
 export default function FiscalYearSettings() {
-  const { refreshGlobalSettings } = useAuth();
-  const [fiscalYears, setFiscalYears] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const currentCompanyId = sajilo.getCompanyId();
+
+  const { data: fiscalYears = [], isLoading, isError, refetch } = useQuery({
+    queryKey: ['fiscalYears', currentCompanyId],
+    queryFn: async () => {
+      const data = await sajilo.entities.FiscalYear.list('-start_date');
+      return data || [];
+    },
+    enabled: !!currentCompanyId,
+  });
+
   const [showForm, setShowForm] = useState(false);
-  const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
     fiscal_year_name: '',
     start_date: '',
@@ -27,21 +36,26 @@ export default function FiscalYearSettings() {
   const [reopenDialog, setReopenDialog] = useState(null);
   const [reopenReason, setReopenReason] = useState('');
 
-  const fetchFiscalYears = async () => {
-    try {
-      const data = await sajilo.entities.FiscalYear.list('-start_date');
-      setFiscalYears(data);
-    } catch (e) {
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      if (form.status === 'OPEN') {
+        const openOnes = fiscalYears.filter(f => f.status === 'OPEN');
+        for (const f of openOnes) {
+          await sajilo.entities.FiscalYear.update(f.id, { status: 'SOFT_CLOSED' });
+        }
+      }
+      return await sajilo.entities.FiscalYear.create(form);
+    },
+    onSuccess: () => {
+      toast.success('Fiscal Year created successfully');
+      setShowForm(false);
+      queryClient.invalidateQueries({ queryKey: ['fiscalYears', currentCompanyId] });
+    },
+    onError: (e) => {
       console.error(e);
-      toast.error('Failed to load Fiscal Years');
-    } finally {
-      setLoading(false);
+      toast.error('Failed to create Fiscal Year');
     }
-  };
-
-  useEffect(() => {
-    fetchFiscalYears();
-  }, []);
+  });
 
   const handleSave = async () => {
     if (!form.fiscal_year_name || !form.start_date || !form.end_date) {
@@ -52,67 +66,65 @@ export default function FiscalYearSettings() {
       toast.error('End date must be after start date');
       return;
     }
-
-    setSaving(true);
-    try {
-      if (form.status === 'OPEN') {
-        // Only one can be open, soft_close others
-        const openOnes = fiscalYears.filter(f => f.status === 'OPEN');
-        for (const f of openOnes) {
-          await sajilo.entities.FiscalYear.update(f.id, { status: 'SOFT_CLOSED' });
-        }
-      }
-      await sajilo.entities.FiscalYear.create(form);
-      toast.success('Fiscal Year created successfully');
-      setShowForm(false);
-      await fetchFiscalYears();
-      await refreshGlobalSettings();
-    } catch (e) {
-      console.error(e);
-      toast.error('Failed to create Fiscal Year');
-    } finally {
-      setSaving(false);
-    }
+    saveMutation.mutate();
   };
 
-  const handleReopen = async () => {
+  const reopenMutation = useMutation({
+    mutationFn: async () => {
+      await sajilo.auth.supabase.rpc('reopen_fiscal_year', {
+        p_company_id: currentCompanyId,
+        p_fy_id: reopenDialog.id,
+        p_reason: reopenReason
+      });
+      return await sajilo.entities.FiscalYear.update(reopenDialog.id, { status: 'SOFT_CLOSED' });
+    },
+    onSuccess: () => {
+      toast.success('Fiscal year unlocked to SOFT_CLOSED state.');
+      setReopenDialog(null);
+      setReopenReason('');
+      queryClient.invalidateQueries({ queryKey: ['fiscalYears', currentCompanyId] });
+    },
+    onError: (e) => {
+      console.error(e);
+      toast.error('Failed to reopen fiscal year.');
+    }
+  });
+
+  const handleReopen = () => {
     if (!reopenReason.trim()) {
       toast.error('Re-opening requires a justification reason.');
       return;
     }
-    try {
-      await sajilo.auth.supabase.rpc('reopen_fiscal_year', {
-        p_company_id: sajilo.getCompanyId(),
-        p_fy_id: reopenDialog.id,
-        p_reason: reopenReason
-      });
-      // The RPC might still set is_locked=false, but we also update status
-      await sajilo.entities.FiscalYear.update(reopenDialog.id, { status: 'SOFT_CLOSED' });
-      toast.success('Fiscal year unlocked to SOFT_CLOSED state.');
-      setReopenDialog(null);
-      setReopenReason('');
-      await fetchFiscalYears();
-      await refreshGlobalSettings();
-    } catch (e) {
-      console.error(e);
-      toast.error('Failed to reopen fiscal year.');
-    }
+    reopenMutation.mutate();
   };
 
-  const handleFinalize = async (fy) => {
+  const finalizeMutation = useMutation({
+    mutationFn: async (fy) => {
+      return await sajilo.entities.FiscalYear.update(fy.id, { status: 'HARD_CLOSED' });
+    },
+    onSuccess: () => {
+      toast.success('Fiscal year HARD_CLOSED permanently.');
+      queryClient.invalidateQueries({ queryKey: ['fiscalYears', currentCompanyId] });
+    },
+    onError: () => {
+      toast.error('Failed to finalize fiscal year.');
+    }
+  });
+
+  const handleFinalize = (fy) => {
     if (!window.confirm('WARNING: Finalizing this year to HARD_CLOSED will permanently lock all adjusting entries for the Inland Revenue Department. It cannot be reopened. Proceed?')) {
       return;
     }
-    try {
-      await sajilo.entities.FiscalYear.update(fy.id, { status: 'HARD_CLOSED' });
-      toast.success('Fiscal year HARD_CLOSED permanently.');
-      await fetchFiscalYears();
-    } catch (e) {
-      toast.error('Failed to finalize fiscal year.');
-    }
+    finalizeMutation.mutate(fy);
   };
 
-  if (loading) return <div className="p-8 text-center text-sm text-muted-foreground">Loading Fiscal Years...</div>;
+  if (isLoading) return <div className="p-8 text-center text-sm text-muted-foreground">Loading Fiscal Years...</div>;
+  if (isError) return (
+    <div className="p-8 text-center text-sm text-red-600 flex flex-col items-center gap-2">
+      Failed to load Fiscal Years.
+      <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+    </div>
+  );
 
   return (
     <div className="bg-card border border-border rounded-xl overflow-hidden">
@@ -252,7 +264,9 @@ export default function FiscalYearSettings() {
           </div>
           <div className="flex justify-end gap-3 mt-6">
             <Button variant="outline" onClick={() => setShowForm(false)}>Cancel</Button>
-            <Button onClick={handleSave} disabled={saving}>{saving ? 'Saving...' : 'Create'}</Button>
+            <Button variant="default" className="w-full" onClick={handleSave} disabled={saveMutation.isPending}>
+              {saveMutation.isPending ? 'Creating...' : 'Create Period'}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
@@ -279,7 +293,9 @@ export default function FiscalYearSettings() {
           </div>
           <DialogFooter className="mt-6">
             <Button variant="outline" onClick={() => setReopenDialog(null)}>Cancel</Button>
-            <Button variant="destructive" onClick={handleReopen}>Re-Open Period</Button>
+            <Button variant="default" onClick={handleReopen} disabled={reopenMutation.isPending}>
+              {reopenMutation.isPending ? 'Processing...' : 'Confirm Unlock'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

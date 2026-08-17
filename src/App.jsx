@@ -330,21 +330,21 @@ function App() {
 
   return (
     <GlobalErrorBoundary>
-    <GlobalVoucherDrawerProvider>
-      <AuthProvider>
-        <DateFormatProvider>
-          <QueryClientProvider client={queryClientInstance}>
-            <Router>
-              <AuthenticatedApp />
-              <GlobalVoucherDrawer />
-              <ModalRegistry />
-            </Router>
-            <Toaster />
-            <SonnerToaster position="top-right" richColors />
-          </QueryClientProvider>
-        </DateFormatProvider>
-      </AuthProvider>
-    </GlobalVoucherDrawerProvider>
+      <QueryClientProvider client={queryClientInstance}>
+        <GlobalVoucherDrawerProvider>
+          <AuthProvider>
+            <DateFormatProvider>
+              <Router>
+                <AuthenticatedApp />
+                <GlobalVoucherDrawer />
+                <ModalRegistry />
+              </Router>
+              <Toaster />
+              <SonnerToaster position="top-right" richColors />
+            </DateFormatProvider>
+          </AuthProvider>
+        </GlobalVoucherDrawerProvider>
+      </QueryClientProvider>
     </GlobalErrorBoundary>
   );
 }

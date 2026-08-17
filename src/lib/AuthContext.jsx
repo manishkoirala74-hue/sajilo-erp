@@ -1,5 +1,6 @@
 import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { sajilo } from '../api/sajiloClient';
 
 const AuthContext = createContext();
@@ -23,9 +24,18 @@ export const AuthProvider = ({ children }) => {
   const fetchPermissions = async (currentUser, companyId) => {
     try {
       let roleId = currentUser.global_role_id;
+      let isTenantAdmin = false;
       if (currentUser.company_scope !== 'ALL') {
         const ucList = await sajilo.entities.UserCompany.filter({ user_id: currentUser.id, company_id: companyId });
-        if (ucList.length > 0) roleId = ucList[0].company_role_id;
+        if (ucList.length > 0) {
+          roleId = ucList[0].company_role_id;
+          isTenantAdmin = ucList[0].is_tenant_admin;
+        }
+      }
+      
+      // Inject admin role into user session if they are a tenant admin
+      if (isTenantAdmin && currentUser.role !== 'admin') {
+        setUser(prev => ({ ...prev, role: 'admin' }));
       }
       
       if (roleId) {
@@ -50,24 +60,37 @@ export const AuthProvider = ({ children }) => {
   const [globalSettings, setGlobalSettings] = useState(null);
   const [mainGodownId, setMainGodownId] = useState(null);
   const [activeGodowns, setActiveGodowns] = useState([]);
-  const [activeFiscalYear, setActiveFiscalYear] = useState(null);
-  const [fiscalYears, setFiscalYears] = useState([]);
+
+  // Fetch Fiscal Years using React Query for global Topbar reactivity
+  const currentCompanyId = activeCompany?.id || sajilo.getCompanyId();
+  const { data: fiscalYears = [], isError: fyIsError, error: fyError, isLoading: fyIsLoading } = useQuery({
+    queryKey: ['fiscalYears', currentCompanyId],
+    queryFn: async () => {
+      const { data, error } = await sajilo.auth.supabase
+        .from('FiscalYear')
+        .select('*')
+        .eq('company_id', currentCompanyId)
+        .order('start_date', { ascending: false });
+        
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!currentCompanyId,
+    staleTime: 1000 * 60 * 10
+  });
+
+  const activeFiscalYear = fiscalYears.find(fy => fy.status === 'OPEN' || fy.is_active === true || fy.is_active === 'true' || fy.is_active === 1) || null;
 
   const fetchGlobalSettings = async (companyId) => {
     try {
-      const [settList, godownList, fyList] = await Promise.all([
+      const [settList, godownList] = await Promise.all([
         sajilo.entities.CompanySettings.filter({ company_id: companyId }),
-        sajilo.entities.Godown.filter({ company_id: companyId, status: 'Active' }),
-        sajilo.entities.FiscalYear.filter({ company_id: companyId })
+        sajilo.entities.Godown.filter({ company_id: companyId, status: 'Active' })
       ]);
       setGlobalSettings(settList.length > 0 ? settList[0] : null);
       setActiveGodowns(godownList || []);
       const mainGodown = (godownList || []).find(g => g.is_main === true);
       setMainGodownId(mainGodown ? mainGodown.id : null);
-      
-      setFiscalYears(fyList || []);
-      const activeFy = (fyList || []).find(fy => fy.is_active === true || fy.is_active === 'true' || fy.is_active === 1);
-      setActiveFiscalYear(activeFy || null);
     } catch (e) {
       console.error("Failed to fetch global settings:", e);
     }
@@ -86,13 +109,11 @@ export const AuthProvider = ({ children }) => {
       }
     }
 
-    try {
-      await sajilo.prefetchCompanyData();
-    } catch (e) {
-      console.error('Prefetch failed:', e);
-    } finally {
-      setIsSwitchingCompany(false);
-    }
+    // 2. Unblock the UI IMMEDIATELY
+    setIsSwitchingCompany(false);
+    
+    // 3. Fire-and-Forget Domain Data (Notice the missing 'await')
+    sajilo.prefetchDomainData(companyId);
   };
 
   // Expose a method to force refresh settings (useful after toggling feature flags)
@@ -160,7 +181,18 @@ export const AuthProvider = ({ children }) => {
       await sajilo.entities.UserCompany.create({
         user_id: user.id,
         company_id: newCompany.id,
-        is_default: true
+        is_default: true,
+        is_tenant_admin: true
+      });
+
+      // 3. Seed default Fiscal Year for new company (Bikram Sambat bounds)
+      const currentYear = new Date().getFullYear();
+      await sajilo.entities.FiscalYear.create({
+        company_id: newCompany.id,
+        fiscal_year_name: `FY-${currentYear}/${currentYear + 1}`,
+        start_date: `${currentYear}-04-01`,
+        end_date: `${currentYear + 1}-03-31`,
+        is_active: true
       });
 
       // 3. Re-sync memory collection vectors and shift context automatically
@@ -314,6 +346,9 @@ export const AuthProvider = ({ children }) => {
       activeGodowns,
       activeFiscalYear,
       fiscalYears,
+      fyIsError,
+      fyError,
+      fyIsLoading,
       refreshGlobalSettings
     }}>
       {children}

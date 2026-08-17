@@ -1,12 +1,13 @@
 import { useState } from 'react';
-import { Outlet, useLocation } from 'react-router-dom';
+import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
 import Sidebar from './Sidebar';
 import Topbar from './Topbar';
 import BottomNavigation from './BottomNavigation';
 import MobileActionSheet from './MobileActionSheet';
 import MobileMenuDrawer from './MobileMenuDrawer';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, ArrowRight } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 const pageTitles = {
   '/': 'Dashboard',
@@ -42,7 +43,8 @@ export default function ERPLayout() {
   const [isMobileFabOpen, setIsMobileFabOpen] = useState(false);
   const location = useLocation();
   const title = pageTitles[location.pathname] || 'Sajilo ERP';
-  const { activeFiscalYear, activeCompany } = useAuth();
+  const navigate = useNavigate();
+  const { activeFiscalYear, activeCompany, fiscalYears, fyIsError, fyError, fyIsLoading, user } = useAuth();
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
@@ -51,11 +53,21 @@ export default function ERPLayout() {
         <Topbar pageTitle={title} onMenuClick={() => setIsMobileMenuOpen(true)} />
         
         {activeCompany && !activeFiscalYear && (
-          <div className="bg-destructive/15 border-b border-destructive/20 px-4 py-2 flex items-center gap-3">
-            <AlertCircle className="w-5 h-5 text-destructive" />
-            <p className="text-sm font-medium text-destructive">
-              Action Required: No Fiscal Year is configured for this company. Financial transactions are currently locked.
-            </p>
+          <div className="bg-destructive/10 border-b border-destructive/20 px-4 py-3 flex flex-col md:flex-row md:items-center justify-between gap-3 overflow-hidden">
+            <div className="flex items-center gap-3">
+              <AlertCircle className="w-5 h-5 text-destructive shrink-0" />
+              <p className="text-sm font-medium text-destructive">
+                To begin recording financial transactions, please configure an active Fiscal Year.
+              </p>
+            </div>
+            <Button 
+              variant="destructive" 
+              size="sm" 
+              className="shrink-0"
+              onClick={() => navigate('/app/settings/finance/fiscal-year')}
+            >
+              Configure Fiscal Year <ArrowRight className="w-4 h-4 ml-2" />
+            </Button>
           </div>
         )}
 

@@ -94,8 +94,11 @@ const buildDefaultPerms = (level) => {
   return perms;
 };
 
+const baseAdminProfile = { label: 'Tenant Admin', color: 'bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-400 border-purple-200 dark:border-purple-500/20', perms: buildDefaultPerms('full') };
+
 const ROLE_PRESETS = {
-  admin: { label: 'Tenant Admin', color: 'bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-400 border-purple-200 dark:border-purple-500/20', perms: buildDefaultPerms('full') },
+  admin: baseAdminProfile,
+  tenant_admin: baseAdminProfile,
   manager: {
     label: 'Manager', color: 'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-500/20',
     perms: { ...buildDefaultPerms('edit'), settings: 'none', chart_of_accounts: 'view', payroll: 'view' }

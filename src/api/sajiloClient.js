@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { queryClientInstance } from '@/lib/query-client';
 
 const supabaseUrl = import.meta.env.VITE_SAJILO_APP_BASE_URL;
 const supabaseKey = import.meta.env.VITE_SAJILO_APP_ID;
@@ -240,6 +241,24 @@ const buildEntityMethods = (tableName) => {
       return data;
     },
     
+    upsert: async (obj, options = {}) => {
+      const sanitized = sanitizePayload(obj);
+      await validateFiscalYear(tableName, sanitized);
+      const objWithCompany = injectCompanyId(sanitized);
+      
+      const { onConflict } = options;
+      
+      let query = supabase.from(tableName).upsert(objWithCompany, {
+        onConflict: onConflict || 'id',
+        ignoreDuplicates: false
+      });
+      
+      const { data, error } = await query.select().single();
+      if (error) handleSupabaseError(error);
+      invalidateCache(tableName);
+      return data;
+    },
+    
     bulkCreate: async (arr) => {
       const sanitizedArr = sanitizePayload(arr);
       if (sanitizedArr.length > 0) await validateFiscalYear(tableName, sanitizedArr[0]); // Best effort for bulk
@@ -279,19 +298,56 @@ export const sajilo = {
     sajilo.clearCache();
     return data;
   },
-  prefetchCompanyData: async () => {
-    // Fire off exact queries used by dashboards so cache hits perfectly
-    const promises = [
-      sajilo.entities.ChartOfAccount.list('account_code'),
-      sajilo.entities.ChartOfAccount.filter({ ledger_type: 'Sub Ledger', is_active: true }, 'account_name', 300),
-      sajilo.entities.ChartOfAccount.filter({ ledger_type: 'Group Ledger', is_active: true }, 'account_code', 300),
-      sajilo.entities.BusinessPartner.filter({ is_customer: true }, '-created_at'),
-      sajilo.entities.BusinessPartner.filter({ is_vendor: true }, '-created_at'),
-      sajilo.entities.Item.list('-created_at'),
-      sajilo.entities.CompanySettings.list(),
-      sajilo.entities.FinancialVoucher.list('-created_at', 500)
-    ];
-    await Promise.allSettled(promises);
+  prefetchDomainData: async (companyId) => {
+    try {
+      // Fire off exact queries used by dashboards so cache hits perfectly
+      // Master Data (Changes rarely) - 10 minute stale time
+      queryClientInstance.prefetchQuery({
+        queryKey: ['chartOfAccounts', companyId],
+        queryFn: () => sajilo.entities.ChartOfAccount.list('account_code'),
+        staleTime: 1000 * 60 * 10,
+      });
+      queryClientInstance.prefetchQuery({
+        queryKey: ['chartOfAccountsSub', companyId],
+        queryFn: () => sajilo.entities.ChartOfAccount.filter({ ledger_type: 'Sub Ledger', is_active: true }, 'account_name', 300),
+        staleTime: 1000 * 60 * 10,
+      });
+      queryClientInstance.prefetchQuery({
+        queryKey: ['chartOfAccountsGroup', companyId],
+        queryFn: () => sajilo.entities.ChartOfAccount.filter({ ledger_type: 'Group Ledger', is_active: true }, 'account_code', 300),
+        staleTime: 1000 * 60 * 10,
+      });
+      queryClientInstance.prefetchQuery({
+        queryKey: ['customers', companyId],
+        queryFn: () => sajilo.entities.BusinessPartner.filter({ is_customer: true }, '-created_at'),
+        staleTime: 1000 * 60 * 10,
+      });
+      queryClientInstance.prefetchQuery({
+        queryKey: ['vendors', companyId],
+        queryFn: () => sajilo.entities.BusinessPartner.filter({ is_vendor: true }, '-created_at'),
+        staleTime: 1000 * 60 * 10,
+      });
+      queryClientInstance.prefetchQuery({
+        queryKey: ['items', companyId],
+        queryFn: () => sajilo.entities.Item.list('-created_at'),
+        staleTime: 1000 * 60 * 10,
+      });
+      queryClientInstance.prefetchQuery({
+        queryKey: ['companySettings', companyId],
+        queryFn: () => sajilo.entities.CompanySettings.list(),
+        staleTime: 1000 * 60 * 10,
+      });
+
+      // Transactional Data (Changes frequently) - 1 minute stale time
+      queryClientInstance.prefetchQuery({
+        queryKey: ['recentVouchers', companyId],
+        queryFn: () => sajilo.entities.FinancialVoucher.list('-created_at', 500),
+        staleTime: 1000 * 60 * 1,
+      });
+    } catch (error) {
+      // Silently log background sync failures; React Query handles the retry logic
+      console.warn("Background domain data pre-warming delayed:", error);
+    }
   },
   setCompanyId: (id) => {
     if (activeCompanyId !== id) {

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { sajilo } from '@/api/sajiloClient';
 import { AlertTriangle, CheckCircle2, ArrowRight, DatabaseBackup } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -6,26 +7,23 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { toast } from 'sonner';
 
 export default function FiscalYearClosingWizard() {
-  const [fiscalYears, setFiscalYears] = useState([]);
+  const queryClient = useQueryClient();
+  const currentCompanyId = sajilo.getCompanyId();
+  
+  const { data: fiscalYears = [], isLoading: loading } = useQuery({
+    queryKey: ['fiscalYears', currentCompanyId],
+    queryFn: async () => {
+      const data = await sajilo.entities.FiscalYear.list('-start_date');
+      return data || [];
+    },
+    enabled: !!currentCompanyId,
+  });
+
   const [closingYearId, setClosingYearId] = useState('');
   const [targetYearId, setTargetYearId] = useState('');
-  const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
   const [preFlightDrafts, setPreFlightDrafts] = useState(null);
   const [preFlightNegativeStock, setPreFlightNegativeStock] = useState(null);
-
-  const fetchData = async () => {
-    try {
-      const data = await sajilo.entities.FiscalYear.list('-start_date');
-      setFiscalYears(data);
-    } catch (e) {
-      toast.error('Failed to load Fiscal Years');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => { fetchData(); }, []);
 
   const runPreflight = async () => {
     if (!closingYearId) return;

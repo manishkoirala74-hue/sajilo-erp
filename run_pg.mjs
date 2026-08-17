@@ -18,8 +18,15 @@ async function run() {
 
     try {
         await client.connect();
-        await client.query(sql);
+        const res = await client.query(sql);
         console.log(`Migration ${file} executed successfully!`);
+        if (res.length) {
+            res.forEach(r => {
+                if (r.command === 'SELECT') console.dir(r.rows, { depth: null });
+            });
+        } else if (res.command === 'SELECT') {
+            console.dir(res.rows, { depth: null });
+        }
     } catch (e) {
         console.error("Migration failed:", e);
     } finally {
