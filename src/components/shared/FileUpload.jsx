@@ -45,79 +45,81 @@ export default function FileUpload({ companyId, moduleName, recordId, existingAt
     setUploading(true);
     setUploadProgress(0);
 
-    const newAttachments = [...attachments];
+    try {
+      const newAttachments = [...attachments];
 
-    for (let i = 0; i < selectedFiles.length; i++) {
-      let file = selectedFiles[i];
-      const isImage = file.type.startsWith('image/');
-      
-      try {
-        if (isImage) {
-          const options = {
-            maxSizeMB: 2,
-            maxWidthOrHeight: 1920,
-            useWebWorker: true,
-            onProgress: (progress) => {
-              // rough progress for compression
-            }
-          };
-          file = await imageCompression(file, options);
-        }
-
-        const fileName = `${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.\-_]/g, '')}`;
-        const filePath = `${companyId}/${moduleName}/${recordId}/${fileName}`;
-
-        // simulate chunk progress or just show overall progress
-        setUploadProgress(Math.round(((i + 0.5) / selectedFiles.length) * 100));
-
-        const { data, error } = await supabase.storage
-          .from('erp_documents')
-          .upload(filePath, file, {
-            cacheControl: '3600',
-            upsert: false
-          });
-
-        if (error) throw error;
-
-        const attachmentMeta = {
-          company_id: companyId,
-          module_type: moduleName,
-          record_id: recordId,
-          file_path: filePath,
-          file_name: file.name,
-          file_size: file.size,
-          mime_type: file.type
-        };
-
-        const { data: dbData, error: dbError } = await supabase
-          .from('DocumentAttachment')
-          .insert([attachmentMeta])
-          .select()
-          .single();
-
-        if (dbError) {
-          console.error("DB Insert error:", dbError);
-          // Rollback storage upload if DB insert fails
-          await supabase.storage.from('erp_documents').remove([filePath]);
-          throw dbError;
-        }
-
-        newAttachments.push(dbData);
+      for (let i = 0; i < selectedFiles.length; i++) {
+        let file = selectedFiles[i];
         
-        setUploadProgress(Math.round(((i + 1) / selectedFiles.length) * 100));
-      } catch (err) {
-        console.error("Upload error:", err);
-        alert(`Failed to upload ${file.name}: ${err.message}`);
-      }
-    }
+        try {
+          const isImage = file.type ? file.type.startsWith('image/') : false;
+          if (isImage) {
+            const options = {
+              maxSizeMB: 2,
+              maxWidthOrHeight: 1920,
+              useWebWorker: true,
+              onProgress: (progress) => {
+                // rough progress for compression
+              }
+            };
+            file = await imageCompression(file, options);
+          }
 
-    setAttachments(newAttachments);
-    setUploading(false);
-    setUploadProgress(0);
-    if (onChange) onChange(newAttachments);
-    
-    // reset input
-    e.target.value = null;
+          const fileName = `${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.\-_]/g, '')}`;
+          const filePath = `${companyId}/${moduleName}/${recordId}/${fileName}`;
+
+          // simulate chunk progress or just show overall progress
+          setUploadProgress(Math.round(((i + 0.5) / selectedFiles.length) * 100));
+
+          const { data, error } = await supabase.storage
+            .from('erp_documents')
+            .upload(filePath, file, {
+              cacheControl: '3600',
+              upsert: false
+            });
+
+          if (error) throw error;
+
+          const attachmentMeta = {
+            company_id: companyId,
+            module_type: moduleName,
+            record_id: recordId,
+            file_path: filePath,
+            file_name: file.name,
+            file_size: file.size,
+            mime_type: file.type
+          };
+
+          const { data: dbData, error: dbError } = await supabase
+            .from('DocumentAttachment')
+            .insert([attachmentMeta])
+            .select()
+            .single();
+
+          if (dbError) {
+            console.error("DB Insert error:", dbError);
+            // Rollback storage upload if DB insert fails
+            await supabase.storage.from('erp_documents').remove([filePath]);
+            throw dbError;
+          }
+
+          newAttachments.push(dbData);
+          
+          setUploadProgress(Math.round(((i + 1) / selectedFiles.length) * 100));
+        } catch (err) {
+          console.error("Upload error:", err);
+          alert(`Failed to upload ${file.name}: ${err.message}`);
+        }
+      }
+
+      setAttachments(newAttachments);
+      if (onChange) onChange(newAttachments);
+    } finally {
+      setUploading(false);
+      setUploadProgress(0);
+      // reset input
+      e.target.value = null;
+    }
   };
 
   const removeAttachment = async (indexToRemove) => {

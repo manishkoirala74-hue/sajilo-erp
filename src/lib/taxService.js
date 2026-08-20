@@ -20,30 +20,42 @@
  */
 import { sajilo } from '@/api/sajiloClient';
 
-let _cache = null;
-let _cacheTs = 0;
+let _cache = {};
+let _cacheTs = {};
 const CACHE_TTL_MS = 60_000; // 1 minute
 
 // ─── Cache Management ─────────────────────────────────────────────────────────
 
 /**
  * Load all active tax types for the current company, sorted by sort_order.
- * Results are cached for 60 seconds.
+ * Results are cached for 60 seconds per company.
  * @returns {Promise<TaxType[]>}
  */
 export async function loadActiveTaxTypes() {
+  const companyId = sajilo.getCompanyId();
+  if (!companyId) return [];
+
   const now = Date.now();
-  if (_cache && now - _cacheTs < CACHE_TTL_MS) return _cache;
+  if (_cache[companyId] && now - (_cacheTs[companyId] || 0) < CACHE_TTL_MS) {
+    return _cache[companyId];
+  }
+
   const data = await sajilo.entities.TaxType.filter({ is_active: true }, 'sort_order', 50);
-  _cache = (data || []).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
-  _cacheTs = now;
-  return _cache;
+  _cache[companyId] = (data || []).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+  _cacheTs[companyId] = now;
+  return _cache[companyId];
 }
 
 /** Invalidate the cache (call after saving/deleting a TaxType). */
 export function invalidateTaxCache() {
-  _cache = null;
-  _cacheTs = 0;
+  const companyId = sajilo.getCompanyId();
+  if (companyId) {
+    delete _cache[companyId];
+    delete _cacheTs[companyId];
+  } else {
+    _cache = {};
+    _cacheTs = {};
+  }
 }
 
 /**

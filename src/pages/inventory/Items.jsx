@@ -263,14 +263,23 @@ export default function Items() {
     const remaining = imgSettings.max_count - currentCount;
     if (remaining <= 0) { toast.error(`Max ${imgSettings.max_count} images allowed`); return; }
     const toUpload = files.slice(0, remaining);
-    for (const file of toUpload) {
-      if (file.size > imgSettings.max_size_mb * 1024 * 1024) {
-        toast.error(`"${file.name}" exceeds ${imgSettings.max_size_mb}MB limit`); continue;
+    
+    setUploading(true);
+    try {
+      for (const file of toUpload) {
+        if (file.size > imgSettings.max_size_mb * 1024 * 1024) {
+          toast.error(`"${file.name}" exceeds ${imgSettings.max_size_mb}MB limit`); continue;
+        }
+        try {
+          const { file_url } = await sajilo.integrations.Core.UploadFile({ file });
+          setForm(prev => ({ ...prev, image_urls: [...(prev.image_urls || []), file_url], image_url: file_url }));
+        } catch (err) {
+          toast.error(`Failed to upload "${file.name}": ${err.message || 'Unknown error'}`);
+        }
       }
-      setUploading(true);
-      const { file_url } = await sajilo.integrations.Core.UploadFile({ file });
-      setForm(prev => ({ ...prev, image_urls: [...(prev.image_urls || []), file_url], image_url: file_url }));
+    } finally {
       setUploading(false);
+      e.target.value = null;
     }
     if (files.length > remaining) toast.warning(`Only ${remaining} more image(s) allowed — rest skipped`);
   };

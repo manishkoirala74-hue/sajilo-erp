@@ -89,14 +89,21 @@ export default function BankAccountFormModal({ account, onSave, onClose }) {
     const files = Array.from(e.target.files);
     if (!files.length) return;
     setUploading(true);
-    const newUrls = [];
-    for (const file of files) {
-      const { file_url } = await sajilo.integrations.Core.UploadFile({ file });
-      newUrls.push(file_url);
+    try {
+      const newUrls = [];
+      for (const file of files) {
+        try {
+          const { file_url } = await sajilo.integrations.Core.UploadFile({ file });
+          newUrls.push(file_url);
+        } catch (err) {
+          toast.error(`Failed to upload "${file.name}": ${err.message || 'Unknown error'}`);
+        }
+      }
+      setForm(prev => ({ ...prev, document_urls: [...(prev.document_urls || []), ...newUrls] }));
+    } finally {
+      setUploading(false);
+      e.target.value = '';
     }
-    setForm(prev => ({ ...prev, document_urls: [...(prev.document_urls || []), ...newUrls] }));
-    setUploading(false);
-    e.target.value = '';
   };
 
   const removeDocument = (idx) => {

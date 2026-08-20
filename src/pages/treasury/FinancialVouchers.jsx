@@ -24,7 +24,7 @@ import VoucherLink from '@/components/shared/VoucherLink';
 import DateInput from '@/components/shared/DateInput';
 
 const emptyVoucher = {
-  voucher_type: 'Receipt', voucher_date: new Date().toISOString().split('T')[0],
+  voucher_type: '', voucher_date: new Date().toISOString().split('T')[0],
   contact_name: '', payment_mode: 'Cash', reference_no: '', narration: '',
   total_amount: 0, status: 'Draft',
   source_account_id: '', source_account_name: '', source_account_code: '', source_account_type: '',
@@ -85,7 +85,7 @@ export default function FinancialVouchers() {
         });
       }
     } else if (searchParams.get('new') === '1') {
-      (() => { setForm({ ...emptyVoucher, voucher_type: searchParams.get("type") || "Receipt" }); setOpen(true); })();
+      (() => { setForm({ ...emptyVoucher, voucher_type: searchParams.get("type") || "" }); setOpen(true); })();
       searchParams.delete('new');
       setSearchParams(searchParams, { replace: true });
     }
@@ -237,6 +237,7 @@ export default function FinancialVouchers() {
   const save = async (status) => {
     setSaving(true);
     try {
+      if (!form.voucher_type) throw new Error("Please select a Voucher Type.");
       let finalEntries = [];
       const isPaymentTypeLocal = form.voucher_type === 'Payment' || form.voucher_type === 'Receipt' || form.voucher_type === 'Contra';
       
@@ -543,7 +544,7 @@ export default function FinancialVouchers() {
               <div>
                 <Label>Voucher Type *</Label>
                 <Select value={form.voucher_type} onValueChange={v => setForm({ ...emptyVoucher, voucher_type: v, voucher_date: form.voucher_date })}>
-                  <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="mt-1"><SelectValue placeholder="Select Voucher Type" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="Receipt">Receipt (Inflow)</SelectItem>
                     <SelectItem value="Payment">Payment (Outflow)</SelectItem>

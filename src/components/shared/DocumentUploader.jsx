@@ -12,15 +12,24 @@ export default function DocumentUploader({ urls = [], onChange, label = 'Attachm
     const files = Array.from(e.target.files);
     if (!files.length) return;
     setUploading(true);
-    const newUrls = [];
-    for (const file of files) {
-      const { file_url } = await sajilo.integrations.Core.UploadFile({ file });
-      newUrls.push(file_url);
+    try {
+      const newUrls = [];
+      for (const file of files) {
+        try {
+          const { file_url } = await sajilo.integrations.Core.UploadFile({ file });
+          newUrls.push(file_url);
+        } catch (err) {
+          toast.error(`Failed to upload "${file.name}": ${err.message || 'Unknown error'}`);
+        }
+      }
+      onChange([...urls, ...newUrls]);
+      if (newUrls.length > 0) {
+        toast.success(`${newUrls.length} file(s) uploaded`);
+      }
+    } finally {
+      setUploading(false);
+      e.target.value = '';
     }
-    onChange([...urls, ...newUrls]);
-    setUploading(false);
-    toast.success(`${newUrls.length} file(s) uploaded`);
-    e.target.value = '';
   };
 
   const remove = (url) => onChange(urls.filter(u => u !== url));

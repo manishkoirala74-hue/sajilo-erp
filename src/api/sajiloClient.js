@@ -19,11 +19,22 @@ const queryCache = new Map();
 // ── Cross-Tab Synchronization ──
 const syncChannel = new BroadcastChannel('sajilo_sync');
 
+const invalidateReactQuery = (tableName) => {
+  if (tableName === 'Item') queryClientInstance.invalidateQueries({ queryKey: ['items'] });
+  if (tableName === 'BusinessPartner') {
+    queryClientInstance.invalidateQueries({ queryKey: ['customers'] });
+    queryClientInstance.invalidateQueries({ queryKey: ['vendors'] });
+  }
+  if (tableName === 'Godown') queryClientInstance.invalidateQueries({ queryKey: ['godowns'] });
+  if (tableName === 'CompanySettings') queryClientInstance.invalidateQueries({ queryKey: ['settings'] });
+};
+
 // Listen for invalidations from other tabs
 syncChannel.onmessage = (event) => {
   if (event.data && event.data.type === 'INVALIDATE') {
     const { tableName } = event.data;
     internalInvalidate(tableName);
+    invalidateReactQuery(tableName);
     window.dispatchEvent(new CustomEvent('sajilo_invalidate', { detail: tableName }));
   }
 };
@@ -38,6 +49,8 @@ const internalInvalidate = (tableName) => {
 
 const invalidateCache = (tableName) => {
   internalInvalidate(tableName);
+  invalidateReactQuery(tableName);
+  
   // Notify other tabs
   syncChannel.postMessage({ type: 'INVALIDATE', tableName });
   // Notify current tab (in case multiple components in the same tab need it)
