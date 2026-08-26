@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster"
 import { QueryClientProvider } from '@tanstack/react-query'
 import { sajilo } from '@/api/sajiloClient';
 import { queryClientInstance } from '@/lib/query-client'
-import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
+import { createBrowserRouter, RouterProvider, Route, Routes, Navigate } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import { DateFormatProvider } from '@/lib/DateFormatContext';
@@ -334,11 +334,7 @@ function App() {
         <GlobalVoucherDrawerProvider>
           <AuthProvider>
             <DateFormatProvider>
-              <Router>
-                <AuthenticatedApp />
-                <GlobalVoucherDrawer />
-                <ModalRegistry />
-              </Router>
+              <RouterProvider router={createBrowserRouter([{ path: '*', element: <><AuthenticatedApp /><GlobalVoucherDrawer /><ModalRegistry /></> }])} />
               <Toaster />
               <SonnerToaster position="top-right" richColors />
             </DateFormatProvider>
