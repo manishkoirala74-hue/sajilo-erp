@@ -41,11 +41,11 @@ EXCEPTION
             RAISE EXCEPTION 'ERR_DUPLICATE_DOC: This document number is already in use. Please enter a new number.';
         END IF;
 END;
-$BODY LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp;
+$BODY$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp;
 
 -- 2. Purchase Checkout
 CREATE OR REPLACE FUNCTION rpc_checkout_purchase_invoice(p_payload JSONB, p_idempotency_key UUID, p_gl_lines JSONB)
-RETURNS JSONB AS $BODY
+RETURNS JSONB AS $BODY$
 DECLARE
     v_invoice_id UUID;
     v_journal_id UUID;
@@ -79,11 +79,11 @@ EXCEPTION
             RAISE EXCEPTION 'ERR_DUPLICATE_DOC: This document number is already in use. Please enter a new number.';
         END IF;
 END;
-$BODY LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp;
+$BODY$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp;
 
 -- 3. Stock Transfer Checkout
 CREATE OR REPLACE FUNCTION rpc_checkout_stock_transfer(p_payload JSONB, p_idempotency_key UUID)
-RETURNS JSONB AS $BODY
+RETURNS JSONB AS $BODY$
 DECLARE
     v_transfer_id UUID;
     v_company_id UUID;
@@ -170,4 +170,4 @@ EXCEPTION
             RAISE EXCEPTION 'ERR_DUPLICATE_DOC: This document number is already in use. Please enter a new number.';
         END IF;
 END;
-$BODY LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp;
+$BODY$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp;

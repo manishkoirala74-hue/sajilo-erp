@@ -37,11 +37,11 @@ EXCEPTION
     WHEN unique_violation THEN
         RAISE EXCEPTION 'ERR_IDEMPOTENCY: This transaction has already been processed.';
 END;
-$BODY LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp;
+$BODY$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp;
 
 -- Rollback 2. Purchase Checkout
 CREATE OR REPLACE FUNCTION rpc_checkout_purchase_invoice(p_payload JSONB, p_idempotency_key UUID, p_gl_lines JSONB)
-RETURNS JSONB AS $BODY
+RETURNS JSONB AS $BODY$
 DECLARE
     v_invoice_id UUID;
     v_journal_id UUID;
@@ -71,11 +71,11 @@ EXCEPTION
     WHEN unique_violation THEN
         RAISE EXCEPTION 'ERR_IDEMPOTENCY: This transaction has already been processed.';
 END;
-$BODY LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp;
+$BODY$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp;
 
 -- Rollback 3. Stock Transfer Checkout
 CREATE OR REPLACE FUNCTION rpc_checkout_stock_transfer(p_payload JSONB, p_idempotency_key UUID)
-RETURNS JSONB AS $BODY
+RETURNS JSONB AS $BODY$
 DECLARE
     v_transfer_id UUID;
     v_company_id UUID;
@@ -158,4 +158,4 @@ EXCEPTION
     WHEN unique_violation THEN
         RAISE EXCEPTION 'ERR_IDEMPOTENCY: This transaction has already been processed.';
 END;
-$BODY LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp;
+$BODY$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp;
