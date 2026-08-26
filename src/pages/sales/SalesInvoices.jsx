@@ -21,6 +21,7 @@ import { checkoutSalesInvoice, cancelSalesInvoice, loadItemsMap, loadSettings } 
 import { loadActiveTaxTypes, computeTotalTax } from '@/lib/taxService';
 import { useSajiloSync } from '@/hooks/useSajiloSync';
 import { usePermissions, useAuth } from '@/lib/AuthContext';
+import { useNavigationBlocker } from '@/hooks/useNavigationBlocker';
 import SearchableSelect from '@/components/shared/SearchableSelect';
 import VoucherLink from '@/components/shared/VoucherLink';
 import { generateVectorPDF } from '@/utils/pdfGenerator';
@@ -56,6 +57,21 @@ export default function SalesInvoices() {
   const [showForm, setShowForm] = useState(false);
   const [viewDetail, setViewDetail] = useState(null);
   const [form, setForm] = useState(emptySI);
+  
+  const [initialForm, setInitialForm] = useState(null);
+  const [isDirty, setIsDirty] = useState(false);
+  useNavigationBlocker(isDirty);
+
+  useEffect(() => {
+    if (showForm) {
+      if (!initialForm) setInitialForm(form);
+      setIsDirty(JSON.stringify(form) !== JSON.stringify(initialForm || form));
+    } else {
+      setInitialForm(null);
+      setIsDirty(false);
+    }
+  }, [form, showForm]);
+
   const [saving, setSaving] = useState(false);
   const [filterStatus, setFilterStatus] = useState('all');
   const [showNegativeStockWarning, setShowNegativeStockWarning] = useState(false);

@@ -14,6 +14,8 @@ function handleDBError(error) {
 
   if (cleanMessage.includes('ERR_INSUFFICIENT_STOCK')) {
     cleanMessage = 'Transaction Blocked: Insufficient stock in the selected Godown.';
+  } else if (cleanMessage.includes('ERR_DUPLICATE_DOC')) {
+    cleanMessage = 'Duplicate Document: This document number is already in use. Please enter a new number.';
   } else if (cleanMessage.includes('ERR_IDEMPOTENCY')) {
     cleanMessage = 'Transaction Blocked: This entry has already been processed.';
   } else if (cleanMessage.includes('ERR_ALREADY_POSTED')) {
@@ -24,6 +26,8 @@ function handleDBError(error) {
     cleanMessage = 'Posting Aborted: Missing required control account mapping.';
   } else if (cleanMessage.includes('ERR_MISSING_GODOWN')) {
     cleanMessage = 'Transaction Blocked: A Godown/Branch must be selected for this transaction.';
+  } else if (cleanMessage.includes('fk_voucher_payment') || cleanMessage.includes('violates foreign key constraint')) {
+    cleanMessage = 'Cannot delete this record because it is actively linked to another transaction (e.g., a payment or allocation). Please reverse the linked transaction first.';
   } else {
     cleanMessage = 'GL Posting Failed: ' + cleanMessage;
   }

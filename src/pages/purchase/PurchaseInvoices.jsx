@@ -21,6 +21,7 @@ import { checkoutPurchaseInvoice, cancelPurchaseInvoice, loadItemsMap, loadSetti
 import { computeTotalTax, loadActiveTaxTypes } from '@/lib/taxService';
 import { useSajiloSync } from '@/hooks/useSajiloSync';
 import { usePermissions, useAuth } from '@/lib/AuthContext';
+import { useNavigationBlocker } from '@/hooks/useNavigationBlocker';
 import SearchableSelect from '@/components/shared/SearchableSelect';
 import { Mail } from 'lucide-react';
 import VoucherLink from '@/components/shared/VoucherLink';
@@ -53,6 +54,21 @@ export default function PurchaseInvoices() {
   const [showForm, setShowForm] = useState(false);
   const [viewDetail, setViewDetail] = useState(null);
   const [form, setForm] = useState(emptyPI);
+  
+  const [initialForm, setInitialForm] = useState(null);
+  const [isDirty, setIsDirty] = useState(false);
+  useNavigationBlocker(isDirty);
+
+  useEffect(() => {
+    if (showForm) {
+      if (!initialForm) setInitialForm(form);
+      setIsDirty(JSON.stringify(form) !== JSON.stringify(initialForm || form));
+    } else {
+      setInitialForm(null);
+      setIsDirty(false);
+    }
+  }, [form, showForm]);
+
   const [saving, setSaving] = useState(false);
   const [filterStatus, setFilterStatus] = useState('all');
 

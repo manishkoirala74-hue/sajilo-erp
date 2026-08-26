@@ -389,7 +389,7 @@ export async function fetchReportData(reportId, fromDate, toDate, extraParams = 
       // "Sales Master Report" — all posted Sales Invoices in the period
       const invoices = await sajilo.entities.SalesInvoice.list('-invoice_date', 2000);
       return (invoices || [])
-        .filter(i => inRange(i.invoice_date, fromDate, toDate))
+        .filter(i => i.status === 'Posted' && inRange(i.invoice_date, fromDate, toDate))
         .map(i => ({
           invoice_number:   i.invoice_number,
           invoice_date:     i.invoice_date,

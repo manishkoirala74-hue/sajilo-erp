@@ -5,7 +5,7 @@ import { sajilo } from '@/api/sajiloClient';
 import DualDateDisplay from '@/components/shared/DualDateDisplay';
 import { formatDualDateString } from '@/lib/nepaliDate';
 import { toast } from 'sonner';
-import { Plus, Eye, Trash2, RotateCcw, TriangleAlert , ListChecks} from 'lucide-react';
+import { Plus, Eye, Trash2, RotateCcw, TriangleAlert, ListChecks, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -22,6 +22,7 @@ import { postFinancialVoucher } from '@/lib/glPostingService';
 import { generateVectorPDF } from '@/utils/pdfGenerator';
 import VoucherLink from '@/components/shared/VoucherLink';
 import DateInput from '@/components/shared/DateInput';
+import { useNavigationBlocker } from '@/hooks/useNavigationBlocker';
 
 const emptyVoucher = {
   voucher_type: '', voucher_date: new Date().toISOString().split('T')[0],
@@ -34,12 +35,27 @@ const emptyVoucher = {
 const fmt = (n) => `NPR ${Number(n || 0).toLocaleString()}`;
 
 export default function FinancialVouchers() {
-  
-
   const [vouchers, setVouchers] = useState([]);
   const [allAccounts, setAllAccounts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
+  const [form, setForm] = useState(emptyVoucher);
+  
+  const [initialForm, setInitialForm] = useState(null);
+  const [isDirty, setIsDirty] = useState(false);
+  
+  useNavigationBlocker(isDirty);
+
+  useEffect(() => {
+    if (open) {
+      if (!initialForm) setInitialForm(form);
+      setIsDirty(JSON.stringify(form) !== JSON.stringify(initialForm || form));
+    } else {
+      setInitialForm(null);
+      setIsDirty(false);
+    }
+  }, [form, open]);
+
   const [viewOpen, setViewOpen] = useState(false);
   const [selected, setSelected] = useState(null);
   const getSafeDefaultDate = () => {
@@ -345,36 +361,68 @@ export default function FinancialVouchers() {
   const handleDelete = async () => {
     if (!selected) return;
     setActionProcessing(true);
-    const user = await sajilo.auth.me();
+    
+    try {
+      const user = await sajilo.auth.me();
 
-    // Reverse GL lines first if voucher is Posted
-    if (selected.status === 'Posted') {
-      const idempotencyKey = crypto.randomUUID();
-      await postFinancialVoucher({ id: selected.id, company_id: selected.company_id }, true, idempotencyKey);
+      if (selected.status === 'Posted') {
+        // Immutable Ledger: Do not hard delete. Reverse GL lines and update status.
+        const idempotencyKey = crypto.randomUUID();
+        await postFinancialVoucher({ id: selected.id, company_id: selected.company_id }, true, idempotencyKey);
+        
+        await sajilo.entities.FinancialVoucher.update(selected.id, { status: 'Cancelled' });
+        
+        // Still log the void action for audit trail
+        await sajilo.entities.FinancialVoucherDeleteLog.create({
+          voucher_id: selected.id,
+          voucher_number: selected.voucher_number,
+          voucher_type: selected.voucher_type,
+          voucher_date: selected.voucher_date,
+          total_amount: selected.total_amount || 0,
+          contact_name: selected.contact_name || '',
+          action_type: 'Void',
+          performed_by: user?.email || 'unknown',
+          reason: actionReason || 'Manual void',
+          voucher_snapshot: selected,
+        });
+        
+        toast.success(`Voucher ${selected.voucher_number} has been voided.`);
+      } else {
+        // Draft: Hard delete is permitted.
+        await sajilo.entities.FinancialVoucherDeleteLog.create({
+          voucher_id: selected.id,
+          voucher_number: selected.voucher_number,
+          voucher_type: selected.voucher_type,
+          voucher_date: selected.voucher_date,
+          total_amount: selected.total_amount || 0,
+          contact_name: selected.contact_name || '',
+          action_type: 'Delete',
+          performed_by: user?.email || 'unknown',
+          reason: actionReason || 'Manual deletion',
+          voucher_snapshot: selected,
+        });
+
+        await sajilo.entities.FinancialVoucher.delete(selected.id);
+        toast.success(`Voucher ${selected.voucher_number} deleted.`);
+      }
+
+      setActionDialog(null);
+      setViewOpen(false);
+      setSelected(null);
+      setActionReason('');
+    } catch (error) {
+      console.error(error);
+      const msg = error.message || 'Unknown error occurred.';
+      // Simple fallback mapping just in case glPostingService didn't map it
+      if (msg.includes('fk_voucher_payment') || msg.includes('violates foreign key constraint')) {
+        toast.error('Cannot delete/void this record because it is actively linked to another transaction. Please reverse the linked transaction first.');
+      } else {
+        toast.error('Action Failed: ' + msg);
+      }
+    } finally {
+      setActionProcessing(false);
+      fetchData();
     }
-
-    // Log the deletion
-    await sajilo.entities.FinancialVoucherDeleteLog.create({
-      voucher_id: selected.id,
-      voucher_number: selected.voucher_number,
-      voucher_type: selected.voucher_type,
-      voucher_date: selected.voucher_date,
-      total_amount: selected.total_amount || 0,
-      contact_name: selected.contact_name || '',
-      action_type: 'Delete',
-      performed_by: user?.email || 'unknown',
-      reason: actionReason || 'Manual deletion',
-      voucher_snapshot: selected,
-    });
-
-    await sajilo.entities.FinancialVoucher.delete(selected.id);
-    toast.success(`Voucher ${selected.voucher_number} deleted and logged`);
-    setActionDialog(null);
-    setViewOpen(false);
-    setSelected(null);
-    setActionReason('');
-    setActionProcessing(false);
-    fetchData();
   };
 
   // ── Reverse voucher ───────────────────────────────────────────────────────
@@ -507,9 +555,47 @@ export default function FinancialVouchers() {
     { key: 'total_amount', label: 'Amount', render: v => fmt(v) },
     { key: 'status', label: 'Status', render: v => <StatusBadge status={v} /> },
     { key: 'id', label: '', render: (_, row) => (
-      <Button size="sm" variant="ghost" onClick={() => { setSelected(row); setViewOpen(true); }}>
-        <Eye className="w-4 h-4" />
-      </Button>
+      <div className="flex gap-1 justify-end">
+        {row.status === 'Draft' && (
+          <Button size="sm" variant="ghost" onClick={() => {
+            const e = row.entries?.length ? row.entries : [{ account_id: '', account_name: '', account_code: '', account_type: '', debit: 0, credit: 0, narration: '' }];
+            let srcAccId = '';
+            let targetEntries = e;
+            let srcAcc = null;
+            if (row.voucher_type !== 'Journal' && e.length > 0) {
+               srcAccId = e[0].account_id;
+               srcAcc = e[0];
+               targetEntries = e.slice(1);
+            }
+            if (targetEntries.length === 0) targetEntries = [{ account_id: '', debit: 0, credit: 0 }];
+            
+            setForm({ 
+              ...emptyVoucher, 
+              ...row, 
+              entries: targetEntries, 
+              source_account_id: srcAccId,
+              source_account_name: srcAcc?.account_name,
+              source_account_code: srcAcc?.account_code,
+              source_account_type: srcAcc?.account_type
+            });
+            try {
+              if (row.bill_allocations && typeof row.bill_allocations === 'string') {
+                 setBillAllocations(JSON.parse(row.bill_allocations));
+              } else if (Array.isArray(row.bill_allocations)) {
+                 setBillAllocations(row.bill_allocations);
+              } else {
+                 setBillAllocations([]);
+              }
+            } catch(e) { setBillAllocations([]); }
+            setOpen(true);
+          }}>
+            <Pencil className="w-4 h-4 text-blue-500" />
+          </Button>
+        )}
+        <Button size="sm" variant="ghost" onClick={() => { setSelected(row); setViewOpen(true); }}>
+          <Eye className="w-4 h-4" />
+        </Button>
+      </div>
     )}
   ];
 
