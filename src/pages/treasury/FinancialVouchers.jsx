@@ -67,7 +67,6 @@ export default function FinancialVouchers() {
     return today;
   };
 
-  const [form, setForm] = useState(emptyVoucher);
   const [settings, setSettings] = useState({});
   const [billAllocations, setBillAllocations] = useState([]);
   const [partnerAccounts, setPartnerAccounts] = useState(new Set());
