@@ -20,8 +20,10 @@ import {
   useItemsQuery, 
   useCustomersQuery, 
   useVendorsQuery, 
-  useDailyMetricsQuery 
+  useDailyMetricsQuery,
+  useRecentDocumentsQuery
 } from '@/hooks/useSajiloQuery';
+import { triggerHaptic } from '@/utils/haptics';
 
 
 
@@ -39,6 +41,7 @@ export default function Dashboard() {
   const { data: customers = [] } = useCustomersQuery();
   const { data: vendors = [] } = useVendorsQuery();
   const { data: metrics = [], isLoading: isLoadingMetrics } = useDailyMetricsQuery();
+  const { data: recentDocs, isLoading: isLoadingRecentDocs } = useRecentDocumentsQuery();
   
   const [recentSales, setRecentSales] = useState([]);
   const [unpaidSalesCount, setUnpaidSalesCount] = useState(0);
@@ -159,6 +162,44 @@ export default function Dashboard() {
           )}
         </div>
       )}
+
+      {/* Mobile Recent Documents */}
+      <div className="md:hidden">
+        <h3 className="text-sm font-semibold text-foreground mb-3 px-1">Recent Documents</h3>
+        <div className="flex overflow-x-auto snap-x snap-mandatory gap-3 pb-2 scrollbar-hide-default">
+          {isLoadingRecentDocs ? (
+            // Skeleton loaders
+            Array(5).fill(0).map((_, i) => (
+              <div key={i} className="snap-start shrink-0 w-[200px] bg-card border border-border rounded-xl p-3 animate-pulse">
+                <div className="h-4 bg-muted rounded w-2/3 mb-2" />
+                <div className="h-3 bg-muted rounded w-1/2 mb-4" />
+                <div className="flex justify-between items-center">
+                  <div className="h-4 bg-muted rounded w-1/3" />
+                  <div className="h-5 bg-muted rounded-full w-12" />
+                </div>
+              </div>
+            ))
+          ) : (
+            recentDocs?.map(doc => (
+              <Link 
+                key={doc.id} 
+                to={doc.path} 
+                onClick={() => triggerHaptic()}
+                className="snap-start shrink-0 w-[200px] bg-card border border-border rounded-xl p-3 shadow-sm hover:shadow-md transition-shadow active:scale-[0.98]"
+              >
+                <div className="flex justify-between items-start mb-1 gap-2">
+                  <span className="font-semibold text-sm text-foreground truncate" title={doc.title}>{doc.title}</span>
+                  <StatusBadge status={doc.status} />
+                </div>
+                <p className="text-[11px] text-muted-foreground mb-3">{doc.type} • {doc.date}</p>
+                <div className="font-mono text-sm font-semibold">
+                  {mask(formatNPR(doc.amount))}
+                </div>
+              </Link>
+            ))
+          )}
+        </div>
+      </div>
 
       {/* Stats */}
       <div className="flex overflow-x-auto snap-x snap-mandatory pb-4 -mx-4 px-4 gap-4 md:grid md:grid-cols-2 lg:grid-cols-4 md:gap-4 md:overflow-visible md:pb-0 md:mx-0 md:px-0 scrollbar-none">

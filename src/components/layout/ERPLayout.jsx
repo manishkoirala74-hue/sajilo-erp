@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
 import Sidebar from './Sidebar';
@@ -38,9 +38,21 @@ const pageTitles = {
 };
 
 export default function ERPLayout() {
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(typeof window !== 'undefined' ? window.innerWidth < 1024 : false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isMobileFabOpen, setIsMobileFabOpen] = useState(false);
+
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth >= 768 && window.innerWidth < 1024) {
+        setCollapsed(true);
+      } else if (window.innerWidth >= 1024) {
+        setCollapsed(false);
+      }
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
   const location = useLocation();
   const title = pageTitles[location.pathname] || 'Sajilo ERP';
   const navigate = useNavigate();

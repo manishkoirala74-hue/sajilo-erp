@@ -71,7 +71,11 @@
 
 @layer utilities {
   .touch-target {
-    @apply min-h-[48px] min-w-[48px];
+    min-width: 44px;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 
   /* Structural Form Classes */

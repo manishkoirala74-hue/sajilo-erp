@@ -8,14 +8,15 @@ import {
   Receipt, ClipboardList, Boxes, Wallet, 
   BookOpen, Ruler, RotateCcw, SlidersHorizontal, 
   ShoppingBag, BarChart2, CreditCard,
-  UserCheck, Truck, X, LifeBuoy
+  UserCheck, Truck, X, LifeBuoy, Lock
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useAuth } from '@/lib/AuthContext';
 import { toast } from 'sonner';
+import { triggerHaptic } from '@/utils/haptics';
 
-// Helper to build nav (reused from Sidebar logic or simplified)
+// Helper to build nav
 const buildNavGroups = (settings) => {
   const s = settings || {};
   const groups = [
@@ -77,7 +78,16 @@ export default function MobileMenuDrawer({ isOpen, onClose }) {
   const location = useLocation();
   const { activeFiscalYear } = useAuth();
   const [navGroups, setNavGroups] = useState([]);
-  const [expandedGroups, setExpandedGroups] = useState([]);
+  
+  // Use sessionStorage for persistent drawer state
+  const [expandedGroups, setExpandedGroups] = useState(() => {
+    try {
+      const stored = sessionStorage.getItem('sajilo_mobile_menu_expanded');
+      return stored ? JSON.parse(stored) : [];
+    } catch (e) {
+      return [];
+    }
+  });
 
   const serverSettings = useSettingsStore(state => state.serverSettings);
   const [settings, setSettings] = useState(null);
@@ -96,25 +106,43 @@ export default function MobileMenuDrawer({ isOpen, onClose }) {
   }, [serverSettings]);
 
   useEffect(() => {
-    const groups = buildNavGroups(settings);
-    setNavGroups(groups);
-    setExpandedGroups([groups[0].label, groups[1]?.label].filter(Boolean));
+    if (settings) {
+      const groups = buildNavGroups(settings);
+      setNavGroups(groups);
+      if (expandedGroups.length === 0) {
+        const defaultExpanded = [groups[0].label, groups[1]?.label].filter(Boolean);
+        setExpandedGroups(defaultExpanded);
+      }
+    }
   }, [settings]);
 
+  useEffect(() => {
+    sessionStorage.setItem('sajilo_mobile_menu_expanded', JSON.stringify(expandedGroups));
+  }, [expandedGroups]);
+
   const toggleGroup = (label) => {
+    triggerHaptic();
     setExpandedGroups(prev =>
       prev.includes(label) ? prev.filter(g => g !== label) : [...prev, label]
     );
   };
 
-  const isActive = (path) => location.pathname === path;
+  const handleClose = () => {
+    triggerHaptic();
+    onClose();
+  };
+
+  const isActive = (path) => {
+    if (path === '/') return location.pathname === '/';
+    return location.pathname.startsWith(path);
+  };
 
   return (
-    <Drawer.Root open={isOpen} onOpenChange={(open) => !open && onClose()} direction="left">
+    <Drawer.Root open={isOpen} onOpenChange={(open) => !open && handleClose()} direction="left">
       <Drawer.Portal>
         <Drawer.Overlay className="fixed inset-0 bg-black/40 z-50 backdrop-blur-sm" />
         <Drawer.Content className="bg-sidebar flex flex-col h-full w-[280px] fixed bottom-0 left-0 top-0 z-50 outline-none border-r border-slate-700/50 print:hidden">
-          <div className="flex items-center justify-between h-16 px-4 border-b border-slate-700/50 shrink-0">
+          <div className="flex items-center justify-between h-16 px-4 border-b border-slate-700/50 shrink-0 pt-[env(safe-area-inset-top)]">
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shrink-0">
                 <Building2 className="w-4 h-4 text-white" />
@@ -123,64 +151,81 @@ export default function MobileMenuDrawer({ isOpen, onClose }) {
                 <p className="text-white font-bold text-sm leading-none">Sajilo ERP</p>
               </div>
             </div>
-            <button onClick={onClose} className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-full transition-colors touch-target">
+            <button onClick={handleClose} className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-full transition-colors touch-target">
               <X className="w-5 h-5" />
             </button>
           </div>
           
-          <div className="flex-1 overflow-y-auto py-4 px-2 scrollbar-none">
-            {navGroups.map((group) => (
-              <div key={group.label} className="mb-2">
-                <button
-                  onClick={() => toggleGroup(group.label)}
-                  className="w-full flex items-center justify-between px-3 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider hover:text-slate-300 transition-colors touch-target"
-                >
-                  {group.label}
-                  {expandedGroups.includes(group.label) ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-                </button>
-                
-                {expandedGroups.includes(group.label) && (
-                  <div className="space-y-1 mt-1 mb-3 pl-1">
-                    {group.items.map((item) => {
-                      const disabledPaths = [
-                        '/pos', '/sales/invoices', '/sales/returns', 
-                        '/purchase/invoices', '/purchase/returns', '/treasury/vouchers'
-                      ];
-                      const isDisabled = !activeFiscalYear && disabledPaths.includes(item.path);
-
-                      return (
-                        <Link
-                          key={item.path}
-                          to={isDisabled ? '#' : item.path}
-                          onClick={(e) => {
-                            if (isDisabled) {
-                              e.preventDefault();
-                              toast.error("No active fiscal year. Please create one to access transactions.");
-                            } else {
-                              onClose();
-                            }
-                          }}
-                          className={cn(
-                            "flex items-center gap-3 px-3 py-2.5 rounded-xl text-[15px] font-medium transition-colors",
-                            isActive(item.path)
-                              ? "bg-primary text-primary-foreground"
-                              : "text-slate-600 active:bg-slate-100",
-                            isDisabled && "opacity-50 cursor-not-allowed"
-                          )}
-                        >
-                          <item.icon className="w-5 h-5 shrink-0" />
-                          <span>{item.label}</span>
-                        </Link>
-                      );
-                    })}
+          <div className="flex-1 overflow-y-auto py-4 px-2 scrollbar-none pb-[env(safe-area-inset-bottom,16px)]">
+            {!settings ? (
+              // Loading Skeleton
+              <div className="space-y-4 px-3 animate-pulse">
+                {[1, 2, 3, 4, 5].map(i => (
+                  <div key={i}>
+                    <div className="h-4 bg-slate-700/50 rounded w-1/3 mb-4" />
+                    <div className="space-y-2">
+                      {[1, 2, 3].map(j => (
+                        <div key={j} className="h-10 bg-slate-800/50 rounded-xl w-full" />
+                      ))}
+                    </div>
                   </div>
-                )}
+                ))}
               </div>
-            ))}
+            ) : (
+              navGroups.map((group) => (
+                <div key={group.label} className="mb-2">
+                  <button
+                    onClick={() => toggleGroup(group.label)}
+                    className="w-full flex items-center justify-between px-3 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider hover:text-slate-300 transition-colors touch-target"
+                  >
+                    {group.label}
+                    {expandedGroups.includes(group.label) ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                  </button>
+                  
+                  {expandedGroups.includes(group.label) && (
+                    <div className="space-y-1 mt-1 mb-3 pl-1">
+                      {group.items.map((item) => {
+                        const disabledPaths = [
+                          '/pos', '/sales/invoices', '/sales/returns', 
+                          '/purchase/invoices', '/purchase/returns', '/treasury/vouchers'
+                        ];
+                        const isDisabled = !activeFiscalYear && disabledPaths.some(dp => item.path.includes(dp));
+
+                        return (
+                          <Link
+                            key={item.path}
+                            to={isDisabled ? '#' : item.path}
+                            onClick={(e) => {
+                              triggerHaptic();
+                              if (isDisabled) {
+                                e.preventDefault();
+                                toast.error("No active fiscal year. Please create one to access transactions.");
+                              } else {
+                                onClose();
+                              }
+                            }}
+                            className={cn(
+                              "flex items-center gap-3 px-3 py-2.5 rounded-xl text-[15px] font-medium transition-colors touch-target",
+                              isActive(item.path)
+                                ? "bg-primary text-primary-foreground"
+                                : "text-slate-600 active:bg-slate-100",
+                              isDisabled && "opacity-50 cursor-not-allowed"
+                            )}
+                          >
+                            <item.icon className="w-5 h-5 shrink-0" />
+                            <span className="flex-1">{item.label}</span>
+                            {isDisabled && <Lock className="w-4 h-4 text-slate-500 shrink-0" />}
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
           </div>
         </Drawer.Content>
       </Drawer.Portal>
     </Drawer.Root>
   );
 }
-

@@ -89,6 +89,32 @@ export function useDailyMetricsQuery(companyId) {
   });
 }
 
+export function useRecentDocumentsQuery(companyId) {
+  const activeCompany = companyId || sajilo.getCompanyId();
+  return useQuery({
+    queryKey: ['recentDocuments', activeCompany],
+    queryFn: async () => {
+      const [sales, purchases] = await Promise.all([
+        sajilo.entities.SalesInvoice.filter({}, '-updated_at', 5).catch(() => []),
+        sajilo.entities.PurchaseInvoice.filter({}, '-updated_at', 5).catch(() => [])
+      ]);
+      const combined = [...(sales || []), ...(purchases || [])];
+      combined.sort((a, b) => new Date(b.updated_at || b.created_at) - new Date(a.updated_at || a.created_at));
+      return combined.slice(0, 5).map(doc => ({
+        id: doc.id,
+        type: doc.customer_id ? 'Sales Invoice' : 'Purchase Bill',
+        title: doc.voucher_no || 'Draft',
+        amount: doc.net_total || doc.grand_total,
+        status: doc.status,
+        date: doc.created_date,
+        path: doc.customer_id ? `/sales/invoices` : `/purchase/invoices`
+      }));
+    },
+    enabled: !!activeCompany,
+    staleTime: 60 * 1000,
+  });
+}
+
 // --- MUTATIONS ---
 
 export function useItemMutation(companyId) {
