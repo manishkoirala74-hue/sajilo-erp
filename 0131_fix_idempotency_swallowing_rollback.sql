@@ -1,6 +1,6 @@
 -- Rollback 1. Sales Checkout
 CREATE OR REPLACE FUNCTION rpc_checkout_sales_invoice(p_payload JSONB, p_idempotency_key UUID, p_gl_lines JSONB)
-RETURNS JSONB AS $BODY
+RETURNS JSONB AS $BODY$
 DECLARE
     v_invoice_id UUID;
     v_journal_id UUID;
@@ -8,6 +8,8 @@ DECLARE
     v_invoice_date DATE;
     v_invoice_number VARCHAR;
     v_notes VARCHAR;
+    -- RESTORED: Declare the challan flag
+    v_is_from_challan BOOLEAN := COALESCE((p_payload->>'is_from_challan')::BOOLEAN, FALSE); 
 BEGIN
     IF p_idempotency_key IS NOT NULL THEN
         INSERT INTO public."TransactionLocks" (idempotency_key) VALUES (p_idempotency_key);
@@ -19,7 +21,12 @@ BEGIN
     v_notes := COALESCE(p_payload->>'notes', 'Sales Invoice ' || v_invoice_number);
 
     v_invoice_id := rpc_internal_save_sales_invoice(p_payload);
-    PERFORM rpc_internal_deduct_stock(v_company_id, v_invoice_id);
+    
+    -- RESTORED: [CRITICAL GUARDRAIL]
+    IF NOT v_is_from_challan THEN
+        PERFORM rpc_internal_deduct_stock(v_company_id, v_invoice_id);
+    END IF;
+
     v_journal_id := rpc_commit_journal_entry_internal(
         v_company_id, v_invoice_date, v_notes,
         'Sales', v_invoice_id, 'SalesInvoice', v_invoice_number, p_gl_lines
