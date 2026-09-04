@@ -56,7 +56,7 @@ export default function ERPLayout() {
   const location = useLocation();
   const title = pageTitles[location.pathname] || 'Sajilo ERP';
   const navigate = useNavigate();
-  const { activeFiscalYear, activeCompany, fiscalYears, fyIsError, fyError, fyIsLoading, user } = useAuth();
+  const { activeFiscalYear, activeCompany, fiscalYears, fyIsError, fyError, fyIsLoading, user, activeRole } = useAuth();
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
@@ -64,6 +64,40 @@ export default function ERPLayout() {
       <div className="flex flex-col flex-1 overflow-hidden relative">
         <Topbar pageTitle={title} onMenuClick={() => setIsMobileMenuOpen(true)} />
         
+        {activeCompany?.status === 'PENDING_DELETION' && (
+          <div className="bg-destructive text-destructive-foreground px-4 py-3 flex flex-col md:flex-row md:items-center justify-between gap-3 overflow-hidden shadow-sm z-10 relative">
+            <div className="flex items-center gap-3">
+              <AlertCircle className="w-5 h-5 shrink-0" />
+              <div>
+                <p className="text-sm font-bold">
+                  GHOST MODE: This company is scheduled for permanent deletion.
+                </p>
+                <p className="text-xs opacity-90">
+                  Deletion scheduled for: {new Date(activeCompany.deletion_scheduled_at).toLocaleDateString()}. All data mutations are currently locked.
+                </p>
+              </div>
+            </div>
+            {(user?.role === 'admin' || ['Admin', 'Owner'].includes(activeRole?.role_name)) && (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="shrink-0 bg-transparent border-white/40 hover:bg-white/20 text-white"
+                onClick={async () => {
+                  try {
+                    const { sajilo } = await import('@/api/sajiloClient');
+                    await sajilo.cancelCompanyDeletion(activeCompany.id);
+                    window.location.reload();
+                  } catch (e) {
+                    console.error('Failed to cancel deletion', e);
+                  }
+                }}
+              >
+                Cancel Deletion
+              </Button>
+            )}
+          </div>
+        )}
+
         {activeCompany && !activeFiscalYear && (
           <div className="bg-destructive/10 border-b border-destructive/20 px-4 py-3 flex flex-col md:flex-row md:items-center justify-between gap-3 overflow-hidden">
             <div className="flex items-center gap-3">

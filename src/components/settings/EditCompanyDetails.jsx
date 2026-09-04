@@ -134,16 +134,14 @@ export default function EditCompanyDetails({ companyId, onBack }) {
       // 2. Verify password using the session email
       await sajilo.auth.loginWithPassword(authUser.email, password);
       
-      // 3. Call the RPC to wipe data
-      await sajilo.wipeCompanyData(companyId);
+      // 3. Call the RPC to request deletion
+      await sajilo.requestCompanyDeletion(companyId);
       
-      toast.success("Company data deleted successfully");
+      toast.success("Company scheduled for deletion in 30 days. Read-only mode activated.");
       setShowDeleteModal(false);
       
-      // 4. Reset company ID and check auth to redirect or reload
-      sajilo.setCompanyId(null);
-      await checkUserAuth();
-      window.location.href = '/settings';
+      // Reload page to reflect Ghost Mode
+      window.location.reload();
       
     } catch (e) {
       console.error(e);

@@ -24,8 +24,8 @@ export const CompanySwitcher = () => {
           </SelectTrigger>
           <SelectContent>
             {availableCompanies.map((company) => (
-              <SelectItem key={company.id} value={company.id}>
-                {company.name}
+              <SelectItem key={company.id} value={company.id} className={company.status === 'PENDING_DELETION' ? 'text-destructive font-semibold line-through' : ''}>
+                {company.status === 'PENDING_DELETION' ? `[DELETING] ${company.name}` : company.name}
               </SelectItem>
             ))}
           </SelectContent>

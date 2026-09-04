@@ -305,8 +305,14 @@ export const sajilo = {
   clearCache: () => {
     queryCache.clear();
   },
-  wipeCompanyData: async (companyId) => {
-    const { data, error } = await supabase.rpc('delete_company_data', { p_company_id: companyId });
+  requestCompanyDeletion: async (companyId) => {
+    const { data, error } = await supabase.rpc('request_company_deletion', { p_company_id: companyId });
+    if (error) throw error;
+    sajilo.clearCache();
+    return data;
+  },
+  cancelCompanyDeletion: async (companyId) => {
+    const { data, error } = await supabase.rpc('cancel_company_deletion', { p_company_id: companyId });
     if (error) throw error;
     sajilo.clearCache();
     return data;

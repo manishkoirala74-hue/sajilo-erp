@@ -265,7 +265,7 @@ export default function CompanyManagement() {
               return (
               <tr key={c.id} className="border-b border-border last:border-0 hover:bg-muted/20">
                 <td className="cell-density font-medium">
-                  {c.name}
+                  <span className={c.status === 'PENDING_DELETION' ? 'line-through text-muted-foreground' : ''}>{c.name}</span>
                   {isDefault && <span className="ml-2 text-xs bg-primary text-primary-foreground px-2 py-0.5 rounded-full">Default</span>}
                 </td>
                 <td className="cell-density text-muted-foreground">{c.tax_id || '-'}</td>
@@ -274,9 +274,15 @@ export default function CompanyManagement() {
                   <div className="text-xs">{c.phone}</div>
                 </td>
                 <td className="cell-density ">
-                  <span className={`px-2 py-1 rounded-full text-xs ${c.is_active ? 'bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400' : 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400'}`}>
-                    {c.is_active ? 'Active' : 'Inactive'}
-                  </span>
+                  {c.status === 'PENDING_DELETION' ? (
+                    <span className="px-2 py-1 rounded-full text-xs font-bold bg-destructive text-destructive-foreground animate-pulse">
+                      PENDING DELETION
+                    </span>
+                  ) : (
+                    <span className={`px-2 py-1 rounded-full text-xs ${c.is_active ? 'bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400' : 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400'}`}>
+                      {c.is_active ? 'Active' : 'Inactive'}
+                    </span>
+                  )}
                 </td>
                 <td className="cell-density text-right">
                   {!isDefault && (
