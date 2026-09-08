@@ -7,8 +7,9 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { ChevronRight, ChevronDown, FileSpreadsheet, Folder, FolderOpen, FileText, Lock } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { buildVisibleColumns, fmtNPR } from '@/lib/reports/reportColumnUtils';
+import { buildVisibleColumns } from '@/lib/reports/reportColumnUtils';
 import { exportFinancialXLSX } from '@/lib/reports/reportExcelExport';
+import { useAmountFormatter } from '@/hooks/useAmountFormatter';
 
 const TYPE_BADGE = {
   Asset:     'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400',
@@ -95,7 +96,7 @@ function computeSubtreeTotals(node, reportType) {
 }
 
 // ── Ledger (leaf) row ─────────────────────────────────────────────────────────
-function LedgerRow({ account, columns, depth }) {
+function LedgerRow({ account, columns, depth, fmtNPR }) {
   const indent = depth * 20 + 8;
   return (
     <tr className="hover:bg-muted/50 transition-colors print:hover:bg-transparent">
@@ -130,7 +131,7 @@ function LedgerRow({ account, columns, depth }) {
 }
 
 // ── Group row (recursive, all levels) ────────────────────────────────────────
-function GroupRow({ node, columns, depth, expandedGroups, onToggle, showZeroBalance, partnerRows, onGroupExpand, reportType }) {
+function GroupRow({ node, columns, depth, expandedGroups, onToggle, showZeroBalance, partnerRows, onGroupExpand, reportType, fmtNPR }) {
   const indent = depth * 20 + 8;
   const isExpanded = expandedGroups.has(node.id);
   const children = node._children || [];
@@ -213,6 +214,7 @@ function GroupRow({ node, columns, depth, expandedGroups, onToggle, showZeroBala
                   partnerRows={partnerRows}
                   onGroupExpand={onGroupExpand}
                   reportType={reportType}
+                  fmtNPR={fmtNPR}
                 />
               )
               : (!showZeroBalance && !(child.closing_balance || child.current_balance || child.closing_debit || child.closing_credit || child.opening_debit || child.opening_credit || child.current_debit || child.current_credit) ? null : (
@@ -221,6 +223,7 @@ function GroupRow({ node, columns, depth, expandedGroups, onToggle, showZeroBala
                   account={child}
                   columns={columns}
                   depth={depth + 1}
+                  fmtNPR={fmtNPR}
                 />
               ))
           )}
@@ -235,6 +238,15 @@ export default function FinancialReportTable({
   accounts,
   columnState, filename, companyName, reportTitle, fromDate, toDate, partnerRows, onGroupExpand
 }) {
+  const { formatNumber } = useAmountFormatter();
+  const fmtNPR = useCallback((n) => {
+    const num = Number(n || 0);
+    if (num === 0) return '0.00';
+    const absNum = Math.abs(num);
+    const formatted = formatNumber(absNum);
+    return num < 0 ? `(${formatted})` : formatted;
+  }, [formatNumber]);
+
   const reportType = columnState?.reportType;
   const columns = useMemo(() => {
     const cols = buildVisibleColumns(columnState);
@@ -408,6 +420,7 @@ export default function FinancialReportTable({
                       partnerRows={partnerRows}
                       onGroupExpand={onGroupExpand}
                       reportType={reportType}
+                      fmtNPR={fmtNPR}
                     />
                   )
                   : (
@@ -416,6 +429,7 @@ export default function FinancialReportTable({
                       account={root}
                       columns={columns}
                       depth={0}
+                      fmtNPR={fmtNPR}
                     />
                   )
               )}

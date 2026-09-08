@@ -110,7 +110,7 @@ export default function ERPLayout() {
               variant="destructive" 
               size="sm" 
               className="shrink-0"
-              onClick={() => navigate('/app/settings/finance/fiscal-year')}
+              onClick={() => navigate('/settings/finance/fiscal-year')}
             >
               Configure Fiscal Year <ArrowRight className="w-4 h-4 ml-2" />
             </Button>

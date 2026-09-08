@@ -19,16 +19,20 @@ import CommunicationModal from '@/components/shared/CommunicationModal';
 import { Mail } from 'lucide-react';
 import { useDateFormat } from '@/lib/DateFormatContext';
 import { adToBS, formatBS } from '@/lib/nepaliDate';
+import { useAmountFormatter } from '@/hooks/useAmountFormatter';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-function fmtNPR(n) {
-  const num = Number(n || 0);
-  if (num === 0) return '—';
-  const absNum = Math.abs(num);
-  const formatted = `NPR ${absNum.toLocaleString('en-NP', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-  return num < 0 ? `(${formatted})` : formatted;
-}
 
+export function useFmtNPR() {
+  const { formatNumber } = useAmountFormatter();
+  return (n) => {
+    const num = Number(n || 0);
+    if (num === 0) return '—';
+    const absNum = Math.abs(num);
+    const formatted = `NPR ${formatNumber(absNum)}`;
+    return num < 0 ? `(${formatted})` : formatted;
+  };
+}
 // downloadCSV replaced by exportFlatXLSX — kept as no-op shim to avoid refactor of every call site
 function downloadCSV(filename, headers, rows, footer) {
   try {
@@ -324,6 +328,8 @@ function TrialBalanceReport({ initialData, initialFromDate, initialToDate, initi
 
 function CashFlowReport({ initialFromDate, initialToDate }) {
   const { displayBsDate } = useDateFormat();
+  const fmtNPR = useFmtNPR();
+
   const [filters, setFilters] = useCachedFilters('cash_flow', { ...DEFAULT_FILTERS, showBsDate: displayBsDate, fromDate: initialFromDate, toDate: initialToDate });
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -382,6 +388,8 @@ function CashFlowReport({ initialFromDate, initialToDate }) {
 
 
 function PartnerSummaryReport({ title, mode, reportId, initialFromDate, initialToDate }) {
+  const fmtNPR = useFmtNPR();
+
   const [filters, setFilters] = useCachedFilters(`partner_summary_${reportId}`, { ...DEFAULT_FILTERS, fromDate: initialFromDate, toDate: initialToDate });
   const [data, setData] = useCachedState(`partner_summary_data_${reportId}`, []);
   const [partners, setPartners] = useCachedState(`partner_summary_partners_${reportId}`, []);
@@ -512,6 +520,8 @@ function PartnerSummaryReport({ title, mode, reportId, initialFromDate, initialT
 
 function PartnerReport({ title, mode, initialFromDate, initialToDate }) {
   const { displayBsDate } = useDateFormat();
+  const fmtNPR = useFmtNPR();
+
   const [filters,   setFilters]   = useCachedFilters(`partner_report_${mode}`, { ...DEFAULT_FILTERS, showBsDate: displayBsDate, fromDate: initialFromDate, toDate: initialToDate });
   const [partners,  setPartners]  = useCachedState(`partner_report_partners_${mode}`, []);
   const [invoices,  setInvoices]  = useCachedState(`partner_report_invoices_${mode}`, []);
@@ -629,6 +639,7 @@ function PartnerReport({ title, mode, initialFromDate, initialToDate }) {
 
 // ── Profit & Loss (Multi-Step Enterprise Format) ────────────────────────────────
 function ProfitLossReport({ initialData, initialFromDate, initialToDate }) {
+  const { formatNumber } = useAmountFormatter();
   const [filters,   setFilters]   = useCachedFilters('profit_loss', { ...DEFAULT_FILTERS, fromDate: initialFromDate, toDate: initialToDate, expandAll: true });
   const [data,      setData]      = useCachedState('profit_loss_data', initialData);
   const [loading,   setLoading]   = useState(false);
@@ -757,7 +768,7 @@ function ProfitLossReport({ initialData, initialFromDate, initialToDate }) {
 
     const fmtAcct = (amount, isDeduction = false) => {
       if (!amount || amount === 0) return '—';
-      const val = Math.abs(amount).toLocaleString('en-NP', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      const val = formatNumber(Math.abs(amount));
       return (amount < 0 || isDeduction) ? `(${val})` : val;
     };
 
@@ -1121,6 +1132,7 @@ function SimpleReport({ title, reportId, initialData, initialFromDate, initialTo
 // ── Detail General Ledger (with Account Picker) ───────────────────────────────
 function GeneralLedgerDetailReport({ initialFromDate, initialToDate }) {
   const { displayBsDate } = useDateFormat();
+  const fmtNPR = useFmtNPR();
   const [filters,   setFilters]   = useCachedFilters('general_ledger_detail', { ...DEFAULT_FILTERS, showBsDate: displayBsDate, fromDate: initialFromDate, toDate: initialToDate, accountId: '' });
   const [accounts,  setAccounts]  = useState([]);
   const [lines,     setLines]     = useCachedState('general_ledger_detail_lines', []);
@@ -1279,6 +1291,7 @@ function GeneralLedgerDetailReport({ initialFromDate, initialToDate }) {
 // ── Stock Ledger Statement Report ───────────────────────────────────────────────
 function StockLedgerStatementReport({ initialFromDate, initialToDate }) {
   const { displayBsDate } = useDateFormat();
+  const fmtNPR = useFmtNPR();
   const [filters,   setFilters]   = useCachedFilters('stock_ledger_detail', { ...DEFAULT_FILTERS, showBsDate: displayBsDate, fromDate: initialFromDate, toDate: initialToDate, itemId: '' });
   const [items,     setItems]     = useState([]);
   const [lines,     setLines]     = useCachedState('stock_ledger_detail_lines', []);
@@ -1414,6 +1427,15 @@ function StockLedgerStatementReport({ initialFromDate, initialToDate }) {
 
 // ── Main ReportViewer ─────────────────────────────────────────────────────────
 export default function ReportViewer({ reportId, data, fromDate, toDate, columnState, onClose }) {
+  const { formatNumber } = useAmountFormatter();
+  const fmtNPR = (n) => {
+    const num = Number(n || 0);
+    if (num === 0) return '—';
+    const absNum = Math.abs(num);
+    const formatted = `NPR ${formatNumber(absNum)}`;
+    return num < 0 ? `(${formatted})` : formatted;
+  };
+
   const [isExporting, setIsExporting] = useState(false);
 
   const handlePrint = useCallback(async () => {

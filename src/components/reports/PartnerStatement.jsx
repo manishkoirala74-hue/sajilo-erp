@@ -7,6 +7,7 @@ import VoucherLink from '@/components/shared/VoucherLink';
 import { useDateFormat } from '@/lib/DateFormatContext';
 
 import { useCachedFilters, useCachedState } from './ReportViewer';
+import { useAmountFormatter } from '@/hooks/useAmountFormatter';
 
 const DEFAULT_FILTERS = {
   showZeroBalance: false,
@@ -17,13 +18,17 @@ const DEFAULT_FILTERS = {
   showBsDate: false,
 };
 
-function fmtNPR(n) {
-  const num = Number(n || 0);
-  return num === 0 ? '0.00' : num.toLocaleString('en-NP', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-
 export default function PartnerStatement({ title, mode, initialFromDate, initialToDate }) {
   const { displayBsDate } = useDateFormat();
+  const { formatNumber } = useAmountFormatter();
+  const fmtNPR = useCallback((n) => {
+    const num = Number(n || 0);
+    if (num === 0) return '0.00';
+    const absNum = Math.abs(num);
+    const formatted = formatNumber(absNum);
+    return num < 0 ? `(${formatted})` : formatted;
+  }, [formatNumber]);
+
   const [filters, setFilters] = useCachedFilters(`partner_statement_${mode}_filters`, { ...DEFAULT_FILTERS, showBsDate: displayBsDate, fromDate: initialFromDate, toDate: initialToDate });
   const [partners, setPartners] = useCachedState(`partner_statement_${mode}_partners`, []);
   const [selectedPartnerId, setSelectedPartnerId] = useCachedState(`partner_statement_${mode}_selectedId`, '');

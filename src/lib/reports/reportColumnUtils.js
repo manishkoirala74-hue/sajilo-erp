@@ -43,14 +43,6 @@ export function buildVisibleColumns(columnState) {
   return cols;
 }
 
-/**
- * Formats a number as NPR currency string.
- */
-export function fmtNPR(n) {
-  const num = Number(n || 0);
-  if (num === 0) return '0.00';
-  return num.toLocaleString('en-NP', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
 
 /**
  * Filters out zero-balance rows if showZeroBalance is false.

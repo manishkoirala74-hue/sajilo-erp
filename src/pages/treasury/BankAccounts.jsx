@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils';
 import BankAccountFormModal from '@/components/treasury/BankAccountFormModal';
 import BankAccountDetailDrawer from '@/components/treasury/BankAccountDetailDrawer';
 import { toast } from 'sonner';
+import { useAmountFormatter } from '@/hooks/useAmountFormatter';
 
 const GROUP_ORDER = ['Cash', 'Bank'];
 
@@ -23,12 +24,8 @@ const categoryStyle = {
   'Cash in Hand': 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
 };
 
-function formatNPR(n) {
-  if (n == null) return '—';
-  return new Intl.NumberFormat('en-NP', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
-}
-
 export default function BankAccounts() {
+  const { formatAmount } = useAmountFormatter();
   const [accounts, setAccounts] = useState([]);
   const [glBalances, setGlBalances] = useState({}); // { gl_account_id -> current_balance }
   const [loading, setLoading] = useState(true);
@@ -162,7 +159,7 @@ export default function BankAccounts() {
           </div>
           <div>
             <p className="text-xs text-muted-foreground">Total Cash Balance</p>
-            <p className="text-lg font-bold text-foreground">NPR {formatNPR(totalCash)}</p>
+            <p className="text-lg font-bold text-foreground">{formatAmount(totalCash)}</p>
           </div>
         </div>
         <div className="bg-card border border-border rounded-xl p-4 flex items-center gap-4">
@@ -171,7 +168,7 @@ export default function BankAccounts() {
           </div>
           <div>
             <p className="text-xs text-muted-foreground">Total Bank Balance</p>
-            <p className="text-lg font-bold text-foreground">NPR {formatNPR(totalBank)}</p>
+            <p className="text-lg font-bold text-foreground">{formatAmount(totalBank)}</p>
           </div>
         </div>
         <div className="bg-card border border-border rounded-xl p-4 flex items-center gap-4">
@@ -180,7 +177,7 @@ export default function BankAccounts() {
           </div>
           <div>
             <p className="text-xs text-muted-foreground">Combined Balance</p>
-            <p className="text-lg font-bold text-foreground">NPR {formatNPR(totalCash + totalBank)}</p>
+            <p className="text-lg font-bold text-foreground">{formatAmount(totalCash + totalBank)}</p>
           </div>
         </div>
       </div>
@@ -216,7 +213,7 @@ export default function BankAccounts() {
                     <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">{items.length}</span>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="text-sm font-semibold text-foreground hidden sm:block">NPR {formatNPR(groupTotal)}</span>
+                    <span className="text-sm font-semibold text-foreground hidden sm:block">{formatAmount(groupTotal)}</span>
                     {isCollapsed ? <ChevronRight className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
                   </div>
                 </button>
@@ -271,7 +268,7 @@ export default function BankAccounts() {
                                 </div>
                               </td>
                               <td className="cell-density text-xs text-muted-foreground">{acc.gl_account_name || '—'}</td>
-                              <td className="cell-density text-right font-mono text-sm font-semibold text-foreground">{formatNPR(getLiveBalance(acc))}</td>
+                              <td className="cell-density text-right font-mono text-sm font-semibold text-foreground">{formatAmount(getLiveBalance(acc))}</td>
                               <td className="cell-density text-center">
                                 <span className={cn('px-2 py-0.5 rounded-full text-xs font-medium', acc.is_active !== false ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400' : 'bg-muted text-muted-foreground')}>
                                   {acc.is_active !== false ? 'Active' : 'Inactive'}
@@ -294,7 +291,7 @@ export default function BankAccounts() {
                           <tr>
                             <td colSpan={type === 'Bank' ? 5 : 3} className="cell-density text-xs font-semibold text-muted-foreground">Total</td>
                             <td className="cell-density text-right font-bold text-sm text-foreground font-mono">
-                              {formatNPR(items.reduce((s, a) => s + getLiveBalance(a), 0))}
+                              {formatAmount(items.reduce((s, a) => s + getLiveBalance(a), 0))}
                             </td>
                             <td colSpan={2} />
                           </tr>

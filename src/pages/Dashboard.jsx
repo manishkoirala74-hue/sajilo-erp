@@ -24,17 +24,11 @@ import {
   useRecentDocumentsQuery
 } from '@/hooks/useSajiloQuery';
 import { triggerHaptic } from '@/utils/haptics';
-
-
-
-function formatNPR(val) {
-  if (val >= 1000000) return `NPR ${(val / 1000000).toFixed(1)}M`;
-  if (val >= 1000) return `NPR ${(val / 1000).toFixed(0)}K`;
-  return `NPR ${val}`;
-}
+import { useAmountFormatter } from '@/hooks/useAmountFormatter';
 
 export default function Dashboard() {
   const { availableCompanies, isLoadingAuth, activeCompany } = useAuth();
+  const { formatAmountShort } = useAmountFormatter();
   
   // ── SWR Queries ──
   const { data: items = [] } = useItemsQuery();
@@ -193,7 +187,7 @@ export default function Dashboard() {
                 </div>
                 <p className="text-[11px] text-muted-foreground mb-3">{doc.type} • {doc.date}</p>
                 <div className="font-mono text-sm font-semibold">
-                  {mask(formatNPR(doc.amount))}
+                  {mask(formatAmountShort(doc.amount))}
                 </div>
               </Link>
             ))
@@ -206,7 +200,7 @@ export default function Dashboard() {
         <div className="snap-center shrink-0 w-[85vw] md:w-auto">
           <StatCard
             title="Total Sales Revenue"
-            value={mask(formatNPR(totalSales))}
+            value={mask(formatAmountShort(totalSales))}
             subtitle="All posted invoices"
             icon={TrendingUp}
             color="indigo"
@@ -217,7 +211,7 @@ export default function Dashboard() {
         <div className="snap-center shrink-0 w-[85vw] md:w-auto">
           <StatCard
             title="Total Purchases"
-            value={mask(formatNPR(totalPurchases))}
+            value={mask(formatAmountShort(totalPurchases))}
             subtitle="All posted bills"
             icon={ShoppingCart}
             color="amber"
@@ -263,7 +257,7 @@ export default function Dashboard() {
               <XAxis dataKey="month" tick={{ fontSize: 12, fill: theme === 'dark' ? '#94a3b8' : '#64748b' }} />
               <YAxis tickFormatter={v => `${v / 1000}K`} tick={{ fontSize: 11, fill: theme === 'dark' ? '#94a3b8' : '#64748b' }} />
               <Tooltip 
-                formatter={v => formatNPR(v)} 
+                formatter={v => formatAmountShort(v)} 
                 contentStyle={{ backgroundColor: theme === 'dark' ? '#1e293b' : '#fff', borderColor: theme === 'dark' ? '#334155' : '#e2e8f0', color: theme === 'dark' ? '#f8fafc' : '#0f172a' }}
               />
               <Area type="monotone" dataKey="sales" stroke="#4F46E5" fill="url(#salesGrad)" strokeWidth={2} name="Sales" />
@@ -280,7 +274,7 @@ export default function Dashboard() {
               <XAxis dataKey="month" tick={{ fontSize: 12, fill: theme === 'dark' ? '#94a3b8' : '#64748b' }} />
               <YAxis tickFormatter={v => `${v / 1000}K`} tick={{ fontSize: 11, fill: theme === 'dark' ? '#94a3b8' : '#64748b' }} />
               <Tooltip 
-                formatter={v => formatNPR(v)}
+                formatter={v => formatAmountShort(v)}
                 contentStyle={{ backgroundColor: theme === 'dark' ? '#1e293b' : '#fff', borderColor: theme === 'dark' ? '#334155' : '#e2e8f0', color: theme === 'dark' ? '#f8fafc' : '#0f172a' }}
               />
               <Legend wrapperStyle={{ color: theme === 'dark' ? '#cbd5e1' : '#475569' }} />
@@ -322,7 +316,7 @@ export default function Dashboard() {
                     <p className="text-xs text-muted-foreground">{inv.customer_name}</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-sm font-semibold">{mask(formatNPR(inv.grand_total || 0))}</p>
+                    <p className="text-sm font-semibold">{mask(formatAmountShort(inv.grand_total || 0))}</p>
                     <StatusBadge status={inv.payment_status} />
                   </div>
                 </div>

@@ -316,6 +316,8 @@ class GlobalErrorBoundary extends Component {
   }
 }
 
+import { NumberFormatProvider } from '@/lib/NumberFormatContext';
+
 function App() {
   React.useEffect(() => {
     const handleKeyDown = (e) => {
@@ -334,9 +336,11 @@ function App() {
         <GlobalVoucherDrawerProvider>
           <AuthProvider>
             <DateFormatProvider>
-              <RouterProvider router={createBrowserRouter([{ path: '*', element: <><AuthenticatedApp /><GlobalVoucherDrawer /><ModalRegistry /></> }])} />
-              <Toaster />
-              <SonnerToaster position="top-right" richColors />
+              <NumberFormatProvider>
+                <RouterProvider router={createBrowserRouter([{ path: '*', element: <><AuthenticatedApp /><GlobalVoucherDrawer /><ModalRegistry /></> }])} />
+                <Toaster />
+                <SonnerToaster position="top-right" richColors />
+              </NumberFormatProvider>
             </DateFormatProvider>
           </AuthProvider>
         </GlobalVoucherDrawerProvider>

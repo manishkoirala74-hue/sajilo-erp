@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { sajilo } from '@/api/sajiloClient';
+import { useAuth } from '@/lib/AuthContext';
 import { toast } from 'sonner';
 import { Plus, Eye, Edit } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -16,9 +17,9 @@ const emptyProject = {
   project_name: '',
   project_type: 'Residential',
   status: 'Active',
-  budget_amount: 0,
+  estimated_budget: 0,
   start_date: new Date().toISOString().split('T')[0],
-  end_date: '',
+  target_completion_date: '',
   customer_id: ''
 };
 
@@ -28,6 +29,9 @@ const statuses = ['Active', 'OnHold', 'Completed', 'Cancelled'];
 const fmt = n => `NPR ${Number(n || 0).toLocaleString()}`;
 
 export default function ProjectMaster() {
+  const { activeCompany } = useAuth();
+  const isGhostMode = activeCompany?.status === 'PENDING_DELETION';
+
   const [projects, setProjects] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -65,7 +69,9 @@ export default function ProjectMaster() {
     setSaving(true);
     try {
       const payload = { ...form };
-      if (payload.budget_amount) payload.budget_amount = parseFloat(payload.budget_amount);
+      if (payload.estimated_budget) payload.estimated_budget = parseFloat(payload.estimated_budget);
+      if (!payload.start_date) payload.start_date = null;
+      if (!payload.target_completion_date) payload.target_completion_date = null;
 
       if (editing) {
         await sajilo.entities.ConstructionProject.update(editing, payload);
@@ -85,18 +91,18 @@ export default function ProjectMaster() {
     }
   };
 
-  const getCustomerName = (id) => customers.find(c => c.id === id)?.partner_name || 'Unknown';
+  const getCustomerName = (id) => customers.find(c => c.id === id)?.name || 'Unknown';
 
   const columns = [
     { key: 'project_name', label: 'Project Name' },
     { key: 'customer_id', label: 'Customer', render: v => getCustomerName(v) },
     { key: 'project_type', label: 'Type' },
-    { key: 'budget_amount', label: 'Budget', render: v => fmt(v) },
+    { key: 'estimated_budget', label: 'Budget', render: v => fmt(v) },
     { key: 'start_date', label: 'Start Date' },
     { key: 'status', label: 'Status', render: v => <StatusBadge status={v} /> },
     { key: 'id', label: 'Actions', render: (_, row) => (
       <div className="flex gap-1">
-        <Button size="sm" variant="ghost" onClick={() => { setForm(row); setEditing(row.id); setOpen(true); }}>
+        <Button size="sm" variant="ghost" disabled={isGhostMode} onClick={() => { setForm(row); setEditing(row.id); setOpen(true); }}>
           <Edit className="w-3 h-3 mr-1" /> Edit
         </Button>
       </div>
@@ -108,9 +114,9 @@ export default function ProjectMaster() {
       <PageHeader 
         title="Construction Projects" 
         subtitle="Manage your projects, budgets, and clients"
-        action={() => { setForm(emptyProject); setEditing(null); setOpen(true); }} 
-        actionLabel="New Project" 
-        actionIcon={Plus} 
+        action={isGhostMode ? undefined : () => { setForm(emptyProject); setEditing(null); setOpen(true); }} 
+        actionLabel={isGhostMode ? undefined : "New Project"} 
+        actionIcon={isGhostMode ? undefined : Plus} 
       />
 
       <DataTable columns={columns} data={projects} searchKey="project_name" loading={loading} />
@@ -121,20 +127,20 @@ export default function ProjectMaster() {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label>Project Name *</Label>
-              <Input value={form.project_name} onChange={e => setField('project_name', e.target.value)} />
+              <Input value={form.project_name} onChange={e => setField('project_name', e.target.value)} disabled={isGhostMode} />
             </div>
             <div>
               <Label>Customer *</Label>
-              <Select value={form.customer_id} onValueChange={v => setField('customer_id', v)}>
+              <Select value={form.customer_id} onValueChange={v => setField('customer_id', v)} disabled={isGhostMode}>
                 <SelectTrigger><SelectValue placeholder="Select customer" /></SelectTrigger>
                 <SelectContent>
-                  {customers.map(c => <SelectItem key={c.id} value={c.id}>{c.partner_name}</SelectItem>)}
+                  {customers.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
             <div>
               <Label>Project Type</Label>
-              <Select value={form.project_type} onValueChange={v => setField('project_type', v)}>
+              <Select value={form.project_type} onValueChange={v => setField('project_type', v)} disabled={isGhostMode}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {projectTypes.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
@@ -143,7 +149,7 @@ export default function ProjectMaster() {
             </div>
             <div>
               <Label>Status</Label>
-              <Select value={form.status} onValueChange={v => setField('status', v)}>
+              <Select value={form.status} onValueChange={v => setField('status', v)} disabled={isGhostMode}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {statuses.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
@@ -152,21 +158,21 @@ export default function ProjectMaster() {
             </div>
             <div>
               <Label>Budget Amount</Label>
-              <Input type="number" value={form.budget_amount} onChange={e => setField('budget_amount', e.target.value)} />
+              <Input type="number" value={form.estimated_budget} onChange={e => setField('estimated_budget', e.target.value)} disabled={isGhostMode} />
             </div>
             <div />
-            <div>
-              <Label>Start Date</Label>
-              <DateInput value={form.start_date} onChange={d => setField('start_date', d)} />
+            <div className="col-span-1">
+              <DateInput label="Start Date" value={form.start_date} onChange={d => setField('start_date', d)} disabled={isGhostMode} />
             </div>
-            <div>
-              <Label>End Date (Optional)</Label>
-              <DateInput value={form.end_date} onChange={d => setField('end_date', d)} />
+            <div className="col-span-1">
+              <DateInput label="End Date (Optional)" value={form.target_completion_date} onChange={d => setField('target_completion_date', d)} disabled={isGhostMode} />
             </div>
           </div>
           <div className="flex justify-end gap-2 mt-4">
             <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-            <Button onClick={save} disabled={saving}>{saving ? 'Saving...' : 'Save Project'}</Button>
+            {!isGhostMode && (
+              <Button onClick={save} disabled={saving}>{saving ? 'Saving...' : 'Save Project'}</Button>
+            )}
           </div>
         </DialogContent>
       </Dialog>

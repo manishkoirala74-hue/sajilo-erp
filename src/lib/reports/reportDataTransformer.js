@@ -5,12 +5,6 @@
 
 import { adToBS, formatBS } from '../nepaliDate.js';
 
-// Native Intl Formatter for localized South Asian numbering system (NPR)
-const nprFormatter = new Intl.NumberFormat('en-IN', {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2
-});
-
 /**
  * Coerce null/undefined text fields to empty strings to protect WebAssembly engines like Yoga.
  */
@@ -24,21 +18,6 @@ function coerceNulls(obj) {
     }
   }
   return obj;
-}
-
-/**
- * Formats a numeric value based on its formatType.
- * If formatType is 'currency' and value is exactly 0, returns '-'.
- */
-function formatValue(val, formatType) {
-  if (formatType === 'currency') {
-    const num = Number(val) || 0;
-    if (Math.abs(num) < 0.001) return '-';
-    // Format negative numbers with parentheses
-    if (num < 0) return `(${nprFormatter.format(Math.abs(num))})`;
-    return nprFormatter.format(num);
-  }
-  return val;
 }
 
 /**
@@ -450,4 +429,3 @@ export function transformReportData(reportType, rawData, parameters = {}, skipZe
   }
 }
 
-export { formatValue };

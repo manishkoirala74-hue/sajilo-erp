@@ -6,6 +6,7 @@ import { Plus, Search, Edit2, Trash2, RefreshCw, ChevronRight, ChevronDown, Fold
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import AccountFormModal from '@/components/accounting/AccountFormModal';
+import { useAmountFormatter } from '@/hooks/useAmountFormatter';
 
 const TYPE_META = {
   Asset:               { badge: 'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400',    dot: 'bg-blue-500',    border: 'border-blue-200 dark:border-blue-500/20'   },
@@ -23,10 +24,8 @@ const TYPE_META = {
 const getMeta = (type) =>
   TYPE_META[type] || { badge: 'bg-slate-100 dark:bg-slate-500/20 text-muted-foreground', dot: 'bg-slate-400', border: 'border-border' };
 
-const fmt = (n) => (n || 0).toLocaleString('en-NP', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
-// ── Sub Ledger Row (leaf) ─────────────────────────────────────────────────────
-function SubLedgerRow({ acc, depth, onEdit, onDelete }) {
+// ── Sub LedgerRow (leaf) ─────────────────────────────────────────────────────
+function SubLedgerRow({ acc, depth, onEdit, onDelete, formatAmount }) {
   const indent = depth * 20 + 16;
   return (
     <div
@@ -47,7 +46,7 @@ function SubLedgerRow({ acc, depth, onEdit, onDelete }) {
         {acc.is_active ? 'Active' : 'Inactive'}
       </span>
       <span className={cn('font-mono text-xs font-semibold w-28 text-right shrink-0', (acc.current_balance || 0) >= 0 ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>
-        {fmt(acc.current_balance)}
+        {formatAmount(acc.current_balance)}
       </span>
       <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
         {/* Sub Ledgers are always editable — lock only applies to Groups */}
@@ -63,7 +62,7 @@ function SubLedgerRow({ acc, depth, onEdit, onDelete }) {
 }
 
 // ── Group Ledger Row (recursive) ──────────────────────────────────────────────
-function GroupLedgerRow({ grp, children, depth, expanded, onToggle, onEdit, onDelete, onAddChild, expandedGroups, toggleGroup }) {
+function GroupLedgerRow({ grp, children, depth, expanded, onToggle, onEdit, onDelete, onAddChild, expandedGroups, toggleGroup, formatAmount }) {
   const indent = depth * 20 + 8;
   const isExpanded = expanded;
   const hasChildren = children.length > 0;
@@ -103,7 +102,7 @@ function GroupLedgerRow({ grp, children, depth, expanded, onToggle, onEdit, onDe
           </span>
         )}
         <span className={cn('font-mono text-xs font-bold w-28 text-right shrink-0', (grp.current_balance || 0) >= 0 ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>
-          {fmt(grp.current_balance)}
+          {formatAmount(grp.current_balance)}
         </span>
         <div
           className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
@@ -144,6 +143,7 @@ function GroupLedgerRow({ grp, children, depth, expanded, onToggle, onEdit, onDe
                   onAddChild={onAddChild}
                   expandedGroups={expandedGroups}
                   toggleGroup={toggleGroup}
+                  formatAmount={formatAmount}
                 />
               )
               : (
@@ -153,6 +153,7 @@ function GroupLedgerRow({ grp, children, depth, expanded, onToggle, onEdit, onDe
                   depth={depth + 1}
                   onEdit={onEdit}
                   onDelete={onDelete}
+                  formatAmount={formatAmount}
                 />
               )
           )}
@@ -171,7 +172,7 @@ function GroupLedgerRow({ grp, children, depth, expanded, onToggle, onEdit, onDe
 }
 
 // ── Type Section (Level 0) ────────────────────────────────────────────────────
-function TypeSection({ type, typeData, meta, isExpanded, onToggle, expandedGroups, toggleGroup, onEdit, onDelete, onAddChild, typeBalance, totalInType }) {
+function TypeSection({ type, typeData, meta, isExpanded, onToggle, expandedGroups, toggleGroup, onEdit, onDelete, onAddChild, typeBalance, totalInType, formatAmount }) {
   return (
     <div>
       {/* Type header */}
@@ -185,7 +186,7 @@ function TypeSection({ type, typeData, meta, isExpanded, onToggle, expandedGroup
           {totalInType} accounts
         </span>
         <span className={cn('font-mono text-xs font-bold w-28 text-right shrink-0', typeBalance >= 0 ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>
-          {fmt(typeBalance)}
+          {formatAmount(typeBalance)}
         </span>
         {isExpanded
           ? <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
@@ -209,10 +210,11 @@ function TypeSection({ type, typeData, meta, isExpanded, onToggle, expandedGroup
               onAddChild={onAddChild}
               expandedGroups={expandedGroups}
               toggleGroup={toggleGroup}
+              formatAmount={formatAmount}
             />
           ))}
           {(typeData?.ungrouped || []).map(sub => (
-            <SubLedgerRow key={sub.id} acc={sub} depth={0} onEdit={onEdit} onDelete={onDelete} />
+            <SubLedgerRow key={sub.id} acc={sub} depth={0} onEdit={onEdit} onDelete={onDelete} formatAmount={formatAmount} />
           ))}
           {(!typeData?.rootGroups?.length && !typeData?.ungrouped?.length) && (
             <p className="text-xs italic text-muted-foreground/60 px-8 py-2">No accounts in this category</p>
@@ -225,6 +227,7 @@ function TypeSection({ type, typeData, meta, isExpanded, onToggle, expandedGroup
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function ChartOfAccounts() {
+  const { formatAmount } = useAmountFormatter();
   const [accounts,       setAccounts]       = useState([]);
   const [loading,        setLoading]        = useState(true);
   const [search,         setSearch]         = useState('');
@@ -257,7 +260,7 @@ export default function ChartOfAccounts() {
 
     // Check for non-zero balance
     if ((acc.current_balance || 0) !== 0) {
-      toast.error(`Cannot delete "${acc.account_name}" — it has a non-zero balance (${fmt(acc.current_balance)} NPR).`);
+      toast.error(`Cannot delete "${acc.account_name}" — it has a non-zero balance (${formatAmount(acc.current_balance)}).`);
       return;
     }
 
@@ -441,6 +444,7 @@ export default function ChartOfAccounts() {
                 onAddChild={handleAddChild}
                 typeBalance={summary[type]?.balance || 0}
                 totalInType={summary[type]?.count || 0}
+                formatAmount={formatAmount}
               />
             ))}
           </div>

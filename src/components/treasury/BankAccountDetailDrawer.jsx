@@ -1,6 +1,7 @@
 import { X, Landmark, Banknote, FileText, ExternalLink, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { useAmountFormatter } from '@/hooks/useAmountFormatter';
 
 const categoryStyle = {
   Current: 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400',
@@ -9,11 +10,6 @@ const categoryStyle = {
   'Fixed Deposit': 'bg-yellow-50 dark:bg-yellow-500/10 text-yellow-700 dark:text-yellow-400',
   'Cash in Hand': 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
 };
-
-function formatNPR(n) {
-  if (n == null) return '—';
-  return new Intl.NumberFormat('en-NP', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
-}
 
 function InfoRow({ label, value }) {
   if (!value) return null;
@@ -34,6 +30,7 @@ function getFileName(url) {
 }
 
 export default function BankAccountDetailDrawer({ account, onClose, onEdit }) {
+  const { formatAmount } = useAmountFormatter();
   if (!account) return null;
   const isBank = account.account_type === 'Bank';
   const docs = account.document_urls || [];
@@ -71,11 +68,11 @@ export default function BankAccountDetailDrawer({ account, onClose, onEdit }) {
           <div className="bg-muted/30 rounded-xl p-4 grid grid-cols-2 gap-4">
             <div>
               <p className="text-xs text-muted-foreground mb-0.5">Opening Balance</p>
-              <p className="text-base font-bold text-foreground">NPR {formatNPR(account.opening_balance)}</p>
+              <p className="text-base font-bold text-foreground">{formatAmount(account.opening_balance)}</p>
             </div>
             <div>
               <p className="text-xs text-muted-foreground mb-0.5">Current Balance</p>
-              <p className="text-base font-bold text-primary">NPR {formatNPR(account.current_balance)}</p>
+              <p className="text-base font-bold text-primary">{formatAmount(account.current_balance)}</p>
             </div>
           </div>
 
