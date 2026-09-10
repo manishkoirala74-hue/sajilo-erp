@@ -18,7 +18,9 @@ import { useSajiloSync } from '@/hooks/useSajiloSync';
 import { loadActiveTaxTypes, computeTotalTax } from '@/lib/taxService';
 import SearchableSelect from '@/components/shared/SearchableSelect';
 import VoucherLink from '@/components/shared/VoucherLink';
+import { useAuth } from '@/lib/AuthContext';
 import FileUpload from '@/components/shared/FileUpload';
+import { getPredictedVoucherNumber } from '@/utils/documentSequence';
 
 const FULFILLMENT_STATUSES = ['Draft', 'Confirmed', 'Preparing', 'Ready', 'Dispatched', 'Delivered'];
 
@@ -38,6 +40,9 @@ export default function SalesOrders() {
   const [form, setForm] = useState(emptySO);
   const [saving, setSaving] = useState(false);
   const [filterStatus, setFilterStatus] = useState('all');
+  const { activeFiscalYear } = useAuth();
+  const [settings, setSettings] = useState(null);
+  const [sequenceConfigs, setSequenceConfigs] = useState([]);
   const [taxTypes, setTaxTypes] = useState([]);
 
   const loadData = () => {
@@ -45,10 +50,14 @@ export default function SalesOrders() {
       sajilo.entities.SalesOrder.list('-created_date'),
       sajilo.entities.BusinessPartner.filter({ is_active: true }),
       loadActiveTaxTypes(),
-    ]).then(([sos, cs, txTypes]) => {
+      sajilo.entities.CompanySettings.list(),
+      sajilo.entities.DocumentSequenceConfig.list(),
+    ]).then(([sos, cs, txTypes, ss, seqConfigs]) => {
       setOrders(sos);
       setCustomers(cs.filter(c => c.is_customer || c.treat_as_customer));
       setTaxTypes(txTypes || []);
+      setSettings(ss[0] || {});
+      setSequenceConfigs(seqConfigs || []);
       setLoading(false);
     }).catch(err => {
       console.error(err);
@@ -99,14 +108,12 @@ export default function SalesOrders() {
     setOrders(data);
   };
 
-  const generateSONumber = () => {
-    const year = new Date().getFullYear();
-    const seq = String(orders.length + 1).padStart(3, '0');
-    return `SO-${year}-${seq}`;
+  const getPredictedSalesOrderNumber = () => {
+    return getPredictedVoucherNumber('SalesOrder', sequenceConfigs, activeFiscalYear, settings);
   };
 
   const openNew = () => {
-    setForm({ ...emptySO, id: crypto.randomUUID(), order_number: generateSONumber() });
+    setForm({ ...emptySO, id: crypto.randomUUID(), order_number: 'AUTO' });
     setShowForm(true);
   };
 
@@ -120,9 +127,9 @@ export default function SalesOrders() {
     if (!form.customer_name) { toast.error('Select a customer'); return; }
     setSaving(true);
     try {
-  await sajilo.entities.SalesOrder.create(form);
-      toast.success('Sales order created');
-        } catch (err) {
+      const savedSO = await sajilo.entities.SalesOrder.create(form);
+      toast.success(`Sales order ${savedSO?.order_number || ''} created`);
+    } catch (err) {
       toast.error(err.message || 'Error occurred while saving');
     } finally {
       setSaving(false);
@@ -199,9 +206,24 @@ export default function SalesOrders() {
       <Dialog open={showForm} onOpenChange={setShowForm}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>New Sales Order — {form.order_number}</DialogTitle>
+            <DialogTitle>{form.id ? 'Edit Sales Order' : 'New Sales Order'}{form.order_number && form.order_number !== 'AUTO' ? ` — ${form.order_number}` : ''}</DialogTitle>
           </DialogHeader>
           <div className="grid grid-cols-2 gap-4 mt-4">
+            <div>
+              <Label>Order Number *</Label>
+              <div className="flex gap-2 mt-1">
+                <Input
+                  value={form.order_number === 'AUTO' ? '' : (form.order_number || '')}
+                  onChange={e => setForm(f => ({ ...f, order_number: e.target.value }))}
+                  readOnly={settings?.invoice_numbering_method !== 'Manual'}
+                  className={settings?.invoice_numbering_method !== 'Manual' ? 'font-mono bg-muted' : 'font-mono'}
+                  placeholder={settings?.invoice_numbering_method === 'Manual' ? 'Enter order number' : `Auto (${getPredictedSalesOrderNumber()})`}
+                />
+                {settings?.invoice_numbering_method !== 'Manual' && (
+                  <span className="flex items-center text-xs text-muted-foreground bg-muted px-2 rounded-xl border border-border whitespace-nowrap">Auto</span>
+                )}
+              </div>
+            </div>
             <div>
               <Label>Customer *</Label>
               <SearchableSelect

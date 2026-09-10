@@ -15,6 +15,8 @@ import DateInput from '@/components/shared/DateInput';
 import { postPurchaseReturn, loadItemsMap, loadSettings } from '@/lib/glPostingService';
 import { loadActiveTaxTypes, computeTotalTax } from '@/lib/taxService';
 import VoucherLink from '@/components/shared/VoucherLink';
+import { useAuth } from '@/lib/AuthContext';
+import { getPredictedVoucherNumber } from '@/utils/documentSequence';
 
 const emptyReturn = {
   return_number: '', purchase_invoice_id: '', purchase_invoice_number: '',
@@ -25,10 +27,13 @@ const emptyReturn = {
 };
 
 export default function PurchaseReturns() {
+  const { activeFiscalYear } = useAuth();
   const [returns, setReturns] = useState([]);
   const [invoices, setInvoices] = useState([]);
   const [vendors, setVendors] = useState([]);
   const [items, setItems] = useState([]);
+  const [settings, setSettings] = useState(null);
+  const [sequenceConfigs, setSequenceConfigs] = useState([]);
   const [taxTypes, setTaxTypes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -43,23 +48,29 @@ export default function PurchaseReturns() {
       sajilo.entities.BusinessPartner.filter({ is_vendor: true }),
       sajilo.entities.Item.filter({ is_active: true }, 'item_name', 500),
       loadActiveTaxTypes(),
-    ]).then(([r, inv, vs, its, txTypes]) => {
+      sajilo.entities.CompanySettings.list(),
+      sajilo.entities.DocumentSequenceConfig.list(),
+    ]).then(([r, inv, vs, its, txTypes, ss, seqConfigs]) => {
       setReturns(r); setInvoices(inv);
       setVendors(vs.filter(v => v.is_active !== false));
       setItems(its);
       setTaxTypes(txTypes || []);
+      setSettings(ss[0] || {});
+      setSequenceConfigs(seqConfigs || []);
       setLoading(false);
     });
   }, []);
+
+  const getPredictedPurchaseReturnNumber = () => {
+    return getPredictedVoucherNumber('PurchaseReturn', sequenceConfigs, activeFiscalYear, settings);
+  };
 
   const fetchReturns = async () => {
     const data = await sajilo.entities.PurchaseReturn.list('-created_date');
     setReturns(data);
   };
 
-  const genNumber = () => `PRN-${new Date().getFullYear()}-${String(returns.length + 1).padStart(3, '0')}`;
-
-  const openNew = () => { setForm({ ...emptyReturn, return_number: genNumber() }); setShowForm(true); };
+  const openNew = () => { setForm({ ...emptyReturn, return_number: 'AUTO' }); setShowForm(true); };
 
   const fetchFromInvoice = (invId) => {
     const inv = invoices.find(i => i.id === invId);
@@ -95,14 +106,14 @@ export default function PurchaseReturns() {
     setSaving(true);
     try {
       const idempotencyKey = crypto.randomUUID();
-      const created = await sajilo.entities.PurchaseReturn.create({ ...form, status, idempotency_key: idempotencyKey });
+      const created = await sajilo.entities.PurchaseReturn.create({ ...form, status, return_number: form.return_number || 'AUTO', idempotency_key: idempotencyKey });
       if (status === 'Posted') {
         // GL Posting & Atomic Stock Update via RPC
         const [itemsMap, glSettings] = await Promise.all([loadItemsMap(form.line_items.map(l => l.item_id)), loadSettings()]);
-        await postPurchaseReturn({ ...form, id: created.id, idempotency_key: idempotencyKey }, itemsMap, glSettings);
-        toast.success('Purchase return posted — stock reduced & GL updated');
+        await postPurchaseReturn({ ...form, ...created, id: created.id, idempotency_key: idempotencyKey }, itemsMap, glSettings);
+        toast.success(`Purchase return ${created?.return_number || ''} posted — stock reduced & GL updated`);
       } else {
-        toast.success('Saved as draft');
+        toast.success(`Purchase return ${created?.return_number || ''} saved as draft`);
       }
     } catch (err) {
       toast.error(err.message || 'Error occurred while saving');
@@ -132,8 +143,23 @@ export default function PurchaseReturns() {
 
       <Dialog open={showForm} onOpenChange={setShowForm}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>Purchase Return — {form.return_number}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>Purchase Return{form.return_number && form.return_number !== 'AUTO' ? ` — ${form.return_number}` : ''}</DialogTitle></DialogHeader>
           <div className="grid grid-cols-2 gap-4 mt-4">
+            <div>
+              <Label>Return Number *</Label>
+              <div className="flex gap-2 mt-1">
+                <Input
+                  value={form.return_number === 'AUTO' ? '' : (form.return_number || '')}
+                  onChange={e => setForm(f => ({ ...f, return_number: e.target.value }))}
+                  readOnly={settings?.invoice_numbering_method !== 'Manual'}
+                  className={settings?.invoice_numbering_method !== 'Manual' ? 'font-mono bg-muted' : 'font-mono'}
+                  placeholder={settings?.invoice_numbering_method === 'Manual' ? 'Enter return number' : `Auto (${getPredictedPurchaseReturnNumber()})`}
+                />
+                {settings?.invoice_numbering_method !== 'Manual' && (
+                  <span className="flex items-center text-xs text-muted-foreground bg-muted px-2 rounded-xl border border-border whitespace-nowrap">Auto</span>
+                )}
+              </div>
+            </div>
             <div>
               <Label>Vendor *</Label>
               <Select value={form.vendor_id} onValueChange={v => {

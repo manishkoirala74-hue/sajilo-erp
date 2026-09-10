@@ -89,9 +89,8 @@ export default function AssetPurchaseModal({ open, onClose, assets, accounts, ba
         });
 
         // Create a Financial Voucher record for visibility under Financial Vouchers
-        const voucherNumber = `APV-${Date.now().toString().slice(-6)}`;
-        await sajilo.entities.FinancialVoucher.create({
-          voucher_number: voucherNumber,
+        const newVoucher = await sajilo.entities.FinancialVoucher.create({
+          voucher_number: 'AUTO',
           voucher_type: 'Journal',
           voucher_date: purchaseDate,
           total_amount: val,
@@ -117,7 +116,7 @@ export default function AssetPurchaseModal({ open, onClose, assets, accounts, ba
           ],
         });
 
-        toast.success(`Asset purchase posted to GL & Financial Vouchers (${voucherNumber})`);
+        toast.success(`Asset purchase posted to GL & Financial Vouchers (${newVoucher?.voucher_number || ''})`);
         onSaved();
         handleClose();
       } else {

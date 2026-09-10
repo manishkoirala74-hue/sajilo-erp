@@ -16,6 +16,8 @@ import DateInput from '@/components/shared/DateInput';
 import { postSalesReturn, loadItemsMap, loadSettings } from '@/lib/glPostingService';
 import { loadActiveTaxTypes, computeTotalTax } from '@/lib/taxService';
 import VoucherLink from '@/components/shared/VoucherLink';
+import { useAuth } from '@/lib/AuthContext';
+import { getPredictedVoucherNumber } from '@/utils/documentSequence';
 
 const emptyReturn = {
   return_number: '', sales_invoice_id: '', sales_invoice_number: '',
@@ -26,10 +28,13 @@ const emptyReturn = {
 };
 
 export default function SalesReturns() {
+  const { activeFiscalYear } = useAuth();
   const [returns, setReturns] = useState([]);
   const [invoices, setInvoices] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [items, setItems] = useState([]);
+  const [settings, setSettings] = useState(null);
+  const [sequenceConfigs, setSequenceConfigs] = useState([]);
   const [taxTypes, setTaxTypes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -44,22 +49,29 @@ export default function SalesReturns() {
       sajilo.entities.BusinessPartner.filter({ is_customer: true }),
       sajilo.entities.Item.filter({ is_active: true }, 'item_name', 500),
       loadActiveTaxTypes(),
-    ]).then(([r, inv, cs, its, txTypes]) => {
+      sajilo.entities.CompanySettings.list(),
+      sajilo.entities.DocumentSequenceConfig.list(),
+    ]).then(([r, inv, cs, its, txTypes, ss, seqConfigs]) => {
       setReturns(r); setInvoices(inv);
       setCustomers(cs.filter(c => c.is_active !== false));
       setItems(its.filter(i => i.item_type !== 'Service'));
       setTaxTypes(txTypes || []);
+      setSettings(ss[0] || {});
+      setSequenceConfigs(seqConfigs || []);
       setLoading(false);
     });
   }, []);
+
+  const getPredictedSalesReturnNumber = () => {
+    return getPredictedVoucherNumber('SalesReturn', sequenceConfigs, activeFiscalYear, settings);
+  };
 
   const fetchReturns = async () => {
     const data = await sajilo.entities.SalesReturn.list('-created_date');
     setReturns(data);
   };
 
-  const genNumber = () => `SRN-${new Date().getFullYear()}-${String(returns.length + 1).padStart(3, '0')}`;
-  const openNew = () => { setForm({ ...emptyReturn, return_number: genNumber() }); setShowForm(true); };
+  const openNew = () => { setForm({ ...emptyReturn, return_number: 'AUTO' }); setShowForm(true); };
 
   const fetchFromInvoice = (invId) => {
     const inv = invoices.find(i => i.id === invId);
@@ -95,14 +107,14 @@ export default function SalesReturns() {
     setSaving(true);
     try {
       const idempotencyKey = crypto.randomUUID();
-      const created = await sajilo.entities.SalesReturn.create({ ...form, status, idempotency_key: idempotencyKey });
+      const created = await sajilo.entities.SalesReturn.create({ ...form, status, return_number: form.return_number || 'AUTO', idempotency_key: idempotencyKey });
       if (status === 'Posted') {
         // GL Posting & Atomic Stock Update via RPC
         const [itemsMap, glSettings] = await Promise.all([loadItemsMap(form.line_items.map(l => l.item_id)), loadSettings()]);
-        await postSalesReturn({ ...form, id: created.id, return_source: form.return_source || 'Sales Invoice', idempotency_key: idempotencyKey }, itemsMap, glSettings);
-        toast.success('Sales return posted — stock restored & GL updated');
+        await postSalesReturn({ ...form, ...created, id: created.id, return_source: form.return_source || 'Sales Invoice', idempotency_key: idempotencyKey }, itemsMap, glSettings);
+        toast.success(`Sales return ${created?.return_number || ''} posted — stock restored & GL updated`);
       } else {
-        toast.success('Saved as draft');
+        toast.success(`Sales return ${created?.return_number || ''} saved as draft`);
       }
     } catch (err) {
       toast.error(err.message || 'Error occurred while saving');
@@ -139,8 +151,23 @@ export default function SalesReturns() {
 
       <Dialog open={showForm} onOpenChange={setShowForm}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>Sales Return — {form.return_number}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>Sales Return{form.return_number && form.return_number !== 'AUTO' ? ` — ${form.return_number}` : ''}</DialogTitle></DialogHeader>
           <div className="grid grid-cols-2 gap-4 mt-4">
+            <div>
+              <Label>Return Number *</Label>
+              <div className="flex gap-2 mt-1">
+                <Input
+                  value={form.return_number === 'AUTO' ? '' : (form.return_number || '')}
+                  onChange={e => setForm(f => ({ ...f, return_number: e.target.value }))}
+                  readOnly={settings?.invoice_numbering_method !== 'Manual'}
+                  className={settings?.invoice_numbering_method !== 'Manual' ? 'font-mono bg-muted' : 'font-mono'}
+                  placeholder={settings?.invoice_numbering_method === 'Manual' ? 'Enter return number' : `Auto (${getPredictedSalesReturnNumber()})`}
+                />
+                {settings?.invoice_numbering_method !== 'Manual' && (
+                  <span className="flex items-center text-xs text-muted-foreground bg-muted px-2 rounded-xl border border-border whitespace-nowrap">Auto</span>
+                )}
+              </div>
+            </div>
             <div>
               <Label>Customer *</Label>
               <Select value={form.customer_id} onValueChange={v => {

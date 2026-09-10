@@ -16,6 +16,7 @@ import FormGrid from '@/components/layout/FormGrid';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/AuthContext';
 import { postStockAdjustment, loadItemsMap, loadSettings } from '@/lib/glPostingService';
+import { getPredictedVoucherNumber } from '@/utils/documentSequence';
 
 const REASONS = ['Physical Count Variance', 'Damage/Wastage', 'Opening Stock', 'Expiry', 'Theft/Loss', 'Other'];
 
@@ -33,7 +34,9 @@ export default function StockAdjustments() {
   const [viewDetail, setViewDetail] = useState(null);
   const [form, setForm] = useState(emptyAdj);
   const [saving, setSaving] = useState(false);
-  const { globalSettings, hasAccess } = useAuth();
+  const { globalSettings, hasAccess, activeFiscalYear } = useAuth();
+  const [settings, setSettings] = useState(null);
+  const [sequenceConfigs, setSequenceConfigs] = useState([]);
   const [showNegativeStockWarning, setShowNegativeStockWarning] = useState(false);
   const [negativeStockItems, setNegativeStockItems] = useState([]);
   const [pendingStatus, setPendingStatus] = useState(null);
@@ -42,10 +45,14 @@ export default function StockAdjustments() {
     Promise.all([
       sajilo.entities.StockAdjustment.list('-created_date'),
       sajilo.entities.Item.filter({ is_active: true }, 'item_name', 500),
-    ]).then(([adj, its]) => {
+      sajilo.entities.CompanySettings.list(),
+      sajilo.entities.DocumentSequenceConfig.list(),
+    ]).then(([adj, its, ss, seqConfigs]) => {
       setAdjustments(adj);
       // Only physical items — exclude services
       setItems(its.filter(i => i.item_type !== 'Service'));
+      setSettings(ss[0] || {});
+      setSequenceConfigs(seqConfigs || []);
       setLoading(false);
     });
   }, []);
@@ -55,9 +62,12 @@ export default function StockAdjustments() {
     setAdjustments(data);
   };
 
-  const genNumber = () => `ADJ-${new Date().getFullYear()}-${String(adjustments.length + 1).padStart(3, '0')}`;
+  const getPredictedStockAdjustmentNumber = () => {
+    return getPredictedVoucherNumber('StockAdjustment', sequenceConfigs, activeFiscalYear, settings);
+  };
+
   const openNew = (type = 'Increase') => {
-    setForm({ ...emptyAdj, adjustment_number: genNumber(), adjustment_type: type });
+    setForm({ ...emptyAdj, adjustment_number: 'AUTO', adjustment_type: type });
     setShowForm(true);
   };
 
@@ -119,14 +129,14 @@ export default function StockAdjustments() {
     setSaving(true);
     try {
       const idempotencyKey = crypto.randomUUID();
-      const created = await sajilo.entities.StockAdjustment.create({ ...form, status, idempotency_key: idempotencyKey });
+      const created = await sajilo.entities.StockAdjustment.create({ ...form, status, adjustment_number: form.adjustment_number || 'AUTO', idempotency_key: idempotencyKey });
       if (status === 'Posted') {
         // GL Posting & Atomic Stock Update via RPC
         const [itemsMap, glSettings] = await Promise.all([loadItemsMap(form.line_items.map(l => l.item_id)), loadSettings()]);
-        await postStockAdjustment({ ...form, id: created.id, idempotency_key: idempotencyKey }, itemsMap, glSettings);
-        toast.success(`Stock adjustment posted — ${form.line_items.length} items updated & GL posted`);
+        await postStockAdjustment({ ...form, ...created, id: created.id, idempotency_key: idempotencyKey }, itemsMap, glSettings);
+        toast.success(`Stock adjustment ${created?.adjustment_number || ''} posted — ${form.line_items.length} items updated & GL posted`);
       } else {
-        toast.success('Adjustment saved as draft');
+        toast.success(`Adjustment ${created?.adjustment_number || ''} saved as draft`);
       }
     } catch (err) {
       toast.error(err.message || 'Error occurred while saving');
@@ -175,10 +185,25 @@ export default function StockAdjustments() {
           <DialogHeader>
             <DialogTitle className={cn('flex items-center gap-2', form.adjustment_type === 'Increase' ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-700 dark:text-red-400')}>
               {form.adjustment_type === 'Increase' ? <TrendingUp className="w-5 h-5" /> : <TrendingDown className="w-5 h-5" />}
-              Stock {form.adjustment_type} — {form.adjustment_number}
+              Stock {form.adjustment_type}{form.adjustment_number && form.adjustment_number !== 'AUTO' ? ` — ${form.adjustment_number}` : ''}
             </DialogTitle>
           </DialogHeader>
           <FormGrid className="mt-4">
+            <div>
+              <Label>Adjustment Number *</Label>
+              <div className="flex gap-2 mt-1">
+                <Input
+                  value={form.adjustment_number === 'AUTO' ? '' : (form.adjustment_number || '')}
+                  onChange={e => setForm(f => ({ ...f, adjustment_number: e.target.value }))}
+                  readOnly={settings?.invoice_numbering_method !== 'Manual'}
+                  className={settings?.invoice_numbering_method !== 'Manual' ? 'font-mono bg-muted' : 'font-mono'}
+                  placeholder={settings?.invoice_numbering_method === 'Manual' ? 'Enter number' : `Auto (${getPredictedStockAdjustmentNumber()})`}
+                />
+                {settings?.invoice_numbering_method !== 'Manual' && (
+                  <span className="flex items-center text-xs text-muted-foreground bg-muted px-2 rounded-xl border border-border whitespace-nowrap">Auto</span>
+                )}
+              </div>
+            </div>
             <div>
               <DateInput label="Date" value={form.adjustment_date} onChange={v => setForm(f => ({ ...f, adjustment_date: v }))} />
             </div>

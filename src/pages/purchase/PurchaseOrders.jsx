@@ -19,7 +19,9 @@ import { useSajiloSync } from '@/hooks/useSajiloSync';
 import { loadActiveTaxTypes, computeTotalTax } from '@/lib/taxService';
 import SearchableSelect from '@/components/shared/SearchableSelect';
 import VoucherLink from '@/components/shared/VoucherLink';
+import { useAuth } from '@/lib/AuthContext';
 import FileUpload from '@/components/shared/FileUpload';
+import { getPredictedVoucherNumber } from '@/utils/documentSequence';
 
 const emptyPO = {
   po_number: '', vendor_id: '', vendor_name: '', status: 'Draft',
@@ -37,6 +39,9 @@ export default function PurchaseOrders() {
   const [form, setForm] = useState(emptyPO);
   const [saving, setSaving] = useState(false);
   const [filterStatus, setFilterStatus] = useState('all');
+  const { activeFiscalYear } = useAuth();
+  const [settings, setSettings] = useState(null);
+  const [sequenceConfigs, setSequenceConfigs] = useState([]);
   const [taxTypes, setTaxTypes] = useState([]);
 
   const loadData = () => {
@@ -44,10 +49,14 @@ export default function PurchaseOrders() {
       sajilo.entities.PurchaseOrder.list('-created_date'),
       sajilo.entities.BusinessPartner.filter({ is_active: true }),
       loadActiveTaxTypes(),
-    ]).then(([pos, vs, txTypes]) => {
+      sajilo.entities.CompanySettings.list(),
+      sajilo.entities.DocumentSequenceConfig.list(),
+    ]).then(([pos, vs, txTypes, ss, seqConfigs]) => {
       setOrders(pos);
       setVendors(vs.filter(v => v.is_vendor || v.treated_as_vendor));
       setTaxTypes(txTypes || []);
+      setSettings(ss[0] || {});
+      setSequenceConfigs(seqConfigs || []);
       setLoading(false);
     }).catch(err => {
       console.error(err);
@@ -98,14 +107,12 @@ export default function PurchaseOrders() {
     setOrders(data);
   };
 
-  const generatePONumber = () => {
-    const year = new Date().getFullYear();
-    const seq = String(orders.length + 1).padStart(3, '0');
-    return `PO-${year}-${seq}`;
+  const getPredictedPurchaseOrderNumber = () => {
+    return getPredictedVoucherNumber('PurchaseOrder', sequenceConfigs, activeFiscalYear, settings);
   };
 
   const openNew = () => {
-    setForm({ ...emptyPO, id: crypto.randomUUID(), po_number: generatePONumber() });
+    setForm({ ...emptyPO, id: crypto.randomUUID(), order_number: 'AUTO', po_number: 'AUTO' });
     setShowForm(true);
   };
 
@@ -119,10 +126,10 @@ export default function PurchaseOrders() {
     if (!form.vendor_name) { toast.error('Select a vendor'); return; }
     setSaving(true);
     try {
-  const data = { ...form, status: submitStatus };
-      await sajilo.entities.PurchaseOrder.create(data);
-      toast.success(`PO ${submitStatus === 'Draft' ? 'saved as draft' : 'submitted for approval'}`);
-        } catch (err) {
+      const data = { ...form, status: submitStatus, order_number: form.order_number || 'AUTO', po_number: form.po_number || 'AUTO' };
+      const savedPO = await sajilo.entities.PurchaseOrder.create(data);
+      toast.success(`PO ${savedPO?.order_number || savedPO?.po_number || ''} ${submitStatus === 'Draft' ? 'saved as draft' : 'submitted for approval'}`);
+    } catch (err) {
       toast.error(err.message || 'Error occurred while saving');
     } finally {
       setSaving(false);
@@ -226,9 +233,24 @@ export default function PurchaseOrders() {
       <Dialog open={showForm} onOpenChange={setShowForm}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>New Purchase Order — {form.po_number}</DialogTitle>
+            <DialogTitle>{form.id ? 'Edit Purchase Order' : 'New Purchase Order'}{form.po_number && form.po_number !== 'AUTO' ? ` — ${form.po_number}` : ''}</DialogTitle>
           </DialogHeader>
           <div className="grid grid-cols-2 gap-4 mt-4">
+            <div>
+              <Label>PO Number *</Label>
+              <div className="flex gap-2 mt-1">
+                <Input
+                  value={form.po_number === 'AUTO' ? '' : (form.po_number || '')}
+                  onChange={e => setForm(f => ({ ...f, po_number: e.target.value, order_number: e.target.value }))}
+                  readOnly={settings?.invoice_numbering_method !== 'Manual'}
+                  className={settings?.invoice_numbering_method !== 'Manual' ? 'font-mono bg-muted' : 'font-mono'}
+                  placeholder={settings?.invoice_numbering_method === 'Manual' ? 'Enter PO number' : `Auto (${getPredictedPurchaseOrderNumber()})`}
+                />
+                {settings?.invoice_numbering_method !== 'Manual' && (
+                  <span className="flex items-center text-xs text-muted-foreground bg-muted px-2 rounded-xl border border-border whitespace-nowrap">Auto</span>
+                )}
+              </div>
+            </div>
             <div>
               <Label>Vendor *</Label>
               <SearchableSelect

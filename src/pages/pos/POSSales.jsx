@@ -173,45 +173,45 @@ export default function POSSales() {
     setProcessing(true);
     try {
       const idempotencyKey = crypto.randomUUID();
-    const saleNum = `POS-${new Date().getFullYear()}-${String(saleCount + 1).padStart(4, '0')}`;
-    
-    const getSafeDefaultDate = () => {
-      const today = format(new Date(), 'yyyy-MM-dd');
-      if (activeFiscalYear) {
-        if (today > activeFiscalYear.end_date) return activeFiscalYear.end_date;
-        if (today < activeFiscalYear.start_date) return activeFiscalYear.start_date;
-      }
-      return today;
-    };
+      const saleNum = 'AUTO';
+      
+      const getSafeDefaultDate = () => {
+        const today = format(new Date(), 'yyyy-MM-dd');
+        if (activeFiscalYear) {
+          if (today > activeFiscalYear.end_date) return activeFiscalYear.end_date;
+          if (today < activeFiscalYear.start_date) return activeFiscalYear.start_date;
+        }
+        return today;
+      };
 
-    const sale = {
-      sale_number: saleNum,
-      sale_date: getSafeDefaultDate(),
-      customer_name: customerName || 'Walk-in Customer',
-      customer_id: customerId || null,
-      payment_method: paymentMethod,
-      cash_bank_account_id: !isCredit ? (selectedCashAccountId || null) : null,
-      cash_bank_account_name: !isCredit ? (selectedCashAccountName || null) : null,
-      subtotal: parseFloat(subtotal.toFixed(2)),
-      discount_amount: parseFloat(globalDiscount.toFixed(2)),
-      vat_amount: parseFloat(vat.toFixed(2)),
-      grand_total: parseFloat(grandTotal.toFixed(2)),
-      amount_tendered: amountTendered,
-      change_amount: parseFloat(change.toFixed(2)),
-      status: 'Completed',
-      line_items: cart,
-      idempotency_key: idempotencyKey
-    };
+      const sale = {
+        sale_number: saleNum,
+        sale_date: getSafeDefaultDate(),
+        customer_name: customerName || 'Walk-in Customer',
+        customer_id: customerId || null,
+        payment_method: paymentMethod,
+        cash_bank_account_id: !isCredit ? (selectedCashAccountId || null) : null,
+        cash_bank_account_name: !isCredit ? (selectedCashAccountName || null) : null,
+        subtotal: parseFloat(subtotal.toFixed(2)),
+        discount_amount: parseFloat(globalDiscount.toFixed(2)),
+        vat_amount: parseFloat(vat.toFixed(2)),
+        grand_total: parseFloat(grandTotal.toFixed(2)),
+        amount_tendered: amountTendered,
+        change_amount: parseFloat(change.toFixed(2)),
+        status: 'Completed',
+        line_items: cart,
+        idempotency_key: idempotencyKey
+      };
       const createdSale = await sajilo.entities.POSSale.create(sale);
       const [itemsMap, settings] = await Promise.all([loadItemsMap(cart.map(c => c.item_id)), loadSettings()]);
-      await postPOSSale({ ...sale, id: createdSale.id }, itemsMap, settings);
-      setLastReceipt(sale);
+      await postPOSSale({ ...sale, ...createdSale, id: createdSale.id }, itemsMap, settings);
+      setLastReceipt(createdSale);
       setCart([]);
       setCustomerName('Walk-in Customer');
       setDiscountPercent(0);
       setAmountTendered(0);
       setSaleCount(prev => prev + 1);
-      toast.success(`Sale ${saleNum} completed!`);
+      toast.success(`Sale ${createdSale?.sale_number || ''} completed!`);
     } catch (err) {
       toast.error(err.message || 'Error occurred while processing POS sale');
     } finally {

@@ -23,6 +23,7 @@ import { generateVectorPDF } from '@/utils/pdfGenerator';
 import VoucherLink from '@/components/shared/VoucherLink';
 import DateInput from '@/components/shared/DateInput';
 import { useNavigationBlocker } from '@/hooks/useNavigationBlocker';
+import { getPredictedVoucherNumber } from '@/utils/documentSequence';
 
 const emptyVoucher = {
   voucher_type: '', voucher_date: new Date().toISOString().split('T')[0],
@@ -68,6 +69,7 @@ export default function FinancialVouchers() {
   };
 
   const [settings, setSettings] = useState({});
+  const [sequenceConfigs, setSequenceConfigs] = useState([]);
   const [billAllocations, setBillAllocations] = useState([]);
   const [partnerAccounts, setPartnerAccounts] = useState(new Set());
   const [activeAllocationRow, setActiveAllocationRow] = useState(null);
@@ -123,14 +125,16 @@ export default function FinancialVouchers() {
 
   async function fetchData() {
     setLoading(true);
-    const [data, accounts, settingsData, partners] = await Promise.all([
+    const [data, accounts, settingsData, partners, seqConfigs] = await Promise.all([
       sajilo.entities.FinancialVoucher.list('-created_at', 200),
       sajilo.entities.ChartOfAccount.filter({ is_active: true }, 'account_code', 1000),
       sajilo.entities.CompanySettings.list(),
       sajilo.entities.BusinessPartner.list(),
+      sajilo.entities.DocumentSequenceConfig.list(),
     ]);
     setVouchers(data);
     setAllAccounts(accounts);
+    setSequenceConfigs(seqConfigs || []);
     
     const pIds = new Set();
     if (partners) {
@@ -143,6 +147,10 @@ export default function FinancialVouchers() {
 
     if (settingsData && settingsData.length > 0) setSettings(settingsData[0]);
     setLoading(false);
+  }
+
+  const getPredictedFinancialVoucherNumber = () => {
+    return getPredictedVoucherNumber('FinancialVoucher', sequenceConfigs, activeFiscalYear, settings);
   };
 
   const cashAccounts = allAccounts.filter(a =>
@@ -234,20 +242,6 @@ export default function FinancialVouchers() {
   const addEntry = () => setForm({ ...form, entries: [...form.entries, { account_id: '', account_code: '', account_name: '', account_type: 'Asset', debit: 0, credit: 0, narration: '' }] });
   const removeEntry = (idx) => setForm({ ...form, entries: form.entries.filter((_, i) => i !== idx) });
 
-  const genNumber = () => {
-    const prefix = { Receipt: 'RV', Payment: 'PV', Journal: 'JV', Contra: 'CV' }[form.voucher_type] || 'VV';
-    const year = new Date().getFullYear();
-    const prefixStr = `${prefix}-${year}-`;
-    let max = 0;
-    vouchers.forEach(v => {
-      if (v.voucher_number && v.voucher_number.startsWith(prefixStr)) {
-        const numStr = v.voucher_number.replace(prefixStr, '');
-        const num = parseInt(numStr, 10);
-        if (!isNaN(num) && num > max) max = num;
-      }
-    });
-    return `${prefixStr}${String(max + 1).padStart(3, '0')}`;
-  };
 
   const save = async (status) => {
     setSaving(true);
@@ -296,7 +290,7 @@ export default function FinancialVouchers() {
         form.total_amount = totDebit;
       }
 
-      const payload = { ...form, entries: finalEntries, status, voucher_number: genNumber(), bill_allocations: (form.voucher_type === 'Receipt' || form.voucher_type === 'Payment') ? JSON.stringify(billAllocations) : null };
+      const payload = { ...form, entries: finalEntries, status, voucher_number: form.voucher_number || 'AUTO', bill_allocations: (form.voucher_type === 'Receipt' || form.voucher_type === 'Payment') ? JSON.stringify(billAllocations) : null };
       delete payload.source_account_id;
       delete payload.source_account_name;
       delete payload.source_account_code;
@@ -310,7 +304,7 @@ export default function FinancialVouchers() {
           account_id: e.account_id,
           debit_amount: e.debit || 0,
           credit_amount: e.credit || 0,
-          description: e.narration || payload.narration || `Financial Voucher ${payload.voucher_number}`
+          description: e.narration || payload.narration || `Financial Voucher ${savedVoucher.voucher_number}`
         }));
         await postFinancialVoucher({ ...savedVoucher, lines: linesToPost }, false, idempotencyKey);
         
@@ -345,7 +339,7 @@ export default function FinancialVouchers() {
         console.error('Vector PDF Gen error:', pdfErr);
       }
 
-      toast.success(`Voucher ${status}`);
+      toast.success(`Voucher ${savedVoucher.voucher_number} (${status}) saved successfully`);
       setOpen(false);
       setForm(emptyVoucher);
       fetchData();
@@ -626,6 +620,21 @@ export default function FinancialVouchers() {
           <DialogHeader><DialogTitle>New Financial Voucher</DialogTitle></DialogHeader>
           <div className="space-y-4 mt-2">
             <FormGrid>
+              <div>
+                <Label>Voucher Number *</Label>
+                <div className="flex gap-2 mt-1">
+                  <Input
+                    value={form.voucher_number === 'AUTO' ? '' : (form.voucher_number || '')}
+                    onChange={e => setForm(f => ({ ...f, voucher_number: e.target.value }))}
+                    readOnly={settings?.invoice_numbering_method !== 'Manual'}
+                    className={settings?.invoice_numbering_method !== 'Manual' ? 'font-mono bg-muted' : 'font-mono'}
+                    placeholder={settings?.invoice_numbering_method === 'Manual' ? 'Enter voucher number' : `Auto (${getPredictedFinancialVoucherNumber()})`}
+                  />
+                  {settings?.invoice_numbering_method !== 'Manual' && (
+                    <span className="flex items-center text-xs text-muted-foreground bg-muted px-2 rounded-xl border border-border whitespace-nowrap">Auto</span>
+                  )}
+                </div>
+              </div>
               <div>
                 <Label>Voucher Type *</Label>
                 <Select value={form.voucher_type} onValueChange={v => setForm({ ...emptyVoucher, voucher_type: v, voucher_date: form.voucher_date })}>

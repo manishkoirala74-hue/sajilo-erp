@@ -22,6 +22,7 @@ import VoucherLink from '@/components/shared/VoucherLink';
 import DataTable from '@/components/shared/DataTable';
 import StatusBadge from '@/components/shared/StatusBadge';
 import FileUpload from '@/components/shared/FileUpload';
+import { getPredictedVoucherNumber } from '@/utils/documentSequence';
 
 const STATUS_COLORS = {
   Draft: 'bg-gray-100 text-gray-700',
@@ -48,6 +49,7 @@ export default function Quotations() {
   const [printTarget, setPrintTarget] = useState(null);
   const [form, setForm] = useState({});
   const [saving, setSaving] = useState(false);
+  const [sequenceConfigs, setSequenceConfigs] = useState([]);
   const [taxTypes, setTaxTypes] = useState([]);
   const printRef = useRef();
 
@@ -58,12 +60,14 @@ export default function Quotations() {
       sajilo.entities.Item.filter({ is_active: true }),
       sajilo.entities.CompanySettings.list(),
       loadActiveTaxTypes(),
-    ]).then(([qs, cs, its, ss, txTypes]) => {
+      sajilo.entities.DocumentSequenceConfig.list(),
+    ]).then(([qs, cs, its, ss, txTypes, seqConfigs]) => {
       setQuotations(qs);
       setCustomers(cs.filter(c => c.is_active !== false));
       setItems(its);
       setSettings(ss[0] || {});
       setTaxTypes(txTypes || []);
+      setSequenceConfigs(seqConfigs || []);
       setLoading(false);
     }).catch(err => {
       console.error(err);
@@ -114,12 +118,8 @@ export default function Quotations() {
     setQuotations(data);
   };
 
-  const generateNumber = () => {
-    const prefix = settings?.quotation_prefix || 'QT';
-    const suffix = settings?.quotation_suffix || '';
-    const year = new Date().getFullYear();
-    const next = settings?.quotation_next_number || (quotations.length + 1);
-    return `${prefix}-${year}-${String(next).padStart(3, '0')}${suffix}`;
+  const getPredictedQuotationNumber = () => {
+    return getPredictedVoucherNumber('Quotation', sequenceConfigs, activeFiscalYear, settings);
   };
 
   const getSafeDefaultDate = () => {
@@ -136,7 +136,7 @@ export default function Quotations() {
     const validDays = settings?.quotation_validity_days || 30;
     return {
       id: crypto.randomUUID(),
-      quotation_number: generateNumber(),
+      quotation_number: 'AUTO',
       customer_id: '', customer_name: '', customer_email: '', customer_phone: '', customer_address: '',
       quotation_date: today,
       valid_until: format(addDays(new Date(), validDays), 'yyyy-MM-dd'),
@@ -180,20 +180,14 @@ export default function Quotations() {
     if (!form.customer_name) { toast.error('Select a customer'); return; }
     setSaving(true);
     try {
-  if (editing) {
+      if (editing) {
         await sajilo.entities.Quotation.update(editing.id, form);
         toast.success('Quotation updated');
       } else {
-        await sajilo.entities.Quotation.create(form);
-        // Bump the next number in settings
-        if (settings?.id) {
-          const next = (settings.quotation_next_number || 1) + 1;
-          await sajilo.entities.CompanySettings.update(settings.id, { quotation_next_number: next });
-          setSettings(s => ({ ...s, quotation_next_number: next }));
-        }
-        toast.success('Quotation created');
+        const savedQ = await sajilo.entities.Quotation.create(form);
+        toast.success(`Quotation ${savedQ?.quotation_number || ''} created`);
       }
-        } catch (err) {
+    } catch (err) {
       toast.error(err.message || 'Error occurred while saving');
     } finally {
       setSaving(false);
@@ -209,7 +203,7 @@ export default function Quotations() {
   };
 
   const duplicate = async (q) => {
-    const copy = { ...q, id: undefined, quotation_number: generateNumber(), status: 'Draft', quotation_date: format(new Date(), 'yyyy-MM-dd') };
+    const copy = { ...q, id: undefined, quotation_number: 'AUTO', status: 'Draft', quotation_date: format(new Date(), 'yyyy-MM-dd') };
     delete copy.id;
     await sajilo.entities.Quotation.create(copy);
     toast.success('Quotation duplicated');
@@ -352,7 +346,7 @@ export default function Quotations() {
       <Dialog open={showForm} onOpenChange={setShowForm}>
         <DialogContent className="max-w-5xl max-h-[92vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editing ? `Edit Quotation — ${form.quotation_number}` : `New Quotation — ${form.quotation_number || ''}`}</DialogTitle>
+            <DialogTitle>{editing ? `Edit Quotation — ${form.quotation_number}` : `New Quotation ${form.quotation_number && form.quotation_number !== 'AUTO' ? '— ' + form.quotation_number : ''}`}</DialogTitle>
           </DialogHeader>
 
           <div className="space-y-6 mt-2">
@@ -372,7 +366,13 @@ export default function Quotations() {
               </div>
               <div>
                 <Label>Quotation Number</Label>
-                <Input value={form.quotation_number || ''} onChange={e => sf('quotation_number', e.target.value)} className="mt-1 font-mono" />
+                <Input
+                  value={form.quotation_number === 'AUTO' ? '' : (form.quotation_number || '')}
+                  onChange={e => sf('quotation_number', e.target.value)}
+                  readOnly={settings?.invoice_numbering_method !== 'Manual'}
+                  className={settings?.invoice_numbering_method !== 'Manual' ? 'mt-1 font-mono bg-muted' : 'mt-1 font-mono'}
+                  placeholder={settings?.invoice_numbering_method === 'Manual' ? 'Enter quotation number' : `Auto (${getPredictedQuotationNumber()})`}
+                />
               </div>
               <div>
                     <DateInput label="Quotation Date" value={form.quotation_date} onChange={v => sf('quotation_date', v)} className="mt-1" min={activeFiscalYear?.start_date} max={activeFiscalYear?.end_date} />

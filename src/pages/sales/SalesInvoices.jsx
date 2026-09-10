@@ -26,6 +26,7 @@ import SearchableSelect from '@/components/shared/SearchableSelect';
 import VoucherLink from '@/components/shared/VoucherLink';
 import { generateVectorPDF } from '@/utils/pdfGenerator';
 import { downloadPDF } from '@/utils/pdf-engine/generator';
+import { getPredictedVoucherNumber } from '@/utils/documentSequence';
 import { Mail, Download } from 'lucide-react';
 import FileUpload from '@/components/shared/FileUpload';
 
@@ -53,6 +54,7 @@ export default function SalesInvoices() {
   const [settings, setSettings] = useState(null);
   const [taxTypes, setTaxTypes] = useState([]);
   const [godowns, setGodowns] = useState([]);
+  const [defaultGodownId, setDefaultGodownId] = useState('');
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [viewDetail, setViewDetail] = useState(null);
@@ -105,6 +107,8 @@ export default function SalesInvoices() {
     setConfirmModal({ isOpen: false, message: '', resolve: null });
   };
 
+  const [sequenceConfigs, setSequenceConfigs] = useState([]);
+
   const loadData = async () => {
     Promise.all([
       sajilo.entities.SalesInvoice.list('-created_date', 50),
@@ -114,7 +118,8 @@ export default function SalesInvoices() {
       sajilo.entities.ChartOfAccount.filter({ is_active: true }, 'account_code', 500),
       loadActiveTaxTypes(),
       sajilo.entities.Godown.filter({ status: 'Active' }),
-    ]).then(([inv, cs, sos, sett, accs, txTypes, gds]) => {
+      sajilo.entities.DocumentSequenceConfig.list(),
+    ]).then(([inv, cs, sos, sett, accs, txTypes, gds, seqConfigs]) => {
       setInvoices(inv);
       setCustomers(cs.filter(c => c.is_customer || c.treat_as_customer));
       setSalesOrders(sos);
@@ -122,9 +127,15 @@ export default function SalesInvoices() {
       setAccounts(accs);
       setTaxTypes(txTypes || []);
       setGodowns(gds || []);
+      setSequenceConfigs(seqConfigs || []);
+      if (gds && gds.length > 0) {
+        const defaultGd = gds.find(g => g.is_main || g.is_default) || gds[0];
+        setDefaultGodownId(defaultGd.id);
+      }
       setLoading(false);
     }).catch(err => {
       console.error(err);
+      toast.error(err.message || "Error loading data");
       setLoading(false);
     });
   };
@@ -208,13 +219,8 @@ export default function SalesInvoices() {
     setInvoices(data);
   };
 
-  const generateInvoiceNumber = () => {
-    const year = new Date().getFullYear();
-    const prefix = settings?.invoice_prefix_sales || 'SI';
-    const suffix = settings?.invoice_suffix || '';
-    const startFrom = settings?.invoice_next_number || 1;
-    const seq = String(startFrom).padStart(3, '0');
-    return `${prefix}-${year}-${seq}${suffix}`;
+  const getPredictedInvoiceNumber = () => {
+    return getPredictedVoucherNumber('SalesInvoice', sequenceConfigs, activeFiscalYear, settings);
   };
 
   const getSafeDefaultDate = () => {
@@ -227,15 +233,13 @@ export default function SalesInvoices() {
   };
 
   const openNew = () => {
-    const isAuto = !settings || settings.invoice_numbering_method !== 'Manual';
-    const invNumber = isAuto ? generateInvoiceNumber() : '';
     const safeDate = getSafeDefaultDate();
     
     setForm({ 
       ...emptySI, 
       id: crypto.randomUUID(), 
-      invoice_number: invNumber, 
-      godown_id: mainGodownId || '', 
+      invoice_number: 'AUTO', 
+      godown_id: mainGodownId || defaultGodownId || '', 
       invoice_date: safeDate,
       due_date: format(new Date(new Date(safeDate).getTime() + 30 * 86400000), 'yyyy-MM-dd'),
       _isNew: true 
@@ -643,11 +647,11 @@ export default function SalesInvoices() {
                     <Label>Invoice Number *</Label>
                     <div className="flex gap-2 mt-1">
                       <Input
-                        value={form.invoice_number}
+                        value={form.invoice_number === 'AUTO' ? '' : (form.invoice_number || '')}
                         onChange={e => setForm(f => ({ ...f, invoice_number: e.target.value }))}
                         readOnly={settings?.invoice_numbering_method !== 'Manual'}
                         className={settings?.invoice_numbering_method !== 'Manual' ? 'font-mono bg-muted' : 'font-mono'}
-                        placeholder={settings?.invoice_numbering_method === 'Manual' ? 'Enter invoice number' : ''}
+                        placeholder={settings?.invoice_numbering_method === 'Manual' ? 'Enter invoice number' : `Auto (${getPredictedInvoiceNumber()})`}
                       />
                       {settings?.invoice_numbering_method !== 'Manual' && (
                         <span className="flex items-center text-xs text-muted-foreground bg-muted px-2 rounded-xl border border-border whitespace-nowrap">Auto</span>

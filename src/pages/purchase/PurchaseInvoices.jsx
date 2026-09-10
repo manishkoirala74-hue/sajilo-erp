@@ -27,6 +27,7 @@ import { Mail } from 'lucide-react';
 import VoucherLink from '@/components/shared/VoucherLink';
 import { generateVectorPDF } from '@/utils/pdfGenerator';
 import FileUpload from '@/components/shared/FileUpload';
+import { getPredictedVoucherNumber } from '@/utils/documentSequence';
 
 const emptyPI = {
   invoice_number: '', vendor_invoice_no: '', po_reference_id: '', godown_id: '',
@@ -48,6 +49,7 @@ export default function PurchaseInvoices() {
   const [approvedPOs, setApprovedPOs] = useState([]);
   const [accounts, setAccounts] = useState([]);
   const [settings, setSettings] = useState(null);
+  const [sequenceConfigs, setSequenceConfigs] = useState([]);
   const [taxTypes, setTaxTypes] = useState([]);
   const [godowns, setGodowns] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -85,8 +87,9 @@ export default function PurchaseInvoices() {
       sajilo.entities.ChartOfAccount.filter({ is_active: true }, 'account_code', 500),
       sajilo.entities.Godown.filter({ status: 'Active' }),
       sajilo.entities.CompanySettings.list(),
-      loadActiveTaxTypes()
-    ]).then(([inv, vs, pos, accs, gds, sett, txTypes]) => {
+      loadActiveTaxTypes(),
+      sajilo.entities.DocumentSequenceConfig.list(),
+    ]).then(([inv, vs, pos, accs, gds, sett, txTypes, seqConfigs]) => {
       setInvoices(inv);
       // Purchase module: show vendors + customers flagged as treated_as_vendor
       setVendors(vs.filter(v => v.is_vendor || v.treated_as_vendor));
@@ -95,6 +98,7 @@ export default function PurchaseInvoices() {
       setGodowns(gds || []);
       setSettings(sett?.length > 0 ? sett[0] : {});
       setTaxTypes(txTypes || []);
+      setSequenceConfigs(seqConfigs || []);
       setLoading(false);
     }).catch(err => {
       console.error(err);
@@ -144,10 +148,8 @@ export default function PurchaseInvoices() {
     setInvoices(data);
   };
 
-  const generateInvoiceNumber = () => {
-    const year = new Date().getFullYear();
-    const seq = String(invoices.length + 1).padStart(3, '0');
-    return `PI-${year}-${seq}`;
+  const getPredictedPurchaseInvoiceNumber = () => {
+    return getPredictedVoucherNumber('PurchaseInvoice', sequenceConfigs, activeFiscalYear, settings);
   };
 
   const getSafeDefaultDate = () => {
@@ -159,14 +161,13 @@ export default function PurchaseInvoices() {
     return today;
   };
 
-  const openNew = (isAuto = true) => {
-    const invNumber = isAuto ? generateInvoiceNumber() : '';
+  const openNew = () => {
     const safeDate = getSafeDefaultDate();
     
     setForm({ 
       ...emptyPI, 
       id: crypto.randomUUID(), 
-      invoice_number: invNumber, 
+      invoice_number: 'AUTO', 
       godown_id: mainGodownId || '', 
       invoice_date: safeDate,
       due_date: format(new Date(new Date(safeDate).getTime() + 30 * 86400000), 'yyyy-MM-dd'),
@@ -425,7 +426,7 @@ export default function PurchaseInvoices() {
       <Dialog open={showForm} onOpenChange={setShowForm}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{form.id ? 'Edit Purchase Invoice' : 'New Purchase Invoice'} — {form.invoice_number}</DialogTitle>
+            <DialogTitle>{form.id ? 'Edit Purchase Invoice' : 'New Purchase Invoice'}{form.invoice_number && form.invoice_number !== 'AUTO' ? ` — ${form.invoice_number}` : ''}</DialogTitle>
           </DialogHeader>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-4 pb-24">
             {/* LEFT COLUMN */}
@@ -519,6 +520,21 @@ export default function PurchaseInvoices() {
                       />
                     </div>
                   )}
+                  <div>
+                    <Label>Purchase Invoice Number *</Label>
+                    <div className="flex gap-2 mt-1">
+                      <Input
+                        value={form.invoice_number === 'AUTO' ? '' : (form.invoice_number || '')}
+                        onChange={e => setForm(f => ({ ...f, invoice_number: e.target.value }))}
+                        readOnly={settings?.invoice_numbering_method !== 'Manual'}
+                        className={settings?.invoice_numbering_method !== 'Manual' ? 'font-mono bg-muted' : 'font-mono'}
+                        placeholder={settings?.invoice_numbering_method === 'Manual' ? 'Enter invoice number' : `Auto (${getPredictedPurchaseInvoiceNumber()})`}
+                      />
+                      {settings?.invoice_numbering_method !== 'Manual' && (
+                        <span className="flex items-center text-xs text-muted-foreground bg-muted px-2 rounded-xl border border-border whitespace-nowrap">Auto</span>
+                      )}
+                    </div>
+                  </div>
                   <div>
                     <Label>Vendor's Invoice No.</Label>
                     <Input value={form.vendor_invoice_no} onChange={e => setForm(f => ({...f, vendor_invoice_no: e.target.value}))} placeholder="Supplier reference" className="mt-1" />
