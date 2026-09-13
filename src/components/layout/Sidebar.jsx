@@ -6,7 +6,7 @@ import {
   Receipt, ClipboardList, Menu, X, Boxes, Wallet,
   Landmark, ShieldCheck, UserCog, Banknote, Factory, Handshake, BookOpen,
   Ruler, Tag, RotateCcw, SlidersHorizontal, ShoppingBag, BarChart2, TrendingDown, CreditCard,
-  UserCheck, Truck, Plus, Search, LifeBuoy, ArrowRightLeft, Star, Layers
+  UserCheck, Truck, Plus, Search, LifeBuoy, ArrowRightLeft, Star, Layers, Pin, PinOff
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { sajilo } from '@/api/sajiloClient';
@@ -14,6 +14,7 @@ import { usePermissions, useAuth } from '@/lib/AuthContext';
 import { ADMIN_ROLES } from '@/lib/rbac';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useModalStore } from '@/store/modalStore';
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 
 import { toast } from 'sonner';
 
@@ -118,7 +119,7 @@ export const buildNavGroups = (settings) => {
   return groups;
 };
 
-export default function Sidebar({ collapsed, onToggle }) {
+export default function Sidebar({ collapsed: propsCollapsed, onToggle }) {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout, activeFiscalYear } = useAuth();
@@ -128,6 +129,56 @@ export default function Sidebar({ collapsed, onToggle }) {
   const [expandedGroups, setExpandedGroups] = useState([]);
   const [expandedSubGroups, setExpandedSubGroups] = useState([]);
   const openModal = useModalStore(state => state.openModal);
+
+  // Desktop hover & pin state model
+  const [isPinned, setIsPinned] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
+  const collapseTimerRef = useRef(null);
+
+  useEffect(() => {
+    const saved = localStorage.getItem('sajilo_sidebar_pinned');
+    if (saved !== null) {
+      setIsPinned(saved === 'true');
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem('sajilo_sidebar_pinned', String(isPinned));
+  }, [isPinned]);
+
+  const isExpanded = isPinned || isHovered;
+  const collapsed = !isExpanded;
+
+  const handleMouseEnter = () => {
+    if (collapseTimerRef.current) {
+      clearTimeout(collapseTimerRef.current);
+      collapseTimerRef.current = null;
+    }
+    setIsHovered(true);
+  };
+
+  const handleMouseLeave = () => {
+    collapseTimerRef.current = setTimeout(() => {
+      setIsHovered(false);
+    }, 180);
+  };
+
+  // Reverse Path Resolution for Deep-Linking
+  useEffect(() => {
+    if (!location.pathname) return;
+    navGroups.forEach(group => {
+      group.items.forEach(item => {
+        if (item.isSubGroup) {
+          if (item.items.some(sub => sub.path === location.pathname)) {
+            setExpandedGroups(prev => Array.from(new Set([...prev, group.label])));
+            setExpandedSubGroups(prev => Array.from(new Set([...prev, item.label])));
+          }
+        } else if (item.path === location.pathname) {
+          setExpandedGroups(prev => Array.from(new Set([...prev, group.label])));
+        }
+      });
+    });
+  }, [location.pathname, navGroups]);
 
   // Favorites state
   const [favoritePaths, setFavoritePaths] = useState(() => {
@@ -163,8 +214,6 @@ export default function Sidebar({ collapsed, onToggle }) {
       return labels;
     });
   }, [settings]);
-
-  // Global Ctrl+K is now handled in App.jsx
 
   const toggleGroup = (label) => {
     setExpandedGroups(prev =>
@@ -268,10 +317,10 @@ export default function Sidebar({ collapsed, onToggle }) {
     ];
     const isDisabled = !activeFiscalYear && disabledPaths.includes(item.path);
     
-    return (
+    const linkContent = (
       <Link
         to={isDisabled ? '#' : item.path}
-        title={collapsed ? item.label : undefined}
+        aria-current={active ? 'page' : undefined}
         onClick={(e) => {
           if (isDisabled) {
             e.preventDefault();
@@ -283,13 +332,13 @@ export default function Sidebar({ collapsed, onToggle }) {
           active
             ? "bg-primary text-white shadow-sm"
             : "text-slate-400 hover:text-white hover:bg-sidebar-hover",
-          !collapsed && isSub && "ml-2",
+          !collapsed && isSub && "ml-3 pl-3 border-l border-slate-700/40 text-xs font-normal",
           isDisabled && "opacity-50 cursor-not-allowed"
         )}
       >
         <item.icon className="w-4 h-4 shrink-0" />
         <span className={cn(
-          "whitespace-nowrap overflow-hidden transition-all duration-300 flex-1",
+          "whitespace-nowrap overflow-hidden text-ellipsis transition-all duration-300 flex-1",
           collapsed ? "opacity-0 w-0 hidden md:block" : "opacity-100"
         )}>
           {item.label}
@@ -316,15 +365,32 @@ export default function Sidebar({ collapsed, onToggle }) {
         )}
       </Link>
     );
+
+    return (
+      <Tooltip open={collapsed ? undefined : false}>
+        <TooltipTrigger asChild>
+          {linkContent}
+        </TooltipTrigger>
+        {collapsed && (
+          <TooltipContent side="right" sideOffset={10}>
+            {item.label}
+          </TooltipContent>
+        )}
+      </Tooltip>
+    );
   };
 
   return (
-    <>
-      <div className={cn(
-        "hidden md:flex flex-col h-full bg-sidebar transition-all duration-300 border-r border-slate-700/30 shadow-[4px_0_24px_rgba(0,0,0,0.02)] relative z-40 print:hidden",
-        collapsed ? "w-[72px]" : "w-64"
-      )}>
-        {/* Logo */}
+    <TooltipProvider delayDuration={200}>
+      <div
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+        className={cn(
+          "hidden md:flex flex-col h-full bg-sidebar transition-all duration-300 border-r border-slate-700/30 shadow-[4px_0_24px_rgba(0,0,0,0.02)] relative z-40 print:hidden",
+          collapsed ? "w-[72px]" : "w-64"
+        )}
+      >
+        {/* Logo & Pin Toggle */}
         <div className="flex items-center h-16 px-4 shrink-0 relative">
           <div className="flex items-center gap-3 w-full">
             <div className={cn(
@@ -341,10 +407,18 @@ export default function Sidebar({ collapsed, onToggle }) {
             )}
           </div>
           <button
-            onClick={onToggle}
-            className="absolute -right-3 top-5 bg-slate-800 border border-slate-700 text-slate-400 hover:text-white transition-colors p-1 rounded-full shadow-sm z-50"
+            onClick={() => setIsPinned(p => !p)}
+            aria-label={isPinned ? "Unpin sidebar" : "Pin sidebar"}
+            aria-pressed={isPinned}
+            title={isPinned ? "Unpin sidebar (Auto-collapse mode)" : "Pin sidebar (Always expanded)"}
+            className={cn(
+              "absolute -right-3 top-5 border transition-colors p-1.5 rounded-full shadow-sm z-50 flex items-center justify-center",
+              isPinned
+                ? "bg-primary border-primary/80 text-white"
+                : "bg-slate-800 border-slate-700 text-slate-400 hover:text-white"
+            )}
           >
-            {collapsed ? <ChevronRight className="w-3 h-3" /> : <ChevronDown className="w-3 h-3 rotate-90" />}
+            {isPinned ? <Pin className="w-3.5 h-3.5" /> : <PinOff className="w-3.5 h-3.5" />}
           </button>
         </div>
 
@@ -433,6 +507,6 @@ export default function Sidebar({ collapsed, onToggle }) {
 
 
       </div>
-    </>
+    </TooltipProvider>
   );
 }

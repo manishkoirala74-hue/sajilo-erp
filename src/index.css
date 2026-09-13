@@ -182,8 +182,15 @@ input[type='number'] {
 }
 
 @layer utilities {
+  .scrollbar-hide-default {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+  }
   .scrollbar-hide-default::-webkit-scrollbar {
     width: 4px;
+    background-color: transparent;
+  }
+  .scrollbar-hide-default::-webkit-scrollbar-track {
     background-color: transparent;
   }
   .scrollbar-hide-default::-webkit-scrollbar-thumb {
@@ -191,9 +198,9 @@ input[type='number'] {
     border-radius: 4px;
   }
   .scrollbar-hide-default:hover::-webkit-scrollbar-thumb {
-    background-color: rgba(255, 255, 255, 0.2);
+    background-color: rgba(255, 255, 255, 0.25);
   }
   .dark .scrollbar-hide-default:hover::-webkit-scrollbar-thumb {
-    background-color: rgba(255, 255, 255, 0.2);
+    background-color: rgba(255, 255, 255, 0.25);
   }
 }
