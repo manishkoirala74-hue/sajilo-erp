@@ -13,6 +13,7 @@ import PageHeader from '@/components/shared/PageHeader';
 import StatusBadge from '@/components/shared/StatusBadge';
 import { toast } from 'sonner';
 import { provisionPartnerLedgers, createPartnerLedger } from '@/lib/partnerLedgerService';
+import { validateVatPan, checkDuplicateVatPan } from '@/utils/vatPanValidation';
 import PartnerBatchActions from '@/components/partners/PartnerBatchActions';
 import FormGrid from '@/components/layout/FormGrid';
 import FormRow from '@/components/layout/FormRow';
@@ -123,9 +124,31 @@ export default function Customers() {
 
   const handleSave = async () => {
     if (!form.name) { toast.error('Name is required'); return; }
+    
+    // VAT/PAN Format Validation
+    const vatVal = validateVatPan(form.tax_id_number);
+    if (!vatVal.isValid) {
+      toast.error(vatVal.error);
+      return;
+    }
+
+    // Pre-submit duplicate check for active company
+    if (vatVal.normalized) {
+      const companyId = sajilo.getCompanyId();
+      const dupeCheck = await checkDuplicateVatPan(vatVal.normalized, companyId, editing?.id);
+      if (dupeCheck.isDuplicate) {
+        toast.error(dupeCheck.error);
+        return;
+      }
+    }
+
     setSaving(true);
     try {
-      let saveData = { ...form, is_customer: true };
+      let saveData = { 
+        ...form, 
+        is_customer: true, 
+        tax_id_number: vatVal.normalized || null 
+      };
       if (!saveData.profile_picture_url) saveData.profile_picture_url = null;
       if (form.treated_as_vendor) saveData.is_vendor = true;
       if (!editing) {
@@ -136,7 +159,6 @@ export default function Customers() {
         toast.success('Customer created — sub-ledger auto-generated');
       } else {
         // Edit Mode
-        const saveData = { ...form };
         delete saveData.receivable_account_id; // don't mess with system ledgers here
         delete saveData.payable_account_id;
         delete saveData._isNew;
@@ -157,11 +179,17 @@ export default function Customers() {
 
         toast.success('Customer updated');
       }
+      setShowForm(false);
     } catch (err) {
-      toast.error('Save failed: ' + err.message);
+      if (err.code === '23505' || err.message?.includes('idx_business_partner_company_vat_pan') || err.message?.includes('unique constraint')) {
+        toast.error('A customer/partner with this VAT/PAN number already exists.');
+      } else if (err.code === '22023') {
+        toast.error(err.message || 'Invalid VAT/PAN number.');
+      } else {
+        toast.error('Save failed: ' + err.message);
+      }
     }
     setSaving(false);
-    setShowForm(false);
     fetchPartners();
   };
 
@@ -445,7 +473,23 @@ export default function Customers() {
             </FormRow>
             <FormRow>
               <Label>VAT/PAN Number</Label>
-              <Input value={form.tax_id_number} onChange={e => setForm({ ...form, tax_id_number: e.target.value })} placeholder="e.g. 608734567" className="mt-1" />
+              <Input 
+                value={form.tax_id_number || ''} 
+                onChange={e => setForm({ ...form, tax_id_number: e.target.value })} 
+                placeholder="e.g. 608734567" 
+                className="mt-1" 
+              />
+              {form.tax_id_number?.trim() && (
+                validateVatPan(form.tax_id_number).isValid ? (
+                  <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-1 font-medium flex items-center gap-1">
+                    ✓ Valid 9-digit VAT/PAN number
+                  </p>
+                ) : (
+                  <p className="text-xs text-amber-600 dark:text-amber-400 mt-1 font-medium flex items-center gap-1">
+                    ⚠ Must be exactly 9 numeric digits
+                  </p>
+                )
+              )}
             </FormRow>
             <FormRow>
               <Label>Email</Label>

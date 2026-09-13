@@ -13,6 +13,7 @@ import DataTable from '@/components/shared/DataTable';
 import FormGrid from '@/components/layout/FormGrid';
 import FormRow from '@/components/layout/FormRow';
 import { toast } from 'sonner';
+import { validateVatPan, checkDuplicateVatPan } from '@/utils/vatPanValidation';
 
 const emptyPartner = {
   name: '', partner_type: 'Company', tax_id_number: '',
@@ -44,10 +45,33 @@ export default function BusinessPartners() {
 
   const handleSave = async () => {
     if (!form.name) { toast.error('Name is required'); return; }
+
+    // VAT/PAN Format Validation
+    const vatVal = validateVatPan(form.tax_id_number);
+    if (!vatVal.isValid) {
+      toast.error(vatVal.error);
+      return;
+    }
+
+    // Pre-submit duplicate check for active company
+    if (vatVal.normalized) {
+      const companyId = sajilo.getCompanyId();
+      const dupeCheck = await checkDuplicateVatPan(vatVal.normalized, companyId, editing?.id);
+      if (dupeCheck.isDuplicate) {
+        toast.error(dupeCheck.error);
+        return;
+      }
+    }
+
     setSaving(true);
     try {
+      const saveData = { 
+        ...form, 
+        tax_id_number: vatVal.normalized || null 
+      };
+
       if (editing) {
-        await sajilo.entities.BusinessPartner.update(editing.id, form);
+        await sajilo.entities.BusinessPartner.update(editing.id, saveData);
 
         // Synchronize ChartOfAccount names if the partner name changed
         if (editing.name !== form.name) {
@@ -63,15 +87,21 @@ export default function BusinessPartners() {
 
         toast.success('Partner updated');
       } else {
-        await sajilo.entities.BusinessPartner.create(form);
+        await sajilo.entities.BusinessPartner.create(saveData);
         toast.success('Partner created');
       }
+      setShowForm(false);
     } catch (err) {
-      toast.error(err.message || 'Error occurred while saving');
+      if (err.code === '23505' || err.message?.includes('idx_business_partner_company_vat_pan') || err.message?.includes('unique constraint')) {
+        toast.error('A partner with this VAT/PAN number already exists.');
+      } else if (err.code === '22023') {
+        toast.error(err.message || 'Invalid VAT/PAN number.');
+      } else {
+        toast.error(err.message || 'Error occurred while saving');
+      }
     } finally {
       setSaving(false);
     }
-    setShowForm(false);
     fetchPartners();
   };
 
@@ -188,7 +218,23 @@ export default function BusinessPartners() {
             </div>
             <div>
               <Label>VAT/PAN Number</Label>
-              <Input value={form.tax_id_number} onChange={e => setForm({...form, tax_id_number: e.target.value})} placeholder="e.g. 608734567" className="mt-1" />
+              <Input 
+                value={form.tax_id_number || ''} 
+                onChange={e => setForm({...form, tax_id_number: e.target.value})} 
+                placeholder="e.g. 608734567" 
+                className="mt-1" 
+              />
+              {form.tax_id_number?.trim() && (
+                validateVatPan(form.tax_id_number).isValid ? (
+                  <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-1 font-medium flex items-center gap-1">
+                    ✓ Valid 9-digit VAT/PAN number
+                  </p>
+                ) : (
+                  <p className="text-xs text-amber-600 dark:text-amber-400 mt-1 font-medium flex items-center gap-1">
+                    ⚠ Must be exactly 9 numeric digits
+                  </p>
+                )
+              )}
             </div>
             <div>
               <Label>Email</Label>

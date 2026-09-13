@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import { sajilo } from '@/api/sajiloClient';
 import { provisionPartnerLedgers } from '@/lib/partnerLedgerService';
+import { validateVatPan, normalizeVatPan } from '@/utils/vatPanValidation';
 import { Upload, Download, CheckCircle2, XCircle, AlertTriangle, X, RefreshCw, Users, Truck, AlertCircle as AlertCircleIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
@@ -199,6 +200,8 @@ export default function PartnerImportExport() {
     }
 
     const errs = [];
+    const seenPansInCsv = {};
+
     rows.forEach((row, i) => {
       const num = i + 2;
       if (!row['Partner Name']?.trim()) errs.push(`Row ${num}: "Partner Name" is required.`);
@@ -212,6 +215,21 @@ export default function PartnerImportExport() {
       if (ob && Number(ob) > 0 && bt && bt !== 'DR' && bt !== 'CR') {
         errs.push(`Row ${num}: "Balance Type" must be Dr or Cr.`);
       }
+
+      // VAT/PAN Format & Intra-CSV Duplicate Checks
+      const rawPan = row['Tax PAN Number']?.trim();
+      if (rawPan) {
+        const valPan = validateVatPan(rawPan);
+        if (!valPan.isValid) {
+          errs.push(`Row ${num}: ${valPan.error}`);
+        } else if (valPan.normalized) {
+          if (seenPansInCsv[valPan.normalized]) {
+            errs.push(`Row ${num}: Duplicate VAT/PAN "${valPan.normalized}" also appears in row ${seenPansInCsv[valPan.normalized]}.`);
+          } else {
+            seenPansInCsv[valPan.normalized] = num;
+          }
+        }
+      }
     });
 
     setParsedRows(rows);
@@ -222,22 +240,60 @@ export default function PartnerImportExport() {
       const allAccounts = await sajilo.entities.ChartOfAccount.filter({ ledger_type: 'Sub Ledger', is_active: true }, 'account_name', 2000);
       setAccounts(allAccounts);
 
-      // Fetch existing partners for duplicate detection
-      const existing = await sajilo.entities.BusinessPartner.list('-created_date', 5000);
+      // Targeted O(1) bulk fetch of matching PANs & names for active company
+      const companyId = sajilo.getCompanyId();
+      const validPans = Array.from(new Set(
+        rows
+          .map(r => normalizeVatPan(r['Tax PAN Number']))
+          .filter(p => p.length === 9)
+      ));
+      const validNames = Array.from(new Set(
+        rows
+          .map(r => r['Partner Name']?.trim())
+          .filter(Boolean)
+      ));
+
       const byTaxId = {};
       const byName = {};
-      existing.forEach(p => { 
-        if (p.tax_id_number) byTaxId[p.tax_id_number.trim()] = p; 
-        if (p.name) byName[p.name.trim().toLowerCase()] = p;
+
+      const queries = [];
+      if (validPans.length > 0) {
+        queries.push(
+          sajilo.auth.supabase
+            .from('BusinessPartner')
+            .select('id, name, tax_id_number, payable_account_id, receivable_account_id')
+            .eq('company_id', companyId)
+            .in('tax_id_number', validPans)
+        );
+      }
+      if (validNames.length > 0) {
+        queries.push(
+          sajilo.auth.supabase
+            .from('BusinessPartner')
+            .select('id, name, tax_id_number, payable_account_id, receivable_account_id')
+            .eq('company_id', companyId)
+            .in('name', validNames)
+        );
+      }
+
+      const results = await Promise.all(queries);
+      results.forEach(res => {
+        if (res.data) {
+          res.data.forEach(p => {
+            if (p.tax_id_number) byTaxId[p.tax_id_number] = p;
+            if (p.name) byName[p.name.trim().toLowerCase()] = p;
+          });
+        }
       });
+
       setExistingByTaxId(byTaxId);
       setExistingByName(byName);
 
       let dupes = 0;
       rows.forEach(r => {
-        const tId = r['Tax PAN Number']?.trim();
+        const normPan = normalizeVatPan(r['Tax PAN Number']);
         const pName = r['Partner Name']?.trim()?.toLowerCase();
-        if ((tId && byTaxId[tId]) || (pName && byName[pName])) dupes++;
+        if ((normPan && byTaxId[normPan]) || (pName && byName[pName])) dupes++;
       });
       setDuplicateCount(dupes);
     }
@@ -265,7 +321,8 @@ export default function PartnerImportExport() {
       if (errorRows.has(i)) return { status: 'failed' };
       const row = parsedRows[i];
       const partnerName = row['Partner Name']?.trim();
-      const taxId = row['Tax PAN Number']?.trim();
+      const rawTaxId = row['Tax PAN Number']?.trim();
+      const normTaxId = normalizeVatPan(rawTaxId);
       const obAmount = Number(row['Opening Balance'] || 0);
       const balType = (row['Balance Type (Dr/Cr)'] || 'Dr').toUpperCase().startsWith('C') ? 'Cr' : 'Dr';
       const journalDate = new Date().toISOString().slice(0, 10);
@@ -273,7 +330,7 @@ export default function PartnerImportExport() {
 
       const basePayload = {
         name: partnerName,
-        tax_id_number: taxId || undefined,
+        tax_id_number: normTaxId || undefined,
         phone: row['Contact Number']?.trim() || undefined,
         city: row['City']?.trim() || undefined,
         address: row['Billing Address']?.trim() || undefined,
@@ -289,7 +346,7 @@ export default function PartnerImportExport() {
       Object.keys(basePayload).forEach(k => basePayload[k] === undefined && delete basePayload[k]);
 
       try {
-        const tIdMatch = taxId ? byTaxId[taxId] : null;
+        const tIdMatch = normTaxId ? byTaxId[normTaxId] : null;
         const nameMatch = partnerName ? byName[partnerName.toLowerCase()] : null;
         const existingPartner = tIdMatch || nameMatch;
         let lGen = 0, jPosted = 0, act = '';
