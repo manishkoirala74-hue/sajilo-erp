@@ -6,7 +6,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Plus, Building, Edit, Upload, Loader2, Image as ImageIcon, X } from 'lucide-react';
 import { toast } from 'sonner';
-import { seedDefaultChartOfAccounts } from '@/lib/defaultCoaSeeder';
 import EditCompanyDetails from './EditCompanyDetails';
 
 export default function CompanyManagement() {

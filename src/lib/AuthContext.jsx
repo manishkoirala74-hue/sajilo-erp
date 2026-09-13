@@ -238,6 +238,13 @@ export const AuthProvider = ({ children }) => {
           setUser(mergedUser);
           setSession({ user: mergedUser });
           setIsAuthenticated(true);
+          
+          if (profileData.must_change_password && window.location.pathname !== '/reset-password') {
+
+              window.location.href = '/reset-password';
+              return;
+            }
+          
           await fetchUserCompanies(mergedUser);
         }
       } else {

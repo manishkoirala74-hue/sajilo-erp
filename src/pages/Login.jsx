@@ -7,13 +7,18 @@ import { Label } from "@/components/ui/label";
 import { LogIn, Mail, Lock, Loader2 } from "lucide-react";
 import AuthLayout from "@/components/AuthLayout";
 import GoogleIcon from "@/components/GoogleIcon";
+import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
+import { toast } from "@/components/ui/use-toast";
+import { sajilo } from "@/api/sajiloClient";
 
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const { login, loginWithGoogle } = useAuth();
+    const [showOtp, setShowOtp] = useState(false);
+  const [otpCode, setOtpCode] = useState("");
+  const { login, loginWithGoogle, verifyOtp } = useAuth();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -23,9 +28,39 @@ export default function Login() {
       await login(email, password);
       window.location.href = "/";
     } catch (err) {
-      setError(err.message || "Invalid email or password");
+      if (err.message && err.message.toLowerCase().includes("email not confirmed")) {
+        setShowOtp(true);
+      } else {
+        setError(err.message || "Invalid email or password");
+      }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleVerify = async () => {
+    setError("");
+    setLoading(true);
+    try {
+      await verifyOtp(email, otpCode);
+      window.location.href = "/onboarding";
+    } catch (err) {
+      setError(err.message || "Invalid verification code");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResend = async () => {
+    setError("");
+    try {
+      await sajilo.auth.supabase.auth.resend({ type: 'signup', email });
+      toast({
+        title: "Code sent",
+        description: "Check your email for the new code.",
+      });
+    } catch (err) {
+      setError(err.message || "Failed to resend code");
     }
   };
 
@@ -37,6 +72,60 @@ export default function Login() {
       setError(err.message || "Google sign-in failed");
     }
   };
+
+  if (showOtp) {
+    return (
+      <AuthLayout
+        icon={Mail}
+        title="Verify your email"
+        subtitle={`We sent a code to ${email}`}
+      >
+        {error && (
+          <div className="mb-4 p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
+            {error}
+          </div>
+        )}
+        <div className="flex justify-center mb-6">
+          <InputOTP
+            maxLength={6}
+            value={otpCode}
+            onChange={setOtpCode}
+            autoFocus
+            autoComplete="one-time-code"
+          >
+            <InputOTPGroup>
+              <InputOTPSlot index={0} />
+              <InputOTPSlot index={1} />
+              <InputOTPSlot index={2} />
+              <InputOTPSlot index={3} />
+              <InputOTPSlot index={4} />
+              <InputOTPSlot index={5} />
+            </InputOTPGroup>
+          </InputOTP>
+        </div>
+        <Button
+          className="w-full h-12 font-medium"
+          onClick={handleVerify}
+          disabled={loading || otpCode.length < 6}
+        >
+          {loading ? (
+            <>
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              Verifying...
+            </>
+          ) : (
+            "Verify"
+          )}
+        </Button>
+        <p className="text-center text-sm text-muted-foreground mt-4">
+          Didn't receive the code?{" "}
+          <button onClick={handleResend} className="text-primary font-medium hover:underline">
+            Resend
+          </button>
+        </p>
+      </AuthLayout>
+    );
+  }
 
   return (
     <AuthLayout
@@ -129,3 +218,4 @@ export default function Login() {
     </AuthLayout>
   );
 }
+

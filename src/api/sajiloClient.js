@@ -454,6 +454,64 @@ export const sajilo = {
       return Promise.all(uploadPromises);
     }
   },
+  users: {
+    createOfflineUser: async (email, full_name, role, company_id, temp_password, is_tenant_admin = false) => {
+      const session = await supabase.auth.getSession();
+      const token = session?.data?.session?.access_token;
+      
+      const { data, error } = await supabase.functions.invoke('create-user-offline', {
+        body: { email, full_name, role, company_id, temp_password, is_tenant_admin },
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      
+      if (error) {
+          let errDetails = 'Failed to create offline user';
+          if (error.context && typeof error.context.text === 'function') {
+            try {
+              const rawText = await error.context.text();
+              try {
+                const json = JSON.parse(rawText);
+                errDetails = json.error || rawText;
+              } catch (e) {
+                errDetails = rawText;
+              }
+            } catch(e) {
+              errDetails = error.message;
+            }
+          }
+          throw new Error('Backend Error: ' + errDetails);
+        }
+      
+      if (data?.error) {
+        throw new Error(data.error);
+      }
+      
+      return data;
+    },
+    inviteUser: async (email, role, company_id, company_role_id = null) => {
+      const session = await supabase.auth.getSession();
+      const token = session?.data?.session?.access_token;
+      
+      const { data, error } = await supabase.functions.invoke('invite-user', {
+        body: { email, role, company_id, company_role_id },
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      
+      if (error) {
+        throw new Error(error.message || 'Failed to invite user');
+      }
+      
+      if (data?.error) {
+        throw new Error(data.error);
+      }
+      
+      return data;
+    }
+  },
   entities: new Proxy({}, {
     get: (target, prop) => {
       if (!target[prop]) {

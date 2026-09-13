@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { sajilo } from '@/api/sajiloClient';
 import {
   UserPlus, Shield, Mail, Check, ChevronDown, ChevronUp,
-  User, Crown, UserCog, KeyRound, Copy, RefreshCw, Clock, Plus, Trash2, Edit2
+  User, Crown, UserCog, KeyRound, Copy, RefreshCw, Clock, Plus, Trash2, Edit2, Loader2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,12 +10,13 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
 function generateTempPassword() {
   const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789@#$!';
-  return Array.from({ length: 10 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+  return Array.from({ length: 12 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
 }
 
 // ── Permission matrix ──────────────────────────────────────────────────────
@@ -130,6 +131,10 @@ export default function UsersRoles() {
   const [inviteRole, setInviteRole] = useState('user');
   const [invitePreset, setInvitePreset] = useState('viewer');
   const [inviting, setInviting] = useState(false);
+  const [createTab, setCreateTab] = useState('invite');
+  const [offlineCreateForm, setOfflineCreateForm] = useState({ email: '', full_name: '', temp_password: '' });
+  const [creatingOffline, setCreatingOffline] = useState(false);
+  const [createdUserOffline, setCreatedUserOffline] = useState(null);
   const [editPerms, setEditPerms] = useState({});
   const [selectedRole, setSelectedRole] = useState('user');
   const [customRoleName, setCustomRoleName] = useState('');
@@ -156,6 +161,24 @@ export default function UsersRoles() {
       setCustomRoles(roles);
     }
     setLoading(false);
+  };
+
+  const handleCreateOffline = async () => {
+    if (!offlineCreateForm.email) return toast.error('Email is required');
+    if (!offlineCreateForm.temp_password) return toast.error('Temporary password is required');
+    try {
+      setCreatingOffline(true);
+      const companyId = sajilo.getCompanyId();
+      await sajilo.users.createOfflineUser(offlineCreateForm.email, offlineCreateForm.full_name, inviteRole, companyId, offlineCreateForm.temp_password, inviteRole === 'admin');
+      
+      setCreatedUserOffline({ email: offlineCreateForm.email, temp_password: offlineCreateForm.temp_password, role: inviteRole });
+      toast.success('Offline user created successfully!');
+      fetchUsers();
+    } catch (e) {
+      toast.error(e.message || 'Failed to create offline user');
+    } finally {
+      setCreatingOffline(false);
+    }
   };
 
   const handleInvite = async () => {
@@ -353,11 +376,9 @@ export default function UsersRoles() {
           </div>
           <div className="flex gap-2">
             <Button size="sm" variant="outline" onClick={() => setShowInvite(true)}>
-              <Mail className="w-3.5 h-3.5 mr-1.5" /> Invite by Email
+              <UserPlus className="w-3.5 h-3.5 mr-1.5" /> Add New User
             </Button>
-            <Button size="sm" onClick={() => { setCreatedUser(null); setCreateForm({ email: '', role: 'user', temp_password: generateTempPassword() }); setShowCreate(true); }}>
-              <UserCog className="w-3.5 h-3.5 mr-1.5" /> Create User
-            </Button>
+            
           </div>
         </div>
 
@@ -472,154 +493,137 @@ export default function UsersRoles() {
         </div>
       </div>
 
-      {/* ── Create User Dialog ── */}
-      <Dialog open={showCreate} onOpenChange={v => { if (!v) resetCreateForm(); }}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <UserCog className="w-4 h-4" /> Create User Account
-            </DialogTitle>
-          </DialogHeader>
-
-          {createdUser ? (
-            <div className="space-y-4 mt-2">
-              <div className="bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 rounded-lg p-4 text-sm text-emerald-800 dark:text-emerald-300">
-                <p className="font-semibold mb-1">✓ User account created!</p>
-                <p className="mt-1 text-xs ">The user must verify their email via the OTP sent to <strong>{createdUser.email}</strong>, then log in with the temporary password below.</p>
-              </div>
-              <div className="bg-muted/40 rounded-lg p-4 space-y-3 text-sm">
-                <div className="flex justify-between items-center">
-                  <span className="text-muted-foreground">Username (Email)</span>
-                  <div className="flex items-center gap-1.5">
-                    <span className="font-mono font-medium">{createdUser.email}</span>
-                    <button onClick={() => { navigator.clipboard.writeText(createdUser.email); toast.success('Copied!'); }} className="p-1 hover:bg-muted rounded">
-                      <Copy className="w-3 h-3 text-muted-foreground" />
-                    </button>
-                  </div>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-muted-foreground">Temporary Password</span>
-                  <div className="flex items-center gap-1.5">
-                    <span className="font-mono font-semibold bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 px-2 py-0.5 rounded text-amber-800 dark:text-amber-300">{createdUser.temp_password}</span>
-                    <button onClick={() => { navigator.clipboard.writeText(createdUser.temp_password); toast.success('Copied!'); }} className="p-1 hover:bg-muted rounded">
-                      <Copy className="w-3 h-3 text-muted-foreground" />
-                    </button>
-                  </div>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-muted-foreground">Role</span>
-                  <span className="capitalize font-medium">{createdUser.role}</span>
-                </div>
-              </div>
-              <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-lg px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
-                ⚠ Copy the temporary password now — it will not be shown again. The user must change it on first login.
-              </div>
-              <div className="flex justify-end">
-                <Button onClick={resetCreateForm}>Done</Button>
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-4 mt-2">
-              <div className="bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 rounded-lg p-3 text-xs text-blue-700 dark:text-blue-400">
-                The account is created immediately. The user logs in with the temporary password and must change it before using the system.
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="col-span-2">
-                  <Label>Email Address (Username) *</Label>
-                  <Input type="email" value={createForm.email} onChange={e => setCreateForm(f => ({ ...f, email: e.target.value }))}
-                    placeholder="john@company.com" className="h-10 border border-border bg-background px-3 text-sm rounded-md focus:ring-1 focus:ring-primary outline-none mt-1 " />
-                </div>
-                <div className="col-span-2">
-                  <Label>Full Name</Label>
-                  <Input value={createForm.full_name} onChange={e => setCreateForm(f => ({ ...f, full_name: e.target.value }))}
-                    placeholder="John Doe" className="h-10 border border-border bg-background px-3 text-sm rounded-md focus:ring-1 focus:ring-primary outline-none mt-1 " />
-                </div>
-              </div>
-              <div>
-                <Label>System Role</Label>
-                <Select value={createForm.role} onValueChange={v => setCreateForm(f => ({ ...f, role: v }))}>
-                  <SelectTrigger className="mt-1 "><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="user"><div className="flex items-center gap-2"><User className="w-3.5 h-3.5" /> User — Standard access</div></SelectItem>
-                    <SelectItem value="admin"><div className="flex items-center gap-2"><Crown className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" /> Tenant Admin — Full access</div></SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>Temporary Password</Label>
-                <div className="h-10 border border-border bg-background px-3 text-sm rounded-md focus:ring-1 focus:ring-primary outline-none mt-1 flex gap-2 ">
-                  <Input value={createForm.temp_password} onChange={e => setCreateForm(f => ({ ...f, temp_password: e.target.value }))} className="font-mono" />
-                  <Button variant="outline" size="icon" onClick={() => setCreateForm(f => ({ ...f, temp_password: generateTempPassword() }))}>
-                    <RefreshCw className="w-4 h-4" />
-                  </Button>
-                </div>
-                <p className="mt-1 text-xs text-muted-foreground ">User must change this on first login.</p>
-              </div>
-              <div className="flex justify-end gap-3 pt-2">
-                <Button variant="outline" onClick={resetCreateForm}>Cancel</Button>
-                <Button onClick={handleCreateUser} disabled={creating}>
-                  {creating ? 'Creating…' : 'Create User'}
-                </Button>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      
 
       {/* ── Invite User Dialog ── */}
       <Dialog open={showInvite} onOpenChange={setShowInvite}>
-        <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle className="flex items-center gap-2"><UserPlus className="w-4 h-4" /> Invite New User</DialogTitle></DialogHeader>
-          <div className="space-y-4 mt-2">
-            <div>
-              <Label>Email Address *</Label>
-              <Input
-                type="email" value={inviteEmail} onChange={e => setInviteEmail(e.target.value)}
-                placeholder="user@company.com" className="h-10 border border-border bg-background px-3 text-sm rounded-md focus:ring-1 focus:ring-primary outline-none mt-1 "
-                onKeyDown={e => e.key === 'Enter' && handleInvite()}
-              />
-            </div>
-            <div>
-              <Label>System Role</Label>
-              <Select value={inviteRole} onValueChange={setInviteRole}>
-                <SelectTrigger className="mt-1 "><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="user">
-                    <div className="flex items-center gap-2"><User className="w-3.5 h-3.5" /><span>User — Standard access</span></div>
-                  </SelectItem>
-                  <SelectItem value="admin">
-                    <div className="flex items-center gap-2"><Crown className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" /><span>Tenant Admin — Full access</span></div>
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Permission Preset</Label>
-              <p className="text-xs text-muted-foreground mb-1.5">Sets default module access when permissions are configured</p>
-              <div className="grid grid-cols-3 gap-2">
-                {Object.entries(ROLE_PRESETS).map(([key, preset]) => (
-                  <button key={key} onClick={() => setInvitePreset(key)}
-                    className={cn('border rounded-lg px-3 py-2 text-xs font-medium transition-all', preset.color,
-                      invitePreset === key ? 'ring-2 ring-primary ring-offset-1' : 'opacity-70 hover:opacity-100'
-                    )}>
-                    {preset.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 rounded-lg p-3 text-xs text-blue-700 dark:text-blue-400">
-              <Mail className="w-3.5 h-3.5 inline mr-1" />
-              An invitation email will be sent. The user must register to activate their account.
-            </div>
-            <div className="flex justify-end gap-3 pt-2">
-              <Button variant="outline" onClick={() => setShowInvite(false)}>Cancel</Button>
-              <Button onClick={handleInvite} disabled={inviting}>
-                {inviting ? 'Sending…' : 'Send Invitation'}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+          <DialogContent className="max-w-md">
+            <DialogHeader><DialogTitle className="flex items-center gap-2"><UserPlus className="w-4 h-4" /> Add New User</DialogTitle></DialogHeader>
+            <Tabs value={createTab} onValueChange={setCreateTab} className="mt-2">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="invite">Send Email Invite</TabsTrigger>
+                <TabsTrigger value="offline">Create Offline</TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="invite" className="space-y-4 pt-4">
+                <div>
+                  <Label>Email Address *</Label>
+                  <Input
+                    type="email" value={inviteEmail} onChange={e => setInviteEmail(e.target.value)}
+                    placeholder="user@company.com" className="h-10 border border-border bg-background px-3 text-sm rounded-md focus:ring-1 focus:ring-primary outline-none mt-1 "
+                    onKeyDown={e => e.key === 'Enter' && handleInvite()}
+                  />
+                </div>
+                <div>
+                  <Label>System Role</Label>
+                  <Select value={inviteRole} onValueChange={setInviteRole}>
+                    <SelectTrigger className="mt-1 "><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="user">
+                        <div className="flex items-center gap-2"><User className="w-3.5 h-3.5" /><span>User � Standard access</span></div>
+                      </SelectItem>
+                      <SelectItem value="admin">
+                        <div className="flex items-center gap-2"><Crown className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" /><span>Tenant Admin � Full access</span></div>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Permission Preset</Label>
+                  <p className="text-xs text-muted-foreground mb-1.5">Sets default module access when permissions are configured</p>
+                  <div className="grid grid-cols-3 gap-2">
+                  {Object.entries(ROLE_PRESETS).map(([key, preset]) => (
+                    <button key={key} onClick={() => setInvitePreset(key)}
+                      className={cn('border rounded-lg px-3 py-2 text-xs font-medium transition-all', preset.color,
+                        invitePreset === key ? 'ring-2 ring-primary ring-offset-1' : 'opacity-70 hover:opacity-100'
+                      )}>
+                      {preset.label}
+                    </button>
+                  ))}
+                  </div>
+                </div>
+                <div className="flex justify-end gap-3 pt-2">
+                  <Button variant="outline" onClick={() => setShowInvite(false)}>Cancel</Button>
+                  <Button onClick={handleInvite} disabled={inviting || !inviteEmail}>
+                    {inviting ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Sending...</> : 'Send Invitation'}
+                  </Button>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="offline" className="pt-4">
+                {createdUserOffline ? (
+                  <div className="space-y-4">
+                    <div className="bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 rounded-lg p-4 text-sm text-emerald-800 dark:text-emerald-300">
+                      <p className="font-semibold mb-1">?? User account created!</p>
+                      <p className="mt-1 text-xs ">Share these login details securely. The user will be forced to change this password on first login.</p>
+                    </div>
+                    <div className="bg-muted/40 rounded-lg p-4 space-y-3 text-sm">
+                      <div className="flex justify-between items-center">
+                        <span className="text-muted-foreground">Username (Email)</span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-mono font-medium">{createdUserOffline.email}</span>
+                          <button onClick={() => { navigator.clipboard.writeText(createdUserOffline.email); toast.success('Copied!'); }} className="p-1 hover:bg-muted rounded"><Copy className="w-3 h-3 text-muted-foreground" /></button>
+                        </div>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-muted-foreground">Temporary Password</span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-mono font-semibold bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 px-2 py-0.5 rounded text-amber-800 dark:text-amber-300">{createdUserOffline.temp_password}</span>
+                          <button onClick={() => { navigator.clipboard.writeText(createdUserOffline.temp_password); toast.success('Copied!'); }} className="p-1 hover:bg-muted rounded"><Copy className="w-3 h-3 text-muted-foreground" /></button>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex justify-end">
+                      <Button onClick={() => setShowInvite(false)}>Done</Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="col-span-2">
+                        <Label>Email Address (Username) *</Label>
+                        <Input type="email" value={offlineCreateForm.email} onChange={e => setOfflineCreateForm(f => ({ ...f, email: e.target.value }))} placeholder="staff@company.com" className="mt-1" />
+                      </div>
+                      <div className="col-span-2">
+                        <Label>Full Name</Label>
+                        <Input value={offlineCreateForm.full_name} onChange={e => setOfflineCreateForm(f => ({ ...f, full_name: e.target.value }))} placeholder="Jane Doe" className="mt-1" />
+                      </div>
+                    </div>
+                    <div>
+                      <Label>System Role</Label>
+                      <Select value={inviteRole} onValueChange={setInviteRole}>
+                        <SelectTrigger className="mt-1 "><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="user">
+                            <div className="flex items-center gap-2"><User className="w-3.5 h-3.5" /><span>User � Standard access</span></div>
+                          </SelectItem>
+                          <SelectItem value="admin">
+                            <div className="flex items-center gap-2"><Crown className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" /><span>Tenant Admin � Full access</span></div>
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label>Temporary Password</Label>
+                      <div className="flex gap-2 mt-1">
+                        <Input value={offlineCreateForm.temp_password} readOnly className="font-mono bg-muted/30" />
+                        <Button variant="outline" size="icon" onClick={() => setOfflineCreateForm(f => ({ ...f, temp_password: generateTempPassword() }))}>
+                          <RefreshCw className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="flex justify-end gap-3 pt-2">
+                      <Button variant="outline" onClick={() => setShowInvite(false)}>Cancel</Button>
+                      <Button onClick={handleCreateOffline} disabled={creatingOffline || !offlineCreateForm.email}>
+                        {creatingOffline ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Creating...</> : 'Create Offline User'}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </TabsContent>
+            </Tabs>
+          </DialogContent>
+        </Dialog>
 
       {/* ── Permission Editor Dialog ── */}
       <Dialog open={showPermissions !== null} onOpenChange={(v) => !v && setShowPermissions(null)}>

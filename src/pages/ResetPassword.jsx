@@ -1,5 +1,7 @@
 import React, { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import { useAuth } from "@/lib/AuthContext";
+import { sajilo } from "@/api/sajiloClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -7,6 +9,7 @@ import { Lock, Loader2, AlertTriangle } from "lucide-react";
 import AuthLayout from "@/components/AuthLayout";
 
 export default function ResetPassword() {
+  const { user } = useAuth();
   const [searchParams] = useSearchParams();
   const resetToken = searchParams.get("token"); 
 
@@ -24,9 +27,10 @@ export default function ResetPassword() {
     }
     setLoading(true);
     try {
-      // Mock password reset
-      await new Promise(r => setTimeout(r, 500));
-      window.location.href = "/login";
+      await sajilo.auth.supabase.auth.updateUser({ password: newPassword });
+      
+      // Trust the database kernel to clear the must_change_password flag via the AFTER UPDATE trigger.
+      window.location.href = user ? "/" : "/login";
     } catch (err) {
       setError(err.message || "Failed to reset password");
     } finally {
@@ -34,7 +38,7 @@ export default function ResetPassword() {
     }
   };
 
-  if (!resetToken) {
+  if (!resetToken && !user) {
     return (
       <AuthLayout
         icon={AlertTriangle}
