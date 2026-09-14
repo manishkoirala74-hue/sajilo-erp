@@ -12,6 +12,7 @@ import { cn } from '@/lib/utils';
 import { sajilo } from '@/api/sajiloClient';
 import { usePermissions, useAuth } from '@/lib/AuthContext';
 import { ADMIN_ROLES } from '@/lib/rbac';
+import { canAccessRoute } from '@/lib/permissionResolver';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useModalStore } from '@/store/modalStore';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
@@ -122,7 +123,7 @@ export const buildNavGroups = (settings) => {
 export default function Sidebar({ collapsed: propsCollapsed, onToggle }) {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, logout, activeFiscalYear } = useAuth();
+  const { user, logout, activeFiscalYear, activeRole, activeCompany } = useAuth();
   const { sidebarVisibility } = usePermissions();
   const [settings, setSettings] = useState(null);
   const [navGroups, setNavGroups] = useState(buildNavGroups(null));
@@ -264,34 +265,23 @@ export default function Sidebar({ collapsed: propsCollapsed, onToggle }) {
     return favoritePaths.map(path => allNavItems.find(i => i.path === path)).filter(Boolean);
   }, [favoritePaths, allNavItems]);
 
-  // Filter groups
+  // Filter groups using company-scoped permission resolver
   const filteredGroups = useMemo(() => {
-    const isAdmin = ADMIN_ROLES.includes(user?.role);
-    
     return navGroups.map(group => {
       let items = group.items.map(item => {
         if (item.isSubGroup) {
-          let subItems = item.items;
-          // Apply RBAC
-          if (!isAdmin) {
-             subItems = subItems.filter(sub => sidebarVisibility.includes(sub.path) || sub.path === '/');
-          }
+          let subItems = item.items.filter(sub => canAccessRoute(sub.path, user, activeRole, null, activeCompany));
           return subItems.length > 0 ? { ...item, items: subItems } : null;
         }
         
         // Root Items
-        let keep = true;
-        // Apply RBAC
-        if (!isAdmin) {
-           keep = sidebarVisibility.includes(item.path) || item.path === '/' || item.path === '/settings' || item.path === '/reports';
-        }
-        
+        const keep = canAccessRoute(item.path, user, activeRole, null, activeCompany);
         return keep ? item : null;
       }).filter(Boolean);
       
       return items.length > 0 ? { ...group, items } : null;
     }).filter(Boolean);
-  }, [navGroups, sidebarVisibility, user]);
+  }, [navGroups, user, activeRole, activeCompany]);
 
   // Inject favorites group if appropriate
   const displayGroups = useMemo(() => {

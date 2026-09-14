@@ -317,6 +317,7 @@ class GlobalErrorBoundary extends Component {
 }
 
 import { NumberFormatProvider } from '@/lib/NumberFormatContext';
+import { WorkspaceProvider } from '@/lib/WorkspaceContext';
 
 function App() {
   React.useEffect(() => {
@@ -335,13 +336,15 @@ function App() {
       <QueryClientProvider client={queryClientInstance}>
         <GlobalVoucherDrawerProvider>
           <AuthProvider>
-            <DateFormatProvider>
-              <NumberFormatProvider>
-                <RouterProvider router={createBrowserRouter([{ path: '*', element: <><AuthenticatedApp /><GlobalVoucherDrawer /><ModalRegistry /></> }])} />
-                <Toaster />
-                <SonnerToaster position="top-right" richColors />
-              </NumberFormatProvider>
-            </DateFormatProvider>
+            <WorkspaceProvider>
+              <DateFormatProvider>
+                <NumberFormatProvider>
+                  <RouterProvider router={createBrowserRouter([{ path: '*', element: <><AuthenticatedApp /><GlobalVoucherDrawer /><ModalRegistry /></> }])} />
+                  <Toaster />
+                  <SonnerToaster position="top-right" richColors />
+                </NumberFormatProvider>
+              </DateFormatProvider>
+            </WorkspaceProvider>
           </AuthProvider>
         </GlobalVoucherDrawerProvider>
       </QueryClientProvider>

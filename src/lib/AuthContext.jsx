@@ -1,11 +1,13 @@
 import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { sajilo } from '../api/sajiloClient';
+import { hasPermission as resolvePermission } from '@/lib/permissionResolver';
 
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
+  const queryClient = useQueryClient();
   const [user, setUser] = useState(null);
   const [session, setSession] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -24,19 +26,24 @@ export const AuthProvider = ({ children }) => {
   const fetchPermissions = async (currentUser, companyId) => {
     try {
       let roleId = currentUser.global_role_id;
-      let isTenantAdmin = false;
-      if (currentUser.company_scope !== 'ALL') {
+      let isTenantAdmin = currentUser.role === 'admin' || currentUser.role === 'tenant_admin' || currentUser.role === 'owner' || currentUser.company_scope === 'ALL';
+
+      if (companyId) {
         const ucList = await sajilo.entities.UserCompany.filter({ user_id: currentUser.id, company_id: companyId });
         if (ucList.length > 0) {
-          roleId = ucList[0].company_role_id;
-          isTenantAdmin = ucList[0].is_tenant_admin;
+          if (ucList[0].company_role_id) roleId = ucList[0].company_role_id;
+          if (ucList[0].is_tenant_admin || ucList[0].is_owner) isTenantAdmin = true;
         }
       }
       
-      // Inject admin role into user session if they are a tenant admin
-      if (isTenantAdmin && currentUser.role !== 'admin') {
-        setUser(prev => ({ ...prev, role: 'admin' }));
-      }
+      setUser(prev => {
+        const base = prev || currentUser;
+        return {
+          ...base,
+          role: isTenantAdmin ? 'admin' : (base.role || 'user'),
+          is_tenant_admin: isTenantAdmin
+        };
+      });
       
       if (roleId) {
         const roles = await sajilo.entities.CompanyRole.filter({ id: roleId });
@@ -112,7 +119,7 @@ export const AuthProvider = ({ children }) => {
     // 2. Unblock the UI IMMEDIATELY
     setIsSwitchingCompany(false);
     
-    // 3. Fire-and-Forget Domain Data (Notice the missing 'await')
+    // 3. Fire-and-Forget Domain Data
     sajilo.prefetchDomainData(companyId);
   };
 
@@ -161,14 +168,10 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // =========================================================================
-  // PRODUCTION REFACTOR: ERP-GRADE TRANSACT-SAFE COMPANY CREATOR
-  // =========================================================================
   const createCompany = async (companyName) => {
     try {
       if (!user || !user.id) throw new Error("No authenticated session available");
 
-      // 1. Explicitly match 'created_by' string to bypass RLS Rule C instantly
       const companyPayload = {
         name: companyName,
         created_by: user.id.toString()
@@ -177,7 +180,6 @@ export const AuthProvider = ({ children }) => {
       const newCompany = await sajilo.entities.Company.create(companyPayload);
       if (!newCompany || !newCompany.id) throw new Error("Database failed to yield returned company reference object");
 
-      // 2. Build direct user relationship mapping link
       await sajilo.entities.UserCompany.create({
         user_id: user.id,
         company_id: newCompany.id,
@@ -185,7 +187,6 @@ export const AuthProvider = ({ children }) => {
         is_tenant_admin: true
       });
 
-      // 3. Seed default Fiscal Year for new company (Bikram Sambat bounds)
       const currentYear = new Date().getFullYear();
       await sajilo.entities.FiscalYear.create({
         company_id: newCompany.id,
@@ -195,7 +196,6 @@ export const AuthProvider = ({ children }) => {
         is_active: true
       });
 
-      // 3. Re-sync memory collection vectors and shift context automatically
       if (user) {
         await fetchUserCompanies(user);
       }
@@ -233,6 +233,12 @@ export const AuthProvider = ({ children }) => {
           setActiveOverrides([]);
           sajilo.setCompanyId(null);
         } else {
+          if (profileData.account_status && profileData.account_status !== 'active') {
+            console.warn("Account status is inactive/suspended:", profileData.account_status);
+            await logout();
+            return;
+          }
+
           setAuthError(null);
           const mergedUser = { ...authUser, ...profileData };
           setUser(mergedUser);
@@ -240,10 +246,9 @@ export const AuthProvider = ({ children }) => {
           setIsAuthenticated(true);
           
           if (profileData.must_change_password && window.location.pathname !== '/reset-password') {
-
-              window.location.href = '/reset-password';
-              return;
-            }
+            window.location.href = '/reset-password';
+            return;
+          }
           
           await fetchUserCompanies(mergedUser);
         }
@@ -258,35 +263,30 @@ export const AuthProvider = ({ children }) => {
         sajilo.setCompanyId(null);
       }
     } catch (error) {
+      console.error("Auth check failed:", error);
       setUser(null);
       setSession(null);
       setIsAuthenticated(false);
-      setActiveCompany(null);
-      setAvailableCompanies([]);
-      setActiveRole(null);
-      setActiveOverrides([]);
-      sajilo.setCompanyId(null);
     } finally {
       setIsLoadingAuth(false);
       setAuthChecked(true);
     }
   };
 
-  useEffect(() => {
-    checkUserAuth();
-  }, []);
-
   const login = async (email, password) => {
-    await sajilo.auth.loginWithPassword(email, password);
+    const res = await sajilo.auth.login(email, password);
     await checkUserAuth();
+    return res;
   };
 
   const loginWithGoogle = async () => {
-    await sajilo.auth.loginWithGoogle();
+    return await sajilo.auth.loginWithGoogle();
   };
 
-  const signUp = async (email, password) => {
-    return await sajilo.auth.signUp(email, password);
+  const signUp = async (data) => {
+    const res = await sajilo.auth.signUp(data);
+    await checkUserAuth();
+    return res;
   };
 
   const verifyOtp = async (email, token) => {
@@ -296,7 +296,13 @@ export const AuthProvider = ({ children }) => {
 
   const logout = async () => {
     try {
+      if (queryClient) {
+        queryClient.clear();
+      }
       await sajilo.auth.logout();
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
       setUser(null);
       setSession(null);
       setIsAuthenticated(false);
@@ -305,13 +311,93 @@ export const AuthProvider = ({ children }) => {
       setActiveRole(null);
       setActiveOverrides([]);
       sajilo.setCompanyId(null);
-    } catch (error) {
-      console.error('Logout error:', error);
     }
   };
 
+  useEffect(() => {
+    checkUserAuth();
+
+    const { data: authListener } = sajilo.auth.supabase.auth.onAuthStateChange(async (event, currentSession) => {
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        await checkUserAuth();
+      } else if (event === 'SIGNED_OUT') {
+        if (queryClient) queryClient.clear();
+        setUser(null);
+        setSession(null);
+        setIsAuthenticated(false);
+        setActiveCompany(null);
+        setAvailableCompanies([]);
+        setActiveRole(null);
+        setActiveOverrides([]);
+        sajilo.setCompanyId(null);
+        setIsLoadingAuth(false);
+        setAuthChecked(true);
+      }
+    });
+
+    return () => {
+      authListener?.subscription?.unsubscribe();
+    };
+  }, []);
+
+  // Realtime subscription for User & UserCompany account/membership status changes
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const channel = sajilo.auth.supabase
+      .channel(`user-lifecycle-${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'User',
+          filter: `id=eq.${user.id}`
+        },
+        (payload) => {
+          const updated = payload.new;
+          if (updated && updated.account_status && updated.account_status !== 'active') {
+            logout();
+          } else {
+            checkUserAuth();
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'UserCompany',
+          filter: `user_id=eq.${user.id}`
+        },
+        (payload) => {
+          const updated = payload.new;
+          if (activeCompany && updated && updated.company_id === activeCompany.id) {
+            if (updated.membership_status && updated.membership_status !== 'active') {
+              fetchUserCompanies(user);
+            } else {
+              fetchPermissions(user, activeCompany.id);
+            }
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      sajilo.auth.supabase.removeChannel(channel);
+    };
+  }, [user?.id, activeCompany?.id]);
+
   const hasAccess = useCallback((module, operation) => {
-    if (user?.role === 'admin' || user?.is_super_admin === true) return true;
+    if (
+      user?.role === 'admin' ||
+      user?.role === 'tenant_admin' ||
+      user?.role === 'owner' ||
+      user?.is_super_admin === true ||
+      user?.company_scope === 'ALL' ||
+      user?.is_tenant_admin === true
+    ) return true;
     
     const override = activeOverrides.find(o => o.module_key === module && o.operation === operation);
     if (override) {
@@ -327,6 +413,15 @@ export const AuthProvider = ({ children }) => {
     return val === true || val === 'true';
   }, [user, activeOverrides, activeRole]);
 
+  const checkPermissionKey = useCallback((permissionKey) => {
+    return resolvePermission({
+      user,
+      activeCompany,
+      activeRole,
+      permissionKey
+    });
+  }, [user, activeCompany, activeRole]);
+
   return (
     <AuthContext.Provider value={{
       user,
@@ -340,7 +435,7 @@ export const AuthProvider = ({ children }) => {
       isSwitchingCompany,
       switchCompany,
       checkUserAuth,
-      createCompany, // 🟢 EXPOSED TO FRONTEND CONTEXT
+      createCompany,
       login,
       loginWithGoogle,
       signUp,
@@ -348,6 +443,8 @@ export const AuthProvider = ({ children }) => {
       logout,
       activeRole,
       hasAccess,
+      checkPermissionKey,
+      sidebarVisibility: activeRole?.sidebar_visibility || [],
       globalSettings,
       mainGodownId,
       activeGodowns,
@@ -376,9 +473,5 @@ export const usePermissions = () => {
   if (!context) {
     throw new Error('usePermissions must be used within an AuthProvider');
   }
-  return {
-    hasAccess: context.hasAccess,
-    activeRole: context.activeRole,
-    sidebarVisibility: context.activeRole?.sidebar_visibility || []
-  };
+  return context;
 };

@@ -3,6 +3,7 @@ import { Outlet, useLocation, Navigate } from 'react-router-dom';
 import { useAuth, usePermissions } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import { AlertCircle } from 'lucide-react';
+import { canAccessRoute } from '@/lib/permissionResolver';
 
 const DefaultFallback = () => (
   <div className="fixed inset-0 flex items-center justify-center">
@@ -13,9 +14,9 @@ const DefaultFallback = () => (
 const AccessDenied = () => (
   <div className="flex flex-col items-center justify-center min-h-[60vh]">
     <h1 className="text-4xl font-bold text-foreground mb-2">403</h1>
-    <h2 className="text-xl font-semibold text-muted-foreground mb-4">Access Denied</h2>
+    <h2 className="text-xl font-semibold text-muted-foreground mb-4">Access Restricted</h2>
     <p className="text-slate-500 mb-6 max-w-md text-center">
-      You do not have the required permissions to view this page. Please contact your system administrator.
+      You do not have permission to access this page in the selected company workspace.
     </p>
     <a href="/" className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors">
       Return to Dashboard
@@ -31,15 +32,15 @@ const FiscalYearRequired = () => (
     <p className="text-slate-500 mb-6 max-w-md text-center">
       To view or create transactions, your company must have an active fiscal year. Please navigate to Settings &gt; Financial Settings &gt; Fiscal Years to create and set an active fiscal year.
     </p>
-    <a href="/settings/financial/fiscal-years" className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors">
+    <a href="/settings/finance/fiscal-year" className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors">
       Go to Fiscal Year Settings
     </a>
   </div>
 );
 
 export default function ProtectedRoute({ fallback = <DefaultFallback />, unauthenticatedElement }) {
-  const { user, isAuthenticated, isLoadingAuth, authChecked, authError, checkUserAuth, activeFiscalYear } = useAuth();
-  const { sidebarVisibility } = usePermissions();
+  const { user, isAuthenticated, isLoadingAuth, authChecked, authError, checkUserAuth, activeFiscalYear, activeCompany } = useAuth();
+  const { activeRole } = usePermissions();
   const location = useLocation();
 
   useEffect(() => {
@@ -69,19 +70,10 @@ export default function ProtectedRoute({ fallback = <DefaultFallback />, unauthe
     return unauthenticatedElement;
   }
 
-  // RBAC Routing Check
-  const path = location.pathname;
-  // Admin role grants full routing access regardless of company_scope.
-  // company_scope is now used only to scope company list, not permissions.
-  const isAdmin = user?.role === 'admin';
-  const isStandardRoute = path === '/' || path === '/settings' || path === '/reports';
-  
-  if (!isAdmin && !isStandardRoute) {
-    // We check if the exact path or base path is in the allowed visibility list
-    const hasPathAccess = sidebarVisibility.some(vis => path.startsWith(vis));
-    if (!hasPathAccess && sidebarVisibility.length > 0) {
-      return <AccessDenied />;
-    }
+  // Zero-Trust Route Authorization Check (Fail-Closed)
+  const isAllowed = canAccessRoute(location.pathname, user, activeRole, null, activeCompany);
+  if (!isAllowed) {
+    return <AccessDenied />;
   }
 
   // Global Fiscal Year Guardrail for transactions
@@ -89,7 +81,7 @@ export default function ProtectedRoute({ fallback = <DefaultFallback />, unauthe
     '/pos', '/sales/quotations', '/sales/orders', '/sales/invoices', '/sales/returns',
     '/purchase/orders', '/purchase/invoices', '/purchase/returns', '/treasury/vouchers'
   ];
-  if (!activeFiscalYear && transactionRoutes.some(route => path.startsWith(route))) {
+  if (!activeFiscalYear && transactionRoutes.some(route => location.pathname.startsWith(route))) {
     return <FiscalYearRequired />;
   }
 

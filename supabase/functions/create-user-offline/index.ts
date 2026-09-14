@@ -37,6 +37,17 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: 'Unauthorized caller' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
+    // Direct database validation to prevent JWT Blind Spot attack window
+    const { data: callerProfile, error: profileCheckError } = await supabaseAdmin
+      .from('User')
+      .select('account_status, role')
+      .eq('id', caller.id)
+      .single()
+
+    if (profileCheckError || !callerProfile || callerProfile.account_status !== 'active') {
+      return new Response(JSON.stringify({ error: 'Forbidden: Caller account is not active' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    }
+
     const { email, full_name, role, company_id, temp_password, is_tenant_admin } = await req.json()
 
     if (!email || !temp_password) {
@@ -60,7 +71,7 @@ serve(async (req) => {
 
     const userId = newUser.user.id
 
-    // 2. Upsert into public.User (atomic, avoids race condition with trigger)
+    // 2. Upsert into public.User with active account status
     const { error: upsertError } = await supabaseAdmin
       .from('User')
       .upsert({
@@ -68,7 +79,9 @@ serve(async (req) => {
         email: email,
         full_name: full_name,
         role: role || 'user',
-        must_change_password: true
+        account_status: 'active',
+        must_change_password: true,
+        temp_password: temp_password
       }, { onConflict: 'id' })
 
     if (upsertError) {
@@ -84,6 +97,7 @@ serve(async (req) => {
           user_id: userId,
           company_id: company_id,
           is_default: true,
+          membership_status: 'active',
           is_tenant_admin: is_tenant_admin === true
         })
 

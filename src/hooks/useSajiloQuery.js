@@ -6,7 +6,7 @@ import { sajilo } from '@/api/sajiloClient';
 export function useItemsQuery(companyId) {
   const activeCompany = companyId || sajilo.getCompanyId();
   return useQuery({
-    queryKey: ['items', activeCompany],
+    queryKey: ['company', activeCompany, 'items'],
     queryFn: async () => {
       const data = await sajilo.entities.Item.filter({ is_active: true }, '-created_at', 1000);
       return data || [];
@@ -19,7 +19,7 @@ export function useItemsQuery(companyId) {
 export function useCustomersQuery(companyId) {
   const activeCompany = companyId || sajilo.getCompanyId();
   return useQuery({
-    queryKey: ['customers', activeCompany],
+    queryKey: ['company', activeCompany, 'customers'],
     queryFn: async () => {
       const data = await sajilo.entities.BusinessPartner.filter({ is_customer: true }, '-created_at', 1000);
       return data || [];
@@ -32,7 +32,7 @@ export function useCustomersQuery(companyId) {
 export function useVendorsQuery(companyId) {
   const activeCompany = companyId || sajilo.getCompanyId();
   return useQuery({
-    queryKey: ['vendors', activeCompany],
+    queryKey: ['company', activeCompany, 'vendors'],
     queryFn: async () => {
       const data = await sajilo.entities.BusinessPartner.filter({ is_vendor: true }, '-created_at', 1000);
       return data || [];
@@ -45,7 +45,7 @@ export function useVendorsQuery(companyId) {
 export function useSettingsQuery(companyId) {
   const activeCompany = companyId || sajilo.getCompanyId();
   return useQuery({
-    queryKey: ['settings', activeCompany],
+    queryKey: ['company', activeCompany, 'settings'],
     queryFn: async () => {
       const data = await sajilo.entities.CompanySettings.list();
       return data.length > 0 ? data[0] : {};
@@ -58,7 +58,7 @@ export function useSettingsQuery(companyId) {
 export function useGodownsQuery(companyId) {
   const activeCompany = companyId || sajilo.getCompanyId();
   return useQuery({
-    queryKey: ['godowns', activeCompany],
+    queryKey: ['company', activeCompany, 'godowns'],
     queryFn: async () => {
       const data = await sajilo.entities.Godown.filter({ is_active: true }, 'name');
       return data || [];
@@ -71,7 +71,7 @@ export function useGodownsQuery(companyId) {
 export function useDailyMetricsQuery(companyId) {
   const activeCompany = companyId || sajilo.getCompanyId();
   return useQuery({
-    queryKey: ['dailyMetrics', activeCompany],
+    queryKey: ['company', activeCompany, 'dailyMetrics'],
     queryFn: async () => {
       const td = new Date();
       const fd = new Date();
@@ -92,7 +92,7 @@ export function useDailyMetricsQuery(companyId) {
 export function useRecentDocumentsQuery(companyId) {
   const activeCompany = companyId || sajilo.getCompanyId();
   return useQuery({
-    queryKey: ['recentDocuments', activeCompany],
+    queryKey: ['company', activeCompany, 'recentDocuments'],
     queryFn: async () => {
       const [sales, purchases] = await Promise.all([
         sajilo.entities.SalesInvoice.filter({}, '-updated_at', 5).catch(() => []),
@@ -127,7 +127,7 @@ export function useItemMutation(companyId) {
       if (action === 'delete') return await sajilo.entities.Item.delete(id);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['items', activeCompany] });
+      queryClient.invalidateQueries({ queryKey: ['company', activeCompany, 'items'] });
     }
   });
 }
@@ -142,8 +142,8 @@ export function usePartnerMutation(companyId) {
       if (action === 'delete') return await sajilo.entities.BusinessPartner.delete(id);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['customers', activeCompany] });
-      queryClient.invalidateQueries({ queryKey: ['vendors', activeCompany] });
+      queryClient.invalidateQueries({ queryKey: ['company', activeCompany, 'customers'] });
+      queryClient.invalidateQueries({ queryKey: ['company', activeCompany, 'vendors'] });
     }
   });
 }

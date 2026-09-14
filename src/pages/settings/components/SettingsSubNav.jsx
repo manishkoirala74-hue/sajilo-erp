@@ -2,6 +2,7 @@ import React from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useSettingsStore } from '@/store/settingsStore';
 import { Circle } from 'lucide-react';
+import { usePermissions } from '@/lib/AuthContext';
 
 import { SETTINGS_SUB_CATEGORIES } from '../config/settingsNavConfig';
 
@@ -10,8 +11,15 @@ const SettingsSubNav = ({ category }) => {
   const location = useLocation();
   const subCategory = location.pathname.split('/')[3];
   const hasUnsavedChanges = useSettingsStore(state => state.hasUnsavedChanges());
+  const { checkPermissionKey } = usePermissions();
 
-  if (items.length === 0) return null;
+  // Filter items dynamically: check item.permissionKey if present
+  const visibleItems = items.filter(item => {
+    if (!item.permissionKey) return true;
+    return checkPermissionKey(item.permissionKey);
+  });
+
+  if (visibleItems.length === 0) return null;
 
   return (
     <div className="flex flex-col h-full py-4">
@@ -21,7 +29,7 @@ const SettingsSubNav = ({ category }) => {
         </h3>
       </div>
       <nav className="flex-1 space-y-1 px-2">
-        {items.map((item) => {
+        {visibleItems.map((item) => {
           const isActive = subCategory === item.id;
           // In a real scenario, we might track dirty state per subcategory
           // For now, if there's unsaved changes and this is the active tab, we show it

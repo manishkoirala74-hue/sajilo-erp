@@ -57,7 +57,6 @@ const invalidateCache = (tableName) => {
   window.dispatchEvent(new CustomEvent('sajilo_invalidate', { detail: tableName }));
 };
 
-
 const validateFiscalYear = async (tableName, payload) => {
   const targetTables = ['FinancialVoucher', 'POSSale', 'PurchaseInvoice', 'SalesInvoice'];
   if (!targetTables.includes(tableName)) return;
@@ -292,6 +291,7 @@ const buildEntityMethods = (tableName) => {
     }
   };
 };
+
 export const sajilo = {
   rpc: async (functionName, payload, invalidateTables = []) => {
     const { data, error } = await supabase.rpc(functionName, payload);
@@ -322,44 +322,44 @@ export const sajilo = {
       // Fire off exact queries used by dashboards so cache hits perfectly
       // Master Data (Changes rarely) - 10 minute stale time
       queryClientInstance.prefetchQuery({
-        queryKey: ['chartOfAccounts', companyId],
+        queryKey: ['company', companyId, 'chartOfAccounts'],
         queryFn: () => sajilo.entities.ChartOfAccount.list('account_code'),
         staleTime: 1000 * 60 * 10,
       });
       queryClientInstance.prefetchQuery({
-        queryKey: ['chartOfAccountsSub', companyId],
+        queryKey: ['company', companyId, 'chartOfAccountsSub'],
         queryFn: () => sajilo.entities.ChartOfAccount.filter({ ledger_type: 'Sub Ledger', is_active: true }, 'account_name', 300),
         staleTime: 1000 * 60 * 10,
       });
       queryClientInstance.prefetchQuery({
-        queryKey: ['chartOfAccountsGroup', companyId],
+        queryKey: ['company', companyId, 'chartOfAccountsGroup'],
         queryFn: () => sajilo.entities.ChartOfAccount.filter({ ledger_type: 'Group Ledger', is_active: true }, 'account_code', 300),
         staleTime: 1000 * 60 * 10,
       });
       queryClientInstance.prefetchQuery({
-        queryKey: ['customers', companyId],
+        queryKey: ['company', companyId, 'customers'],
         queryFn: () => sajilo.entities.BusinessPartner.filter({ is_customer: true }, '-created_at'),
         staleTime: 1000 * 60 * 10,
       });
       queryClientInstance.prefetchQuery({
-        queryKey: ['vendors', companyId],
+        queryKey: ['company', companyId, 'vendors'],
         queryFn: () => sajilo.entities.BusinessPartner.filter({ is_vendor: true }, '-created_at'),
         staleTime: 1000 * 60 * 10,
       });
       queryClientInstance.prefetchQuery({
-        queryKey: ['items', companyId],
+        queryKey: ['company', companyId, 'items'],
         queryFn: () => sajilo.entities.Item.list('-created_at'),
         staleTime: 1000 * 60 * 10,
       });
       queryClientInstance.prefetchQuery({
-        queryKey: ['companySettings', companyId],
+        queryKey: ['company', companyId, 'settings'],
         queryFn: () => sajilo.entities.CompanySettings.list(),
         staleTime: 1000 * 60 * 10,
       });
 
       // Transactional Data (Changes frequently) - 1 minute stale time
       queryClientInstance.prefetchQuery({
-        queryKey: ['recentVouchers', companyId],
+        queryKey: ['company', companyId, 'recentVouchers'],
         queryFn: () => sajilo.entities.FinancialVoucher.list('-created_at', 500),
         staleTime: 1000 * 60 * 1,
       });
@@ -387,6 +387,11 @@ export const sajilo = {
   },
   auth: {
     supabase,
+    login: async (email, password) => {
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+      return data;
+    },
     loginWithPassword: async (email, password) => {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
@@ -503,6 +508,41 @@ export const sajilo = {
       
       if (error) {
         throw new Error(error.message || 'Failed to invite user');
+      }
+      
+      if (data?.error) {
+        throw new Error(data.error);
+      }
+      
+      return data;
+    },
+    resetUserPassword: async (target_user_id, temp_password, company_id) => {
+      const session = await supabase.auth.getSession();
+      const token = session?.data?.session?.access_token;
+      
+      const { data, error } = await supabase.functions.invoke('reset-user-password', {
+        body: { target_user_id, temp_password, company_id },
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      
+      if (error) {
+        let errDetails = 'Failed to reset user password';
+        if (error.context && typeof error.context.text === 'function') {
+          try {
+            const rawText = await error.context.text();
+            try {
+              const json = JSON.parse(rawText);
+              errDetails = json.error || rawText;
+            } catch (e) {
+              errDetails = rawText;
+            }
+          } catch (e) {
+            errDetails = error.message;
+          }
+        }
+        throw new Error('Backend Error: ' + errDetails);
       }
       
       if (data?.error) {

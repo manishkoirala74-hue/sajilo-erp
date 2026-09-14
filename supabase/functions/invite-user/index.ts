@@ -32,12 +32,12 @@ serve(async (req) => {
 
     const { data: callerProfile, error: callerError } = await supabaseAdmin
       .from('User')
-      .select('role')
+      .select('role, account_status')
       .eq('id', callingUser.id)
       .single()
 
-    if (callerError || (callerProfile.role !== 'admin' && callerProfile.role !== 'tenant_admin')) {
-      throw new Error('Forbidden: You must be an admin to invite users.')
+    if (callerError || !callerProfile || callerProfile.account_status !== 'active' || (callerProfile.role !== 'admin' && callerProfile.role !== 'tenant_admin')) {
+      throw new Error('Forbidden: You must be an active admin to invite users.')
     }
 
     const { email, role, company_id, company_role_id } = await req.json()
@@ -59,7 +59,8 @@ serve(async (req) => {
         id: newUserId,
         email: email,
         role: role === 'admin' ? 'tenant_admin' : role,
-        company_scope: 'SELECTED'
+        company_scope: 'SELECTED',
+        account_status: 'active'
       }, {
         onConflict: 'id'
       })
@@ -76,6 +77,7 @@ serve(async (req) => {
            company_id: company_id,
            is_tenant_admin: role === 'admin' || role === 'tenant_admin',
            company_role_id: company_role_id || null,
+           membership_status: 'active',
            is_default: true
          })
          
