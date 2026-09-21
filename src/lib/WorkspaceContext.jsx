@@ -12,7 +12,7 @@ export const WorkspaceProvider = ({ children }) => {
   const queryClient = useQueryClient();
 
   const { data: settings = null, isLoading } = useQuery({
-    queryKey: ['company', activeCompany?.id, 'settings'],
+    queryKey: ['Company', activeCompany?.id, 'CompanySettings', 'settings'],
     queryFn: async () => {
       if (!activeCompany?.id) return null;
       const data = await sajilo.entities.CompanySettings.list();

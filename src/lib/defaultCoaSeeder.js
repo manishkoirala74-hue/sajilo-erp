@@ -3,13 +3,19 @@ import { sajilo } from '@/api/sajiloClient';
 const DEFAULT_COA = [
   // ── ASSETS (Debit) ──
   { code: '1000', name: 'Assets', type: 'Asset', subtype: '', ledger_type: 'Group Ledger', balance: 'Debit' },
-  
+
   { code: '1100', name: 'Current Assets', type: 'Asset', subtype: 'Current Asset', ledger_type: 'Group Ledger', balance: 'Debit', parent: '1000' },
   { code: '1110', name: 'Cash in Hand', type: 'Asset', subtype: 'Current Asset', ledger_type: 'Sub Ledger', balance: 'Debit', parent: '1100' },
   { code: '1120', name: 'Bank Accounts', type: 'Asset', subtype: 'Current Asset', ledger_type: 'Group Ledger', balance: 'Debit', parent: '1100' },
   { code: '1130', name: 'Trade Receivables (Customers)', type: 'Asset', subtype: 'Current Asset', ledger_type: 'Group Ledger', balance: 'Debit', parent: '1100' },
+  // 1131: AR Control — the postable sub-ledger used when no customer-specific sub-ledger exists.
+  // Individual customer sub-ledgers are auto-created as siblings under 1130 by provisionPartnerLedgers().
+  { code: '1131', name: 'Accounts Receivable — Control', type: 'Asset', subtype: 'Current Asset', ledger_type: 'Sub Ledger', balance: 'Debit', parent: '1130' },
   { code: '1140', name: 'Inventory', type: 'Asset', subtype: 'Current Asset', ledger_type: 'Sub Ledger', balance: 'Debit', parent: '1100' },
-  
+  // 1510: VAT Receivable (Input Tax) — debited on purchase invoices that carry VAT.
+  // Maps to gl_vat_receivable_id in CompanySettings, required by checkoutPurchaseInvoice().
+  { code: '1510', name: 'VAT Receivable / Input Tax', type: 'Asset', subtype: 'Current Asset', ledger_type: 'Sub Ledger', balance: 'Debit', parent: '1100' },
+
   { code: '1200', name: 'Fixed Assets', type: 'Asset', subtype: 'Fixed Asset', ledger_type: 'Group Ledger', balance: 'Debit', parent: '1000' },
   { code: '1210', name: 'Machinery & Equipment', type: 'Asset', subtype: 'Fixed Asset', ledger_type: 'Sub Ledger', balance: 'Debit', parent: '1200' },
   { code: '1220', name: 'Office Equipment', type: 'Asset', subtype: 'Fixed Asset', ledger_type: 'Sub Ledger', balance: 'Debit', parent: '1200' },
@@ -22,30 +28,37 @@ const DEFAULT_COA = [
 
   // ── LIABILITIES (Credit) ──
   { code: '2000', name: 'Liabilities', type: 'Liability', subtype: '', ledger_type: 'Group Ledger', balance: 'Credit' },
-  
+
   { code: '2100', name: 'Current Liabilities', type: 'Liability', subtype: 'Current Liability', ledger_type: 'Group Ledger', balance: 'Credit', parent: '2000' },
   { code: '2110', name: 'Trade Payables (Suppliers)', type: 'Liability', subtype: 'Current Liability', ledger_type: 'Group Ledger', balance: 'Credit', parent: '2100' },
+  // 2111: AP Control — the postable sub-ledger used when no supplier-specific sub-ledger exists.
+  // Individual supplier sub-ledgers are auto-created as siblings under 2110 by provisionPartnerLedgers().
+  { code: '2111', name: 'Accounts Payable — Control', type: 'Liability', subtype: 'Current Liability', ledger_type: 'Sub Ledger', balance: 'Credit', parent: '2110' },
   { code: '2120', name: 'VAT Payable', type: 'Liability', subtype: 'Current Liability', ledger_type: 'Sub Ledger', balance: 'Credit', parent: '2100' },
   { code: '2130', name: 'TDS Payable', type: 'Liability', subtype: 'Current Liability', ledger_type: 'Sub Ledger', balance: 'Credit', parent: '2100' },
-  
+
   { code: '2200', name: 'Non-Current Liabilities', type: 'Liability', subtype: 'Long Term Liability', ledger_type: 'Group Ledger', balance: 'Credit', parent: '2000' },
   { code: '2210', name: 'Bank Loans', type: 'Liability', subtype: 'Long Term Liability', ledger_type: 'Sub Ledger', balance: 'Credit', parent: '2200' },
 
   // ── EQUITY (Credit) ──
   { code: '3000', name: 'Equity', type: 'Equity', subtype: '', ledger_type: 'Group Ledger', balance: 'Credit' },
-  { code: '3100', name: 'Owner\'s Capital', type: 'Equity', subtype: 'Equity', ledger_type: 'Sub Ledger', balance: 'Credit', parent: '3000' },
+  { code: '3100', name: "Owner's Capital", type: 'Equity', subtype: 'Equity', ledger_type: 'Sub Ledger', balance: 'Credit', parent: '3000' },
   { code: '3200', name: 'Retained Earnings', type: 'Equity', subtype: 'Equity', ledger_type: 'Sub Ledger', balance: 'Credit', parent: '3000' },
   { code: '3300', name: 'Current Year Earnings', type: 'Equity', subtype: 'Equity', ledger_type: 'Sub Ledger', balance: 'Credit', parent: '3000' },
 
   // ── REVENUE (Credit) ──
   { code: '4000', name: 'Revenue', type: 'Revenue', subtype: '', ledger_type: 'Group Ledger', balance: 'Credit' },
   { code: '4100', name: 'Sales Revenue', type: 'Revenue', subtype: 'Operating Revenue', ledger_type: 'Sub Ledger', balance: 'Credit', parent: '4000' },
+  // 4010: Contra-revenue — debited when a sales return is posted, keeping gross vs. net revenue distinct.
+  { code: '4010', name: 'Sales Returns & Allowances', type: 'Revenue', subtype: 'Operating Revenue', ledger_type: 'Sub Ledger', balance: 'Debit', parent: '4000' },
   { code: '4200', name: 'Service Income', type: 'Revenue', subtype: 'Operating Revenue', ledger_type: 'Sub Ledger', balance: 'Credit', parent: '4000' },
   { code: '4300', name: 'Other Income', type: 'Revenue', subtype: 'Non-Operating Revenue', ledger_type: 'Sub Ledger', balance: 'Credit', parent: '4000' },
 
   // ── COGS (Debit) ──
   { code: '5000', name: 'Cost of Goods Sold (COGS)', type: 'Expense', subtype: 'Direct Expense', ledger_type: 'Group Ledger', balance: 'Debit' },
   { code: '5100', name: 'Cost of Sales', type: 'Expense', subtype: 'Direct Expense', ledger_type: 'Sub Ledger', balance: 'Debit', parent: '5000' },
+  // 5010: Contra-COGS — credited when a purchase return is posted.
+  { code: '5010', name: 'Purchase Returns & Allowances', type: 'Expense', subtype: 'Direct Expense', ledger_type: 'Sub Ledger', balance: 'Credit', parent: '5000' },
   { code: '5200', name: 'Direct Labor', type: 'Expense', subtype: 'Direct Expense', ledger_type: 'Sub Ledger', balance: 'Debit', parent: '5000' },
   { code: '5300', name: 'Manufacturing Overhead', type: 'Expense', subtype: 'Direct Expense', ledger_type: 'Group Ledger', balance: 'Debit', parent: '5000' },
   { code: '5310', name: 'Factory Rent', type: 'Expense', subtype: 'Direct Expense', ledger_type: 'Sub Ledger', balance: 'Debit', parent: '5300' },

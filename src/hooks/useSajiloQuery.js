@@ -6,7 +6,7 @@ import { sajilo } from '@/api/sajiloClient';
 export function useItemsQuery(companyId) {
   const activeCompany = companyId || sajilo.getCompanyId();
   return useQuery({
-    queryKey: ['company', activeCompany, 'items'],
+    queryKey: ['company', activeCompany, 'Item', 'items'],
     queryFn: async () => {
       const data = await sajilo.entities.Item.filter({ is_active: true }, '-created_at', 1000);
       return data || [];
@@ -19,7 +19,7 @@ export function useItemsQuery(companyId) {
 export function useCustomersQuery(companyId) {
   const activeCompany = companyId || sajilo.getCompanyId();
   return useQuery({
-    queryKey: ['company', activeCompany, 'customers'],
+    queryKey: ['company', activeCompany, 'BusinessPartner', 'customers'],
     queryFn: async () => {
       const data = await sajilo.entities.BusinessPartner.filter({ is_customer: true }, '-created_at', 1000);
       return data || [];
@@ -32,7 +32,7 @@ export function useCustomersQuery(companyId) {
 export function useVendorsQuery(companyId) {
   const activeCompany = companyId || sajilo.getCompanyId();
   return useQuery({
-    queryKey: ['company', activeCompany, 'vendors'],
+    queryKey: ['company', activeCompany, 'BusinessPartner', 'vendors'],
     queryFn: async () => {
       const data = await sajilo.entities.BusinessPartner.filter({ is_vendor: true }, '-created_at', 1000);
       return data || [];
@@ -45,7 +45,7 @@ export function useVendorsQuery(companyId) {
 export function useSettingsQuery(companyId) {
   const activeCompany = companyId || sajilo.getCompanyId();
   return useQuery({
-    queryKey: ['company', activeCompany, 'settings'],
+    queryKey: ['company', activeCompany, 'CompanySettings', 'settings'],
     queryFn: async () => {
       const data = await sajilo.entities.CompanySettings.list();
       return data.length > 0 ? data[0] : {};
@@ -58,7 +58,7 @@ export function useSettingsQuery(companyId) {
 export function useGodownsQuery(companyId) {
   const activeCompany = companyId || sajilo.getCompanyId();
   return useQuery({
-    queryKey: ['company', activeCompany, 'godowns'],
+    queryKey: ['company', activeCompany, 'Godown', 'godowns'],
     queryFn: async () => {
       const data = await sajilo.entities.Godown.filter({ is_active: true }, 'name');
       return data || [];
@@ -68,31 +68,32 @@ export function useGodownsQuery(companyId) {
   });
 }
 
-export function useDailyMetricsQuery(companyId) {
+export function useDailyMetricsQuery(companyId, startDate, endDate) {
   const activeCompany = companyId || sajilo.getCompanyId();
   return useQuery({
-    queryKey: ['company', activeCompany, 'dailyMetrics'],
+    queryKey: ['company', activeCompany, 'DailyMetricsRollup', 'dailyMetrics', startDate, endDate],
     queryFn: async () => {
-      const td = new Date();
-      const fd = new Date();
-      fd.setMonth(fd.getMonth() - 5);
-      fd.setDate(1);
-      
-      const fromDate = fd.toISOString().slice(0, 10);
-      const toDate = td.toISOString().slice(0, 10);
-      
-      const data = await sajilo.entities.DailyMetricsRollup.filter({}, '-metric_date', 200);
-      return (data || []).filter(d => d.metric_date >= fromDate && d.metric_date <= toDate) || [];
+      // Use Supabase query builder directly to filter by date at the DB level
+      const { data, error } = await sajilo.auth.supabase
+        .from('DailyMetricsRollup')
+        .select('*')
+        .eq('company_id', activeCompany)
+        .gte('metric_date', startDate)
+        .lte('metric_date', endDate)
+        .order('metric_date', { ascending: false });
+        
+      if (error) throw error;
+      return data || [];
     },
-    enabled: !!activeCompany,
-    refetchInterval: 5 * 60 * 1000, // Refetch every 5 minutes for "real-time" dashboard
+    enabled: !!activeCompany && !!startDate && !!endDate,
+    refetchInterval: 5 * 60 * 1000,
   });
 }
 
 export function useRecentDocumentsQuery(companyId) {
   const activeCompany = companyId || sajilo.getCompanyId();
   return useQuery({
-    queryKey: ['company', activeCompany, 'recentDocuments'],
+    queryKey: ['company', activeCompany, 'SalesInvoice', 'PurchaseInvoice', 'recentDocuments'],
     queryFn: async () => {
       const [sales, purchases] = await Promise.all([
         sajilo.entities.SalesInvoice.filter({}, '-updated_at', 5).catch(() => []),
@@ -115,6 +116,50 @@ export function useRecentDocumentsQuery(companyId) {
   });
 }
 
+export function useDashboardSummaryQuery(companyId, startDate, endDate) {
+  const activeCompany = companyId || sajilo.getCompanyId();
+  return useQuery({
+    queryKey: ['company', activeCompany, 'SalesInvoice', 'PurchaseOrder', 'BusinessPartner', 'Item', 'DailyMetricsRollup', 'dashboardSummary', startDate, endDate],
+    queryFn: async () => {
+      const { data, error } = await sajilo.auth.supabase.rpc('get_dashboard_summary', {
+        p_company_id: activeCompany,
+        p_start_date: startDate,
+        p_end_date: endDate
+      });
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!activeCompany && !!startDate && !!endDate,
+    staleTime: 60 * 1000,
+  });
+}
+
+export function useRecentSalesQuery(companyId) {
+  const activeCompany = companyId || sajilo.getCompanyId();
+  return useQuery({
+    queryKey: ['company', activeCompany, 'SalesInvoice', 'recentSales'],
+    queryFn: async () => {
+      const data = await sajilo.entities.SalesInvoice.filter({ status: 'Posted' }, '-created_date', 5).catch(() => []);
+      return data || [];
+    },
+    enabled: !!activeCompany,
+    staleTime: 60 * 1000,
+  });
+}
+
+export function usePendingApprovalsQuery(companyId) {
+  const activeCompany = companyId || sajilo.getCompanyId();
+  return useQuery({
+    queryKey: ['company', activeCompany, 'PurchaseOrder', 'pendingApprovals'],
+    queryFn: async () => {
+      const data = await sajilo.entities.PurchaseOrder.filter({ status: 'Pending Approval' }).catch(() => []);
+      return data || [];
+    },
+    enabled: !!activeCompany,
+    staleTime: 60 * 1000,
+  });
+}
+
 // --- MUTATIONS ---
 
 export function useItemMutation(companyId) {
@@ -127,7 +172,7 @@ export function useItemMutation(companyId) {
       if (action === 'delete') return await sajilo.entities.Item.delete(id);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['company', activeCompany, 'items'] });
+      queryClient.invalidateQueries({ predicate: (q) => q.queryKey.includes('Item') });
     }
   });
 }
@@ -142,8 +187,7 @@ export function usePartnerMutation(companyId) {
       if (action === 'delete') return await sajilo.entities.BusinessPartner.delete(id);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['company', activeCompany, 'customers'] });
-      queryClient.invalidateQueries({ queryKey: ['company', activeCompany, 'vendors'] });
+      queryClient.invalidateQueries({ predicate: (q) => q.queryKey.includes('BusinessPartner') });
     }
   });
 }

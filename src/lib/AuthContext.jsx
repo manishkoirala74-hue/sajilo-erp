@@ -23,55 +23,14 @@ export const AuthProvider = ({ children }) => {
   const [activeRole, setActiveRole] = useState(null);
   const [activeOverrides, setActiveOverrides] = useState([]);
 
-  const fetchPermissions = async (currentUser, companyId) => {
-    try {
-      let roleId = currentUser.global_role_id;
-      let isTenantAdmin = currentUser.role === 'admin' || currentUser.role === 'tenant_admin' || currentUser.role === 'owner' || currentUser.company_scope === 'ALL';
-
-      if (companyId) {
-        const ucList = await sajilo.entities.UserCompany.filter({ user_id: currentUser.id, company_id: companyId });
-        if (ucList.length > 0) {
-          if (ucList[0].company_role_id) roleId = ucList[0].company_role_id;
-          if (ucList[0].is_tenant_admin || ucList[0].is_owner) isTenantAdmin = true;
-        }
-      }
-      
-      setUser(prev => {
-        const base = prev || currentUser;
-        return {
-          ...base,
-          role: isTenantAdmin ? 'admin' : (base.role || 'user'),
-          is_tenant_admin: isTenantAdmin
-        };
-      });
-      
-      if (roleId) {
-        const roles = await sajilo.entities.CompanyRole.filter({ id: roleId });
-        if (roles.length > 0) setActiveRole(roles[0]);
-        else setActiveRole(null);
-      } else {
-        setActiveRole(null);
-      }
-
-      const overrides = await sajilo.entities.UserPermissionOverride.filter({ user_id: currentUser.id });
-      const validOverrides = overrides.filter(o => 
-        (o.company_id === null || o.company_id === companyId) && 
-        (o.expires_at === null || new Date(o.expires_at) > new Date())
-      );
-      setActiveOverrides(validOverrides);
-    } catch (e) {
-      console.error("Failed to fetch permissions:", e);
-    }
-  };
-
-  const [globalSettings, setGlobalSettings] = useState(null);
+    const [globalSettings, setGlobalSettings] = useState(null);
   const [mainGodownId, setMainGodownId] = useState(null);
   const [activeGodowns, setActiveGodowns] = useState([]);
 
   // Fetch Fiscal Years using React Query for global Topbar reactivity
   const currentCompanyId = activeCompany?.id || sajilo.getCompanyId();
   const { data: fiscalYears = [], isError: fyIsError, error: fyError, isLoading: fyIsLoading } = useQuery({
-    queryKey: ['fiscalYears', currentCompanyId],
+    queryKey: ['Company', currentCompanyId, 'FiscalYear', 'fiscalYears'],
     queryFn: async () => {
       const { data, error } = await sajilo.auth.supabase
         .from('FiscalYear')
@@ -88,32 +47,30 @@ export const AuthProvider = ({ children }) => {
 
   const activeFiscalYear = fiscalYears.find(fy => fy.status === 'OPEN' || fy.is_active === true || fy.is_active === 'true' || fy.is_active === 1) || null;
 
-  const fetchGlobalSettings = async (companyId) => {
-    try {
-      const [settList, godownList] = await Promise.all([
-        sajilo.entities.CompanySettings.filter({ company_id: companyId }),
-        sajilo.entities.Godown.filter({ company_id: companyId, status: 'Active' })
-      ]);
-      setGlobalSettings(settList.length > 0 ? settList[0] : null);
-      setActiveGodowns(godownList || []);
-      const mainGodown = (godownList || []).find(g => g.is_main === true);
-      setMainGodownId(mainGodown ? mainGodown.id : null);
-    } catch (e) {
-      console.error("Failed to fetch global settings:", e);
-    }
-  };
-
-  const switchCompany = async (companyId, preloadedCompany = null, currentUser = user) => {
+    const switchCompany = async (companyId) => {
     setIsSwitchingCompany(true);
     sajilo.setCompanyId(companyId);
     
-    const company = preloadedCompany || availableCompanies.find(c => c.id === companyId);
-    if (company) {
-      setActiveCompany(company);
-      if (currentUser) {
-        await fetchPermissions(currentUser, companyId);
-        await fetchGlobalSettings(companyId);
+    try {
+      const { data: ctx, error } = await sajilo.auth.supabase.rpc('get_user_auth_context', {
+        p_company_id: companyId
+      });
+      
+      if (error) throw error;
+
+      if (ctx && ctx.status === 'ok') {
+        const mergedUser = { ...user, ...ctx.user, is_tenant_admin: ctx.is_tenant_admin };
+        setUser(mergedUser);
+        setSession({ user: mergedUser });
+        setActiveCompany(ctx.active_company);
+        setActiveRole(ctx.active_role || null);
+        setActiveOverrides(ctx.overrides || []);
+        setGlobalSettings(ctx.settings || null);
+        setActiveGodowns(ctx.godowns || []);
+        setMainGodownId((ctx.godowns || []).find(g => g.is_main)?.id || null);
       }
+    } catch (e) {
+      console.error("Failed to switch company cleanly:", e);
     }
 
     // 2. Unblock the UI IMMEDIATELY
@@ -126,49 +83,11 @@ export const AuthProvider = ({ children }) => {
   // Expose a method to force refresh settings (useful after toggling feature flags)
   const refreshGlobalSettings = async () => {
     if (activeCompany) {
-      await fetchGlobalSettings(activeCompany.id);
+      await checkUserAuth();
     }
   };
 
-  const fetchUserCompanies = async (userData) => {
-    try {
-      const userCompanies = await sajilo.entities.UserCompany.filter({ user_id: userData.id });
-
-      if (!userCompanies || userCompanies.length === 0) {
-        setAvailableCompanies([]);
-        setActiveCompany(null);
-        sajilo.setCompanyId(null);
-        return;
-      }
-
-      const companyIds = userCompanies.map(uc => uc.company_id);
-
-      const { data: allowedCompanies, error } = await sajilo.auth.supabase
-        .from('Company')
-        .select('*')
-        .in('id', companyIds);
-
-      if (error) throw error;
-
-      setAvailableCompanies(allowedCompanies || []);
-
-      if (allowedCompanies && allowedCompanies.length > 0) {
-        const defaultUc = userCompanies.find(uc => uc.is_default);
-        const stored = sajilo.getCompanyId();
-        const storedIsAllowed = stored && companyIds.includes(stored);
-        
-        const targetId = (storedIsAllowed ? stored : null) ||
-          (defaultUc ? defaultUc.company_id : allowedCompanies[0].id);
-          
-        const target = allowedCompanies.find(c => c.id === targetId) || allowedCompanies[0];
-        await switchCompany(target.id, target, userData);
-      }
-    } catch (e) {
-      console.error("Failed to fetch companies cleanly:", e);
-    }
-  };
-
-  const createCompany = async (companyName) => {
+    const createCompany = async (companyName) => {
     try {
       if (!user || !user.id) throw new Error("No authenticated session available");
 
@@ -197,7 +116,7 @@ export const AuthProvider = ({ children }) => {
       });
 
       if (user) {
-        await fetchUserCompanies(user);
+        await switchCompany(newCompany.id);
       }
       
       return newCompany;
@@ -212,45 +131,73 @@ export const AuthProvider = ({ children }) => {
       const authUser = await sajilo.auth.me();
       
       if (authUser) {
-        let profileData = null;
-        try {
-          const existingUsers = await sajilo.entities.User.filter({ id: authUser.id });
-          if (existingUsers && existingUsers.length > 0) {
-            profileData = existingUsers[0];
-          }
-        } catch (e) {
-          console.error("Failed to fetch public User table:", e);
+        const storedCompanyId = sajilo.getCompanyId();
+        const { data: ctx, error } = await sajilo.auth.supabase.rpc('get_user_auth_context', {
+          p_company_id: storedCompanyId || null
+        });
+        
+        if (error) {
+           console.error("Auth RPC failed:", error);
+           throw error;
         }
 
-        if (!profileData) {
-          setAuthError({ type: 'incomplete_profile' });
-          setUser(authUser);
-          setSession({ user: authUser });
-          setIsAuthenticated(true);
-          setAvailableCompanies([]);
-          setActiveCompany(null);
-          setActiveRole(null);
-          setActiveOverrides([]);
-          sajilo.setCompanyId(null);
-        } else {
-          if (profileData.account_status && profileData.account_status !== 'active') {
-            console.warn("Account status is inactive/suspended:", profileData.account_status);
+        switch (ctx.status) {
+          case 'not_registered':
+            setAuthError({ type: 'incomplete_profile' });
+            setUser(authUser);
+            setSession({ user: authUser });
+            setIsAuthenticated(true);
+            setAvailableCompanies([]);
+            setActiveCompany(null);
+            setActiveRole(null);
+            setActiveOverrides([]);
+            sajilo.setCompanyId(null);
+            break;
+            
+          case 'suspended':
+            console.warn("Account status is inactive/suspended");
             await logout();
             return;
-          }
-
-          setAuthError(null);
-          const mergedUser = { ...authUser, ...profileData };
-          setUser(mergedUser);
-          setSession({ user: mergedUser });
-          setIsAuthenticated(true);
-          
-          if (profileData.must_change_password && window.location.pathname !== '/reset-password') {
-            window.location.href = '/reset-password';
-            return;
-          }
-          
-          await fetchUserCompanies(mergedUser);
+            
+          case 'company_access_denied':
+            setAuthError({ type: 'company_access_denied' });
+            break;
+            
+          case 'no_company':
+            setAuthError(null);
+            setUser({ ...authUser, ...ctx.user });
+            setSession({ user: { ...authUser, ...ctx.user } });
+            setIsAuthenticated(true);
+            setAvailableCompanies(ctx.available_companies || []);
+            setActiveCompany(null);
+            setActiveRole(null);
+            setActiveOverrides([]);
+            sajilo.setCompanyId(null);
+            break;
+            
+          case 'ok':
+            setAuthError(null);
+            if (ctx.user.must_change_password && window.location.pathname !== '/reset-password') {
+              window.location.href = '/reset-password';
+              return;
+            }
+            
+            const mergedUser = { ...authUser, ...ctx.user, is_tenant_admin: ctx.is_tenant_admin };
+            setUser(mergedUser);
+            setSession({ user: mergedUser });
+            setIsAuthenticated(true);
+            setAvailableCompanies(ctx.available_companies || []);
+            setActiveCompany(ctx.active_company);
+            setActiveRole(ctx.active_role || null);
+            setActiveOverrides(ctx.overrides || []);
+            setGlobalSettings(ctx.settings || null);
+            setActiveGodowns(ctx.godowns || []);
+            setMainGodownId((ctx.godowns || []).find(g => g.is_main)?.id || null);
+            sajilo.setCompanyId(ctx.active_company.id);
+            
+            // Fire-and-Forget Domain Data
+            sajilo.prefetchDomainData(ctx.active_company.id);
+            break;
         }
       } else {
         setUser(null);
@@ -318,7 +265,11 @@ export const AuthProvider = ({ children }) => {
     checkUserAuth();
 
     const { data: authListener } = sajilo.auth.supabase.auth.onAuthStateChange(async (event, currentSession) => {
-      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+      if (event === 'TOKEN_REFRESHED') {
+        if (currentSession) setSession(currentSession);
+        return;
+      }
+      if (event === 'SIGNED_IN') {
         await checkUserAuth();
       } else if (event === 'SIGNED_OUT') {
         if (queryClient) queryClient.clear();
@@ -375,9 +326,9 @@ export const AuthProvider = ({ children }) => {
           const updated = payload.new;
           if (activeCompany && updated && updated.company_id === activeCompany.id) {
             if (updated.membership_status && updated.membership_status !== 'active') {
-              fetchUserCompanies(user);
+              checkUserAuth();
             } else {
-              fetchPermissions(user, activeCompany.id);
+              checkUserAuth();
             }
           }
         }

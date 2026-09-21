@@ -180,6 +180,7 @@ export default function Items() {
   const [accounts, setAccounts] = useState([]);
   const [discountSchemes, setDiscountSchemes] = useState([]);
   const [taxTypes, setTaxTypes] = useState([]);
+  const [settings, setSettings] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -209,7 +210,10 @@ export default function Items() {
       setAccounts(accs);
       setDiscountSchemes(ds);
       setTaxTypes((txTypes || []).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0)));
-      if (cs[0]) setImgSettings({ max_size_mb: cs[0].item_image_max_size_mb || 2, max_count: cs[0].item_image_max_count || 3 });
+      if (cs[0]) {
+        setSettings(cs[0]);
+        setImgSettings({ max_size_mb: cs[0].item_image_max_size_mb || 2, max_count: cs[0].item_image_max_count || 3 });
+      }
       setLoading(false);
     });
   }, []);
@@ -229,9 +233,10 @@ export default function Items() {
   };
 
   const openNew = () => { 
-    const defSales = accounts.find(a => a.account_code === '4100');
-    const defCogs = accounts.find(a => a.account_code === '5100');
-    const defInv = accounts.find(a => a.account_code === '1140');
+    // P3: Read defaults from GL Settings, with graceful fallback to hardcoded codes if not configured
+    const defSales = accounts.find(a => a.id === settings?.gl_default_sales_account_id) || accounts.find(a => a.account_code === '4100');
+    const defCogs = accounts.find(a => a.id === settings?.gl_default_cogs_account_id) || accounts.find(a => a.account_code === '5100');
+    const defInv = accounts.find(a => a.id === settings?.gl_default_inventory_account_id) || accounts.find(a => a.account_code === '1140');
 
     setForm({ 
       ...emptyItem, 

@@ -13,42 +13,25 @@ export const supabase = createClient(supabaseUrl || 'https://placeholder.supabas
 let activeCompanyId = null;
 const globalTables = ['User', 'Company', 'UserCompany'];
 
-// ── In-Memory Cache for blazing fast navigation ──
-const queryCache = new Map();
-
 // ── Cross-Tab Synchronization ──
 const syncChannel = new BroadcastChannel('sajilo_sync');
 
 const invalidateReactQuery = (tableName) => {
-  if (tableName === 'Item') queryClientInstance.invalidateQueries({ queryKey: ['items'] });
-  if (tableName === 'BusinessPartner') {
-    queryClientInstance.invalidateQueries({ queryKey: ['customers'] });
-    queryClientInstance.invalidateQueries({ queryKey: ['vendors'] });
-  }
-  if (tableName === 'Godown') queryClientInstance.invalidateQueries({ queryKey: ['godowns'] });
-  if (tableName === 'CompanySettings') queryClientInstance.invalidateQueries({ queryKey: ['settings'] });
+  queryClientInstance.invalidateQueries({
+    predicate: (query) => query.queryKey.includes(tableName)
+  });
 };
 
 // Listen for invalidations from other tabs
 syncChannel.onmessage = (event) => {
   if (event.data && event.data.type === 'INVALIDATE') {
     const { tableName } = event.data;
-    internalInvalidate(tableName);
     invalidateReactQuery(tableName);
     window.dispatchEvent(new CustomEvent('sajilo_invalidate', { detail: tableName }));
   }
 };
 
-const internalInvalidate = (tableName) => {
-  for (const key of queryCache.keys()) {
-    if (key.startsWith(tableName + ':')) {
-      queryCache.delete(key);
-    }
-  }
-};
-
 const invalidateCache = (tableName) => {
-  internalInvalidate(tableName);
   invalidateReactQuery(tableName);
   
   // Notify other tabs
@@ -150,9 +133,6 @@ const buildEntityMethods = (tableName) => {
       // Short-circuit: non-global tables require a company context
       if (!isGlobal && !sajilo.getCompanyId()) return [];
 
-      const cacheKey = `${tableName}:list:${orderBy}:${limit}:${sajilo.getCompanyId()}`;
-      if (queryCache.has(cacheKey)) return queryCache.get(cacheKey);
-
       let query = supabase.from(tableName).select('*').limit(limit);
       query = applyCompanyFilter(query);
       
@@ -167,7 +147,6 @@ const buildEntityMethods = (tableName) => {
       
       const { data, error } = await query;
       if (error) throw error;
-      queryCache.set(cacheKey, data);
       return data;
     },
     
@@ -176,22 +155,6 @@ const buildEntityMethods = (tableName) => {
       if (!isGlobal && !sajilo.getCompanyId()) return [];
 
       const sanitizedMatch = sanitizePayload(matchObj);
-      const cacheKey = `${tableName}:filter:${JSON.stringify(sanitizedMatch)}:${orderBy}:${limit}:${sajilo.getCompanyId()}`;
-      if (queryCache.has(cacheKey)) return queryCache.get(cacheKey);
-
-      // Intelligent Cache Lookup for primary key point queries
-      const matchKeys = Object.keys(sanitizedMatch);
-      if (matchKeys.length === 1 && matchKeys[0] === 'id') {
-        for (const [key, cachedData] of queryCache.entries()) {
-          if (key.startsWith(`${tableName}:list:`) && Array.isArray(cachedData)) {
-            const found = cachedData.find(item => item.id === sanitizedMatch.id);
-            if (found) {
-              return [found];
-            }
-          }
-        }
-      }
-
       let query = supabase.from(tableName).select('*').match(sanitizedMatch).limit(limit);
       query = applyCompanyFilter(query);
       
@@ -204,31 +167,16 @@ const buildEntityMethods = (tableName) => {
       
       const { data, error } = await query;
       if (error) throw error;
-      queryCache.set(cacheKey, data);
       return data;
     },
     
     get: async (id) => {
       const sanitizedMatch = sanitizePayload({ id });
-      const cacheKey = `${tableName}:get:${id}:${sajilo.getCompanyId()}`;
-      if (queryCache.has(cacheKey)) return queryCache.get(cacheKey);
-
-      // Intelligent Cache Lookup for primary key point queries
-      for (const [key, cachedData] of queryCache.entries()) {
-        if (key.startsWith(`${tableName}:list:`) && Array.isArray(cachedData)) {
-          const found = cachedData.find(item => item.id === id);
-          if (found) {
-            return found;
-          }
-        }
-      }
-
       let query = supabase.from(tableName).select('*').eq('id', id).single();
       query = applyCompanyFilter(query);
       
       const { data, error } = await query;
       if (error && error.code !== 'PGRST116') throw error; // Ignore not found error
-      if (data) queryCache.set(cacheKey, data);
       return data;
     },
     
@@ -303,7 +251,7 @@ export const sajilo = {
   },
   invalidateCache,
   clearCache: () => {
-    queryCache.clear();
+    queryClientInstance.clear();
   },
   requestCompanyDeletion: async (companyId) => {
     const { data, error } = await supabase.rpc('request_company_deletion', { p_company_id: companyId });
@@ -318,60 +266,13 @@ export const sajilo = {
     return data;
   },
   prefetchDomainData: async (companyId) => {
-    try {
-      // Fire off exact queries used by dashboards so cache hits perfectly
-      // Master Data (Changes rarely) - 10 minute stale time
-      queryClientInstance.prefetchQuery({
-        queryKey: ['company', companyId, 'chartOfAccounts'],
-        queryFn: () => sajilo.entities.ChartOfAccount.list('account_code'),
-        staleTime: 1000 * 60 * 10,
-      });
-      queryClientInstance.prefetchQuery({
-        queryKey: ['company', companyId, 'chartOfAccountsSub'],
-        queryFn: () => sajilo.entities.ChartOfAccount.filter({ ledger_type: 'Sub Ledger', is_active: true }, 'account_name', 300),
-        staleTime: 1000 * 60 * 10,
-      });
-      queryClientInstance.prefetchQuery({
-        queryKey: ['company', companyId, 'chartOfAccountsGroup'],
-        queryFn: () => sajilo.entities.ChartOfAccount.filter({ ledger_type: 'Group Ledger', is_active: true }, 'account_code', 300),
-        staleTime: 1000 * 60 * 10,
-      });
-      queryClientInstance.prefetchQuery({
-        queryKey: ['company', companyId, 'customers'],
-        queryFn: () => sajilo.entities.BusinessPartner.filter({ is_customer: true }, '-created_at'),
-        staleTime: 1000 * 60 * 10,
-      });
-      queryClientInstance.prefetchQuery({
-        queryKey: ['company', companyId, 'vendors'],
-        queryFn: () => sajilo.entities.BusinessPartner.filter({ is_vendor: true }, '-created_at'),
-        staleTime: 1000 * 60 * 10,
-      });
-      queryClientInstance.prefetchQuery({
-        queryKey: ['company', companyId, 'items'],
-        queryFn: () => sajilo.entities.Item.list('-created_at'),
-        staleTime: 1000 * 60 * 10,
-      });
-      queryClientInstance.prefetchQuery({
-        queryKey: ['company', companyId, 'settings'],
-        queryFn: () => sajilo.entities.CompanySettings.list(),
-        staleTime: 1000 * 60 * 10,
-      });
-
-      // Transactional Data (Changes frequently) - 1 minute stale time
-      queryClientInstance.prefetchQuery({
-        queryKey: ['company', companyId, 'recentVouchers'],
-        queryFn: () => sajilo.entities.FinancialVoucher.list('-created_at', 500),
-        staleTime: 1000 * 60 * 1,
-      });
-    } catch (error) {
-      // Silently log background sync failures; React Query handles the retry logic
-      console.warn("Background domain data pre-warming delayed:", error);
-    }
+    // Disabled: Aggressively pre-fetching massive tables (Items, Partners, Vouchers)
+    // freezes the main browser thread during JSON parsing on company switch.
+    // React Query will organically load what is needed for the active view.
   },
   setCompanyId: (id) => {
     if (activeCompanyId !== id) {
       activeCompanyId = id;
-      queryCache.clear(); // Clear cache when company switches
     }
     if (id) {
       localStorage.setItem('activeCompanyId', id);

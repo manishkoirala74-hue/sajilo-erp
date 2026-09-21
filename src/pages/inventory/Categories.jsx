@@ -21,6 +21,7 @@ export default function Categories() {
   const [categories, setCategories] = useState([]);
   const [accounts, setAccounts] = useState([]);
   const [discountSchemes, setDiscountSchemes] = useState([]);
+  const [settings, setSettings] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -32,10 +33,12 @@ export default function Categories() {
       sajilo.entities.ItemCategory.list('category_name'),
       sajilo.entities.ChartOfAccount.filter({ is_active: true }, 'account_code', 500),
       sajilo.entities.DiscountScheme.filter({ is_active: true }, 'scheme_name', 200),
-    ]).then(([cats, accs, ds]) => {
+      sajilo.entities.CompanySettings.list(),
+    ]).then(([cats, accs, ds, cs]) => {
       setCategories(cats);
       setAccounts(accs);
       setDiscountSchemes(ds);
+      if (cs[0]) setSettings(cs[0]);
       setLoading(false);
     });
   }, []);
@@ -45,7 +48,19 @@ export default function Categories() {
     setCategories(data);
   };
 
-  const openNew = () => { setForm(emptyForm); setEditing(null); setShowForm(true); };
+  const openNew = () => {
+    const defSales = accounts.find(a => a.id === settings?.gl_default_sales_account_id) || accounts.find(a => a.account_code === '4100');
+    const defCogs = accounts.find(a => a.id === settings?.gl_default_cogs_account_id) || accounts.find(a => a.account_code === '5100');
+    setForm({
+      ...emptyForm,
+      sales_account_id: defSales?.id || '',
+      sales_account_name: defSales?.account_name || '',
+      purchase_account_id: defCogs?.id || '',
+      purchase_account_name: defCogs?.account_name || '',
+    });
+    setEditing(null);
+    setShowForm(true);
+  };
   const openEdit = (c) => { setForm(c); setEditing(c); setShowForm(true); };
   const sf = (k, v) => setForm(prev => ({ ...prev, [k]: v }));
 
@@ -53,14 +68,14 @@ export default function Categories() {
     if (!form.category_name) { toast.error('Category name is required'); return; }
     setSaving(true);
     try {
-  if (editing) {
+      if (editing) {
         await sajilo.entities.ItemCategory.update(editing.id, form);
         toast.success('Category updated');
       } else {
         await sajilo.entities.ItemCategory.create(form);
         toast.success('Category created');
       }
-        } catch (err) {
+    } catch (err) {
       toast.error(err.message || 'Error occurred while saving');
     } finally {
       setSaving(false);
@@ -86,7 +101,15 @@ export default function Categories() {
       )
     },
     { key: 'category_code', label: 'Code' },
-    { key: 'description', label: 'Description' },
+    {
+      key: 'accounts', label: 'GL Accounts',
+      render: (_, row) => (
+        <div className="text-xs text-muted-foreground space-y-0.5">
+          {row.sales_account_name && <div><span className="font-medium">Sales:</span> {row.sales_account_name}</div>}
+          {row.purchase_account_name && <div><span className="font-medium">COGS:</span> {row.purchase_account_name}</div>}
+        </div>
+      )
+    },
     {
       key: 'discount_scheme_name', label: 'Discount',
       render: v => v ? <span className="text-xs bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20 px-2 py-0.5 rounded-full">{v}</span> : '—'
@@ -134,8 +157,38 @@ export default function Categories() {
             </div>
 
             <div>
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 pb-1 border-b border-border">Default Settings</p>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 pb-1 border-b border-border">GL Mapping & Defaults</p>
               <div className="space-y-3">
+                <div>
+                  <Label>Sales Account</Label>
+                  <Select value={form.sales_account_id} onValueChange={v => {
+                    const acc = salesAccounts.find(a => a.id === v);
+                    setForm(prev => ({ ...prev, sales_account_id: v, sales_account_name: acc?.account_name || '' }));
+                  }}>
+                    <SelectTrigger><SelectValue placeholder="— Inherit from Settings —" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={null}>— Inherit from Settings —</SelectItem>
+                      {salesAccounts.map(a => (
+                        <SelectItem key={a.id} value={a.id}>{a.account_code} - {a.account_name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Cost of Goods Sold (COGS) / Purchase Account</Label>
+                  <Select value={form.purchase_account_id} onValueChange={v => {
+                    const acc = cogsAccounts.find(a => a.id === v);
+                    setForm(prev => ({ ...prev, purchase_account_id: v, purchase_account_name: acc?.account_name || '' }));
+                  }}>
+                    <SelectTrigger><SelectValue placeholder="— Inherit from Settings —" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={null}>— Inherit from Settings —</SelectItem>
+                      {cogsAccounts.map(a => (
+                        <SelectItem key={a.id} value={a.id}>{a.account_code} - {a.account_name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
                 <div>
                   <Label>Default Discount Scheme</Label>
                   <Select value={form.discount_scheme_id} onValueChange={v => {

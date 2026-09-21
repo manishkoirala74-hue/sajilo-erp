@@ -14,7 +14,7 @@ import { isValidUUID } from '@/lib/utils';
  */
 export function useItemTradingHistory(itemId) {
   return useQuery({
-    queryKey: ['itemTradingHistory', itemId],
+    queryKey: ['Item', 'SalesInvoice', 'PurchaseInvoice', 'itemTradingHistory', itemId],
     queryFn: async () => {
       if (!itemId || !isValidUUID(itemId)) return [];
       const { data, error } = await supabase.rpc('get_item_recent_trading_history_rpc', {

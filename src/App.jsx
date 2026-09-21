@@ -19,98 +19,98 @@ import ERPLayout from '@/components/layout/ERPLayout';
 
 // Pages
 import Dashboard from '@/pages/Dashboard';
-import BusinessPartners from '@/pages/partners/BusinessPartners';
-import Customers from '@/pages/partners/Customers';
-import Suppliers from '@/pages/partners/Suppliers';
-import Items from '@/pages/inventory/Items';
-import StockTransfers from '@/pages/inventory/StockTransfers';
-import Categories from '@/pages/inventory/Categories';
-import UnitOfMeasures from '@/pages/inventory/UnitOfMeasures';
-import DiscountSchemes from '@/pages/inventory/DiscountSchemes';
-import StockAdjustments from '@/pages/inventory/StockAdjustments';
-import Godowns from '@/pages/inventory/Godowns';
-import PriceRevisionWizard from './pages/inventory/PriceRevisionWizard';
-import StockAssemblyList from '@/pages/inventory/StockAssemblyList';
-import POSSales from '@/pages/pos/POSSales';
-import PurchaseOrders from '@/pages/purchase/PurchaseOrders';
-import PurchaseInvoices from '@/pages/purchase/PurchaseInvoices';
-import PurchaseReturns from '@/pages/purchase/PurchaseReturns';
-import SalesOrders from '@/pages/sales/SalesOrders';
-import SalesInvoices from '@/pages/sales/SalesInvoices';
-import SalesReturns from '@/pages/sales/SalesReturns';
-import Quotations from '@/pages/sales/Quotations';
-import SettingsLayout from '@/pages/settings/SettingsLayout';
-import PDFTemplatesList from '@/pages/settings/PDFTemplatesList';
-import TemplateBuilder from '@/pages/settings/TemplateBuilder';
+const BusinessPartners = React.lazy(() => import('@/pages/partners/BusinessPartners'));
+const Customers = React.lazy(() => import('@/pages/partners/Customers'));
+const Suppliers = React.lazy(() => import('@/pages/partners/Suppliers'));
+const Items = React.lazy(() => import('@/pages/inventory/Items'));
+const StockTransfers = React.lazy(() => import('@/pages/inventory/StockTransfers'));
+const Categories = React.lazy(() => import('@/pages/inventory/Categories'));
+const UnitOfMeasures = React.lazy(() => import('@/pages/inventory/UnitOfMeasures'));
+const DiscountSchemes = React.lazy(() => import('@/pages/inventory/DiscountSchemes'));
+const StockAdjustments = React.lazy(() => import('@/pages/inventory/StockAdjustments'));
+const Godowns = React.lazy(() => import('@/pages/inventory/Godowns'));
+const PriceRevisionWizard = React.lazy(() => import('./pages/inventory/PriceRevisionWizard'));
+const StockAssemblyList = React.lazy(() => import('@/pages/inventory/StockAssemblyList'));
+const POSSales = React.lazy(() => import('@/pages/pos/POSSales'));
+const PurchaseOrders = React.lazy(() => import('@/pages/purchase/PurchaseOrders'));
+const PurchaseInvoices = React.lazy(() => import('@/pages/purchase/PurchaseInvoices'));
+const PurchaseReturns = React.lazy(() => import('@/pages/purchase/PurchaseReturns'));
+const SalesOrders = React.lazy(() => import('@/pages/sales/SalesOrders'));
+const SalesInvoices = React.lazy(() => import('@/pages/sales/SalesInvoices'));
+const SalesReturns = React.lazy(() => import('@/pages/sales/SalesReturns'));
+const Quotations = React.lazy(() => import('@/pages/sales/Quotations'));
+const SettingsLayout = React.lazy(() => import('@/pages/settings/SettingsLayout'));
+const PDFTemplatesList = React.lazy(() => import('@/pages/settings/PDFTemplatesList'));
+const TemplateBuilder = React.lazy(() => import('@/pages/settings/TemplateBuilder'));
 // Company
-import CompanyManagementPage from '@/pages/settings/company/CompanyManagementPage';
-import UserRoles from '@/pages/settings/company/UserRoles';
-import PasswordPolicy from '@/pages/settings/company/PasswordPolicy';
-import ApprovalControl from '@/pages/settings/company/ApprovalControl';
+const CompanyManagementPage = React.lazy(() => import('@/pages/settings/company/CompanyManagementPage'));
+const UserRoles = React.lazy(() => import('@/pages/settings/company/UserRoles'));
+const PasswordPolicy = React.lazy(() => import('@/pages/settings/company/PasswordPolicy'));
+const ApprovalControl = React.lazy(() => import('@/pages/settings/company/ApprovalControl'));
 // Finance
-import FiscalYear from '@/pages/settings/finance/FiscalYear';
-import TaxVatMatrices from '@/pages/settings/finance/TaxVatMatrices';
-import GLMapping from '@/pages/settings/finance/GLMapping';
-import PayrollMapping from '@/pages/settings/finance/PayrollMapping';
-import Depreciation from '@/pages/settings/finance/Depreciation';
+const FiscalYear = React.lazy(() => import('@/pages/settings/finance/FiscalYear'));
+const TaxVatMatrices = React.lazy(() => import('@/pages/settings/finance/TaxVatMatrices'));
+const GLMapping = React.lazy(() => import('@/pages/settings/finance/GLMapping'));
+const PayrollMapping = React.lazy(() => import('@/pages/settings/finance/PayrollMapping'));
+const Depreciation = React.lazy(() => import('@/pages/settings/finance/Depreciation'));
 // Operations
-import ReceivableCollections from '@/pages/settings/operations/ReceivableCollections';
-import VoucherSequence from '@/pages/settings/operations/VoucherSequence';
-import InventorySettings from '@/pages/settings/operations/InventorySettings';
-import QuickActionsSettings from '@/pages/settings/operations/QuickActionsSettings';
+const ReceivableCollections = React.lazy(() => import('@/pages/settings/operations/ReceivableCollections'));
+const VoucherSequence = React.lazy(() => import('@/pages/settings/operations/VoucherSequence'));
+const InventorySettings = React.lazy(() => import('@/pages/settings/operations/InventorySettings'));
+const QuickActionsSettings = React.lazy(() => import('@/pages/settings/operations/QuickActionsSettings'));
 // Data
-import SystemCutOver from '@/pages/settings/data/SystemCutOver';
-import ItemImportExportPage from '@/pages/settings/data/ItemImportExportPage';
-import DataUtilitiesPage from '@/pages/settings/data/DataUtilitiesPage';
+const SystemCutOver = React.lazy(() => import('@/pages/settings/data/SystemCutOver'));
+const ItemImportExportPage = React.lazy(() => import('@/pages/settings/data/ItemImportExportPage'));
+const DataUtilitiesPage = React.lazy(() => import('@/pages/settings/data/DataUtilitiesPage'));
 // Integrations
-import FeatureToggles from '@/pages/settings/integrations/FeatureToggles';
-import RegionalSettings from '@/pages/settings/integrations/RegionalSettings';
-import StorageLimits from '@/pages/settings/integrations/StorageLimits';
-import CommunicationChannels from '@/pages/settings/integrations/CommunicationChannels';
-import PaymentGateways from '@/pages/settings/integrations/PaymentGateways';
-import Reports from '@/pages/Reports.jsx';
-import EmployeeReceivableReport from '@/pages/reports/EmployeeReceivableReport';
-import EmployeePayableReport from '@/pages/reports/EmployeePayableReport';
-import UserActivityLog from '@/pages/reports/UserActivityLog';
-import InventoryTurnoverReport from '@/pages/reports/InventoryTurnoverReport';
-import CommunicationLogs from '@/pages/reports/CommunicationLogs';
-import PriceRevisionHistory from '@/pages/reports/PriceRevisionHistory';
-import GrossProfitMarginReport from '@/pages/reports/GrossProfitMarginReport';
-import CustomerBillDue from '@/pages/reports/CustomerBillDue';
-import SupplierBillDue from '@/pages/reports/SupplierBillDue';
-import PurchasePriceChangeHistory from '@/pages/reports/PurchasePriceChangeHistory';
-import NegativeStockExceptionReport from '@/pages/reports/NegativeStockExceptionReport';
-import ComposeEmail from '@/pages/email/ComposeEmail';
-import Profile from '@/pages/Profile';
-import HelpSupport from '@/pages/HelpSupport';
+const FeatureToggles = React.lazy(() => import('@/pages/settings/integrations/FeatureToggles'));
+const RegionalSettings = React.lazy(() => import('@/pages/settings/integrations/RegionalSettings'));
+const StorageLimits = React.lazy(() => import('@/pages/settings/integrations/StorageLimits'));
+const CommunicationChannels = React.lazy(() => import('@/pages/settings/integrations/CommunicationChannels'));
+const PaymentGateways = React.lazy(() => import('@/pages/settings/integrations/PaymentGateways'));
+const Reports = React.lazy(() => import('@/pages/Reports.jsx'));
+const EmployeeReceivableReport = React.lazy(() => import('@/pages/reports/EmployeeReceivableReport'));
+const EmployeePayableReport = React.lazy(() => import('@/pages/reports/EmployeePayableReport'));
+const UserActivityLog = React.lazy(() => import('@/pages/reports/UserActivityLog'));
+const InventoryTurnoverReport = React.lazy(() => import('@/pages/reports/InventoryTurnoverReport'));
+const CommunicationLogs = React.lazy(() => import('@/pages/reports/CommunicationLogs'));
+const PriceRevisionHistory = React.lazy(() => import('@/pages/reports/PriceRevisionHistory'));
+const GrossProfitMarginReport = React.lazy(() => import('@/pages/reports/GrossProfitMarginReport'));
+const CustomerBillDue = React.lazy(() => import('@/pages/reports/CustomerBillDue'));
+const SupplierBillDue = React.lazy(() => import('@/pages/reports/SupplierBillDue'));
+const PurchasePriceChangeHistory = React.lazy(() => import('@/pages/reports/PurchasePriceChangeHistory'));
+const NegativeStockExceptionReport = React.lazy(() => import('@/pages/reports/NegativeStockExceptionReport'));
+const ComposeEmail = React.lazy(() => import('@/pages/email/ComposeEmail'));
+const Profile = React.lazy(() => import('@/pages/Profile'));
+const HelpSupport = React.lazy(() => import('@/pages/HelpSupport'));
 
 // Accounting
-import ChartOfAccounts from '@/pages/accounting/ChartOfAccounts';
-import GeneralLedger from '@/pages/accounting/GeneralLedger';
+const ChartOfAccounts = React.lazy(() => import('@/pages/accounting/ChartOfAccounts'));
+const GeneralLedger = React.lazy(() => import('@/pages/accounting/GeneralLedger'));
 
 // Treasury
-import FinancialVouchers from '@/pages/treasury/FinancialVouchers';
-import BankAccounts from '@/pages/treasury/BankAccounts';
+const FinancialVouchers = React.lazy(() => import('@/pages/treasury/FinancialVouchers'));
+const BankAccounts = React.lazy(() => import('@/pages/treasury/BankAccounts'));
 
 // Fixed Assets
-import FixedAssets from '@/pages/assets/FixedAssets';
-import AssetCompliance from '@/pages/assets/AssetCompliance';
-import DepreciationSchedules from '@/pages/assets/DepreciationSchedules';
+const FixedAssets = React.lazy(() => import('@/pages/assets/FixedAssets'));
+const AssetCompliance = React.lazy(() => import('@/pages/assets/AssetCompliance'));
+const DepreciationSchedules = React.lazy(() => import('@/pages/assets/DepreciationSchedules'));
 
 // HR
-import Employees from '@/pages/hr/Employees';
-import PayrollRuns from '@/pages/hr/PayrollRuns';
+const Employees = React.lazy(() => import('@/pages/hr/Employees'));
+const PayrollRuns = React.lazy(() => import('@/pages/hr/PayrollRuns'));
 
 // Manufacturing
-import ManufacturingOrders from '@/pages/manufacturing/ManufacturingOrders';
+const ManufacturingOrders = React.lazy(() => import('@/pages/manufacturing/ManufacturingOrders'));
 
 // Services
-import ServiceContracts from '@/pages/services/ServiceContracts';
+const ServiceContracts = React.lazy(() => import('@/pages/services/ServiceContracts'));
 
 // Construction
-import ProjectMaster from '@/pages/construction/ProjectMaster';
-import DeliveryChallans from '@/pages/construction/DeliveryChallans';
-import ConsolidatedBilling from '@/pages/construction/ConsolidatedBilling';
+const ProjectMaster = React.lazy(() => import('@/pages/construction/ProjectMaster'));
+const DeliveryChallans = React.lazy(() => import('@/pages/construction/DeliveryChallans'));
+const ConsolidatedBilling = React.lazy(() => import('@/pages/construction/ConsolidatedBilling'));
 
 // Auth pages
 import Login from '@/pages/Login';
@@ -280,7 +280,7 @@ const AuthenticatedApp = () => {
 };
 
 import { GlobalVoucherDrawerProvider } from '@/lib/GlobalVoucherContext';
-import GlobalVoucherDrawer from '@/components/shared/GlobalVoucherDrawer';
+const GlobalVoucherDrawer = React.lazy(() => import('@/components/shared/GlobalVoucherDrawer'));
 
 class GlobalErrorBoundary extends Component {
   constructor(props) {

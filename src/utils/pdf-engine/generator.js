@@ -1,5 +1,3 @@
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
 import { formatDualDateString } from '@/lib/nepaliDate';
 
 /**
@@ -10,6 +8,13 @@ import { formatDualDateString } from '@/lib/nepaliDate';
  * @returns {Blob} The generated PDF as a Blob.
  */
 export const generatePDF = async (data, layoutConfig = {}) => {
+  const [jsPDFModule, autoTableModule] = await Promise.all([
+    import('jspdf'),
+    import('jspdf-autotable')
+  ]);
+  const jsPDF = jsPDFModule.default || jsPDFModule.jsPDF || jsPDFModule;
+  const autoTable = autoTableModule.default || autoTableModule;
+
   // Extract configuration with defaults
   const config = {
     primaryColor: layoutConfig.primaryColor || '#3b82f6', // Default blue

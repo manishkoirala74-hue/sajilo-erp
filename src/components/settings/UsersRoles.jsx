@@ -139,7 +139,7 @@ export default function UsersRoles() {
 
   // TanStack Query for Bulletproof 2-Step Workspace User Fetching
   const { data: users = [], isLoading: loadingUsers } = useQuery({
-    queryKey: ['company', activeCompanyId, 'users'],
+    queryKey: ['Company', activeCompanyId, 'User', 'UserCompany', 'users'],
     queryFn: async () => {
       if (!activeCompanyId) return [];
 

@@ -17,11 +17,11 @@ import {
 } from 'recharts';
 
 import { 
-  useItemsQuery, 
-  useCustomersQuery, 
-  useVendorsQuery, 
   useDailyMetricsQuery,
-  useRecentDocumentsQuery
+  useRecentDocumentsQuery,
+  useDashboardSummaryQuery,
+  useRecentSalesQuery,
+  usePendingApprovalsQuery
 } from '@/hooks/useSajiloQuery';
 import { triggerHaptic } from '@/utils/haptics';
 import { useAmountFormatter } from '@/hooks/useAmountFormatter';
@@ -29,36 +29,25 @@ import { useAmountFormatter } from '@/hooks/useAmountFormatter';
 export default function Dashboard() {
   const { availableCompanies, isLoadingAuth, activeCompany } = useAuth();
   const { formatAmountShort } = useAmountFormatter();
+  const activeCompanyId = activeCompany?.id || null;
   
-  // ── SWR Queries ──
-  const { data: items = [] } = useItemsQuery();
-  const { data: customers = [] } = useCustomersQuery();
-  const { data: vendors = [] } = useVendorsQuery();
-  const { data: metrics = [], isLoading: isLoadingMetrics } = useDailyMetricsQuery();
+  // --- Date Range Calculation ---
+  const today = new Date();
+  const endDate = today.toISOString().slice(0, 10);
+  const fd = new Date();
+  fd.setMonth(fd.getMonth() - 5);
+  fd.setDate(1);
+  const startDate = fd.toISOString().slice(0, 10);
+
+  // --- Independent Queries ---
+  const { data: metrics = [], isLoading: isLoadingMetrics } = useDailyMetricsQuery(activeCompanyId, startDate, endDate);
   const { data: recentDocs, isLoading: isLoadingRecentDocs } = useRecentDocumentsQuery();
-  
-  const [recentSales, setRecentSales] = useState([]);
-  const [unpaidSalesCount, setUnpaidSalesCount] = useState(0);
-  const [pendingApprovals, setPendingApprovals] = useState([]);
-  
+  const { data: summary, isLoading: isLoadingSummary } = useDashboardSummaryQuery(activeCompanyId, startDate, endDate);
+  const { data: recentSales = [], isLoading: isLoadingRecentSales } = useRecentSalesQuery();
+  const { data: pendingApprovals = [], isLoading: isLoadingApprovals } = usePendingApprovalsQuery();
+
   const [amountsVisible, setAmountsVisible] = useState(true);
   const { theme } = useTheme();
-  const activeCompanyId = activeCompany?.id || null;
-
-  useEffect(() => {
-    if (!activeCompanyId) return;
-
-    // Fetch optimized subsets of data
-    Promise.all([
-      sajilo.entities.SalesInvoice.filter({ status: 'Posted' }, '-created_date', 5).catch(e => []),
-      sajilo.entities.SalesInvoice.filter({ payment_status: 'Unpaid', status: 'Posted' }, '-created_date').catch(e => []),
-      sajilo.entities.PurchaseOrder.filter({ status: 'Pending Approval' }).catch(e => []),
-    ]).then(([rs, us, pa]) => {
-      setRecentSales(rs || []);
-      setUnpaidSalesCount((us || []).length);
-      setPendingApprovals(pa || []);
-    });
-  }, [activeCompanyId]);
 
   // Aggregate daily metrics into monthly chart data
   const chartData = useMemo(() => {
@@ -85,12 +74,7 @@ export default function Dashboard() {
     return Object.values(monthlyMap).sort((a, b) => a.sortKey.localeCompare(b.sortKey));
   }, [metrics]);
 
-  const totalSales = metrics.reduce((s, m) => s + (parseFloat(m.total_sales_amount) || 0), 0);
-  const totalPurchases = metrics.reduce((s, m) => s + (parseFloat(m.total_purchases_amount) || 0), 0); 
-  
-  const lowStockItems = items.filter(i => i.quantity_on_hand <= i.reorder_level && i.reorder_level > 0);
-
-  const loading = isLoadingAuth || isLoadingMetrics;
+  const loading = isLoadingAuth || isLoadingSummary || isLoadingMetrics;
 
   const mask = (val) => amountsVisible ? val : '••••••';
 
@@ -128,7 +112,7 @@ export default function Dashboard() {
         </button>
       </div>
       {/* Alerts */}
-      {(pendingApprovals.length > 0 || lowStockItems.length > 0) && (
+      {(pendingApprovals.length > 0 || (summary?.low_stock_items || 0) > 0) && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {pendingApprovals.length > 0 && (
             <Link to="/purchase/orders" className="flex items-center gap-3 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-xl p-4 hover:bg-amber-100 dark:bg-amber-500/20 transition-colors">
@@ -142,13 +126,13 @@ export default function Dashboard() {
               <ArrowRight className="w-4 h-4 text-amber-500 ml-auto" />
             </Link>
           )}
-          {lowStockItems.length > 0 && (
+          {(summary?.low_stock_items || 0) > 0 && (
             <Link to="/inventory/items" className="flex items-center gap-3 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-xl p-4 hover:bg-red-100 dark:bg-red-500/20 transition-colors">
               <div className="p-2 bg-red-100 dark:bg-red-500/20 rounded-lg">
                 <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400" />
               </div>
               <div>
-                <p className="font-semibold text-red-800 dark:text-red-300 text-sm">{lowStockItems.length} Item{lowStockItems.length > 1 ? 's' : ''} Below Reorder Level</p>
+                <p className="font-semibold text-red-800 dark:text-red-300 text-sm">{summary?.low_stock_items} Item{(summary?.low_stock_items || 0) > 1 ? 's' : ''} Below Reorder Level</p>
                 <p className="text-xs text-red-600 dark:text-red-400">Stock replenishment needed</p>
               </div>
               <ArrowRight className="w-4 h-4 text-red-500 ml-auto" />
@@ -200,7 +184,7 @@ export default function Dashboard() {
         <div className="snap-center shrink-0 w-[85vw] md:w-auto">
           <StatCard
             title="Total Sales Revenue"
-            value={mask(formatAmountShort(totalSales))}
+            value={mask(formatAmountShort(summary?.total_sales || 0))}
             subtitle="All posted invoices"
             icon={TrendingUp}
             color="indigo"
@@ -211,7 +195,7 @@ export default function Dashboard() {
         <div className="snap-center shrink-0 w-[85vw] md:w-auto">
           <StatCard
             title="Total Purchases"
-            value={mask(formatAmountShort(totalPurchases))}
+            value={mask(formatAmountShort(summary?.total_purchases || 0))}
             subtitle="All posted bills"
             icon={ShoppingCart}
             color="amber"
@@ -220,7 +204,7 @@ export default function Dashboard() {
         <div className="snap-center shrink-0 w-[85vw] md:w-auto">
           <StatCard
             title="Unpaid Invoices"
-            value={mask(unpaidSalesCount)}
+            value={mask(summary?.unpaid_sales_count || 0)}
             subtitle="Accounts receivable"
             icon={FileText}
             color="red"
@@ -229,7 +213,7 @@ export default function Dashboard() {
         <div className="snap-center shrink-0 w-[85vw] md:w-auto">
           <StatCard
             title="Active Customers"
-            value={customers.filter(c => c.is_active !== false).length}
+            value={summary?.active_customers || 0}
             subtitle="Registered Customers"
             icon={Users}
             color="blue"
@@ -331,23 +315,23 @@ export default function Dashboard() {
           <div className="space-y-3">
             <div className="flex justify-between items-center py-2 border-b border-border">
               <span className="text-sm text-muted-foreground">Total Items</span>
-              <span className="font-semibold">{items.length}</span>
+              <span className="font-semibold">{summary?.total_items || 0}</span>
             </div>
             <div className="flex justify-between items-center py-2 border-b border-border">
               <span className="text-sm text-muted-foreground">Active Items</span>
-              <span className="font-semibold text-emerald-600 dark:text-emerald-400">{items.filter(i => i.is_active !== false).length}</span>
+              <span className="font-semibold text-emerald-600 dark:text-emerald-400">{summary?.active_items || 0}</span>
             </div>
             <div className="flex justify-between items-center py-2 border-b border-border">
               <span className="text-sm text-muted-foreground">Low Stock Items</span>
-              <span className="font-semibold text-red-600 dark:text-red-400">{lowStockItems.length}</span>
+              <span className="font-semibold text-red-600 dark:text-red-400">{summary?.low_stock_items || 0}</span>
             </div>
             <div className="flex justify-between items-center py-2 border-b border-border">
               <span className="text-sm text-muted-foreground">Total Customers</span>
-              <span className="font-semibold">{customers.length}</span>
+              <span className="font-semibold">{summary?.total_customers || 0}</span>
             </div>
             <div className="flex justify-between items-center py-2">
               <span className="text-sm text-muted-foreground">Total Vendors</span>
-              <span className="font-semibold">{vendors.length}</span>
+              <span className="font-semibold">{summary?.total_vendors || 0}</span>
             </div>
           </div>
         </div>

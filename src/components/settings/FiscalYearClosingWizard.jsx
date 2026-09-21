@@ -11,7 +11,7 @@ export default function FiscalYearClosingWizard() {
   const currentCompanyId = sajilo.getCompanyId();
   
   const { data: fiscalYears = [], isLoading: loading } = useQuery({
-    queryKey: ['fiscalYears', currentCompanyId],
+    queryKey: ['Company', currentCompanyId, 'FiscalYear', 'fiscalYears'],
     queryFn: async () => {
       const data = await sajilo.entities.FiscalYear.list('-start_date');
       return data || [];

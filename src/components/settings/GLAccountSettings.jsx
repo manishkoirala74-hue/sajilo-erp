@@ -12,7 +12,8 @@ const GL_FIELDS = [
   { key: 'gl_accounts_payable',        label: 'Accounts Payable (AP)',             desc: 'Default control account for vendor credit balances', filterTypes: ['Liability'] },
   { key: 'gl_cash_account',            label: 'Default Cash Account',              desc: 'Used for cash sales and purchases', filterTypes: ['Asset'] },
   { key: 'gl_bank_account',            label: 'Default Bank Account',              desc: 'Used for bank transfers/cheque sales and purchases', filterTypes: ['Asset'] },
-  { key: 'gl_vat_payable',             label: 'VAT Payable Account',               desc: 'Control account for input and output VAT', filterTypes: ['Liability'] },
+  { key: 'gl_vat_payable',             label: 'VAT Payable Account',               desc: 'Control account for output VAT (sales)', filterTypes: ['Liability'] },
+  { key: 'gl_vat_receivable',          label: 'VAT Receivable Account',            desc: 'Control account for input VAT (purchases)', filterTypes: ['Asset'] },
   { key: 'gl_sales_return_account',    label: 'Sales Returns & Allowances',        desc: 'Contra-revenue — debited on sales return', filterTypes: ['Revenue'] },
   { key: 'gl_purchase_return_account', label: 'Purchase Returns & Allowances',     desc: 'Contra-COGS — credited on purchase return', filterTypes: ['Expense'] },
   { key: 'gl_default_sales_account',   label: 'Default Sales Revenue',             desc: 'Fallback if item has no sales account', filterTypes: ['Revenue'] },
@@ -37,6 +38,38 @@ const LEDGER_GROUP_FIELDS = [
     filterType: 'Liability',
   },
 ];
+
+function HealthCheckBanner({ settings }) {
+  const checks = [
+    { key: 'gl_default_cogs_account_id', label: 'Default COGS', critical: true },
+    { key: 'gl_default_inventory_account_id', label: 'Default Inventory', critical: true },
+    { key: 'gl_vat_payable_id', label: 'VAT Payable (Sales)', critical: true },
+    { key: 'gl_vat_receivable_id', label: 'VAT Receivable (Purchases)', critical: true },
+    { key: 'gl_customer_ledger_group_id', label: 'Customer Ledger Group', critical: false },
+    { key: 'gl_supplier_ledger_group_id', label: 'Supplier Ledger Group', critical: false },
+  ];
+
+  const missingCritical = checks.filter(c => c.critical && !settings[c.key]);
+  const missingWarnings = checks.filter(c => !c.critical && !settings[c.key]);
+
+  if (missingCritical.length === 0 && missingWarnings.length === 0) return null;
+
+  return (
+    <div className={`rounded-lg px-4 py-3 text-sm border ${missingCritical.length > 0 ? 'bg-red-50 dark:bg-red-500/10 border-red-200 dark:border-red-500/20 text-red-800 dark:text-red-300' : 'bg-yellow-50 dark:bg-yellow-500/10 border-yellow-200 dark:border-yellow-500/20 text-yellow-800 dark:text-yellow-300'}`}>
+      <p className="font-semibold mb-1">
+        {missingCritical.length > 0 ? '⚠️ Critical Configuration Missing' : '⚠️ Configuration Warnings'}
+      </p>
+      <ul className="list-disc list-inside text-xs space-y-0.5">
+        {missingCritical.map(c => (
+          <li key={c.key}>Missing <strong>{c.label}</strong> — transactions relying on this will fail.</li>
+        ))}
+        {missingWarnings.map(c => (
+          <li key={c.key}>Missing <strong>{c.label}</strong> — ledgers will not auto-generate.</li>
+        ))}
+      </ul>
+    </div>
+  );
+}
 
 export default function GLAccountSettings({ settings, onChange }) {
   const [subAccounts,   setSubAccounts]   = useState([]);
@@ -91,12 +124,15 @@ export default function GLAccountSettings({ settings, onChange }) {
       };
 
       // Sub-ledger GL accounts
+      map('gl_accounts_receivable',      subs, '1131');  // AR Control
+      map('gl_accounts_payable',         subs, '2111');  // AP Control
       map('gl_default_sales_account',    subs, '4100');  // Sales Revenue
       map('gl_default_cogs_account',     subs, '5100');  // Cost of Sales
       map('gl_default_inventory_account',subs, '1140');  // Inventory
-      map('gl_sales_return_account',     subs, '4100');  // Sales Returns → Sales Revenue
-      map('gl_purchase_return_account',  subs, '5100');  // Purchase Returns → Cost of Sales
+      map('gl_sales_return_account',     subs, '4010');  // Sales Returns
+      map('gl_purchase_return_account',  subs, '5010');  // Purchase Returns
       map('gl_vat_payable',              subs, '2120');  // VAT Payable
+      map('gl_vat_receivable',           subs, '1510');  // VAT Receivable
       map('gl_opening_equity_account',   subs, '3200');  // Retained Earnings
       map('gl_stock_variance_account',   subs, '6700');  // Miscellaneous Expense
 
@@ -130,6 +166,8 @@ export default function GLAccountSettings({ settings, onChange }) {
 
   return (
     <div className="space-y-6">
+      <HealthCheckBanner settings={settings} />
+
       {/* ── Restore Defaults ── */}
       <div className="bg-orange-50 dark:bg-orange-500/10 border border-orange-200 dark:border-orange-500/20 rounded-lg px-4 py-3 text-sm text-orange-800 dark:text-orange-300 flex justify-between items-center">
         <div>

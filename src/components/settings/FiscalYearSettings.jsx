@@ -17,7 +17,7 @@ export default function FiscalYearSettings() {
   const currentCompanyId = sajilo.getCompanyId();
 
   const { data: fiscalYears = [], isLoading, isError, refetch } = useQuery({
-    queryKey: ['fiscalYears', currentCompanyId],
+    queryKey: ['Company', currentCompanyId, 'FiscalYear', 'fiscalYears'],
     queryFn: async () => {
       const data = await sajilo.entities.FiscalYear.list('-start_date');
       return data || [];
@@ -82,7 +82,7 @@ export default function FiscalYearSettings() {
       toast.success('Fiscal year unlocked to SOFT_CLOSED state.');
       setReopenDialog(null);
       setReopenReason('');
-      queryClient.invalidateQueries({ queryKey: ['fiscalYears', currentCompanyId] });
+      queryClient.invalidateQueries({ predicate: (q) => q.queryKey.includes('FiscalYear') });
     },
     onError: (e) => {
       console.error(e);

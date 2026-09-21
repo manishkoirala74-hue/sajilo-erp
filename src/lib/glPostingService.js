@@ -22,8 +22,13 @@ function handleDBError(error) {
     cleanMessage = 'Transaction Blocked: Document is already posted and locked.';
   } else if (cleanMessage.includes('ERR_UNBALANCED_JOURNAL')) {
     cleanMessage = 'Posting Blocked: The journal entry is mathematically unbalanced.';
-  } else if (cleanMessage.includes('ERR_STRICT_ACCOUNT_MAPPING') || cleanMessage.includes('ERR_MISSING_ACCOUNT')) {
-    cleanMessage = 'Posting Aborted: Missing required control account mapping.';
+  } else if (cleanMessage.includes('ERR_MISSING_ACCOUNT')) {
+    // Pass the DB message through directly — it already names the item and
+    // tells the user exactly where to fix it (Settings → GL Account Mappings).
+    const detail = cleanMessage.replace(/^.*ERR_MISSING_ACCOUNT:\s*/, '');
+    cleanMessage = 'Account Mapping Required: ' + detail;
+  } else if (cleanMessage.includes('ERR_STRICT_ACCOUNT_MAPPING')) {
+    cleanMessage = 'Posting Aborted: Missing required control account mapping. Please check Settings → GL Account Mappings.';
   } else if (cleanMessage.includes('ERR_MISSING_GODOWN')) {
     cleanMessage = 'Transaction Blocked: A Godown/Branch must be selected for this transaction.';
   } else if (cleanMessage.includes('fk_voucher_payment') || cleanMessage.includes('violates foreign key constraint')) {

@@ -1,5 +1,3 @@
-import { jsPDF } from 'jspdf';
-import autoTable from 'jspdf-autotable';
 import { supabase } from '@/api/sajiloClient';
 
 /**
@@ -13,6 +11,11 @@ import { supabase } from '@/api/sajiloClient';
  * @returns {Promise<{ blob: Blob, blobUrl: string, storagePath: string }>}
  */
 export async function generateVectorPDF(documentData, moduleName, companySettings, partnerData, companyId) {
+  const [{ jsPDF }, autoTableModule] = await Promise.all([
+    import('jspdf'),
+    import('jspdf-autotable')
+  ]);
+  const autoTable = autoTableModule.default || autoTableModule;
   const doc = new jsPDF('p', 'pt', 'a4');
   
   // A4 dimensions in points: 595.28 x 841.89

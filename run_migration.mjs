@@ -5,7 +5,7 @@ const prisma = new PrismaClient();
 
 async function run() {
     try {
-        const sql = fs.readFileSync('094_unified_cancellation_rpc.sql', 'utf8');
+        const sql = fs.readFileSync('153_auth_context_rpc.sql', 'utf8');
         await prisma.$executeRawUnsafe(sql);
         console.log("Migration executed successfully!");
     } catch (e) {

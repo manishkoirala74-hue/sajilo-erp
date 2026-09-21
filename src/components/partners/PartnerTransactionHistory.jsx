@@ -8,7 +8,7 @@ export default function PartnerTransactionHistory({ partner, type }) {
   const { formatDate } = useDateFormat();
   
   const { data: history = [], isLoading: loading, error } = useQuery({
-    queryKey: ['partnerLedgerHistory', partner?.id],
+    queryKey: ['BusinessPartner', 'SalesInvoice', 'PurchaseInvoice', 'PaymentReceipt', 'partnerLedgerHistory', partner?.id],
     queryFn: async () => {
       if (!partner?.id || !isValidUUID(partner.id)) return [];
       const { data, error } = await supabase.rpc('get_partner_ledger_history_rpc', {

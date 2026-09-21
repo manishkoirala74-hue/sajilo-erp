@@ -4,7 +4,7 @@
  * Enforces: group header tints + bold, sub-group indentation + bold,
  * leaf indentation regular, numeric currency formatting right-aligned.
  */
-import ExcelJS from 'exceljs';
+
 import { computeGroupTotals } from '@/lib/reports/reportColumnUtils';
 
 // ── Colour palette ─────────────────────────────────────────────────────────────
@@ -277,7 +277,8 @@ async function buildFlatSheet(wb, sheetName, { headers, rows, footer, companyNam
  * Note: Now async because exceljs writes to buffer asynchronously.
  */
 export async function exportFinancialXLSX({ groups, columns, columnState, companyName, reportTitle, fromDate, toDate, filename }) {
-  const wb = new ExcelJS.Workbook();
+  const ExcelJS = await import('exceljs');
+  const wb = new (ExcelJS.default || ExcelJS).Workbook();
   await buildFinancialSheet(wb, reportTitle || 'Report', { groups, columns, columnState, companyName, reportTitle, fromDate, toDate });
   await downloadWorkbook(wb, filename || 'report.xlsx');
 }
@@ -287,7 +288,8 @@ export async function exportFinancialXLSX({ groups, columns, columnState, compan
  * Note: Now async.
  */
 export async function exportFlatXLSX({ headers, rows, footer, companyName, reportTitle, fromDate, toDate, filename }) {
-  const wb = new ExcelJS.Workbook();
+  const ExcelJS = await import('exceljs');
+  const wb = new (ExcelJS.default || ExcelJS).Workbook();
   await buildFlatSheet(wb, reportTitle || 'Report', { headers, rows, footer, companyName, reportTitle, fromDate, toDate });
   await downloadWorkbook(wb, filename || 'report.xlsx');
 }
