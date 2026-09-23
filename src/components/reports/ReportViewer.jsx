@@ -1845,7 +1845,7 @@ export default function ReportViewer({ reportId, data, fromDate, toDate, columnS
       {/* Print stylesheet injection */}
       <style dangerouslySetInnerHTML={{ __html: PRINT_STYLE }} />
 
-      <div className="fixed inset-0 z-[100] flex flex-col sm:items-center sm:justify-center bg-background sm:bg-black/40 sm:backdrop-blur-sm sm:p-4">
+      <div className="fixed inset-0 z-40 flex flex-col sm:items-center sm:justify-center bg-background sm:bg-black/40 sm:backdrop-blur-sm sm:p-4">
         <div className="bg-card w-full h-[100dvh] sm:h-auto sm:max-h-[92vh] sm:max-w-5xl sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden pb-[env(safe-area-inset-bottom)] sm:pb-0">
           {/* Modal Header */}
           <div className="flex items-center justify-between px-5 py-3 border-b border-border shrink-0">
