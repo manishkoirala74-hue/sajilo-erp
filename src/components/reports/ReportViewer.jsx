@@ -147,15 +147,15 @@ function ReportTable({ title, subtitle, headers, rows, footer, onExport, onEmail
         )}
       </div>
       <div className="border border-border rounded-xl overflow-hidden">
-        <div className="table-scroll-container">
+        <div className="table-scroll-container overflow-x-auto" tabIndex={0} role="region" aria-label="Report data">
           <table className="table-fluid-grid text-sm print:text-[10pt]">
-            <thead className="cell-density bg-slate-100 dark:bg-slate-500/20 border-b-2 border-border">
+            <thead className="cell-density bg-slate-100 dark:bg-slate-500/20 border-b-2 border-border sticky top-0 z-10 shadow-sm">
               <tr>
                 {headers.map((h, i) => {
                   const isNum = rightCols.has(i);
-                  const stickyClasses = i === 0 ? 'sticky left-0 bg-slate-100 dark:bg-[#1e293b] z-20 border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]' : '';
+                  const stickyClasses = i === 0 ? 'sticky left-0 top-0 z-30 bg-slate-100 dark:bg-[#1e293b] border-r border-border md:border-r-0 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]' : '';
                   return (
-                    <th key={i} className={`cell-density font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider ${isNum ? 'amount-cell tabular-nums' : 'text-align-left'} ${stickyClasses}`}>
+                    <th key={i} scope="col" className={`cell-density font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider ${isNum ? 'amount-cell tabular-nums' : 'text-align-left'} ${stickyClasses}`}>
                       {h}
                     </th>
                   );
@@ -169,9 +169,9 @@ function ReportTable({ title, subtitle, headers, rows, footer, onExport, onEmail
                   <tr key={i} className="hover:bg-muted/20 print:hover:bg-transparent">
                     {row.map((cell, j) => {
                       const isNum = rightCols.has(j);
-                      const stickyClasses = j === 0 ? 'sticky left-0 bg-card z-10 border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]' : '';
+                      const stickyClasses = j === 0 ? 'sticky left-0 bg-card z-20 border-r border-border md:border-r-0 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]' : '';
                       return (
-                        <td key={j} className={`cell-density print:text-[10pt] ${isNum ? 'amount-cell tabular-nums' : 'text-align-left'} ${stickyClasses}`}>
+                        <td key={j} className={`cell-density print:text-[10pt] ${isNum ? 'amount-cell tabular-nums' : 'text-align-left'} ${stickyClasses}`} {...(j === 0 ? { scope: "row" } : {})}>
                           {cell}
                         </td>
                       );
@@ -1845,8 +1845,8 @@ export default function ReportViewer({ reportId, data, fromDate, toDate, columnS
       {/* Print stylesheet injection */}
       <style dangerouslySetInnerHTML={{ __html: PRINT_STYLE }} />
 
-      <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm p-2 sm:p-4">
-        <div className="bg-card rounded-2xl shadow-2xl w-full max-w-5xl max-h-[92vh] flex flex-col">
+      <div className="fixed inset-0 z-[100] flex flex-col sm:items-center sm:justify-center bg-background sm:bg-black/40 sm:backdrop-blur-sm sm:p-4">
+        <div className="bg-card w-full h-[100dvh] sm:h-auto sm:max-h-[92vh] sm:max-w-5xl sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden pb-[env(safe-area-inset-bottom)] sm:pb-0">
           {/* Modal Header */}
           <div className="flex items-center justify-between px-5 py-3 border-b border-border shrink-0">
             <p className="text-xs text-muted-foreground font-medium">
@@ -1862,7 +1862,7 @@ export default function ReportViewer({ reportId, data, fromDate, toDate, columnS
             </div>
           </div>
           {/* Report Body */}
-          <div className="flex-1 overflow-y-auto p-5">
+          <div className="flex-1 overflow-y-auto p-0 sm:p-5">
             {renderContent()}
           </div>
         </div>

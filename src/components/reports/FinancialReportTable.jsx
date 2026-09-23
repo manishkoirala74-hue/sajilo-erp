@@ -164,7 +164,7 @@ function GroupRow({ node, columns, depth, expandedGroups, onToggle, showZeroBala
       >
         {columns.map(col => {
           if (col.key === 'account_code') return (
-            <td key={col.key} className="cell-density py-3 min-w-[140px] max-w-[45vw] sm:min-w-[220px] sm:max-w-[400px] whitespace-normal sticky left-0 bg-card z-10 border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] print:text-[9px]"
+            <td key={col.key} scope="row" className="cell-density py-3 min-w-[140px] max-w-[45vw] sm:min-w-[220px] sm:max-w-[400px] whitespace-normal sticky left-0 bg-card z-20 border-r border-border md:border-r-0 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] print:text-[9px]"
               style={{ paddingLeft: `${indent}px`, paddingRight: '8px' }}>
               <div className="flex items-center gap-1.5">
                 {hasChildren || isControlAccount
@@ -357,7 +357,7 @@ export default function FinancialReportTable({
       </div>
 
       <div className="border border-border rounded-xl overflow-hidden print:border-0 print:rounded-none">
-        <div className="table-scroll-container">
+        <div className="table-scroll-container overflow-x-auto" tabIndex={0} role="region" aria-label="Financial report data">
           <table className={cn("text-sm border-collapse print:text-[10px]", columns.length > 4 ? "table-fluid-grid" : "w-full")}>
             <colgroup>
               {columns.map(col => {
@@ -439,7 +439,7 @@ export default function FinancialReportTable({
               <tr>
                 {columns.map(col => {
                   if (col.key === 'account_code') return (
-                    <td key={col.key} className="cell-density font-bold text-xs text-foreground uppercase tracking-wider sticky left-0 bg-secondary z-10 border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] print:text-[9px] print:text-foreground min-w-[140px] sm:min-w-[220px] max-w-[45vw]">
+                    <td key={col.key} scope="row" className="cell-density font-bold text-xs text-foreground uppercase tracking-wider sticky left-0 bg-secondary z-20 border-r border-border md:border-r-0 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] print:text-[9px] print:text-foreground min-w-[140px] sm:min-w-[220px] max-w-[45vw]">
                       GRAND TOTAL
                     </td>
                   );

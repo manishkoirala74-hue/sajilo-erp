@@ -168,9 +168,9 @@ export default function Reports() {
         <p className="text-sm text-muted-foreground mt-0.5">Generate, filter, and export business reports</p>
       </div>
 
-      <div className="flex gap-5">
+      <div className="flex flex-col md:flex-row gap-4 md:gap-5">
         {/* Left: Category Nav */}
-        <div className="w-52 shrink-0 space-y-1">
+        <div className="w-full md:w-52 shrink-0 flex flex-row md:flex-col gap-2 md:gap-0 md:space-y-1 overflow-x-auto scrollbar-hide pb-2 md:pb-0 [mask-image:linear-gradient(to_right,black_85%,transparent_100%)] md:[mask-image:none] pr-10 md:pr-0">
           {CATEGORIES.map(cat => {
             const c   = CM[cat.color];
             const isActive = activeCategory === cat.id;
@@ -178,7 +178,7 @@ export default function Reports() {
               <button
                 key={cat.id}
                 onClick={() => setActiveCategory(cat.id)}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all text-left ${
+                className={`shrink-0 whitespace-nowrap w-auto md:w-full flex items-center gap-2 md:gap-3 px-3 py-2 md:py-2.5 rounded-full md:rounded-lg text-sm font-medium transition-all text-left ${
                   isActive
                     ? `${c.bg} ${c.border} border ${c.icon}`
                     : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
