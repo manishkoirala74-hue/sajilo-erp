@@ -1,6 +1,6 @@
 import { useSearchParams, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { sajilo } from '@/api/sajiloClient';
 import DualDateDisplay from '@/components/shared/DualDateDisplay';
 import { formatDualDateString } from '@/lib/nepaliDate';
@@ -11,6 +11,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerFooter,
+  DrawerTitle,
+} from '@/components/ui/drawer';
 import SearchableSelect from '@/components/shared/SearchableSelect';
 import PageHeader from '@/components/shared/PageHeader';
 import DataTable from '@/components/shared/DataTable';
@@ -83,6 +90,64 @@ export default function FinancialVouchers() {
   const [actionDialog, setActionDialog] = useState(null); // null | 'delete' | 'reverse'
   const [actionReason, setActionReason] = useState('');
   const [actionProcessing, setActionProcessing] = useState(false);
+  // Mobile Drawer State for Ledger Entries
+  const [isVoucherDrawerOpen, setIsVoucherDrawerOpen] = useState(false);
+  const [voucherDrawerMode, setVoucherDrawerMode] = useState('add');
+  const [voucherDrawerEditIdx, setVoucherDrawerEditIdx] = useState(null);
+  const [voucherDrawerForm, setVoucherDrawerForm] = useState({ account_id: '', account_name: '', account_code: '', account_type: '', debit: 0, credit: 0, narration: '' });
+  const voucherFirstInputRef = useRef(null);
+
+  const openVoucherDrawerAdd = () => {
+    setVoucherDrawerMode('add');
+    setVoucherDrawerEditIdx(null);
+    setVoucherDrawerForm({ account_id: '', account_name: '', account_code: '', account_type: '', debit: 0, credit: 0, narration: '' });
+    setIsVoucherDrawerOpen(true);
+  };
+  
+  const openVoucherDrawerEdit = (idx) => {
+    setVoucherDrawerMode('edit');
+    setVoucherDrawerEditIdx(idx);
+    setVoucherDrawerForm({ ...form.entries[idx] });
+    setIsVoucherDrawerOpen(true);
+  };
+
+  const saveVoucherDrawerEntry = () => {
+    if (!voucherDrawerForm.account_id) {
+      toast.error('Please select an account');
+      return false;
+    }
+    const valAmount = form.voucher_type === 'Journal' ? 
+       (Number(voucherDrawerForm.debit) || Number(voucherDrawerForm.credit) || 0) : 
+       (Number(voucherDrawerForm.debit) || 0);
+    if (valAmount <= 0) {
+      toast.error('Amount must be greater than 0');
+      return false;
+    }
+    
+    let newEntries = [...form.entries];
+    if (voucherDrawerMode === 'add') {
+      newEntries.push(voucherDrawerForm);
+      toast.success(`Added entry for ${voucherDrawerForm.account_name}`);
+    } else {
+      newEntries[voucherDrawerEditIdx] = voucherDrawerForm;
+      toast.success(`Updated entry for ${voucherDrawerForm.account_name}`);
+    }
+    const total = newEntries.reduce((s, e) => s + (Number(e.debit) || 0), 0);
+    setForm({ ...form, entries: newEntries, total_amount: total });
+    return true;
+  };
+
+  const handleVoucherDrawerSaveAndAddNext = (e) => {
+    if (saveVoucherDrawerEntry()) {
+      setVoucherDrawerMode('add');
+      setVoucherDrawerEditIdx(null);
+      setVoucherDrawerForm({ account_id: '', account_name: '', account_code: '', account_type: '', debit: 0, credit: 0, narration: '' });
+      setTimeout(() => {
+        voucherFirstInputRef.current?.focus();
+      }, 0);
+    }
+  };
+
 
   useEffect(() => { fetchData(); }, []);
   const [searchParams, setSearchParams] = useSearchParams();
@@ -706,12 +771,14 @@ export default function FinancialVouchers() {
 
 
             {/* Entries table */}
-            <div>
+            <div className="space-y-3 mt-4">
               <div className="flex justify-between items-end mb-2">
                 <Label>Ledger Entries *</Label>
-                <Button variant="outline" size="sm" onClick={addEntry} className="print:hidden"><Plus className="w-4 h-4 mr-1" /> Add Row</Button>
+                <Button variant="outline" size="sm" onClick={() => { addEntry(); if (window.innerWidth < 768) openVoucherDrawerAdd(); }} className="print:hidden hidden md:flex"><Plus className="w-4 h-4 mr-1" /> Add Row</Button>
               </div>
-              <div className="border border-border rounded-lg overflow-x-auto">
+              
+              {/* Desktop View */}
+              <div className="hidden md:block border border-border rounded-lg overflow-x-auto">
                 <table className="table-fluid-grid text-sm">
                   <thead className="cell-density bg-muted/50"><tr>
                     <th className="cell-density text-left w-2/5">Account</th>
@@ -779,10 +846,166 @@ export default function FinancialVouchers() {
                   </tbody>
                 </table>
               </div>
-              <div className="flex justify-end mt-2 text-sm font-semibold text-foreground">
+              
+              {/* Mobile View */}
+              <div className="md:hidden space-y-3">
+                {form.entries.length > 0 ? (
+                  <ul className="space-y-3">
+                    {form.entries.map((e, i) => (
+                      <li key={i} className="bg-card border border-border rounded-xl shadow-sm flex items-stretch overflow-hidden">
+                        <div className="flex-1 p-3 cursor-pointer" onClick={() => openVoucherDrawerEdit(i)}>
+                          <div className="flex justify-between items-start mb-1">
+                            <span className="font-semibold text-sm line-clamp-1 pr-2">{e.account_name || 'Unnamed Account'}</span>
+                            <span className="font-medium text-sm whitespace-nowrap">{fmt(form.voucher_type === 'Journal' ? (Number(e.debit) || Number(e.credit) || 0) : e.debit)}</span>
+                          </div>
+                          <div className="flex justify-between items-center text-xs text-muted-foreground">
+                            <span>{e.account_type || 'Account'}</span>
+                            {form.voucher_type === 'Journal' && (
+                              <span className="uppercase text-[10px] font-bold px-1.5 py-0.5 rounded bg-muted">{Number(e.debit) > 0 ? 'DR' : 'CR'}</span>
+                            )}
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          aria-label={`Delete ${e.account_name}`}
+                          className="w-[44px] border-l border-border flex items-center justify-center text-red-400 hover:text-red-600 hover:bg-red-50 transition-colors active:bg-red-100 touch-target shrink-0"
+                          onClick={(ev) => { 
+                            ev.stopPropagation(); 
+                            const itemToRemove = form.entries[i];
+                            removeEntry(i); 
+                            toast("Entry deleted", {
+                              action: {
+                                label: "Undo",
+                                onClick: () => {
+                                  setForm(prev => {
+                                    const restoredArr = [...prev.entries];
+                                    restoredArr.splice(i, 0, itemToRemove);
+                                    const total = restoredArr.reduce((s, ent) => s + (Number(ent.debit) || 0), 0);
+                                    return { ...prev, entries: restoredArr, total_amount: total };
+                                  });
+                                }
+                              }
+                            });
+                          }}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <div className="text-center p-6 border border-dashed rounded-xl text-sm text-muted-foreground">
+                    No entries added yet.
+                  </div>
+                )}
+                <Button variant="outline" size="sm" onClick={openVoucherDrawerAdd} className="flex w-full justify-center py-5 rounded-xl border-dashed">
+                  <Plus className="w-4 h-4 mr-1" /> Add Entry
+                </Button>
+              </div>
+
+              <div className="flex justify-end mt-2 text-sm font-semibold text-foreground bg-card p-4 rounded-xl border border-border shadow-sm md:border-none md:shadow-none md:p-0 md:bg-transparent">
                 Total Debit: {fmt(form.total_amount)}
               </div>
             </div>
+
+            {/* Mobile Drawer for Entries */}
+            <Drawer open={isVoucherDrawerOpen} onOpenChange={setIsVoucherDrawerOpen}>
+              <DrawerContent className="max-h-[90dvh]">
+                <span className="sr-only" aria-live="polite">
+                  {voucherDrawerMode === 'add' ? 'Add new ledger entry form opened' : 'Edit ledger entry form opened'}
+                </span>
+                <DrawerHeader className="border-b text-left">
+                  <DrawerTitle>{voucherDrawerMode === 'add' ? 'Add Ledger Entry' : 'Edit Ledger Entry'}</DrawerTitle>
+                </DrawerHeader>
+                <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-muted-foreground uppercase">Account</label>
+                    <div ref={voucherFirstInputRef} tabIndex={-1} className="outline-none">
+                      <SearchableSelect
+                        options={targetAccounts.map(a => ({ value: a.id, label: `${a.account_name} (${a.account_type})` }))}
+                        value={voucherDrawerForm.account_id}
+                        onChange={v => {
+                          const a = allAccounts.find(x => x.id === v);
+                          setVoucherDrawerForm(prev => ({
+                            ...prev,
+                            account_id: v,
+                            account_name: a?.account_name,
+                            account_code: a?.account_code,
+                            account_type: a?.account_type
+                          }));
+                        }}
+                        placeholder="Select account"
+                        className="w-full h-10 text-base"
+                      />
+                    </div>
+                  </div>
+                  
+                  {form.voucher_type === 'Journal' ? (
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-semibold text-muted-foreground uppercase">Debit</label>
+                        <Input 
+                          type="text" 
+                          inputMode="decimal"
+                          value={voucherDrawerForm.debit} 
+                          onChange={e => setVoucherDrawerForm(prev => ({ ...prev, debit: e.target.value === '' ? '' : (parseFloat(e.target.value) || 0) }))} 
+                          disabled={Number(voucherDrawerForm.credit) > 0}
+                          className="text-base h-10" 
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-semibold text-muted-foreground uppercase">Credit</label>
+                        <Input 
+                          type="text" 
+                          inputMode="decimal"
+                          value={voucherDrawerForm.credit} 
+                          onChange={e => setVoucherDrawerForm(prev => ({ ...prev, credit: e.target.value === '' ? '' : (parseFloat(e.target.value) || 0) }))} 
+                          disabled={Number(voucherDrawerForm.debit) > 0}
+                          className="text-base h-10" 
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold text-muted-foreground uppercase">Amount</label>
+                      <Input 
+                        type="text" 
+                        inputMode="decimal"
+                        value={voucherDrawerForm.debit} 
+                        onChange={e => setVoucherDrawerForm(prev => ({ ...prev, debit: e.target.value === '' ? '' : (parseFloat(e.target.value) || 0) }))} 
+                        className="text-base h-10" 
+                      />
+                    </div>
+                  )}
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-muted-foreground uppercase">Line Narration</label>
+                    <Input 
+                      value={voucherDrawerForm.narration || ''} 
+                      onChange={e => setVoucherDrawerForm(prev => ({ ...prev, narration: e.target.value }))} 
+                      placeholder="Optional note"
+                      className="text-base h-10" 
+                    />
+                  </div>
+                </div>
+                
+                <DrawerFooter className="border-t flex flex-row justify-end gap-2 pt-4">
+                  <Button variant="ghost" onClick={() => setIsVoucherDrawerOpen(false)} className="mr-auto">Cancel</Button>
+                  {voucherDrawerMode === 'add' && (
+                    <Button 
+                      variant="outline" 
+                      onPointerDown={(e) => e.preventDefault()} 
+                      onClick={handleVoucherDrawerSaveAndAddNext}
+                    >
+                      Save & Add Next
+                    </Button>
+                  )}
+                  <Button onClick={() => { if(saveVoucherDrawerEntry()) setIsVoucherDrawerOpen(false); }}>
+                    Save
+                  </Button>
+                </DrawerFooter>
+              </DrawerContent>
+            </Drawer>
 
             <div className="flex justify-end gap-3">
               <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
