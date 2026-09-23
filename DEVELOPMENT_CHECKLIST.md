@@ -27,3 +27,13 @@ This document serves as the core set of architectural principles and lessons lea
 ## 3. General Refactoring
 
 - **Audit Stale References:** When ripping out custom logic (e.g., replacing an in-memory `queryCache` with React Query), aggressively search the codebase for lingering invocations (e.g., `queryCache.clear()`). Silent JavaScript `ReferenceErrors` in background functions will permanently lock UI loading states.
+
+## 4. Mobile UX & Form Paradigms
+
+- **The Mobile Data-Entry Pivot (Master-Detail):** Never use vertically stacked cards for complex line-item data entry on mobile, as it breaks spatial context and forces endless scrolling. Fork the UI: use a high-density table for desktop, and a compact Summary List paired with a Bottom Sheet (Drawer) for mobile line-item editing.
+- **The Modal Pivot (Sticky App Bars):** Do not use floating, absolute-positioned close buttons on mobile dialogs; they conflict with virtual keyboards. Full-screen mobile modals must implement a sticky App Bar (Header) to anchor primary actions (Save, Close).
+- **The Mobile Keyboard Trap (`inputMode`):** Never use `pattern="[0-9]*"` for numeric/currency inputs, as it strictly blocks decimal points. Use `inputMode="decimal"` paired with `type="text"` to reliably summon the native numeric keypad on iOS and Android.
+- **The iOS Focus Trap & Continuous Entry:** When building continuous "Save & Add Next" loops, do not rely on `setTimeout` to refocus inputs, as this violates iOS Safari's user gesture model. Instead, bind `onPointerDown={(e) => e.preventDefault()}` to the submit button. This prevents the browser from dropping focus, keeping the virtual keyboard permanently open.
+- **Drawer Overflow Protection:** When rendering forms inside a bottom drawer, wrap the form body in an `overflow-y-auto` container while keeping the header and footer sticky. This ensures inputs are never trapped beneath the virtual keyboard.
+- **Destructive Mobile Actions:** Ensure mobile delete actions meet the 44x44px touch target minimum. Favor instant deletion paired with an "Undo Toast" rather than aggressive, flow-breaking confirmation modals.
+- **Physical Device Verification:** Chrome DevTools Device Mode cannot accurately simulate native virtual keyboard DOM shifts or `visualViewport` events. Always verify complex mobile forms on a physical device.
