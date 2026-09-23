@@ -130,7 +130,6 @@ export function getRoutePermissionConfig(pathname) {
 
   if (prefixMatch) return prefixMatch;
 
-  // TODO: Switch to Fail-Closed for production deployment
-  // In production, flip to: return { path: normalized, permission: 'system.unregistered', access: 'permission' };
-  return { path: normalized, permission: null, access: 'authenticated' };
+  // Fail-Closed: unknown routes are denied by default (DEVELOPMENT_CHECKLIST §2)
+  return { path: normalized, permission: 'system.unregistered', access: 'denied' };
 }

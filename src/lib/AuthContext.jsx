@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { sajilo } from '../api/sajiloClient';
 import { hasPermission as resolvePermission } from '@/lib/permissionResolver';
+import throttle from 'lodash/throttle';
 
 const AuthContext = createContext();
 
@@ -222,7 +223,6 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (email, password) => {
     const res = await sajilo.auth.login(email, password);
-    await checkUserAuth();
     return res;
   };
 
@@ -232,13 +232,11 @@ export const AuthProvider = ({ children }) => {
 
   const signUp = async (data) => {
     const res = await sajilo.auth.signUp(data);
-    await checkUserAuth();
     return res;
   };
 
   const verifyOtp = async (email, token) => {
     await sajilo.auth.verifyOtp(email, token);
-    await checkUserAuth();
   };
 
   const logout = async () => {
@@ -339,6 +337,61 @@ export const AuthProvider = ({ children }) => {
       sajilo.auth.supabase.removeChannel(channel);
     };
   }, [user?.id, activeCompany?.id]);
+
+  // ── CompanySettings Realtime Subscription ──
+  // Pushes setting changes to ALL connected users without re-login.
+  // Uses abstracted realtimeSync interface for database portability.
+  useEffect(() => {
+    if (!activeCompany?.id) return;
+    
+    let unsubscribeFn = null;
+    
+    const setupRealtime = async () => {
+      const { subscribeToCompanySettings } = await import('@/api/realtimeSync');
+      unsubscribeFn = subscribeToCompanySettings(activeCompany.id, (newSettings) => {
+        if (newSettings) {
+          setGlobalSettings(newSettings);
+        } else {
+          refreshGlobalSettings();
+        }
+      });
+    };
+    
+    setupRealtime();
+    
+    return () => {
+      if (unsubscribeFn) unsubscribeFn();
+    };
+  }, [activeCompany?.id]);
+
+  // ── Session Idle Timeout ──
+  // Enforces company-configured session idle policy (security.sessionIdleTimeoutMinutes).
+  useEffect(() => {
+    const timeoutMinutes = globalSettings?.session_idle_timeout_minutes ?? 0;
+    if (!timeoutMinutes || timeoutMinutes <= 0 || !isAuthenticated) return;
+
+    const timeoutMs = timeoutMinutes * 60 * 1000;
+    let idleTimer;
+
+    const reset = () => {
+      clearTimeout(idleTimer);
+      idleTimer = setTimeout(() => {
+        logout();
+      }, timeoutMs);
+    };
+
+    const throttledResetTimer = throttle(reset, 5000, { leading: true, trailing: false });
+
+    const events = ['mousedown', 'keydown', 'touchstart', 'visibilitychange'];
+    events.forEach((e) => window.addEventListener(e, throttledResetTimer));
+    reset();
+
+    return () => {
+      clearTimeout(idleTimer);
+      throttledResetTimer.cancel();
+      events.forEach((e) => window.removeEventListener(e, throttledResetTimer));
+    };
+  }, [globalSettings?.session_idle_timeout_minutes, isAuthenticated]);
 
   const hasAccess = useCallback((module, operation) => {
     if (

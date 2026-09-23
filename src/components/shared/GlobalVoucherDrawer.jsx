@@ -12,9 +12,9 @@ const normalizeVoucherData = (data, lines, fallbackFlag, financialFlag) => {
     raw: data,
     title: data.voucher_number || data.invoice_number || data.return_number || data.order_number || data.sale_number || data.adjustment_number || data.contract_reference || data.id,
     status: data.status,
-    date: data.date || data.transaction_date || data.invoice_date || data.order_date || data.entry_date || 'N/A',
-    partnerName: data.partner_name || data.vendor_name || data.customer_name || 'Mapped Partner',
-    hasPartner: !!(data.partner_id || data.vendor_id || data.customer_id),
+    date: data.date || data.voucher_date || data.transaction_date || data.invoice_date || data.order_date || data.entry_date || 'N/A',
+    partnerName: data.partner_name || data.vendor_name || data.customer_name || data.contact_name || 'Mapped Partner',
+    hasPartner: !!(data.partner_id || data.vendor_id || data.customer_id || data.contact_name),
     total: data.total_amount ?? data.grand_total ?? data.total_price ?? data.total_debit ?? 0,
     remarks: data.remarks || data.narration || data.notes || data.description,
     isFinancial: financialFlag || fallbackFlag,
@@ -284,8 +284,8 @@ export default function GlobalVoucherDrawer() {
                           {normalizedData.isFinancial ? (
                             <>
                               <TableCell className="font-medium">{line.account_name}</TableCell>
-                              <TableCell className="text-right">{line.debit_amount > 0 ? line.debit_amount.toLocaleString() : '-'}</TableCell>
-                              <TableCell className="text-right">{line.credit_amount > 0 ? line.credit_amount.toLocaleString() : '-'}</TableCell>
+                              <TableCell className="text-right">{(line.debit_amount || line.debit) > 0 ? Number(line.debit_amount || line.debit).toLocaleString() : '-'}</TableCell>
+                              <TableCell className="text-right">{(line.credit_amount || line.credit) > 0 ? Number(line.credit_amount || line.credit).toLocaleString() : '-'}</TableCell>
                             </>
                           ) : (
                             <>
@@ -322,11 +322,11 @@ export default function GlobalVoucherDrawer() {
                             <div className="font-medium text-foreground">{line.account_name}</div>
                             <div className="flex justify-between text-sm">
                               <span className="text-muted-foreground">Debit</span>
-                              <span className="font-semibold">{line.debit_amount > 0 ? line.debit_amount.toLocaleString() : '-'}</span>
+                              <span className="font-semibold">{(line.debit_amount || line.debit) > 0 ? Number(line.debit_amount || line.debit).toLocaleString() : '-'}</span>
                             </div>
                             <div className="flex justify-between text-sm">
                               <span className="text-muted-foreground">Credit</span>
-                              <span className="font-semibold">{line.credit_amount > 0 ? line.credit_amount.toLocaleString() : '-'}</span>
+                              <span className="font-semibold">{(line.credit_amount || line.credit) > 0 ? Number(line.credit_amount || line.credit).toLocaleString() : '-'}</span>
                             </div>
                           </>
                         ) : (

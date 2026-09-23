@@ -88,7 +88,7 @@ export default function FinancialVouchers() {
   const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
   const navigate = useNavigate();
-  const { activeCompany, activeFiscalYear } = useAuth();
+  const { activeCompany, activeFiscalYear, hasAccess, checkPermissionKey } = useAuth();
 
   useEffect(() => {
     const viewId = searchParams.get('view');
@@ -1030,22 +1030,26 @@ export default function FinancialVouchers() {
                 </Button>
                 {selected.status !== 'Cancelled' && !selected._isViewMode && (
                   <div className="flex justify-end gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="gap-1.5 text-amber-600 dark:text-amber-400 border-amber-300 dark:border-amber-500/30 hover:bg-amber-50 dark:bg-amber-500/10 print:hidden"
-                      onClick={() => { setActionReason(''); setActionDialog('reverse'); }}
-                    >
-                      <RotateCcw className="w-3.5 h-3.5" /> Reverse Voucher
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="gap-1.5 text-red-600 dark:text-red-400 border-red-300 dark:border-red-500/30 hover:bg-red-50 dark:bg-red-500/10 print:hidden"
-                      onClick={() => { setActionReason(''); setActionDialog('delete'); }}
-                    >
-                      <Trash2 className="w-3.5 h-3.5" /> Delete Voucher
-                    </Button>
+                    {selected.status === 'Posted' && checkPermissionKey('vouchers.approve') && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-1.5 text-amber-600 dark:text-amber-400 border-amber-300 dark:border-amber-500/30 hover:bg-amber-50 dark:bg-amber-500/10 print:hidden"
+                        onClick={() => { setActionReason(''); setActionDialog('reverse'); }}
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" /> Reverse Voucher
+                      </Button>
+                    )}
+                    {selected.status === 'Draft' && hasAccess('vouchers', 'delete') && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-1.5 text-red-600 dark:text-red-400 border-red-300 dark:border-red-500/30 hover:bg-red-50 dark:bg-red-500/10 print:hidden"
+                        onClick={() => { setActionReason(''); setActionDialog('delete'); }}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" /> Delete Voucher
+                      </Button>
+                    )}
                   </div>
                 )}
               </div>

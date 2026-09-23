@@ -68,6 +68,15 @@ const RegionalSettings = React.lazy(() => import('@/pages/settings/integrations/
 const StorageLimits = React.lazy(() => import('@/pages/settings/integrations/StorageLimits'));
 const CommunicationChannels = React.lazy(() => import('@/pages/settings/integrations/CommunicationChannels'));
 const PaymentGateways = React.lazy(() => import('@/pages/settings/integrations/PaymentGateways'));
+// v3 Company Settings — Finance
+const PeriodLock = React.lazy(() => import('@/pages/settings/finance/PeriodLock'));
+const CostingMethod = React.lazy(() => import('@/pages/settings/finance/CostingMethod'));
+// v3 Company Settings — Operations
+const BatchExpiry = React.lazy(() => import('@/pages/settings/operations/BatchExpiry'));
+// v3 Company Settings — Company
+const SecurityPolicy = React.lazy(() => import('@/pages/settings/company/SecurityPolicy'));
+const ApprovalQueuePage = React.lazy(() => import('@/pages/settings/company/ApprovalQueue'));
+
 const Reports = React.lazy(() => import('@/pages/Reports.jsx'));
 const EmployeeReceivableReport = React.lazy(() => import('@/pages/reports/EmployeeReceivableReport'));
 const EmployeePayableReport = React.lazy(() => import('@/pages/reports/EmployeePayableReport'));
@@ -121,16 +130,9 @@ import ChangePassword from '@/pages/ChangePassword';
 import Onboarding from '@/pages/Onboarding';
 
 const AuthenticatedApp = () => {
-  const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin, user, isAuthenticated } = useAuth();
-  const [passwordExpiryDays, setPasswordExpiryDays] = React.useState(null);
+  const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin, user, isAuthenticated, globalSettings } = useAuth();
+  const passwordExpiryDays = globalSettings?.password_expiry_days ?? 0;
 
-  React.useEffect(() => {
-    if (isAuthenticated) {
-      sajilo.entities.CompanySettings.list().then(data => {
-        if (data.length > 0) setPasswordExpiryDays(data[0].password_expiry_days ?? 0);
-      });
-    }
-  }, [isAuthenticated]);
 
   if (isLoadingPublicSettings || isLoadingAuth) {
     return (
@@ -207,16 +209,21 @@ const AuthenticatedApp = () => {
             <Route path="company/roles" element={<UserRoles />} />
             <Route path="company/password" element={<PasswordPolicy />} />
             <Route path="company/approvals" element={<ApprovalControl />} />
+            <Route path="company/security" element={<SecurityPolicy />} />
+            <Route path="company/approval-queue" element={<ApprovalQueuePage />} />
             <Route path="finance/fiscal-year" element={<FiscalYear />} />
             <Route path="finance/tax-vat" element={<TaxVatMatrices />} />
             <Route path="finance/gl-mapping" element={<GLMapping />} />
             <Route path="finance/payroll-mapping" element={<PayrollMapping />} />
             <Route path="finance/depreciation" element={<Depreciation />} />
+            <Route path="finance/period-lock" element={<PeriodLock />} />
+            <Route path="finance/costing-method" element={<CostingMethod />} />
             <Route path="operations/collections" element={<ReceivableCollections />} />
             <Route path="operations/vouchers" element={<VoucherSequence />} />
             <Route path="operations/inventory" element={<InventorySettings />} />
             <Route path="operations/templates" element={<PDFTemplatesList />} />
             <Route path="operations/quick-actions" element={<QuickActionsSettings />} />
+            <Route path="operations/batch-expiry" element={<BatchExpiry />} />
             <Route path="data/cut-over" element={<SystemCutOver />} />
             <Route path="data/import" element={<ItemImportExportPage />} />
             <Route path="data/utilities" element={<DataUtilitiesPage />} />

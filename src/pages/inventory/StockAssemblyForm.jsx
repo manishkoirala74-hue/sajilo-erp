@@ -8,11 +8,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Plus, Trash2, Layers } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/lib/AuthContext';
+import { useCompanySettings } from '@/hooks/useCompanySettings';
 import { useForm, useFieldArray } from 'react-hook-form';
 import DateInput from '@/components/shared/DateInput';
 
 export default function StockAssemblyForm({ assemblyId, onClose, onSaved }) {
-  const { user, activeCompany, globalSettings, hasAccess } = useAuth();
+  const { user, activeCompany, hasAccess } = useAuth();
+  const { inventory } = useCompanySettings();
   const [loading, setLoading] = useState(false);
   const [showNegativeStockWarning, setShowNegativeStockWarning] = useState(false);
   const [negativeStockItems, setNegativeStockItems] = useState([]);
@@ -85,7 +87,7 @@ export default function StockAssemblyForm({ assemblyId, onClose, onSaved }) {
       return;
     }
 
-    if (isComplete && globalSettings?.negative_stock_policy === 'WARN_AND_ALLOW' && !data._skipStockCheck) {
+    if (isComplete && inventory.negativeStockPolicy === 'WARN_AND_ALLOW' && !data._skipStockCheck) {
       try {
         const consumedItems = data.lineItems.filter(l => l.line_type === 'Consumed' && l.item_id);
         if (consumedItems.length > 0) {

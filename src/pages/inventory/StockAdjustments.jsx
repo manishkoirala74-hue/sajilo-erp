@@ -15,6 +15,8 @@ import DateInput from '@/components/shared/DateInput';
 import FormGrid from '@/components/layout/FormGrid';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/AuthContext';
+import { useCompanySettings } from '@/hooks/useCompanySettings';
+
 import { postStockAdjustment, loadItemsMap, loadSettings } from '@/lib/glPostingService';
 import { getPredictedVoucherNumber } from '@/utils/documentSequence';
 
@@ -34,7 +36,8 @@ export default function StockAdjustments() {
   const [viewDetail, setViewDetail] = useState(null);
   const [form, setForm] = useState(emptyAdj);
   const [saving, setSaving] = useState(false);
-  const { globalSettings, hasAccess, activeFiscalYear } = useAuth();
+  const { hasAccess, activeFiscalYear } = useAuth();
+  const { inventory } = useCompanySettings();
   const [settings, setSettings] = useState(null);
   const [sequenceConfigs, setSequenceConfigs] = useState([]);
   const [showNegativeStockWarning, setShowNegativeStockWarning] = useState(false);
@@ -104,7 +107,7 @@ export default function StockAdjustments() {
     if (form.line_items.length === 0) { toast.error('Add at least one item'); return; }
 
     if (status === 'Posted') {
-      const policy = globalSettings?.negative_stock_policy || 'STRICT_BLOCK';
+      const policy = inventory.negativeStockPolicy;
       const negatives = [];
       
       for (const line of form.line_items) {

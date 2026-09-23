@@ -12,6 +12,7 @@ import DateInput from '@/components/shared/DateInput';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { useAuth } from '@/lib/AuthContext';
+import { useCompanySettings } from '@/hooks/useCompanySettings';
 import { cn } from '@/lib/utils';
 
 const emptyForm = {
@@ -23,7 +24,8 @@ const emptyForm = {
 };
 
 export default function StockTransfers() {
-  const { activeGodowns, globalSettings, hasAccess } = useAuth();
+  const { activeGodowns, hasAccess } = useAuth();
+  const { inventory } = useCompanySettings();
   const [showNegativeStockWarning, setShowNegativeStockWarning] = useState(false);
   const [negativeStockItems, setNegativeStockItems] = useState([]);
   const [transfers, setTransfers] = useState([]);
@@ -156,7 +158,7 @@ export default function StockTransfers() {
     if (form.line_items.length === 0) return toast.error('Add at least one item');
     
     // UX Safeguard Validation & Negative Stock Policy
-    const policy = globalSettings?.negative_stock_policy || 'STRICT_BLOCK';
+    const policy = inventory.negativeStockPolicy;
     const negatives = [];
 
     for (const item of form.line_items) {

@@ -20,6 +20,8 @@ import { loadActiveTaxTypes, computeTotalTax } from '@/lib/taxService';
 import { useSajiloSync } from '@/hooks/useSajiloSync';
 import { useAuth } from '@/lib/AuthContext';
 
+import { useCompanySettings } from '@/hooks/useCompanySettings';
+
 const fmt = n => `NPR ${Number(n || 0).toLocaleString()}`;
 
 export default function POSSales() {
@@ -43,7 +45,8 @@ export default function POSSales() {
   const [selectedCashAccountId, setSelectedCashAccountId] = useState('');
   const [selectedCashAccountName, setSelectedCashAccountName] = useState('');
   const [taxTypes, setTaxTypes] = useState([]);
-  const { globalSettings, hasAccess, activeFiscalYear } = useAuth();
+  const { hasAccess, activeFiscalYear } = useAuth();
+  const { inventory } = useCompanySettings();
   const [showNegativeStockWarning, setShowNegativeStockWarning] = useState(false);
   const [negativeStockItems, setNegativeStockItems] = useState([]);
 
@@ -143,7 +146,7 @@ export default function POSSales() {
     if (cart.length === 0) return toast.error('Cart is empty');
     
     // Negative Stock Policy Check
-    const policy = globalSettings?.negative_stock_policy || 'STRICT_BLOCK';
+    const policy = inventory.negativeStockPolicy;
     const negatives = [];
     
     for (const c of cart) {
@@ -219,6 +222,7 @@ export default function POSSales() {
     }
   };
 
+  const { globalSettings } = useAuth();
   const isMissingGL = globalSettings && (!globalSettings.gl_accounts_receivable_id || !globalSettings.gl_vat_payable_id || !globalSettings.gl_default_sales_account_id);
 
   const renderCartContent = () => (

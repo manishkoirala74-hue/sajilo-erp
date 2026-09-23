@@ -104,7 +104,13 @@ export default function CommunicationSettings({ companyId }) {
     }
   };
 
-  if (user?.role !== 'admin') {
+  const isAdmin =
+    user?.is_tenant_admin === true ||
+    user?.role === 'admin' ||
+    user?.role === 'owner' ||
+    user?.role === 'tenant_admin';
+
+  if (!isAdmin) {
     return (
       <div className="flex flex-col items-center justify-center p-8 text-center bg-red-50 dark:bg-red-950/20 rounded-xl border border-red-200 dark:border-red-900/50">
         <AlertCircle className="w-12 h-12 text-red-500 mb-3" />

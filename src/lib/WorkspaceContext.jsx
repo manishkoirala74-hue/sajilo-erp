@@ -1,5 +1,5 @@
 import React, { createContext, useContext } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/lib/AuthContext';
 import { sajilo } from '@/api/sajiloClient';
 import { formatDualDateString } from '@/lib/nepaliDate';
@@ -8,30 +8,29 @@ import DualDateDisplay from '@/components/shared/DualDateDisplay';
 const WorkspaceContext = createContext(null);
 
 export const WorkspaceProvider = ({ children }) => {
-  const { activeCompany } = useAuth();
+  const { activeCompany, globalSettings, isLoadingAuth, refreshGlobalSettings } = useAuth();
   const queryClient = useQueryClient();
 
-  const { data: settings = null, isLoading } = useQuery({
-    queryKey: ['Company', activeCompany?.id, 'CompanySettings', 'settings'],
-    queryFn: async () => {
-      if (!activeCompany?.id) return null;
-      const data = await sajilo.entities.CompanySettings.list();
-      return data[0] || null;
-    },
-    enabled: !!activeCompany?.id,
-    staleTime: 1000 * 60 * 10,
-  });
+  // Read directly from globalSettings — no independent DB call.
+  // globalSettings is the single source of truth hydrated by get_user_auth_context RPC.
+  const settings = globalSettings || null;
+  const isLoading = isLoadingAuth;
 
   const dateFormat = settings?.date_format || 'AD';
   const displayBsDate = settings?.display_bs_date ?? false;
-  const numberSystem = settings?.number_system || (dateFormat === 'BS' ? 'south_asian' : 'international');
+  const numberSystem =
+    settings?.number_system || (dateFormat === 'BS' ? 'south_asian' : 'international');
 
   const toggleDateFormat = async () => {
     if (!settings?.id) return;
     const newFormat = dateFormat === 'AD' ? 'BS' : 'AD';
     try {
       await sajilo.entities.CompanySettings.update(settings.id, { date_format: newFormat });
-      queryClient.invalidateQueries({ queryKey: ['company', activeCompany?.id, 'settings'] });
+      // Invalidate using entity-driven key pattern (DEVELOPMENT_CHECKLIST §2)
+      queryClient.invalidateQueries({
+        predicate: (q) => q.queryKey.includes('CompanySettings'),
+      });
+      await refreshGlobalSettings();
     } catch (e) {
       console.error('Failed to update date format', e);
     }
@@ -42,7 +41,10 @@ export const WorkspaceProvider = ({ children }) => {
     const newSystem = numberSystem === 'international' ? 'south_asian' : 'international';
     try {
       await sajilo.entities.CompanySettings.update(settings.id, { number_system: newSystem });
-      queryClient.invalidateQueries({ queryKey: ['company', activeCompany?.id, 'settings'] });
+      queryClient.invalidateQueries({
+        predicate: (q) => q.queryKey.includes('CompanySettings'),
+      });
+      await refreshGlobalSettings();
     } catch (e) {
       console.warn('Failed to update number system', e);
     }
@@ -70,11 +72,7 @@ export const WorkspaceProvider = ({ children }) => {
     formatDateForExport,
   };
 
-  return (
-    <WorkspaceContext.Provider value={value}>
-      {children}
-    </WorkspaceContext.Provider>
-  );
+  return <WorkspaceContext.Provider value={value}>{children}</WorkspaceContext.Provider>;
 };
 
 export const useWorkspace = () => {
