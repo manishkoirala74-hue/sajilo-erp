@@ -30,7 +30,7 @@ export const AuthProvider = ({ children }) => {
 
   // Fetch Fiscal Years using React Query for global Topbar reactivity
   const currentCompanyId = activeCompany?.id || sajilo.getCompanyId();
-  const { data: fiscalYears = [], isError: fyIsError, error: fyError, isLoading: fyIsLoading } = useQuery({
+  const { data: fiscalYears = [], isError: fyIsError, error: fyError, isLoading: fyIsLoading, isFetching: fyIsFetching } = useQuery({
     queryKey: ['Company', currentCompanyId, 'FiscalYear', 'fiscalYears'],
     queryFn: async () => {
       const { data, error } = await sajilo.auth.supabase

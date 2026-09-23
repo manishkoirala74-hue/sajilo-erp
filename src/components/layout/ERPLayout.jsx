@@ -57,7 +57,7 @@ export default function ERPLayout() {
   const location = useLocation();
   const title = pageTitles[location.pathname] || 'Sajilo ERP';
   const navigate = useNavigate();
-  const { activeFiscalYear, activeCompany, fiscalYears, fyIsError, fyError, fyIsLoading, user, activeRole } = useAuth();
+  const { activeFiscalYear, activeCompany, fiscalYears, fyIsError, fyError, fyIsLoading, fyIsFetching, isSwitchingCompany, user, activeRole } = useAuth();
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
@@ -99,7 +99,7 @@ export default function ERPLayout() {
           </div>
         )}
 
-        {activeCompany && !activeFiscalYear && !fyIsLoading && (
+        {activeCompany && !activeFiscalYear && !fyIsLoading && !fyIsFetching && !isSwitchingCompany && (
           <div className="bg-destructive/10 border-b border-destructive/20 px-4 py-3 flex flex-col md:flex-row md:items-center justify-between gap-3 overflow-hidden">
             <div className="flex items-center gap-3">
               <AlertCircle className="w-5 h-5 text-destructive shrink-0" />
