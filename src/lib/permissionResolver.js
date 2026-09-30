@@ -135,6 +135,12 @@ const LEGACY_MODULE_MAP = {
   'hr_payroll.run':        { module: 'hr_payroll',   level: 'full' },
   'hr_documents.view':     { module: 'hr_documents', level: 'view' },
   'hr_documents.manage':   { module: 'hr_documents', level: 'full' },
+  'hr_loans.view':         { module: 'hr_loans',     level: 'view' },
+  'hr_loans.manage':       { module: 'hr_loans',     level: 'full' },
+
+  // Fixed Assets
+  'asset_compliance.view':   { module: 'asset_compliance', level: 'view' },
+  'asset_compliance.manage': { module: 'asset_compliance', level: 'full' },
 };
 
 /**

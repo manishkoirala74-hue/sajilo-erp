@@ -17,6 +17,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { MODULE_PERMISSIONS } from '@/config/routePermissions';
 
 function generateSecureTempPassword() {
   const charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+-=';
@@ -29,67 +30,6 @@ function generateSecureTempPassword() {
   return password;
 }
 
-// ── Permission matrix ──────────────────────────────────────────────────────
-const MODULE_PERMISSIONS = [
-  {
-    group: 'Sales',
-    modules: [
-      { key: 'sales_orders', label: 'Sales Orders' },
-      { key: 'sales_invoices', label: 'Sales Invoices' },
-      { key: 'sales_returns', label: 'Sales Returns' },
-      { key: 'pos', label: 'POS Terminal' },
-    ]
-  },
-  {
-    group: 'Purchase',
-    modules: [
-      { key: 'purchase_orders', label: 'Purchase Orders' },
-      { key: 'purchase_invoices', label: 'Purchase Invoices' },
-      { key: 'purchase_returns', label: 'Purchase Returns' },
-    ]
-  },
-  {
-    group: 'Inventory',
-    modules: [
-      { key: 'items', label: 'Items / Products' },
-      { key: 'categories', label: 'Item Categories' },
-      { key: 'stock_adjustments', label: 'Stock Adjustments' },
-      { key: 'uom', label: 'Units of Measure' },
-      { key: 'discounts', label: 'Discount Schemes' },
-    ]
-  },
-  {
-    group: 'Accounting & Finance',
-    modules: [
-      { key: 'chart_of_accounts', label: 'Chart of Accounts' },
-      { key: 'vouchers', label: 'Financial Vouchers' },
-      { key: 'reports', label: 'Reports' },
-    ]
-  },
-  {
-    group: 'HR & Payroll',
-    modules: [
-      { key: 'employees', label: 'Employees' },
-      { key: 'payroll', label: 'Payroll Runs' },
-    ]
-  },
-  {
-    group: 'Fixed Assets',
-    modules: [
-      { key: 'assets', label: 'Asset Register' },
-      { key: 'asset_compliance', label: 'Asset Compliance' },
-    ]
-  },
-  {
-    group: 'Other',
-    modules: [
-      { key: 'partners', label: 'Business Partners' },
-      { key: 'manufacturing', label: 'Manufacturing Orders' },
-      { key: 'services', label: 'Service Contracts' },
-      { key: 'settings', label: 'Settings' },
-    ]
-  },
-];
 
 const ACCESS_LEVELS = [
   { value: 'none', label: 'No Access', color: 'text-muted-foreground' },
@@ -111,11 +51,11 @@ const ROLE_PRESETS = {
   tenant_admin: baseAdminProfile,
   manager: {
     label: 'Manager', color: 'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-500/20',
-    perms: { ...buildDefaultPerms('edit'), settings: 'none', chart_of_accounts: 'view', payroll: 'view' }
+    perms: { ...buildDefaultPerms('edit'), settings: 'none', chart_of_accounts: 'view', hr_payroll: 'view', hr_attendance: 'view' }
   },
   accountant: {
     label: 'Accountant', color: 'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-500/20',
-    perms: { ...buildDefaultPerms('view'), chart_of_accounts: 'full', vouchers: 'full', reports: 'full', sales_invoices: 'edit', purchase_invoices: 'edit', settings: 'none' }
+    perms: { ...buildDefaultPerms('view'), chart_of_accounts: 'full', vouchers: 'full', reports: 'full', sales_invoices: 'edit', purchase_invoices: 'edit', settings: 'none', hr_employees: 'none', hr_leave: 'none', hr_attendance: 'none', hr_documents: 'none', hr_loans: 'none' }
   },
   sales_rep: {
     label: 'Sales Rep', color: 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/20',
@@ -125,8 +65,13 @@ const ROLE_PRESETS = {
     label: 'Warehouse', color: 'bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-400 border-orange-200 dark:border-orange-500/20',
     perms: { ...buildDefaultPerms('none'), items: 'full', stock_adjustments: 'full', categories: 'view', uom: 'view', purchase_orders: 'view', purchase_invoices: 'view' }
   },
+  hr_manager: {
+    label: 'HR Manager', color: 'bg-pink-100 dark:bg-pink-500/20 text-pink-700 dark:text-pink-400 border-pink-200 dark:border-pink-500/20',
+    perms: { ...buildDefaultPerms('none'), hr_employees: 'full', hr_leave: 'full', hr_attendance: 'full', hr_payroll: 'full', hr_documents: 'full', hr_loans: 'full', reports: 'view' }
+  },
   viewer: { label: 'Viewer', color: 'bg-slate-100 dark:bg-slate-500/20 text-muted-foreground border-border', perms: buildDefaultPerms('view') },
 };
+
 
 export default function UsersRoles() {
   const { activeCompany } = useAuth();

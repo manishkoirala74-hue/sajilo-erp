@@ -4,6 +4,89 @@
  * Path matching normalizes trailing slashes, query parameters, and dynamic segments.
  */
 
+/**
+ * MODULE_PERMISSIONS — Single Source of Truth for the Permission Editor UI.
+ *
+ * ─── HOW TO ADD A NEW MODULE ───────────────────────────────────────────────
+ * 1. Add a new entry (or a new group) here.
+ * 2. Add its permission key(s) to ROUTE_PERMISSIONS below.
+ * 3. Add its key → legacy map entry in permissionResolver.js › LEGACY_MODULE_MAP.
+ *
+ * That's it. The Roles & Permissions editor (/settings/company/roles) will
+ * automatically include the new module in its permission matrix — no other
+ * file changes needed.
+ * ───────────────────────────────────────────────────────────────────────────
+ */
+export const MODULE_PERMISSIONS = [
+  {
+    group: 'Sales',
+    modules: [
+      { key: 'sales_orders',   label: 'Sales Orders & Quotations' },
+      { key: 'sales_invoices', label: 'Sales Invoices' },
+      { key: 'sales_returns',  label: 'Sales Returns' },
+      { key: 'pos',            label: 'POS Terminal' },
+    ],
+  },
+  {
+    group: 'Purchase',
+    modules: [
+      { key: 'purchase_orders',   label: 'Purchase Orders' },
+      { key: 'purchase_invoices', label: 'Purchase Invoices' },
+      { key: 'purchase_returns',  label: 'Purchase Returns' },
+    ],
+  },
+  {
+    group: 'Inventory',
+    modules: [
+      { key: 'items',             label: 'Items / Products' },
+      { key: 'categories',        label: 'Item Categories' },
+      { key: 'stock_adjustments', label: 'Stock Adjustments & Transfers' },
+      { key: 'uom',               label: 'Units of Measure' },
+      { key: 'discounts',         label: 'Discount Schemes' },
+    ],
+  },
+  {
+    group: 'Accounting & Finance',
+    modules: [
+      { key: 'chart_of_accounts', label: 'Chart of Accounts & GL' },
+      { key: 'vouchers',          label: 'Financial Vouchers' },
+      { key: 'reports',           label: 'Reports' },
+    ],
+  },
+  {
+    group: 'HR & Payroll',
+    modules: [
+      { key: 'hr_employees',  label: 'Employees & KYC Profiles' },
+      { key: 'hr_leave',      label: 'Leave Management' },
+      { key: 'hr_attendance', label: 'Attendance Tracking' },
+      { key: 'hr_payroll',    label: 'Payroll Runs' },
+      { key: 'hr_documents',  label: 'HR Documents' },
+      { key: 'hr_loans',      label: 'Loans & Advances' },
+    ],
+  },
+  {
+    group: 'Fixed Assets',
+    modules: [
+      { key: 'assets',           label: 'Asset Register' },
+      { key: 'asset_compliance', label: 'Asset Compliance' },
+    ],
+  },
+  {
+    group: 'Other Modules',
+    modules: [
+      { key: 'partners',      label: 'Business Partners' },
+      { key: 'manufacturing', label: 'Manufacturing Orders' },
+      { key: 'services',      label: 'Service Contracts' },
+    ],
+  },
+  {
+    group: 'Settings & Administration',
+    modules: [
+      { key: 'settings', label: 'General Settings' },
+    ],
+  },
+];
+
 export const ROUTE_PERMISSIONS = [
   // Core Landing Pages
   { path: '/', permission: null, access: 'authenticated' },
@@ -48,12 +131,12 @@ export const ROUTE_PERMISSIONS = [
   { path: '/assets/compliance', permission: 'depreciation.view', access: 'permission' },
 
   // HR & Payroll Module — Granular per v6 plan (Principle of Least Privilege)
-  { path: '/hr/employees',  permission: 'hr_employees.view',    access: 'permission' },
-  { path: '/hr/leave',      permission: 'hr_leave.manage',      access: 'permission' },
+  { path: '/hr/employees',  permission: 'hr_employees.view',  access: 'permission' },
+  { path: '/hr/leave',      permission: 'hr_leave.manage',    access: 'permission' },
   { path: '/hr/attendance', permission: 'hr_attendance.manage', access: 'permission' },
-  { path: '/hr/payroll',    permission: 'hr_payroll.run',       access: 'permission' },
-  { path: '/hr/loans',      permission: 'hr_employees.view',    access: 'permission' },
-  { path: '/hr/documents',  permission: 'hr_documents.view',    access: 'permission' },
+  { path: '/hr/payroll',    permission: 'hr_payroll.run',     access: 'permission' },
+  { path: '/hr/loans',      permission: 'hr_loans.view',      access: 'permission' },
+  { path: '/hr/documents',  permission: 'hr_documents.view',  access: 'permission' },
 
   // Construction Module
   { path: '/construction/projects', permission: 'items.view', access: 'permission' },
