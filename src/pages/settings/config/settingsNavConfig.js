@@ -1,4 +1,4 @@
-import { Building, Landmark, Settings2, Database, Plug } from 'lucide-react';
+import { Building, Landmark, Settings2, Database, Plug, Users } from 'lucide-react';
 
 export const SETTINGS_CATEGORIES = [
   { id: 'company', label: 'Company Workspace', icon: Building, path: '/settings/company' },
@@ -6,6 +6,7 @@ export const SETTINGS_CATEGORIES = [
   { id: 'operations', label: 'Operational Features', icon: Settings2, path: '/settings/operations' },
   { id: 'data', label: 'Data Logistics', icon: Database, path: '/settings/data' },
   { id: 'integrations', label: 'App & Integrations', icon: Plug, path: '/settings/integrations' },
+  { id: 'hr', label: 'HR Configuration', icon: Users, path: '/settings/hr' },
 ];
 
 export const SETTINGS_SUB_CATEGORIES = {
@@ -21,7 +22,7 @@ export const SETTINGS_SUB_CATEGORIES = {
     { id: 'fiscal-year', label: 'Fiscal Year Management', path: '/settings/finance/fiscal-year', permissionKey: 'fiscal_year.view', keywords: ['dates', 'calendar', 'start', 'end'] },
     { id: 'tax-vat', label: 'Tax & VAT Matrices', path: '/settings/finance/tax-vat', permissionKey: 'tax.view', keywords: ['gst', 'percentage', 'rate'] },
     { id: 'gl-mapping', label: 'GL Account Mapping', path: '/settings/finance/gl-mapping', permissionKey: 'gl_mapping.view', keywords: ['ledger', 'accounting', 'chart'] },
-    { id: 'payroll-mapping', label: 'Payroll Component Mapping', path: '/settings/finance/payroll-mapping', permissionKey: 'payroll_mapping.view', keywords: ['salary', 'wages', 'hr'] },
+    
     { id: 'depreciation', label: 'Depreciation Method', path: '/settings/finance/depreciation', permissionKey: 'depreciation.view', keywords: ['assets', 'straight-line', 'declining'] },
     { id: 'period-lock', label: 'Period Lock', path: '/settings/finance/period-lock', permissionKey: 'settings.view', keywords: ['close', 'lock', 'date', 'book closing'] },
     { id: 'costing-method', label: 'Accounting Controls', path: '/settings/finance/costing-method', permissionKey: 'settings.view', keywords: ['fifo', 'lifo', 'wac', 'currency', 'tax'] },
@@ -45,6 +46,11 @@ export const SETTINGS_SUB_CATEGORIES = {
     { id: 'storage', label: 'Storage & Media Limits', path: '/settings/integrations/storage', permissionKey: 'settings.view', keywords: ['space', 'attachments', 'images'] },
     { id: 'payment', label: 'Payment Gateways', path: '/settings/integrations/payment', permissionKey: 'settings.view', keywords: ['stripe', 'paypal', 'esewa', 'khalti'] },
     { id: 'communication', label: 'Communication Channels', path: '/settings/integrations/communication', permissionKey: 'settings.view', keywords: ['email', 'sms', 'smtp', 'notifications'] },
+  ],
+  hr: [
+    { id: 'departments', label: 'Departments & Designations', path: '/settings/hr/departments', permissionKey: 'hr_employees.view', keywords: ['department', 'designation', 'team', 'division', 'org chart'] },
+    { id: 'leave-policy', label: 'Leave Policy & Holidays', path: '/settings/hr/leave-policy', permissionKey: 'hr_leave.manage', keywords: ['leave', 'holiday', 'annual', 'sick', 'maternity', 'accrual', 'carry forward'] },
+    { id: 'payroll-mapping', label: 'Payroll Component Mapping', path: '/settings/hr/payroll-mapping', permissionKey: 'hr_payroll.run', keywords: ['salary', 'wages', 'earnings', 'deductions', 'pf', 'tds'] },
   ],
 };
 

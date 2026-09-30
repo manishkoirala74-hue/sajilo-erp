@@ -161,7 +161,7 @@ export default function Reports() {
 
   return (
     <>
-    <div className="space-y-5">
+    <div className="space-y-5 print:hidden">
       {/* Page Header */}
       <div>
         <h2 className="text-xl font-bold text-foreground">Reports</h2>

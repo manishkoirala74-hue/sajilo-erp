@@ -121,7 +121,20 @@ const LEGACY_MODULE_MAP = {
   'cutover.execute': { module: 'settings', level: 'full' },
 
   'security_audit.view': { module: 'settings', level: 'view' },
-  'security_audit.export': { module: 'settings', level: 'full' }
+  'security_audit.export': { module: 'settings', level: 'full' },
+
+  // HR Module — Granular keys (v6 plan)
+  'hr_employees.view':     { module: 'hr_employees', level: 'view' },
+  'hr_employees.manage':   { module: 'hr_employees', level: 'edit' },
+  'hr_profile.view':       { module: 'hr_employees', level: 'view' },
+  'hr_leave.apply':        { module: 'hr_leave',     level: 'edit' },
+  'hr_leave.manage':       { module: 'hr_leave',     level: 'full' },
+  'hr_attendance.clock':   { module: 'hr_attendance',level: 'edit' },
+  'hr_attendance.manage':  { module: 'hr_attendance',level: 'full' },
+  'hr_payroll.view':       { module: 'hr_payroll',   level: 'view' },
+  'hr_payroll.run':        { module: 'hr_payroll',   level: 'full' },
+  'hr_documents.view':     { module: 'hr_documents', level: 'view' },
+  'hr_documents.manage':   { module: 'hr_documents', level: 'full' },
 };
 
 /**

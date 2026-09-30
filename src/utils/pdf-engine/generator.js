@@ -217,9 +217,18 @@ export const generatePDF = async (data, layoutConfig = {}) => {
   doc.text((data.total || 0).toString(), 190, finalY + 14, { align: 'right' });
   doc.setFont(config.fontFamily, 'normal');
 
-  // -- 5. Terms & Payment Info --
+  // -- 5. Remarks, Terms & Payment Info --
   let bottomY = finalY + 10;
   
+  const overallRemarks = data.remarks || data.notes || data.narration || data.description;
+  if (overallRemarks) {
+    doc.setFont(config.fontFamily, 'bold');
+    doc.text('Remarks:', 14, bottomY);
+    doc.setFont(config.fontFamily, 'normal');
+    doc.text(overallRemarks.toString(), 14, bottomY + 6, { maxWidth: 100 });
+    bottomY += 6 + (Math.ceil(overallRemarks.toString().length / 50) * 5);
+  }
+
   if (config.paymentInformation) {
     doc.setFont(config.fontFamily, 'bold');
     doc.text('Payment Information:', 14, bottomY);

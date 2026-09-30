@@ -11,13 +11,17 @@ const GLMapping = () => {
   const { draftSettings, updateDraftSettings, setServerSettings, resetDraft } = useSettingsStore();
 
   const handleSave = async () => {
+    if (!draftSettings?.id) {
+      toast.error("Cannot save: Company Settings record not loaded. Please refresh the page.");
+      return;
+    }
     try {
       await sajilo.entities.CompanySettings.update(draftSettings.id, draftSettings);
       setServerSettings({ ...draftSettings });
       toast.success("GL Account Mappings saved successfully");
     } catch (e) {
-      console.error(e);
-      toast.error("Failed to save GL Account Mappings");
+      console.error("GL Save error:", e);
+      toast.error(`Failed to save GL Account Mappings: ${e.message}`);
     }
   };
 

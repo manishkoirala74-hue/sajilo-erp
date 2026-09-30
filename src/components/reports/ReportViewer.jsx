@@ -10,7 +10,7 @@ import PartnerStatement from '@/components/reports/PartnerStatement';
 import FinancialReportTable from '@/components/reports/FinancialReportTable';
 import ReportFilterBar from '@/components/reports/ReportFilterBar';
 import { exportFlatXLSX } from '@/lib/reports/reportExcelExport';
-import { sajilo } from '@/api/sajiloClient';
+import { sajilo, supabase } from '@/api/sajiloClient';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { format } from 'date-fns';
 import SearchableSelect from '@/components/shared/SearchableSelect';
@@ -75,23 +75,18 @@ export function useCachedState(key, defaultState) {
 // ── Print Stylesheet ──────────────────────────────────────────────────────────
 const PRINT_STYLE = `
 @media print {
-  /* Hide everything except the print portal */
-  body * { visibility: hidden !important; }
-  #sajilo-print-portal,
-  #sajilo-print-portal * { visibility: visible !important; }
+  @page { margin: 10mm; size: A4 landscape; }
 
-  @page { margin: 12mm 10mm; size: A4 landscape; }
-
-  #sajilo-print-portal {
-    position: absolute !important;
-    top: 0 !important;
-    left: 0 !important;
-    width: 100% !important;
-    background: white;
-    font-family: 'Calibri', Arial, sans-serif;
-    font-size: 9pt;
-    color: #0f172a;
+  /* Release modal constraints to allow normal page pagination */
+  .report-modal-container, .table-scroll-container, .fixed.inset-0 {
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    position: static !important;
   }
+
+  thead { display: table-header-group !important; }
+  tfoot { display: table-footer-group !important; }
 
   /* ── Table layout ── */
   table {
@@ -121,7 +116,7 @@ const PRINT_STYLE = `
   tr.print-group-row { background: #f1f5f9 !important; font-weight: 700 !important; }
   .text-right, .tabular-nums { text-align: right !important; }
   .print-hide { display: none !important; }
-  .print:hidden { display: none !important; }
+  .print\\:hidden { display: none !important; }
 }
 `;
 
@@ -166,7 +161,7 @@ function ReportTable({ title, subtitle, headers, rows, footer, onExport, onEmail
               {rows.length === 0
                 ? <tr><td colSpan={headers.length} className="cell-density text-center text-muted-foreground text-sm">No data found for the selected period.</td></tr>
                 : rows.map((row, i) => (
-                  <tr key={i} className="hover:bg-muted/20 print:hover:bg-transparent">
+                  <tr key={i} className="hover:bg-muted/20 print:hover:bg-transparent print:break-inside-avoid print:bg-white print:text-black">
                     {row.map((cell, j) => {
                       const isNum = rightCols.has(j);
                       const stickyClasses = j === 0 ? 'sticky left-0 bg-card z-20 border-r border-border md:border-r-0 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]' : '';
@@ -214,6 +209,7 @@ function TrialBalanceReport({ initialData, initialFromDate, initialToDate, initi
   const [partnerRows, setPartnerRows] = useState({});  // { [groupId]: AccountRow[] }
   const [company,     setCompany]     = useState(null);
   const [loading,     setLoading]     = useState(false);
+  const [exportProgress, setExportProgress] = useState(null); // { current, total }
   const [hasLoaded,   setHasLoaded]   = useState(false);  // track if user has clicked Apply
 
   // Identify AR / AP control accounts — match by account_type + keyword
@@ -781,7 +777,7 @@ function ProfitLossReport({ initialData, initialFromDate, initialToDate }) {
 
       return (
         <React.Fragment key={account.id}>
-          <tr className={`hover:bg-muted/20 print:hover:bg-transparent ${isGroup ? 'font-semibold text-foreground' : 'text-muted-foreground'}`}>
+          <tr className={`hover:bg-muted/20 print:hover:bg-transparent print:break-inside-avoid print:bg-white print:text-black ${isGroup ? 'font-semibold text-foreground' : 'text-muted-foreground'}`}>
             <td className='px-3 py-1.5 border-none sticky left-0 bg-card z-10 border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]' style={{ paddingLeft: `${16 + level * 20}px` }}>
               {isGroup ? (
                 <button onClick={() => toggleExpand(account.id)} className='flex items-center gap-1.5 hover:text-primary transition-colors text-left w-full'>
@@ -1437,12 +1433,25 @@ export default function ReportViewer({ reportId, data, fromDate, toDate, columnS
   };
 
   const [isExporting, setIsExporting] = useState(false);
+  const [exportProgress, setExportProgress] = useState(null);
+  const [isPreparingPrint, setIsPreparingPrint] = useState(false);
+
+  useEffect(() => {
+    window.onXlsxProgress = (current, total) => {
+      if (current === null) {
+        setExportProgress(null);
+      } else {
+        setExportProgress({ current, total });
+      }
+    };
+    return () => {
+      delete window.onXlsxProgress;
+    };
+  }, []);
 
   const handlePrint = useCallback(async () => {
-    setIsExporting(true);
+    setIsPreparingPrint(true);
     try {
-      const { requestPDFExport } = await import('@/lib/reports/reportExportEngine');
-      
       let extraParams = {};
       if (reportId === 'ledger_detail') {
         extraParams = filterCache['general_ledger_detail'] || {};
@@ -1454,11 +1463,36 @@ export default function ReportViewer({ reportId, data, fromDate, toDate, columnS
         extraParams = filterCache['partner_statement_ap_filters'] || {};
       }
 
-      await requestPDFExport(reportId, { fromDate, toDate, ...columnState, ...extraParams });
-    } catch (err) {
-      alert(err.message || 'Failed to generate PDF');
+      const payload = {
+        p_company_id: sajilo.getCompanyId(),
+        p_report_type: reportId,
+        p_parameters: { fromDate, toDate, ...columnState, ...extraParams },
+        p_export_format: 'browser_print'
+      };
+
+      const logPromise = supabase.rpc('log_report_generation', payload);
+      const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000));
+      
+      try {
+        await Promise.race([logPromise, timeoutPromise]);
+      } catch (err) {
+        try {
+          let queue = JSON.parse(localStorage.getItem('erp_failed_audit_logs') || '[]');
+          queue.push({ ...payload, _queuedAt: Date.now(), _id: crypto.randomUUID() });
+          if (queue.length > 200) queue = queue.slice(queue.length - 200);
+          localStorage.setItem('erp_failed_audit_logs', JSON.stringify(queue));
+        } catch (storageError) {
+          console.error('Audit queue write failed - log entry lost:', storageError, payload);
+        }
+      }
+
+      const originalTitle = document.title;
+      const rTitle = reportId ? reportId.replace(/_/g, ' ').toUpperCase() : 'REPORT';
+      document.title = `${rTitle}_${format(new Date(), 'yyyyMMdd_HHmmss')}`; 
+      window.print();
+      document.title = originalTitle;
     } finally {
-      setIsExporting(false);
+      setIsPreparingPrint(false);
     }
   }, [reportId, fromDate, toDate, columnState]);
 
@@ -1842,19 +1876,37 @@ export default function ReportViewer({ reportId, data, fromDate, toDate, columnS
 
   return (
     <>
+      {/* Export Progress Overlay */}
+      {exportProgress && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm print:hidden">
+          <div className="bg-card p-6 rounded-xl shadow-2xl max-w-sm w-full text-center space-y-4">
+            <h3 className="font-semibold text-lg">Exporting Spreadsheet...</h3>
+            <p className="text-sm text-muted-foreground">
+              Processing row {exportProgress.current.toLocaleString()} of {exportProgress.total.toLocaleString()}
+            </p>
+            <div className="w-full bg-secondary rounded-full h-2.5 overflow-hidden">
+              <div 
+                className="bg-primary h-2.5 rounded-full transition-all duration-300" 
+                style={{ width: `${Math.min(100, Math.round((exportProgress.current / exportProgress.total) * 100))}%` }}
+              ></div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Print stylesheet injection */}
       <style dangerouslySetInnerHTML={{ __html: PRINT_STYLE }} />
 
-      <div className="fixed inset-0 z-40 flex flex-col sm:items-center sm:justify-center bg-background sm:bg-black/40 sm:backdrop-blur-sm sm:p-4">
-        <div className="bg-card w-full h-[100dvh] sm:h-auto sm:max-h-[92vh] sm:max-w-5xl sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden pb-[env(safe-area-inset-bottom)] sm:pb-0">
+      <div className="fixed inset-0 z-40 flex flex-col sm:items-center sm:justify-center bg-background sm:bg-black/40 sm:backdrop-blur-sm sm:p-4 print:bg-white report-modal-container">
+        <div className="bg-card w-full h-[100dvh] sm:h-auto sm:max-h-[92vh] sm:max-w-5xl sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden print:overflow-visible print:shadow-none pb-[env(safe-area-inset-bottom)] sm:pb-0 print:pb-0">
           {/* Modal Header */}
-          <div className="flex items-center justify-between px-5 py-3 border-b border-border shrink-0">
+          <div className="flex items-center justify-between px-5 py-3 border-b border-border shrink-0 print:hidden">
             <p className="text-xs text-muted-foreground font-medium">
               Report Viewer — use filters inside each report to adjust the period
             </p>
             <div className="flex items-center gap-2">
-              <Button size="sm" variant="outline" onClick={handlePrint} disabled={isExporting}>
-                <Printer className="w-3.5 h-3.5 mr-1" /> {isExporting ? 'Generating...' : 'Download PDF'}
+              <Button size="sm" variant="outline" onClick={handlePrint} disabled={isPreparingPrint}>
+                <Printer className="w-3.5 h-3.5 mr-1" /> {isPreparingPrint ? 'Preparing...' : 'Print / Save as PDF'}
               </Button>
               <button onClick={onClose} className="text-muted-foreground hover:text-foreground ml-1">
                 <X className="w-5 h-5" />

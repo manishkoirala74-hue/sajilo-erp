@@ -37,3 +37,21 @@ This document serves as the core set of architectural principles and lessons lea
 - **Drawer Overflow Protection:** When rendering forms inside a bottom drawer, wrap the form body in an `overflow-y-auto` container while keeping the header and footer sticky. This ensures inputs are never trapped beneath the virtual keyboard.
 - **Destructive Mobile Actions:** Ensure mobile delete actions meet the 44x44px touch target minimum. Favor instant deletion paired with an "Undo Toast" rather than aggressive, flow-breaking confirmation modals.
 - **Physical Device Verification:** Chrome DevTools Device Mode cannot accurately simulate native virtual keyboard DOM shifts or `visualViewport` events. Always verify complex mobile forms on a physical device.
+- **The Multi-Column Data Trap (Sticky Matrix):** When rendering wide data tables on mobile, applying `overflow-x-auto` to the wrapper isn't enough; the first column (e.g., Account Name) must be frozen (`sticky left-0`) with a subtle drop shadow to maintain row context during horizontal scrolling.
+- **The Top-Left Intersection (Z-Index Hierarchy):** When combining a sticky header (`top-0 z-10`) with a sticky first column (`left-0 z-20`), the intersecting top-left cell must have the highest z-index (`top-0 left-0 z-30`) to prevent data cells from bleeding through during diagonal scrolling.
+- **Z-Index Portal Collisions:** Never arbitrarily bump a full-screen modal's z-index (e.g., to `z-[100]`) without accounting for UI library Portals. Shadcn/Radix tooltips, popovers, and Select dropdowns default to `z-50`. Modals should sit beneath `z-50` (e.g., `z-40`) to ensure dropdowns don't open invisibly underneath them.
+- **App Bar Action Overflow:** Full-screen mobile modals must keep their App Bars strictly organized. Do not clutter the header. Keep a Close button on the left, a truncated Title in the center, and hide all secondary actions (Excel, Print) inside an ellipsis (...) dropdown on the far right.
+- **Swipe Affordances:** For horizontally scrollable navigation pills, use visual cues like a CSS mask (`[mask-image:linear-gradient(...)]`) or deliberate padding (`pr-8`) so the last item peeks out, providing an intuitive cue that the container is swipeable.
+- **iOS Safe Area Insets:** For any `100dvh` container, apply `pb-[env(safe-area-inset-bottom)]` to the main scroll container to prevent the iOS Home Indicator from covering the bottom-most clickable elements or data rows.
+- **Table Accessibility & Keyboard Navigation:** Always add `tabIndex={0}`, `role="region"`, and an `aria-label` to horizontally scrollable table wrappers so they can be navigated via keyboard. Ensure `scope="col"` and `scope="row"` are applied to headers and sticky axes so screen readers announce coordinates correctly.
+
+## 5. Ledger Governance & UI Consistency
+
+- **Append-Only Ledger Principle:** Financial journals (GeneralLedgerJournal) must never be hard-deleted if they are Posted. Reversals must be executed by creating explicit contra-entries. Database functions or RPCs must never issue raw DELETE commands for posted ledger entries.
+- **Strict UI State Machines & RBAC:** Action buttons in the UI must strictly map to the document's state and proper RBAC (Role-Based Access Control) permissions. For example, "Delete" operations are only for Draft items governed by hasAccess, while "Reverse" operations apply to Posted items and require elevated permissions like checkPermissionKey.
+- **Audit Trails for Reversals:** Any reversal or cancellation action must require an explicit reason from the user. This reason must be appended to the transaction's narration/remarks for strict audit visibility.
+- **Data Normalization & Adapters:** When building global UI components (like a GlobalVoucherDrawer), data normalization adapters must rigorously support the specific schemas of all entity types being passed in (e.g., handling both debit/credit and debit_amount/credit_amount, ensuring fields like oucher_date and contact_name are part of fallback chains).
+
+## SQL Management
+
+- **Mandatory SQL Rollback Scripts:** Whenever a SQL script is created or updated for schema changes, migrations, or RPC modifications, you must simultaneously create or update a corresponding rollback script to ensure all database changes can be safely reverted.

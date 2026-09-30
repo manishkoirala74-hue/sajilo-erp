@@ -232,7 +232,8 @@ async function buildFlatSheet(wb, sheetName, { headers, rows, footer, companyNam
   });
 
   // Data rows
-  rows.forEach(dataRow => {
+  let processedRows = 0;
+  for (const dataRow of rows) {
     row = ws.getRow(r++);
     dataRow.forEach((val, j) => {
       const isNumericCol = j >= dataRow.length - 2;
@@ -248,7 +249,15 @@ async function buildFlatSheet(wb, sheetName, { headers, rows, footer, companyNam
         styleCell(cell, {});
       }
     });
-  });
+
+    processedRows++;
+    if (processedRows % 100 === 0) {
+      if (typeof window !== 'undefined' && window.onXlsxProgress) {
+        window.onXlsxProgress(processedRows, rows.length);
+      }
+      await new Promise(resolve => setTimeout(resolve, 0)); // Yield to main thread to prevent tab crash
+    }
+  }
 
   // Footer
   if (footer) {
@@ -277,10 +286,16 @@ async function buildFlatSheet(wb, sheetName, { headers, rows, footer, companyNam
  * Note: Now async because exceljs writes to buffer asynchronously.
  */
 export async function exportFinancialXLSX({ groups, columns, columnState, companyName, reportTitle, fromDate, toDate, filename }) {
-  const ExcelJS = await import('exceljs');
-  const wb = new (ExcelJS.default || ExcelJS).Workbook();
-  await buildFinancialSheet(wb, reportTitle || 'Report', { groups, columns, columnState, companyName, reportTitle, fromDate, toDate });
-  await downloadWorkbook(wb, filename || 'report.xlsx');
+  try {
+    const ExcelJS = await import('exceljs');
+    const wb = new (ExcelJS.default || ExcelJS).Workbook();
+    await buildFinancialSheet(wb, reportTitle || 'Report', { groups, columns, columnState, companyName, reportTitle, fromDate, toDate });
+    await downloadWorkbook(wb, filename || 'report.xlsx');
+  } finally {
+    if (typeof window !== 'undefined' && window.onXlsxProgress) {
+      window.onXlsxProgress(null);
+    }
+  }
 }
 
 /**
@@ -288,8 +303,14 @@ export async function exportFinancialXLSX({ groups, columns, columnState, compan
  * Note: Now async.
  */
 export async function exportFlatXLSX({ headers, rows, footer, companyName, reportTitle, fromDate, toDate, filename }) {
-  const ExcelJS = await import('exceljs');
-  const wb = new (ExcelJS.default || ExcelJS).Workbook();
-  await buildFlatSheet(wb, reportTitle || 'Report', { headers, rows, footer, companyName, reportTitle, fromDate, toDate });
-  await downloadWorkbook(wb, filename || 'report.xlsx');
+  try {
+    const ExcelJS = await import('exceljs');
+    const wb = new (ExcelJS.default || ExcelJS).Workbook();
+    await buildFlatSheet(wb, reportTitle || 'Report', { headers, rows, footer, companyName, reportTitle, fromDate, toDate });
+    await downloadWorkbook(wb, filename || 'report.xlsx');
+  } finally {
+    if (typeof window !== 'undefined' && window.onXlsxProgress) {
+      window.onXlsxProgress(null);
+    }
+  }
 }

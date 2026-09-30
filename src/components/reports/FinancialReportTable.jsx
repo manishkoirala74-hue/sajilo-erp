@@ -99,7 +99,7 @@ function computeSubtreeTotals(node, reportType) {
 function LedgerRow({ account, columns, depth, fmtNPR }) {
   const indent = depth * 20 + 8;
   return (
-    <tr className="hover:bg-muted/50 transition-colors print:hover:bg-transparent">
+    <tr className="hover:bg-muted/50 transition-colors print:hover:bg-transparent print:break-inside-avoid print:bg-white print:text-black">
       {columns.map(col => {
         if (col.key === 'account_code') return (
           <td key={col.key} className="cell-density py-1.5 min-w-[140px] max-w-[45vw] sm:min-w-[220px] sm:max-w-[400px] whitespace-normal sticky left-0 bg-card z-10 border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] print:text-[9px]"

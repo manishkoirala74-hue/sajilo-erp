@@ -6,7 +6,8 @@ import {
   Receipt, ClipboardList, Menu, X, Boxes, Wallet,
   Landmark, ShieldCheck, UserCog, Banknote, Factory, Handshake, BookOpen,
   Ruler, Tag, RotateCcw, SlidersHorizontal, ShoppingBag, BarChart2, TrendingDown, CreditCard,
-  UserCheck, Truck, Plus, Search, LifeBuoy, ArrowRightLeft, Star, Layers, Pin, PinOff
+  UserCheck, Truck, Plus, Search, LifeBuoy, ArrowRightLeft, Star, Layers, Pin, PinOff,
+  Calendar, ClipboardCheck, Award
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { sajilo } from '@/api/sajiloClient';
@@ -92,7 +93,11 @@ export const buildNavGroups = (settings) => {
       label: 'HR & PAYROLL',
       items: [
         { icon: UserCog, label: 'Employees', path: '/hr/employees' },
+        { icon: Calendar, label: 'Leave Management', path: '/hr/leave' },
+        { icon: ClipboardCheck, label: 'Attendance', path: '/hr/attendance' },
         { icon: Banknote, label: 'Payroll Runs', path: '/hr/payroll' },
+        { icon: Award, label: 'Loans & Advances', path: '/hr/loans' },
+        { icon: FileText, label: 'HR Documents', path: '/hr/documents' },
       ]
     });
   }

@@ -60,10 +60,14 @@ export default function ERPLayout() {
   const { activeFiscalYear, activeCompany, fiscalYears, fyIsError, fyError, fyIsLoading, fyIsFetching, isSwitchingCompany, user, activeRole } = useAuth();
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
-      <Sidebar collapsed={collapsed} onToggle={() => setCollapsed(c => !c)} />
-      <div className="flex flex-col flex-1 overflow-hidden relative">
-        <Topbar pageTitle={title} onMenuClick={() => setIsMobileMenuOpen(true)} />
+    <div className="flex h-screen print:h-auto overflow-hidden print:overflow-visible bg-background">
+      <div className="print:hidden">
+        <Sidebar collapsed={collapsed} onToggle={() => setCollapsed(c => !c)} />
+      </div>
+      <div className="flex flex-col flex-1 overflow-hidden print:overflow-visible relative">
+        <div className="print:hidden">
+          <Topbar pageTitle={title} onMenuClick={() => setIsMobileMenuOpen(true)} />
+        </div>
         
         {activeCompany?.status === 'PENDING_DELETION' && (
           <div className="bg-destructive text-destructive-foreground px-4 py-3 flex flex-col md:flex-row md:items-center justify-between gap-3 overflow-hidden shadow-sm z-10 relative">
@@ -119,17 +123,19 @@ export default function ERPLayout() {
         )}
 
         <React.Suspense fallback={<DomainSkeletonLoader />}>
-          <main className="flex-1 overflow-y-auto p-4 md:p-6 pb-20 md:pb-6 animate-fade-in">
+          <main className="flex-1 overflow-y-auto print:overflow-visible p-4 md:p-6 pb-20 md:pb-6 animate-fade-in">
             <Outlet />
           </main>
         </React.Suspense>
       </div>
 
       {/* Mobile only components */}
-      <BottomNavigation 
-        onOpenMenu={() => setIsMobileMenuOpen(true)} 
-        onOpenFab={() => setIsMobileFabOpen(true)} 
-      />
+      <div className="print:hidden">
+        <BottomNavigation 
+          onOpenMenu={() => setIsMobileMenuOpen(true)} 
+          onOpenFab={() => setIsMobileFabOpen(true)} 
+        />
+      </div>
       <MobileActionSheet 
         isOpen={isMobileFabOpen} 
         onClose={() => setIsMobileFabOpen(false)} 

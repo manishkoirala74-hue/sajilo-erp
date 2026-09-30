@@ -362,6 +362,13 @@
     "gl_vat_payable_name": {
       "type": "string"
     },
+    "gl_vat_receivable_id": {
+      "type": "string",
+      "description": "VAT Receivable GL account (Input VAT on purchases)"
+    },
+    "gl_vat_receivable_name": {
+      "type": "string"
+    },
     "gl_sales_return_account_id": {
       "type": "string"
     },

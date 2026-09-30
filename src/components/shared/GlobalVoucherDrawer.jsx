@@ -121,28 +121,29 @@ export default function GlobalVoucherDrawer() {
             journals = altJournals;
           }
             
-          if (journals && journals.length > 0) {
-            const j = journals[0];
-            const { data: jLines } = await sajilo.auth.supabase
-              .from('GeneralLedgerLine')
-              .select('id, debit_amount, credit_amount, account_id, account_name')
-              .eq('journal_id', j.id);
-              
-            const accIds = [...new Set((jLines || []).map(l => l.account_id).filter(Boolean))];
-            let accsMap = {};
-            if (accIds.length > 0) {
-              const { data: accs } = await sajilo.auth.supabase
-                .from('ChartOfAccount')
-                .select('id, account_name')
-                .in('id', accIds);
-              (accs || []).forEach(a => accsMap[a.id] = a.account_name);
-            }
-              
-            const mappedLines = (jLines || []).map(l => ({
-              account_name: l.account_name || accsMap[l.account_id] || 'Unknown Account',
-              debit_amount: l.debit_amount,
-              credit_amount: l.credit_amount
-            }));
+            if (journals && journals.length > 0) {
+              const j = journals[0];
+              const { data: jLines } = await sajilo.auth.supabase
+                .from('GeneralLedgerLine')
+                .select('id, debit_amount, credit_amount, account_id, account_name, description')
+                .eq('journal_id', j.id);
+                
+              const accIds = [...new Set((jLines || []).map(l => l.account_id).filter(Boolean))];
+              let accsMap = {};
+              if (accIds.length > 0) {
+                const { data: accs } = await sajilo.auth.supabase
+                  .from('ChartOfAccount')
+                  .select('id, account_name')
+                  .in('id', accIds);
+                (accs || []).forEach(a => accsMap[a.id] = a.account_name);
+              }
+                
+              const mappedLines = (jLines || []).map(l => ({
+                account_name: l.account_name || accsMap[l.account_id] || 'Unknown Account',
+                debit_amount: l.debit_amount,
+                credit_amount: l.credit_amount,
+                description: l.description
+              }));
             
             const fakeDoc = {
               id: j.id,
@@ -260,6 +261,7 @@ export default function GlobalVoucherDrawer() {
                         {normalizedData.isFinancial ? (
                           <>
                             <TableHead>Account</TableHead>
+                            <TableHead>Remarks</TableHead>
                             <TableHead className="text-right">Debit</TableHead>
                             <TableHead className="text-right">Credit</TableHead>
                           </>
@@ -284,6 +286,7 @@ export default function GlobalVoucherDrawer() {
                           {normalizedData.isFinancial ? (
                             <>
                               <TableCell className="font-medium">{line.account_name}</TableCell>
+                              <TableCell className="text-muted-foreground max-w-[200px] truncate" title={line.description || line.remarks || line.narration}>{line.description || line.remarks || line.narration || '-'}</TableCell>
                               <TableCell className="text-right">{(line.debit_amount || line.debit) > 0 ? Number(line.debit_amount || line.debit).toLocaleString() : '-'}</TableCell>
                               <TableCell className="text-right">{(line.credit_amount || line.credit) > 0 ? Number(line.credit_amount || line.credit).toLocaleString() : '-'}</TableCell>
                             </>
@@ -299,7 +302,7 @@ export default function GlobalVoucherDrawer() {
                       )})}
                       {normalizedData.lines.length === 0 && (
                         <TableRow>
-                          <TableCell colSpan={normalizedData.isFinancial ? 3 : 4} className="text-center py-6 text-muted-foreground">
+                          <TableCell colSpan={4} className="text-center py-6 text-muted-foreground">
                             No line items found.
                           </TableCell>
                         </TableRow>
@@ -320,6 +323,9 @@ export default function GlobalVoucherDrawer() {
                         {normalizedData.isFinancial ? (
                           <>
                             <div className="font-medium text-foreground">{line.account_name}</div>
+                            {(line.description || line.remarks || line.narration) && (
+                              <div className="text-sm text-muted-foreground italic mb-1">{line.description || line.remarks || line.narration}</div>
+                            )}
                             <div className="flex justify-between text-sm">
                               <span className="text-muted-foreground">Debit</span>
                               <span className="font-semibold">{(line.debit_amount || line.debit) > 0 ? Number(line.debit_amount || line.debit).toLocaleString() : '-'}</span>

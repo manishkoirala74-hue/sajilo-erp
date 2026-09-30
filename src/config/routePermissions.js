@@ -47,9 +47,13 @@ export const ROUTE_PERMISSIONS = [
   { path: '/assets/depreciation', permission: 'depreciation.view', access: 'permission' },
   { path: '/assets/compliance', permission: 'depreciation.view', access: 'permission' },
 
-  // HR & Payroll Module
-  { path: '/hr/employees', permission: 'payroll_mapping.view', access: 'permission' },
-  { path: '/hr/payroll', permission: 'payroll_mapping.view', access: 'permission' },
+  // HR & Payroll Module — Granular per v6 plan (Principle of Least Privilege)
+  { path: '/hr/employees',  permission: 'hr_employees.view',    access: 'permission' },
+  { path: '/hr/leave',      permission: 'hr_leave.manage',      access: 'permission' },
+  { path: '/hr/attendance', permission: 'hr_attendance.manage', access: 'permission' },
+  { path: '/hr/payroll',    permission: 'hr_payroll.run',       access: 'permission' },
+  { path: '/hr/loans',      permission: 'hr_employees.view',    access: 'permission' },
+  { path: '/hr/documents',  permission: 'hr_documents.view',    access: 'permission' },
 
   // Construction Module
   { path: '/construction/projects', permission: 'items.view', access: 'permission' },
@@ -86,6 +90,11 @@ export const ROUTE_PERMISSIONS = [
   { path: '/settings/integrations/storage', permission: 'settings.view', access: 'permission' },
   { path: '/settings/integrations/communication', permission: 'settings.view', access: 'permission' },
   { path: '/settings/integrations/payment', permission: 'settings.view', access: 'permission' },
+
+  // HR Configuration Settings
+  { path: '/settings/hr/departments', permission: 'hr_employees.view', access: 'permission' },
+  { path: '/settings/hr/leave-policy', permission: 'hr_leave.manage', access: 'permission' },
+  { path: '/settings/hr', permission: 'hr_employees.view', access: 'permission' },
 
   { path: '/settings/templates/builder', permission: 'document_templates.view', access: 'permission' },
 

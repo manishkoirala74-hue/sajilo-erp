@@ -51,7 +51,7 @@ const ApprovalControl = React.lazy(() => import('@/pages/settings/company/Approv
 const FiscalYear = React.lazy(() => import('@/pages/settings/finance/FiscalYear'));
 const TaxVatMatrices = React.lazy(() => import('@/pages/settings/finance/TaxVatMatrices'));
 const GLMapping = React.lazy(() => import('@/pages/settings/finance/GLMapping'));
-const PayrollMapping = React.lazy(() => import('@/pages/settings/finance/PayrollMapping'));
+const PayrollMapping = React.lazy(() => import('@/pages/settings/hr/PayrollMapping'));
 const Depreciation = React.lazy(() => import('@/pages/settings/finance/Depreciation'));
 // Operations
 const ReceivableCollections = React.lazy(() => import('@/pages/settings/operations/ReceivableCollections'));
@@ -109,6 +109,13 @@ const DepreciationSchedules = React.lazy(() => import('@/pages/assets/Depreciati
 // HR
 const Employees = React.lazy(() => import('@/pages/hr/Employees'));
 const PayrollRuns = React.lazy(() => import('@/pages/hr/PayrollRuns'));
+const LeaveManagement = React.lazy(() => import('@/pages/hr/LeaveManagement'));
+const AttendanceTracking = React.lazy(() => import('@/pages/hr/AttendanceTracking'));
+const LoansAdvances = React.lazy(() => import('@/pages/hr/LoansAdvances'));
+const HRDocuments = React.lazy(() => import('@/pages/hr/HRDocuments'));
+// HR Settings
+const DepartmentSettings = React.lazy(() => import('@/pages/settings/hr/DepartmentSettings'));
+const LeavePolicySettings = React.lazy(() => import('@/pages/settings/hr/LeavePolicySettings'));
 
 // Manufacturing
 const ManufacturingOrders = React.lazy(() => import('@/pages/manufacturing/ManufacturingOrders'));
@@ -214,7 +221,7 @@ const AuthenticatedApp = () => {
             <Route path="finance/fiscal-year" element={<FiscalYear />} />
             <Route path="finance/tax-vat" element={<TaxVatMatrices />} />
             <Route path="finance/gl-mapping" element={<GLMapping />} />
-            <Route path="finance/payroll-mapping" element={<PayrollMapping />} />
+            
             <Route path="finance/depreciation" element={<Depreciation />} />
             <Route path="finance/period-lock" element={<PeriodLock />} />
             <Route path="finance/costing-method" element={<CostingMethod />} />
@@ -232,6 +239,10 @@ const AuthenticatedApp = () => {
             <Route path="integrations/storage" element={<StorageLimits />} />
             <Route path="integrations/communication" element={<CommunicationChannels />} />
             <Route path="integrations/payment" element={<PaymentGateways />} />
+            {/* HR Configuration Settings */}
+            <Route path="hr/departments" element={<DepartmentSettings />} />
+            <Route path="hr/leave-policy" element={<LeavePolicySettings />} />
+            <Route path="hr/payroll-mapping" element={<PayrollMapping />} />
           </Route>
           <Route path="/settings/templates/builder/:id" element={<TemplateBuilder />} />
           <Route path="/help-support" element={<HelpSupport />} />
@@ -265,7 +276,11 @@ const AuthenticatedApp = () => {
 
           {/* HR */}
           <Route path="/hr/employees" element={<Employees />} />
+          <Route path="/hr/leave" element={<LeaveManagement />} />
+          <Route path="/hr/attendance" element={<AttendanceTracking />} />
           <Route path="/hr/payroll" element={<PayrollRuns />} />
+          <Route path="/hr/loans" element={<LoansAdvances />} />
+          <Route path="/hr/documents" element={<HRDocuments />} />
 
           {/* Manufacturing */}
           <Route path="/manufacturing/orders" element={<ManufacturingOrders />} />
@@ -326,7 +341,10 @@ class GlobalErrorBoundary extends Component {
 import { NumberFormatProvider } from '@/lib/NumberFormatContext';
 import { WorkspaceProvider } from '@/lib/WorkspaceContext';
 
+import { useSyncAuditLogs } from '@/hooks/useSyncAuditLogs';
+
 function App() {
+  useSyncAuditLogs();
   React.useEffect(() => {
     const handleKeyDown = (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'k') {

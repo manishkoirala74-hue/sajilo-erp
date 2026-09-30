@@ -305,7 +305,7 @@ export default function PartnerStatement({ title, mode, initialFromDate, initial
           <div className="table-scroll-container">
             <table className="table-fluid-grid text-base text-left">
               <thead>
-                <tr className="border-y-2 border-border bg-muted/50/50">
+                <tr className="border-y-2 border-border bg-muted/50/50 print:break-inside-avoid print:bg-white print:text-black">
                   <th className="cell-density font-semibold text-slate-500 text-left sticky left-0 bg-slate-100 dark:bg-[#1e293b] z-20 border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">Transaction Details</th>
                   <th className="cell-density font-semibold text-slate-500 text-left w-1/3">Description</th>
                   <th className="cell-density font-semibold text-slate-500 amount-cell uppercase">Debit</th>
@@ -316,7 +316,7 @@ export default function PartnerStatement({ title, mode, initialFromDate, initial
               </thead>
             <tbody className="divide-y divide-slate-100">
               {/* Opening Balance Row */}
-              <tr className="bg-muted/50/30">
+              <tr className="bg-muted/50/30 print:break-inside-avoid print:bg-white print:text-black">
                 <td className="cell-density py-2.5 px-2 text-slate-400 italic sticky left-0 bg-card z-10 border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">
                   <span className="text-[10px] uppercase tracking-widest">{displayDate(filters.fromDate)}</span>
                 </td>
@@ -329,7 +329,7 @@ export default function PartnerStatement({ title, mode, initialFromDate, initial
 
               {/* Transactions */}
               {transactions.map((t, i) => (
-                <tr key={i} className="hover:bg-muted/50/50">
+                <tr key={i} className="hover:bg-muted/50/50 print:break-inside-avoid print:bg-white print:text-black">
                   <td className="cell-density py-2 px-2 whitespace-nowrap sticky left-0 bg-card z-10 border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">
                     <div className="flex flex-col">
                       <span className="text-muted-foreground text-[10px] uppercase tracking-widest">{displayDate(t.date)}{filters.showBsDate && t.bs_date_formatted ? ` | ${t.bs_date_formatted}` : ''}</span>
@@ -353,7 +353,7 @@ export default function PartnerStatement({ title, mode, initialFromDate, initial
               )}
             </tbody>
             <tfoot>
-              <tr className="border-t-2 border-border bg-muted/50 font-bold">
+              <tr className="border-t-2 border-border bg-muted/50 font-bold print:break-inside-avoid print:bg-white print:text-black">
                 <td className="cell-density py-3 px-2 sticky left-0 bg-slate-100 dark:bg-[#1e293b] z-10 border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]"></td>
                 <td className="cell-density py-3 px-2 text-muted-foreground text-right">Closing Balance as of {displayDate(filters.toDate)}:</td>
                 <td className="cell-density py-3 px-2 text-right tabular-nums font-mono text-emerald-700 dark:text-emerald-400">{fmtNPR(summary.debit)}</td>
