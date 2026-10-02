@@ -4,7 +4,7 @@ import { useTheme } from '@/lib/ThemeContext';
 import { sajilo } from '@/api/sajiloClient';
 import {
   TrendingUp, ShoppingCart, Users, FileText, AlertCircle, Clock, ArrowRight,
-  Eye, EyeOff, Building
+  Eye, EyeOff, Building, Landmark, Banknote
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -21,7 +21,8 @@ import {
   useRecentDocumentsQuery,
   useDashboardSummaryQuery,
   useRecentSalesQuery,
-  usePendingApprovalsQuery
+  usePendingApprovalsQuery,
+  useCashBalanceQuery,
 } from '@/hooks/useSajiloQuery';
 import { triggerHaptic } from '@/utils/haptics';
 import { useAmountFormatter } from '@/hooks/useAmountFormatter';
@@ -45,6 +46,9 @@ export default function Dashboard() {
   const { data: summary, isLoading: isLoadingSummary } = useDashboardSummaryQuery(activeCompanyId, startDate, endDate);
   const { data: recentSales = [], isLoading: isLoadingRecentSales } = useRecentSalesQuery();
   const { data: pendingApprovals = [], isLoading: isLoadingApprovals } = usePendingApprovalsQuery();
+  // Decoupled from useDashboardSummaryQuery — lightweight GL-only query with 5-min staleTime.
+  // See useCashBalanceQuery in useSajiloQuery.js and migrations 208–210 for context.
+  const { data: cashData, isLoading: isLoadingCash } = useCashBalanceQuery(activeCompanyId);
 
   const [amountsVisible, setAmountsVisible] = useState(true);
   const { theme } = useTheme();
@@ -180,7 +184,7 @@ export default function Dashboard() {
       </div>
 
       {/* Stats */}
-      <div className="flex overflow-x-auto snap-x snap-mandatory pb-4 -mx-4 px-4 gap-4 md:grid md:grid-cols-2 lg:grid-cols-4 md:gap-4 md:overflow-visible md:pb-0 md:mx-0 md:px-0 scrollbar-none">
+      <div className="flex overflow-x-auto snap-x snap-mandatory pb-4 -mx-4 px-4 gap-4 md:grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 md:gap-4 md:overflow-visible md:pb-0 md:mx-0 md:px-0 scrollbar-none">
         <div className="snap-center shrink-0 w-[85vw] md:w-auto">
           <StatCard
             title="Total Sales Revenue"
@@ -216,6 +220,28 @@ export default function Dashboard() {
             value={summary?.active_customers || 0}
             subtitle="Registered Customers"
             icon={Users}
+            color="blue"
+          />
+        </div>
+        {/* Cash Balance — guarded by isLoadingCash per DEVELOPMENT_CHECKLIST.md §2.
+            Sourced from get_cash_bank_balance RPC (migration 210): fiscal-year-bounded,
+            flag-filtered. BankAccount registration is NOT required for this to populate. */}
+        <div className="snap-center shrink-0 w-[85vw] md:w-auto">
+          <StatCard
+            title="Cash Balance"
+            value={!isLoadingCash ? mask(formatAmountShort(cashData?.cash_balance ?? 0)) : '…'}
+            subtitle={cashData?.fy_start_date ? `Since ${cashData.fy_start_date}` : 'Fiscal year to date'}
+            icon={Banknote}
+            color="emerald"
+          />
+        </div>
+        {/* Bank Balance — same source and guards as Cash Balance card above. */}
+        <div className="snap-center shrink-0 w-[85vw] md:w-auto">
+          <StatCard
+            title="Bank Balance"
+            value={!isLoadingCash ? mask(formatAmountShort(cashData?.bank_balance ?? 0)) : '…'}
+            subtitle={cashData?.fy_start_date ? `Since ${cashData.fy_start_date}` : 'Fiscal year to date'}
+            icon={Landmark}
             color="blue"
           />
         </div>

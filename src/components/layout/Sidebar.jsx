@@ -16,6 +16,7 @@ import { ADMIN_ROLES } from '@/lib/rbac';
 import { canAccessRoute } from '@/lib/permissionResolver';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useModalStore } from '@/store/modalStore';
+import { useLayoutMode } from '@/lib/LayoutModeContext';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 
 import { toast } from 'sonner';
@@ -125,7 +126,7 @@ export const buildNavGroups = (settings) => {
   return groups;
 };
 
-export default function Sidebar({ collapsed: propsCollapsed, onToggle }) {
+export default function Sidebar() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout, activeFiscalYear, activeRole, activeCompany } = useAuth();
@@ -136,24 +137,26 @@ export default function Sidebar({ collapsed: propsCollapsed, onToggle }) {
   const [expandedSubGroups, setExpandedSubGroups] = useState([]);
   const openModal = useModalStore(state => state.openModal);
 
-  // Desktop hover & pin state model
-  const [isPinned, setIsPinned] = useState(false);
+  // Desktop hover, focus & pin state model
+  const [isPinned, setIsPinned] = useState(() => localStorage.getItem('sajilo_sidebar_pinned') === 'true');
   const [isHovered, setIsHovered] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
+  const { documentMode } = useLayoutMode();
   const collapseTimerRef = useRef(null);
-
-  useEffect(() => {
-    const saved = localStorage.getItem('sajilo_sidebar_pinned');
-    if (saved !== null) {
-      setIsPinned(saved === 'true');
-    }
-  }, []);
 
   useEffect(() => {
     localStorage.setItem('sajilo_sidebar_pinned', String(isPinned));
   }, [isPinned]);
 
-  const isExpanded = isPinned || isHovered;
-  const collapsed = !isExpanded;
+  useEffect(() => {
+    return () => {
+      if (collapseTimerRef.current) clearTimeout(collapseTimerRef.current);
+    };
+  }, []);
+
+  const reserved = isPinned && !documentMode;
+  const open = reserved || isHovered || isFocused;
+  const collapsed = !open;
 
   const handleMouseEnter = () => {
     if (collapseTimerRef.current) {
@@ -166,25 +169,47 @@ export default function Sidebar({ collapsed: propsCollapsed, onToggle }) {
   const handleMouseLeave = () => {
     collapseTimerRef.current = setTimeout(() => {
       setIsHovered(false);
+      setIsFocused(false);
     }, 180);
   };
 
-  // Reverse Path Resolution for Deep-Linking
-  useEffect(() => {
-    if (!location.pathname) return;
+  // Reverse Path Resolution for Deep-Linking (Longest Prefix Match)
+  const activePath = useMemo(() => {
+    const path = location.pathname;
+    let best = '';
     navGroups.forEach(group => {
       group.items.forEach(item => {
         if (item.isSubGroup) {
-          if (item.items.some(sub => sub.path === location.pathname)) {
+          item.items.forEach(sub => {
+            if ((sub.path === '/' ? path === '/' : (path === sub.path || path.startsWith(sub.path + '/'))) && sub.path.length > best.length) {
+              best = sub.path;
+            }
+          });
+        } else {
+          if ((item.path === '/' ? path === '/' : (path === item.path || path.startsWith(item.path + '/'))) && item.path.length > best.length) {
+            best = item.path;
+          }
+        }
+      });
+    });
+    return best;
+  }, [location.pathname, navGroups]);
+
+  useEffect(() => {
+    if (!activePath) return;
+    navGroups.forEach(group => {
+      group.items.forEach(item => {
+        if (item.isSubGroup) {
+          if (item.items.some(sub => sub.path === activePath)) {
             setExpandedGroups(prev => Array.from(new Set([...prev, group.label])));
             setExpandedSubGroups(prev => Array.from(new Set([...prev, item.label])));
           }
-        } else if (item.path === location.pathname) {
+        } else if (item.path === activePath) {
           setExpandedGroups(prev => Array.from(new Set([...prev, group.label])));
         }
       });
     });
-  }, [location.pathname, navGroups]);
+  }, [activePath, navGroups]);
 
   // Favorites state
   const [favoritePaths, setFavoritePaths] = useState(() => {
@@ -248,7 +273,7 @@ export default function Sidebar({ collapsed: propsCollapsed, onToggle }) {
     });
   };
 
-  const isActive = (path) => location.pathname === path;
+  const isActive = (path) => activePath === path;
 
   // Flatten all items for favorites lookup
   const allNavItems = useMemo(() => {
@@ -377,14 +402,18 @@ export default function Sidebar({ collapsed: propsCollapsed, onToggle }) {
 
   return (
     <TooltipProvider delayDuration={200}>
-      <div
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
-        className={cn(
-          "hidden md:flex flex-col h-full bg-sidebar transition-all duration-300 border-r border-slate-700/30 shadow-[4px_0_24px_rgba(0,0,0,0.02)] relative z-40 print:hidden",
-          collapsed ? "w-[72px]" : "w-64"
-        )}
-      >
+      <div className={cn("hidden md:block relative shrink-0 h-full print:hidden", reserved ? "w-64" : "w-[72px]")}>
+        <aside
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
+          onFocus={() => setIsFocused(true)}
+          onBlur={e => { if (!e.currentTarget.contains(e.relatedTarget)) setIsFocused(false); }}
+          className={cn(
+            "absolute inset-y-0 left-0 flex flex-col h-full bg-sidebar transition-all duration-300 border-r border-slate-700/30",
+            open ? "w-64" : "w-[72px]",
+            !reserved && (isHovered || isFocused) ? "z-50 shadow-xl" : "z-40"
+          )}
+        >
         {/* Logo & Pin Toggle */}
         <div className="flex items-center h-16 px-4 shrink-0 relative">
           <div className="flex items-center gap-3 w-full">
@@ -501,6 +530,7 @@ export default function Sidebar({ collapsed: propsCollapsed, onToggle }) {
         </nav>
 
 
+        </aside>
       </div>
     </TooltipProvider>
   );

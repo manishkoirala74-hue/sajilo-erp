@@ -778,13 +778,13 @@ export default function FinancialVouchers() {
               </div>
               
               {/* Desktop View */}
-              <div className="hidden md:block border border-border rounded-lg overflow-x-auto">
-                <table className="table-fluid-grid text-sm">
+              <div className="hidden md:block border border-border rounded-lg overflow-visible">
+                <table className="w-full text-sm table-fixed">
                   <thead className="cell-density bg-muted/50"><tr>
-                    <th className="cell-density text-left w-2/5">Account</th>
-                    {form.voucher_type === 'Journal' && <th className="cell-density text-right w-1/6">Debit</th>}
-                    {form.voucher_type === 'Journal' && <th className="cell-density text-right w-1/6">Credit</th>}
-                    {form.voucher_type !== 'Journal' && <th className="cell-density text-right w-1/5">Amount</th>}
+                    <th className="cell-density text-left w-[40%]">Account</th>
+                    {form.voucher_type === 'Journal' && <th className="cell-density text-right w-[15%]">Debit</th>}
+                    {form.voucher_type === 'Journal' && <th className="cell-density text-right w-[15%]">Credit</th>}
+                    {form.voucher_type !== 'Journal' && <th className="cell-density text-right w-[20%]">Amount</th>}
                     <th className="cell-density text-left">Line Narration</th>
                     <th className="cell-density w-10"></th>
                   </tr></thead>
@@ -1032,7 +1032,7 @@ export default function FinancialVouchers() {
             
             {loadingBills ? <div className="p-4 text-center">Loading...</div> : (
               <div className="border border-border rounded-lg overflow-hidden">
-                <table className="table-fluid-grid text-sm">
+                <table className="w-full text-sm table-fixed min-w-[640px]">
                   <thead className="cell-density bg-muted/50">
                     <tr>
                       <th className="cell-density text-left">Date</th>
@@ -1124,7 +1124,7 @@ export default function FinancialVouchers() {
                 </div>
                 <div>
                   <p className="font-medium mb-2">Ledger Entries</p>
-                  <table className="table-fluid-grid border rounded-lg overflow-hidden text-xs">
+                  <table className="w-full table-fixed border rounded-lg overflow-hidden text-xs">
                     <thead className="cell-density bg-muted/50"><tr>
                       <th className="cell-density text-left">Account</th>
                       <th className="cell-density text-left">Type</th>

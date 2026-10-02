@@ -1,4 +1,4 @@
-import { Bell, ChevronDown, LogOut, User, Menu, Sun, Moon } from 'lucide-react';
+import { Bell, ChevronDown, LogOut, User, Menu, Sun, Moon, AlertTriangle } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
 import { useDateFormat } from '@/lib/DateFormatContext';
 import { useTheme } from '@/lib/ThemeContext';
@@ -8,14 +8,18 @@ import {
   DropdownMenuSeparator, DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu';
 import { CompanySwitcher } from '@/components/CompanySwitcher';
+import { Link } from 'react-router-dom';
 
 export default function Topbar({ pageTitle, onMenuClick }) {
-  const { user, logout } = useAuth();
+  const { user, logout, activeFiscalYear, fiscalYears, fyIsLoading } = useAuth();
   const { dateFormat, toggleDateFormat, displayBsDate } = useDateFormat();
   const { theme, resolvedTheme, toggleTheme } = useTheme();
 
+  const hasYearsButNoneOpen = !fyIsLoading && fiscalYears && fiscalYears.length > 0 && !activeFiscalYear;
+
   return (
-    <header className="sticky top-0 z-30 h-auto min-h-[64px] pt-[env(safe-area-inset-top,16px)] pb-2 bg-card border-b border-border flex items-center justify-between px-4 md:px-6 shrink-0 transition-colors duration-200 print:hidden">
+    <div className="flex flex-col w-full z-30 sticky top-0 print:hidden">
+      <header className="h-auto min-h-[64px] pt-[env(safe-area-inset-top,16px)] pb-2 bg-card border-b border-border flex items-center justify-between px-4 md:px-6 shrink-0 transition-colors duration-200">
       <div className="flex items-center gap-3 md:gap-4">
         <button onClick={onMenuClick} className="md:hidden p-2 -ml-2 text-muted-foreground hover:bg-muted rounded-full touch-target">
           <Menu className="w-5 h-5" />
@@ -83,6 +87,22 @@ export default function Topbar({ pageTitle, onMenuClick }) {
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
-    </header>
+      </header>
+
+      {hasYearsButNoneOpen && (
+        <div className="w-full bg-amber-500 text-white text-xs font-semibold px-4 py-2 flex items-center justify-between gap-3 shadow-md">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 shrink-0" />
+            <span>No Active Fiscal Year — transaction posting is disabled until an administrator re-opens a fiscal year.</span>
+          </div>
+          <Link
+            to="/settings/finance/fiscal-year"
+            className="underline underline-offset-2 whitespace-nowrap hover:text-white/80"
+          >
+            Go to Fiscal Calendar &rarr;
+          </Link>
+        </div>
+      )}
+    </div>
   );
 }

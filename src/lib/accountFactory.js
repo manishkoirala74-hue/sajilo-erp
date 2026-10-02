@@ -17,8 +17,14 @@ export const ACCOUNT_METADATA = {
 /**
  * Generates an automated sub-ledger for partners, taxes, and bank accounts.
  * Validates metadata rigorously and fetches a unique sequential code via an RPC lock.
+ *
+ * @param {boolean} [isCashAccount=false] - Set true for Cash-type sub-ledgers (e.g. Petty Cash).
+ *   Persists is_cash_account = true on the ChartOfAccount row so the dashboard RPC
+ *   get_cash_bank_balance can identify it without brittle ILIKE heuristics.
+ * @param {boolean} [isBankAccount=false] - Set true for Bank-type sub-ledgers.
+ *   Persists is_bank_account = true on the ChartOfAccount row.
  */
-export async function createSubLedger({ name, parentGroupId, parentGroupName, accountType, accountSubtype = '', openingBalance = 0, description = '' }) {
+export async function createSubLedger({ name, parentGroupId, parentGroupName, accountType, accountSubtype = '', openingBalance = 0, description = '', isCashAccount = false, isBankAccount = false }) {
   const metadata = ACCOUNT_METADATA[accountType];
   if (!metadata) {
     throw new Error(`Invalid accountType '${accountType}'. No strict metadata mapping found.`);
@@ -48,7 +54,11 @@ export async function createSubLedger({ name, parentGroupId, parentGroupName, ac
     is_active: true,
     is_system_account: false,
     current_balance: openingBalance,
-    description: description
+    description: description,
+    // Classification flags for the dashboard cash/bank balance RPC.
+    // These replace brittle ILIKE text-matching — see migrations 208–210.
+    is_cash_account: isCashAccount,
+    is_bank_account: isBankAccount,
   };
 
   const newAccount = await sajilo.entities.ChartOfAccount.create(payload);

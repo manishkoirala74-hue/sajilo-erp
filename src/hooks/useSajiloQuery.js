@@ -160,6 +160,48 @@ export function usePendingApprovalsQuery(companyId) {
   });
 }
 
+/**
+ * Fetches live Cash and Bank balances from the dedicated lightweight RPC
+ * get_cash_bank_balance(), which is fiscal-year-bounded and uses strict
+ * is_cash_account / is_bank_account flags — not ILIKE heuristics.
+ *
+ * Decoupled from useDashboardSummaryQuery intentionally:
+ *   - useDashboardSummaryQuery runs heavy Sales/Purchases/Inventory aggregations.
+ *   - Adding 'GeneralLedgerJournal' to that key would re-trigger those expensive
+ *     aggregations on every posted voucher (per feedback §3).
+ *   - This hook only touches GeneralLedgerLine + GeneralLedgerJournal + ChartOfAccount
+ *     + FiscalYear, so its invalidation scope is narrow and its payload is tiny.
+ *
+ * staleTime: 5 minutes — acceptable staleness for a balance-sheet position
+ * on an operational dashboard. Not a real-time ticker.
+ */
+export function useCashBalanceQuery(companyId) {
+  const activeCompany = companyId || sajilo.getCompanyId();
+  const today = new Date().toISOString().slice(0, 10);
+
+  return useQuery({
+    // Entity-driven query key per DEVELOPMENT_CHECKLIST.md §2.
+    // Includes all DB entities touched by the RPC so predicate-based
+    // cache invalidation correctly busts this cache when relevant data changes.
+    queryKey: [
+      'company', activeCompany,
+      'GeneralLedgerLine', 'ChartOfAccount', 'FiscalYear',
+      'cashBankBalance',
+    ],
+    queryFn: async () => {
+      const { data, error } = await sajilo.auth.supabase.rpc('get_cash_bank_balance', {
+        p_company_id: activeCompany,
+        p_as_of_date: today,
+      });
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!activeCompany,
+    staleTime: 5 * 60 * 1000,   // 5 minutes — avoids DB hammering during peak entry
+    refetchOnWindowFocus: false, // balance doesn't need refetch on every tab switch
+  });
+}
+
 // --- MUTATIONS ---
 
 export function useItemMutation(companyId) {

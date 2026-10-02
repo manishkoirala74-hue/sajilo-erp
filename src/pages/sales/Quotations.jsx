@@ -309,6 +309,7 @@ export default function Quotations() {
         actionLabel="New Quotation"
         actionIcon={Plus}
         actionDisabled={!activeFiscalYear}
+        disabledReason="Posting disabled: No active fiscal year."
       />
 
       {/* Status Tabs */}

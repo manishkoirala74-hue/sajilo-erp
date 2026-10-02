@@ -56,6 +56,17 @@ export default function GeneralLedger() {
     }
   }, [activeFiscalYear]);
 
+  if (!activeFiscalYear) {
+    return (
+      <div className="p-8 text-center bg-muted/10 border border-dashed border-border rounded-xl mt-8">
+        <h3 className="text-lg font-semibold text-foreground">No Active Fiscal Year</h3>
+        <p className="text-sm text-muted-foreground mt-1 max-w-md mx-auto">
+          General Ledger analysis requires an active fiscal period. An administrator must Re-Open a fiscal year in the settings.
+        </p>
+      </div>
+    );
+  }
+
   const fetchData = () => {
     setLoading(true);
     Promise.all([

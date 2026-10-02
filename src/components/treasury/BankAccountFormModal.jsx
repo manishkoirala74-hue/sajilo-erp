@@ -143,7 +143,11 @@ export default function BankAccountFormModal({ account, onSave, onClose }) {
         accountType: isLiability ? 'Liability' : 'Asset',
         accountSubtype: isLiability ? 'Current Liability' : 'Current Asset',
         openingBalance: form.opening_balance || 0,
-        description: `Auto-created for ${form.account_type} account: ${form.account_name.trim()}`
+        description: `Auto-created for ${form.account_type} account: ${form.account_name.trim()}`,
+        // Classification flags — stored on the GL account row so the dashboard
+        // RPC get_cash_bank_balance can resolve balances without ILIKE heuristics.
+        isCashAccount: form.account_type === 'Cash',
+        isBankAccount: form.account_type === 'Bank',
       });
 
       await onSave({ ...form, gl_account_id: newGLAccount.id, gl_account_name: newGLAccount.account_name });

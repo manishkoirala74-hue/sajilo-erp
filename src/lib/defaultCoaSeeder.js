@@ -128,6 +128,12 @@ export async function seedDefaultChartOfAccounts() {
         is_system_account: true,
         current_balance: 0,
         description: 'System Default Account',
+        // Classification flags for the dashboard cash/bank balance RPC (migrations 208-210).
+        // is_cash_account: only the Cash in Hand ledger (1110) is a postable cash account.
+        // is_bank_account: false for all seeded accounts; individual bank sub-ledgers created
+        //   via BankAccountFormModal → createSubLedger() set this flag themselves.
+        is_cash_account: acc.code === '1110',
+        is_bank_account: false,
       };
 
       if (acc.parent && codeToId[acc.parent]) {

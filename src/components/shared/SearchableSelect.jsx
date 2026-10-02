@@ -1,37 +1,45 @@
-import { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { ChevronDown, Check, Search, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
+
+const EMPTY = [];
+
+const lookupLabel = (options, groups, value) => {
+  const allFlat = groups ? groups.flatMap(g => g.options) : options;
+  const selected = allFlat.find(o => o.value === value);
+  return selected ? selected.label : null;
+};
 
 /**
  * SearchableSelect — a drop-in replacement for <Select> that adds live filtering.
  * Uses Popover to render the dropdown in a Portal, preventing overflow clipping.
  */
-export default function SearchableSelect({
+const SearchableSelect = React.memo(React.forwardRef(function SearchableSelect({
   value,
+  valueLabel,
   onValueChange,
   onChange,
-  options = [],
+  options = EMPTY,
   groups = null,
   placeholder = 'Select…',
   className,
   disabled = false,
   onCreateNew,
-  createNewText = "Create New",
-}) {
+  createNewText = 'Create New',
+  onCommit,
+  onKeyDown,
+  ...domProps
+}, ref) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [activeIndex, setActiveIndex] = useState(-1);
   const inputRef = useRef(null);
   const listRef = useRef(null);
+  const committed = useRef(false);
 
-  // Focus search input when opened
-  useEffect(() => {
-    if (open) {
-      setTimeout(() => inputRef.current?.focus(), 30);
-      setActiveIndex(-1);
-    }
-  }, [open]);
+  // Memoized fallback if valueLabel isn't provided
+  const label = valueLabel ?? lookupLabel(options, groups, value);
 
   // Reset active index when search changes
   useEffect(() => {
@@ -42,7 +50,8 @@ export default function SearchableSelect({
     opts.filter(o =>
       !search ||
       o.label?.toLowerCase().includes(search.toLowerCase()) ||
-      o.sub?.toLowerCase().includes(search.toLowerCase())
+      o.sub?.toLowerCase().includes(search.toLowerCase()) ||
+      o.code?.toLowerCase().includes(search.toLowerCase())
     );
 
   // Flat array of currently visible options for keyboard navigation
@@ -75,16 +84,10 @@ export default function SearchableSelect({
     }
   };
 
-  // Resolve display label
-  const allFlat = groups
-    ? groups.flatMap(g => g.options)
-    : options;
-  const selected = allFlat.find(o => o.value === value);
-  const displayLabel = selected ? selected.label : null;
-
   const handleSelect = (val) => {
     if (onValueChange) onValueChange(val);
     if (onChange) onChange(val);
+    committed.current = true;
     setOpen(false);
     setSearch('');
   };
@@ -109,13 +112,17 @@ export default function SearchableSelect({
         )}
       >
         <Check className={cn('w-3.5 h-3.5 shrink-0 mt-1', isMatched ? 'opacity-100 text-primary' : 'opacity-0')} />
-        <div className="flex flex-col items-start space-y-0.5">
-          <span className="text-sm font-medium text-stone-900 dark:text-stone-100 whitespace-normal break-words leading-tight">
+        <div className="flex flex-col items-start space-y-0.5 overflow-hidden">
+          <span className="text-sm font-medium text-stone-900 dark:text-stone-100 whitespace-normal break-words leading-tight w-full">
             {opt.label}
           </span>
-          <span className="text-[11px] text-stone-400 dark:text-stone-500 font-mono">
-            Code: {opt.code || opt.sub || 'N/A'} • Unit: {opt.unit || 'N/A'}
-          </span>
+          {(opt.code || opt.sub || opt.unit) && (
+            <span className="text-[11px] text-stone-400 dark:text-stone-500 font-mono w-full truncate">
+              {opt.code || opt.sub ? `Code: ${opt.code || opt.sub}` : ''} 
+              {(opt.code || opt.sub) && opt.unit ? ' • ' : ''}
+              {opt.unit ? `Unit: ${opt.unit}` : ''}
+            </span>
+          )}
         </div>
       </button>
     );
@@ -125,17 +132,28 @@ export default function SearchableSelect({
     <Popover open={open} onOpenChange={o => { setOpen(o); if (!o) setSearch(''); }}>
       <PopoverTrigger asChild>
         <button
+          ref={ref}
           type="button"
           disabled={disabled}
+          {...domProps}
           className={cn(
             'flex h-11 sm:h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-transparent px-3 py-2 text-base sm:text-sm shadow-sm',
             'focus:outline-none focus:ring-1 focus:ring-ring',
             'disabled:cursor-not-allowed disabled:opacity-50',
-            !displayLabel && 'text-muted-foreground',
+            !label && 'text-muted-foreground',
             className
           )}
+          onKeyDown={e => {
+            if (!open && e.key.length === 1 && e.key !== ' ' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+              e.preventDefault();
+              setSearch(e.key);
+              setOpen(true);
+              return;
+            }
+            onKeyDown?.(e);
+          }}
         >
-          <span className="truncate">{displayLabel || placeholder}</span>
+          <span className="truncate">{label || placeholder}</span>
           <ChevronDown className={cn('h-4 w-4 opacity-50 shrink-0 transition-transform', open && 'rotate-180')} />
         </button>
       </PopoverTrigger>
@@ -143,6 +161,19 @@ export default function SearchableSelect({
       <PopoverContent 
         className="p-0 z-[100] w-full min-w-[320px] md:min-w-[450px] max-w-[600px]" 
         align="start"
+        onOpenAutoFocus={e => { 
+          e.preventDefault(); 
+          inputRef.current?.focus(); 
+          const len = inputRef.current?.value.length;
+          if (len) inputRef.current?.setSelectionRange(len, len);
+        }}
+        onCloseAutoFocus={e => { 
+          if (committed.current) { 
+            e.preventDefault(); 
+            committed.current = false; 
+            onCommit?.(); 
+          } 
+        }}
       >
         {/* Search box */}
         <div className="flex items-center gap-2 px-2 py-1.5 border-b bg-muted/30">
@@ -173,7 +204,12 @@ export default function SearchableSelect({
           ) : (
             flatVisibleOptions.length === 0
               ? <p className="px-3 py-4 text-sm text-center text-muted-foreground">No results</p>
-              : filterOpts(options).map(renderOption)
+              : flatVisibleOptions.slice(0, 100).map(renderOption)
+          )}
+          {flatVisibleOptions.length > 100 && (
+            <p className="px-3 py-2 text-xs text-center text-muted-foreground border-t mt-1 bg-muted/20">
+              Showing first 100 results. Type to narrow search.
+            </p>
           )}
         </div>
         {onCreateNew && (
@@ -194,4 +230,6 @@ export default function SearchableSelect({
       </PopoverContent>
     </Popover>
   );
-}
+}));
+
+export default SearchableSelect;

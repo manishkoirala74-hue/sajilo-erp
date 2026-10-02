@@ -94,7 +94,7 @@
   }
   
   .table-fluid-grid {
-    @apply w-full min-w-max;
+    @apply w-full;
   }
   
   .cell-density {
@@ -202,5 +202,12 @@ input[type='number'] {
   }
   .dark .scrollbar-hide-default:hover::-webkit-scrollbar-thumb {
     background-color: rgba(255, 255, 255, 0.25);
+  }
+}
+
+@media print {
+  .print-exact-colors {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
 }

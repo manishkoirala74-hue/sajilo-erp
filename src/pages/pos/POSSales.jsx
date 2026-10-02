@@ -344,8 +344,8 @@ export default function POSSales() {
 
       <div className="px-4 pb-4 shrink-0">
         <Button className="w-full mt-2 h-14 text-lg font-bold shadow-lg rounded-xl"
-          onClick={() => processSale()} disabled={cart.length === 0 || processing || isMissingGL}>
-          {processing ? 'Processing...' : 'Complete Sale'}
+          onClick={() => processSale()} disabled={cart.length === 0 || processing || isMissingGL || !activeFiscalYear}>
+          {!activeFiscalYear ? 'No Active Fiscal Year' : (processing ? 'Processing...' : 'Complete Sale')}
         </Button>
       </div>
     </>

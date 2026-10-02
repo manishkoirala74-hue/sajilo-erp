@@ -39,26 +39,39 @@ export default function BankAccounts() {
 
   const fetchAccounts = async () => {
     setLoading(true);
-    // 1. Fetch mapped BankAccounts and raw COA Cash/Bank accounts
+    // 1. Fetch mapped BankAccounts and COA accounts flagged as cash or bank.
+    //    NOTE: We filter on is_cash_account / is_bank_account (set by migrations
+    //    208–211) rather than account_type IN ('Cash','Bank'). The ChartOfAccount
+    //    account_type column stores the double-entry classification ('Asset',
+    //    'Liability', etc.) — 'Cash in Hand' has account_type = 'Asset', so the
+    //    old filter silently excluded it. The boolean flags are the authoritative
+    //    treasury classification and work regardless of the accounting type.
     const [data, coaData] = await Promise.all([
       sajilo.entities.BankAccount.list('-created_date', 500),
-      supabase.from('ChartOfAccount').select('id, account_name, account_type, current_balance').in('account_type', ['Cash', 'Bank'])
+      supabase
+        .from('ChartOfAccount')
+        .select('id, account_name, account_type, is_cash_account, is_bank_account, current_balance')
+        .or('is_cash_account.eq.true,is_bank_account.eq.true')
     ]);
 
     let mergedAccounts = [...data];
     const mappedGlIds = new Set(data.map(a => a.gl_account_id).filter(Boolean));
 
-    // 2. Auto-include any Cash/Bank COA accounts that aren't mapped yet
+    // 2. Auto-include any flagged COA accounts not yet registered as a BankAccount row.
     if (coaData && coaData.data) {
       coaData.data.forEach(coa => {
         if (!mappedGlIds.has(coa.id)) {
+          // Derive the treasury type from the deterministic flags — do NOT use
+          // coa.account_type here, which is the double-entry type ('Asset'), not
+          // the treasury type ('Cash'/'Bank') the page groups and totals on.
+          const treasuryType = coa.is_cash_account ? 'Cash' : 'Bank';
           mergedAccounts.push({
-            id: coa.id, // using COA id as virtual ID
+            id: coa.id,         // using COA id as virtual ID
             account_name: coa.account_name,
-            account_type: coa.account_type,
+            account_type: treasuryType,
             gl_account_id: coa.id,
             is_active: true,
-            is_virtual: true // flag so we know it's not a real BankAccount record
+            is_virtual: true    // flag so we know it's not a real BankAccount record
           });
         }
       });

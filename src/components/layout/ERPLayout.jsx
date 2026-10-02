@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { cn } from '@/lib/utils';
 import DomainSkeletonLoader from './DomainSkeletonLoader';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
@@ -38,31 +39,23 @@ const pageTitles = {
   '/reports': 'Reports',
 };
 
+import { LayoutModeContext } from '@/lib/LayoutModeContext';
+
 export default function ERPLayout() {
-  const [collapsed, setCollapsed] = useState(typeof window !== 'undefined' ? window.innerWidth < 1024 : false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isMobileFabOpen, setIsMobileFabOpen] = useState(false);
+  const [documentMode, setDocumentMode] = useState(false);
 
-  useEffect(() => {
-    const handleResize = () => {
-      if (window.innerWidth >= 768 && window.innerWidth < 1024) {
-        setCollapsed(true);
-      } else if (window.innerWidth >= 1024) {
-        setCollapsed(false);
-      }
-    };
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
   const location = useLocation();
   const title = pageTitles[location.pathname] || 'Sajilo ERP';
   const navigate = useNavigate();
   const { activeFiscalYear, activeCompany, fiscalYears, fyIsError, fyError, fyIsLoading, fyIsFetching, isSwitchingCompany, user, activeRole } = useAuth();
 
   return (
-    <div className="flex h-screen print:h-auto overflow-hidden print:overflow-visible bg-background">
+    <LayoutModeContext.Provider value={{ documentMode, setDocumentMode }}>
+    <div className="flex h-dvh print:h-auto overflow-hidden print:overflow-visible bg-background">
       <div className="print:hidden">
-        <Sidebar collapsed={collapsed} onToggle={() => setCollapsed(c => !c)} />
+        <Sidebar />
       </div>
       <div className="flex flex-col flex-1 overflow-hidden print:overflow-visible relative">
         <div className="print:hidden">
@@ -123,7 +116,7 @@ export default function ERPLayout() {
         )}
 
         <React.Suspense fallback={<DomainSkeletonLoader />}>
-          <main className="flex-1 overflow-y-auto print:overflow-visible p-4 md:p-6 pb-20 md:pb-6 animate-fade-in">
+          <main className={cn('flex-1 overflow-y-auto print:overflow-visible animate-fade-in', documentMode ? 'p-0 pb-20 md:pb-0' : 'p-4 md:p-6 pb-20 md:pb-6')}>
             <Outlet />
           </main>
         </React.Suspense>
@@ -145,5 +138,6 @@ export default function ERPLayout() {
         onClose={() => setIsMobileMenuOpen(false)} 
       />
     </div>
+    </LayoutModeContext.Provider>
   );
 }

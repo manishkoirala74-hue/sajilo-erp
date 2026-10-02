@@ -78,6 +78,7 @@ const SecurityPolicy = React.lazy(() => import('@/pages/settings/company/Securit
 const ApprovalQueuePage = React.lazy(() => import('@/pages/settings/company/ApprovalQueue'));
 
 const Reports = React.lazy(() => import('@/pages/Reports.jsx'));
+const DayBookReport = React.lazy(() => import('@/pages/reports/DayBookReport'));
 const EmployeeReceivableReport = React.lazy(() => import('@/pages/reports/EmployeeReceivableReport'));
 const EmployeePayableReport = React.lazy(() => import('@/pages/reports/EmployeePayableReport'));
 const UserActivityLog = React.lazy(() => import('@/pages/reports/UserActivityLog'));
@@ -249,6 +250,7 @@ const AuthenticatedApp = () => {
           <Route path="/email/compose" element={<ComposeEmail />} />
           {/* Reports */}
           <Route path="/reports" element={<Reports />} />
+          <Route path="/reports/accounting/day-book" element={<DayBookReport />} />
           <Route path="/reports/employee-receivables" element={<EmployeeReceivableReport />} />
           <Route path="/reports/employee-payables" element={<EmployeePayableReport />} />
           <Route path="/reports/communication-logs" element={<CommunicationLogs />} />
@@ -343,6 +345,8 @@ import { WorkspaceProvider } from '@/lib/WorkspaceContext';
 
 import { useSyncAuditLogs } from '@/hooks/useSyncAuditLogs';
 
+const router = createBrowserRouter([{ path: '*', element: <><AuthenticatedApp /><GlobalVoucherDrawer /><ModalRegistry /></> }]);
+
 function App() {
   useSyncAuditLogs();
   React.useEffect(() => {
@@ -364,7 +368,7 @@ function App() {
             <WorkspaceProvider>
               <DateFormatProvider>
                 <NumberFormatProvider>
-                  <RouterProvider router={createBrowserRouter([{ path: '*', element: <><AuthenticatedApp /><GlobalVoucherDrawer /><ModalRegistry /></> }])} />
+                  <RouterProvider router={router} />
                   <Toaster />
                   <SonnerToaster position="top-right" richColors />
                 </NumberFormatProvider>
