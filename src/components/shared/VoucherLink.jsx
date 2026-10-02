@@ -1,17 +1,34 @@
 import { useGlobalVoucherDrawer } from '@/lib/GlobalVoucherContext';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
 
+// ---------------------------------------------------------------------------
+// Sajilo Voucher Number Formats (examples):
+//   Simple    : SI-2026-001, PI-2026-012, JV-202611-12
+//   Compound  : PV-FS 2083.084-00019  (prefix "PV-FS", space, fiscal YYYY.NNN, dash, seq)
+//   Suffixed  : MYPR-2026-123-REV
+//
+// The regex must capture the ENTIRE token including embedded spaces and dots
+// that belong to the Sajilo fiscal-period notation.
+//
+// Strategy: match a known prefix segment (up to two alpha parts separated by
+// hyphen or space), followed by the numeric sequence which may contain dots.
+// ---------------------------------------------------------------------------
+
+// Single-voucher guard used inside VoucherLink
+const VOUCHER_REGEX_SINGLE =
+  /^[A-Z]{2,8}(?:-[A-Z]{1,6})?[\s\-]?\d{2,6}(?:[.\-]\d{2,6}){0,2}-\d{2,8}(?:-[A-Z0-9]{1,10})?$/i;
+
+// Splitter used inside VoucherTextLinkifier to extract voucher tokens from prose.
+const VOUCHER_REGEX_SPLIT =
+  /([A-Z]{2,8}(?:-[A-Z]{1,6})?[\s\-]?\d{2,6}(?:[.\-]\d{2,6}){0,2}-\d{2,8}(?:-[A-Z0-9]{1,10})?)/gi;
+
 export default function VoucherLink({ voucherNumber, children }) {
   const { openVoucher } = useGlobalVoucherDrawer();
   const text = children || voucherNumber;
   if (!voucherNumber) return <span>{text}</span>;
 
-  const vNumStr = String(voucherNumber).toUpperCase().trim();
-  // Match any standard voucher pattern (e.g. SI-2026-001, MYPR-2026-123-REV, JV-202611-12)
-  // [2-8 uppercase alphanumeric] + hyphen + [4-8 digit year/date] + hyphen + [1-6 digits] + optional suffix
-  // Wait, some vouchers might be INV-001. So \d+ after hyphen.
-  // Actually, let's just do: 2 to 8 alphanumeric, hyphen, then digits (at least 3), optionally more hyphens and letters/digits
-  const isVoucher = /^[A-Z0-9]{2,8}-\d{3,}/.test(vNumStr);
+  const vNumStr = String(voucherNumber).trim();
+  const isVoucher = VOUCHER_REGEX_SINGLE.test(vNumStr);
   if (!isVoucher) return <span>{text}</span>;
 
   return (
@@ -39,23 +56,23 @@ export default function VoucherLink({ voucherNumber, children }) {
 export function VoucherTextLinkifier({ text }) {
   if (!text) return null;
   const strText = String(text);
-  
-  // Natively matches anything looking like a voucher: Prefix(2-8 chars)-Date(4-8 chars)-Number(1-6 chars)[-Suffix]
-  // Fallback to simpler Prefix-Number if it doesn't have a date part
-  // Matches: SI-2026-001, PI-2026-012-REV, INV-1234, MYPREFIX-2025-0001
-  const regex = /([A-Z0-9]{2,8}-\d{3,}(?:-[A-Z0-9]+)?)/gi;
-  
-  const parts = strText.split(regex);
+
+  // Split the input on any voucher-like token (handles spaces + dots in Sajilo format)
+  const parts = strText.split(VOUCHER_REGEX_SPLIT);
+
   return (
     <>
       {parts.map((part, i) => {
-        if (part.match(regex)) {
+        if (VOUCHER_REGEX_SPLIT.test(part)) {
+          // Reset lastIndex after stateful global regex test
+          VOUCHER_REGEX_SPLIT.lastIndex = 0;
           return (
             <VoucherLink key={i} voucherNumber={part}>
               <span className="cursor-pointer text-primary hover:underline">{part}</span>
             </VoucherLink>
           );
         }
+        VOUCHER_REGEX_SPLIT.lastIndex = 0;
         return <span key={i}>{part}</span>;
       })}
     </>

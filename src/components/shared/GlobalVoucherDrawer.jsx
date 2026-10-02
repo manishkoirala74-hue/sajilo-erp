@@ -160,7 +160,7 @@ export default function GlobalVoucherDrawer() {
         }
 
         if (!headers || !headers.length) {
-          throw new Error(`Voucher '${cleanVoucherNumber}' not found in database module '${entityName}'.`);
+          throw new Error(`Voucher '${cleanVoucherNumber}' not found${entityName ? ` in database module '${entityName}'` : ' in general ledger'}.`);
         }
 
         const doc = headers[0];

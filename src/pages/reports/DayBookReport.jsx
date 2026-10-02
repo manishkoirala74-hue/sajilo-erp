@@ -7,7 +7,7 @@ import { format } from 'date-fns';
 import { ArrowLeft, BookOpen, Printer, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { BSDatePicker } from '@/components/reports/ReportFilterBar';
-import { VoucherTextLinkifier } from '@/components/shared/VoucherLink';
+import VoucherLink from '@/components/shared/VoucherLink';
 import { toast } from 'sonner';
 
 const VOUCHER_TYPE_ABBR = {
@@ -176,7 +176,7 @@ export default function DayBookReport() {
                       <td className="px-3 py-1.5 sticky left-0 bg-card z-10">
                         {left && <>
                           <p className="font-medium truncate max-w-[200px]">{left?.account_name || ''}</p>
-                          <p className="text-[10px] text-muted-foreground">(<VoucherTextLinkifier text={`No: ${left?.voucher_number || ''}`} />)</p>
+                          <p className="text-[10px] text-muted-foreground">(No: <VoucherLink voucherNumber={left?.voucher_number}>{left?.voucher_number}</VoucherLink>)</p>
                         </>}
                       </td>
                       <td className="px-3 py-1.5 text-muted-foreground">{left ? (VOUCHER_TYPE_ABBR[left.voucher_type] || left.voucher_type) : ''}</td>
@@ -187,7 +187,7 @@ export default function DayBookReport() {
                       <td className="px-3 py-1.5">
                         {right && <>
                           <p className="font-medium truncate max-w-[200px]">{right?.account_name || ''}</p>
-                          <p className="text-[10px] text-muted-foreground">(<VoucherTextLinkifier text={`No: ${right?.voucher_number || ''}`} />)</p>
+                          <p className="text-[10px] text-muted-foreground">(No: <VoucherLink voucherNumber={right?.voucher_number}>{right?.voucher_number}</VoucherLink>)</p>
                         </>}
                       </td>
                       <td className="px-3 py-1.5 text-muted-foreground">{right ? (VOUCHER_TYPE_ABBR[right.voucher_type] || right.voucher_type) : ''}</td>

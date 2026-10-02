@@ -10,7 +10,7 @@ import DateInput from '@/components/shared/DateInput';
 import { cn } from '@/lib/utils';
 import JournalEntryModal from '@/components/accounting/JournalEntryModal';
 import JournalDetailDrawer from '@/components/accounting/JournalDetailDrawer';
-import { VoucherTextLinkifier } from '@/components/shared/VoucherLink';
+import VoucherLink, { VoucherTextLinkifier } from '@/components/shared/VoucherLink';
 
 const MODULE_COLORS = {
   Manufacturing: 'bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-400',
@@ -148,6 +148,7 @@ export default function GeneralLedger() {
             <thead className="cell-density bg-muted/30 border-b border-border">
               <tr>
                 <th className="cell-density text-left  text-xs font-semibold text-muted-foreground w-28">Date</th>
+                <th className="cell-density text-left  text-xs font-semibold text-muted-foreground w-36">Voucher #</th>
                 <th className="cell-density text-left  text-xs font-semibold text-muted-foreground">Description</th>
                 <th className="cell-density text-left  text-xs font-semibold text-muted-foreground w-32">Module</th>
                 <th className="cell-density text-left  text-xs font-semibold text-muted-foreground w-40">Source Document</th>
@@ -161,15 +162,18 @@ export default function GeneralLedger() {
             <tbody className="divide-y divide-border">
               {loading ? (
                 Array(6).fill(0).map((_, i) => (
-                  <tr key={i}>{Array(9).fill(0).map((__, j) => <td key={j} className="cell-density "><div className="h-4 bg-muted rounded animate-pulse" /></td>)}</tr>
+                  <tr key={i}>{Array(10).fill(0).map((__, j) => <td key={j} className="cell-density "><div className="h-4 bg-muted rounded animate-pulse" /></td>)}</tr>
                 ))
               ) : filtered.length === 0 ? (
-                <tr><td colSpan={9} className="cell-density text-center py-12 text-muted-foreground">No journal entries found</td></tr>
+                <tr><td colSpan={10} className="cell-density text-center py-12 text-muted-foreground">No journal entries found</td></tr>
               ) : filtered.map(j => {
                 const balanced = Math.abs((j.total_debit || 0) - (j.total_credit || 0)) < 0.001;
                 return (
                   <tr key={j.id} className="hover:bg-muted/20 cursor-pointer transition-colors" onClick={() => setSelectedJournal(j)}>
                     <td className="cell-density text-xs font-mono text-muted-foreground">{formatDate(j.entry_date)}</td>
+                    <td className="cell-density text-xs font-mono" onClick={e => e.stopPropagation()}>
+                      <VoucherLink voucherNumber={j.voucher_no}>{j.voucher_no || '—'}</VoucherLink>
+                    </td>
                     <td className="cell-density font-medium max-w-xs">
                       <p className="truncate" onClick={e => e.stopPropagation()}><VoucherTextLinkifier text={j.description} /></p>
                       {j.notes && <p className="text-xs text-muted-foreground truncate" onClick={e => e.stopPropagation()}><VoucherTextLinkifier text={j.notes} /></p>}

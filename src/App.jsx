@@ -351,7 +351,7 @@ function App() {
   useSyncAuditLogs();
   React.useEffect(() => {
     const handleKeyDown = (e) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
         useModalStore.getState().openModal('COMMAND_PALETTE');
       }
