@@ -1,5 +1,8 @@
-import { useState, useEffect } from 'react';
-import { sajilo, supabase } from '@/api/sajiloClient';
+import { useState } from 'react';
+import { sajilo } from '@/api/sajiloClient';
+import { useAuth } from '@/lib/AuthContext';
+import { useBankAccountsQuery } from '@/hooks/useSajiloQuery';
+import { useQueryClient } from '@tanstack/react-query';
 import { Plus, Pencil, Trash2, Search, Landmark, Banknote, Building, ChevronDown, ChevronRight, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -26,83 +29,18 @@ const categoryStyle = {
 
 export default function BankAccounts() {
   const { formatAmount } = useAmountFormatter();
-  const [accounts, setAccounts] = useState([]);
-  const [glBalances, setGlBalances] = useState({}); // { gl_account_id -> current_balance }
-  const [loading, setLoading] = useState(true);
+  const { activeCompany } = useAuth();
+  const queryClient = useQueryClient();
+
+  const { data, isLoading: loading } = useBankAccountsQuery(activeCompany?.id);
+  const accounts = data?.accounts || [];
+  const glBalances = data?.glBalances || {};
+
   const [search, setSearch] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [collapsed, setCollapsed] = useState({});
   const [detailAccount, setDetailAccount] = useState(null);
-
-  useEffect(() => { fetchAccounts(); }, []);
-
-  const fetchAccounts = async () => {
-    setLoading(true);
-    // 1. Fetch mapped BankAccounts and COA accounts flagged as cash or bank.
-    //    NOTE: We filter on is_cash_account / is_bank_account (set by migrations
-    //    208–211) rather than account_type IN ('Cash','Bank'). The ChartOfAccount
-    //    account_type column stores the double-entry classification ('Asset',
-    //    'Liability', etc.) — 'Cash in Hand' has account_type = 'Asset', so the
-    //    old filter silently excluded it. The boolean flags are the authoritative
-    //    treasury classification and work regardless of the accounting type.
-    const [data, coaData] = await Promise.all([
-      sajilo.entities.BankAccount.list('-created_date', 500),
-      supabase
-        .from('ChartOfAccount')
-        .select('id, account_name, account_type, is_cash_account, is_bank_account, current_balance')
-        .or('is_cash_account.eq.true,is_bank_account.eq.true')
-    ]);
-
-    let mergedAccounts = [...data];
-    const mappedGlIds = new Set(data.map(a => a.gl_account_id).filter(Boolean));
-
-    // 2. Auto-include any flagged COA accounts not yet registered as a BankAccount row.
-    if (coaData && coaData.data) {
-      coaData.data.forEach(coa => {
-        if (!mappedGlIds.has(coa.id)) {
-          // Derive the treasury type from the deterministic flags — do NOT use
-          // coa.account_type here, which is the double-entry type ('Asset'), not
-          // the treasury type ('Cash'/'Bank') the page groups and totals on.
-          const treasuryType = coa.is_cash_account ? 'Cash' : 'Bank';
-          mergedAccounts.push({
-            id: coa.id,         // using COA id as virtual ID
-            account_name: coa.account_name,
-            account_type: treasuryType,
-            gl_account_id: coa.id,
-            is_active: true,
-            is_virtual: true    // flag so we know it's not a real BankAccount record
-          });
-        }
-      });
-    }
-
-    setAccounts(mergedAccounts);
-
-    // 3. Fetch LIVE General Ledger lines for bulletproof accuracy
-    const glIds = mergedAccounts.map(a => a.gl_account_id).filter(Boolean);
-    let map = {};
-    
-    if (glIds.length > 0) {
-      const { data: glData } = await supabase.from('GeneralLedgerLine').select('account_id, debit_amount, credit_amount').in('account_id', glIds);
-      if (glData) {
-        glData.forEach(line => {
-           if (!map[line.account_id]) map[line.account_id] = 0;
-           map[line.account_id] += (line.debit_amount || 0) - (line.credit_amount || 0);
-        });
-      }
-    }
-    
-    // Fallback to COA cache if no GL lines exist
-    if (coaData && coaData.data) {
-      coaData.data.forEach(coa => {
-        if (map[coa.id] === undefined) map[coa.id] = coa.current_balance || 0;
-      });
-    }
-
-    setGlBalances(map);
-    setLoading(false);
-  };
 
   // Get the live COA balance for an account; fall back to stored current_balance
   const getLiveBalance = (acc) => {
@@ -113,23 +51,25 @@ export default function BankAccounts() {
   };
 
   const handleSave = async (formData) => {
+    // Inject company_id since we are bypassing component-level sajilo wrapper injections if any
+    const payload = { ...formData, company_id: activeCompany?.id };
     if (editing) {
-      await sajilo.entities.BankAccount.update(editing.id, formData);
+      await sajilo.entities.BankAccount.update(editing.id, payload);
       toast.success('Account updated');
     } else {
-      await sajilo.entities.BankAccount.create(formData);
+      await sajilo.entities.BankAccount.create(payload);
       toast.success('Account created');
     }
     setModalOpen(false);
     setEditing(null);
-    fetchAccounts();
+    queryClient.invalidateQueries({ queryKey: ['company', activeCompany?.id, 'bankAccountsWithBalances'] });
   };
 
   const handleDelete = async (acc) => {
     if (!confirm(`Delete "${acc.account_name}"? This cannot be undone.`)) return;
     await sajilo.entities.BankAccount.delete(acc.id);
     toast.success('Account deleted');
-    fetchAccounts();
+    queryClient.invalidateQueries({ queryKey: ['company', activeCompany?.id, 'bankAccountsWithBalances'] });
   };
 
   const filtered = accounts.filter(a =>

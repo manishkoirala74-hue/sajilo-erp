@@ -202,6 +202,82 @@ export function useCashBalanceQuery(companyId) {
   });
 }
 
+export function useBankAccountsQuery(companyId) {
+  const activeCompany = companyId || sajilo.getCompanyId();
+
+  return useQuery({
+    // V2: Reordered Query Key for precise invalidation targeting
+    queryKey: ['company', activeCompany, 'bankAccountsWithBalances', 'BankAccount', 'ChartOfAccount', 'GeneralLedgerLine'],
+    queryFn: async () => {
+      // 1. Fetch physical BankAccount metadata
+      const { data: bankData, error: bankError } = await sajilo.auth.supabase
+        .from('BankAccount')
+        .select('*')
+        .eq('company_id', activeCompany)
+        .order('created_at', { ascending: false });
+
+      if (bankError) throw bankError;
+
+      // 2. Fetch COA accounts flagged as Cash or Bank
+      const { data: coaData, error: coaError } = await sajilo.auth.supabase
+        .from('ChartOfAccount')
+        .select('id, account_name, account_type, is_cash_account, is_bank_account, current_balance')
+        .eq('company_id', activeCompany)
+        .or('is_cash_account.eq.true,is_bank_account.eq.true');
+
+      if (coaError) throw coaError;
+
+      let mergedAccounts = [...(bankData || [])];
+      const mappedGlIds = new Set(mergedAccounts.map(a => a.gl_account_id).filter(Boolean));
+
+      // 3. Auto-include any flagged COA accounts not yet registered as a BankAccount row
+      (coaData || []).forEach(coa => {
+        if (!mappedGlIds.has(coa.id)) {
+          const treasuryType = coa.is_cash_account ? 'Cash' : 'Bank';
+          mergedAccounts.push({
+            id: coa.id, // using COA id as virtual ID
+            account_name: coa.account_name,
+            account_type: treasuryType,
+            gl_account_id: coa.id,
+            is_active: true,
+            is_virtual: true
+          });
+        }
+      });
+
+      // 4. Fetch LIVE General Ledger lines for bulletproof accuracy
+      const glIds = mergedAccounts.map(a => a.gl_account_id).filter(Boolean);
+      let glBalances = {};
+
+      if (glIds.length > 0) {
+        const { data: glData, error: glError } = await sajilo.auth.supabase
+          .from('GeneralLedgerLine')
+          .select('account_id, debit_amount, credit_amount')
+          .eq('company_id', activeCompany)
+          .in('account_id', glIds);
+
+        if (glError) throw glError;
+
+        if (glData) {
+          glData.forEach(line => {
+            if (!glBalances[line.account_id]) glBalances[line.account_id] = 0;
+            glBalances[line.account_id] += (line.debit_amount || 0) - (line.credit_amount || 0);
+          });
+        }
+      }
+
+      // Fallback to COA cache if no GL lines exist
+      (coaData || []).forEach(coa => {
+        if (glBalances[coa.id] === undefined) glBalances[coa.id] = coa.current_balance || 0;
+      });
+
+      return { accounts: mergedAccounts, glBalances };
+    },
+    enabled: !!activeCompany,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+}
+
 // --- MUTATIONS ---
 
 export function useItemMutation(companyId) {

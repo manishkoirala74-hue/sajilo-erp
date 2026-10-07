@@ -6,6 +6,13 @@ export const BS_MONTHS = [
   'Kartik', 'Mangsir', 'Poush', 'Magh', 'Falgun', 'Chaitra'
 ];
 
+const pad = n => String(n).padStart(2, '0');
+const addDaysAD = (ad, n) => {
+  const [y, m, d] = ad.split('-').map(Number);
+  const t = new Date(Date.UTC(y, m - 1, d + n));
+  return `${t.getUTCFullYear()}-${pad(t.getUTCMonth() + 1)}-${pad(t.getUTCDate())}`;
+};
+
 // Parse a 'YYYY-MM-DD' or full ISO string into a UTC midnight Date to avoid timezone shifts
 // This is kept for formatting functions
 function parseDate(dateStr) {
@@ -67,6 +74,44 @@ export function isValidBSDate(bsYear, bsMonth, bsDay) {
   } catch (e) {
     return false;
   }
+}
+
+/**
+ * Get days in a BS month
+ */
+export function getBSMonthDays(bsYear, bsMonth) {
+  const start = bsToAD(bsYear, bsMonth, 1);
+  const next  = bsMonth === 12 ? bsToAD(bsYear + 1, 1, 1) : bsToAD(bsYear, bsMonth + 1, 1);
+  return Math.round((Date.parse(next) - Date.parse(start)) / 86400000);
+}
+
+/**
+ * Returns month boundaries and days array for grid rendering.
+ * calendar: 'AD' | 'BS', month 1-12
+ */
+export function getMonthPeriod(calendar, year, month) {
+  let startAD, length, label;
+  if (calendar === 'BS') {
+    startAD = bsToAD(year, month, 1);
+    length  = getBSMonthDays(year, month);
+    label   = `${BS_MONTHS[month - 1]} ${year}`;
+  } else {
+    startAD = `${year}-${pad(month)}-01`;
+    length  = new Date(Date.UTC(year, month, 0)).getUTCDate();
+    label   = new Date(Date.UTC(year, month - 1, 1)).toLocaleString('en-GB', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+  }
+  const days = Array.from({ length }, (_, i) => {
+    const ad = addDaysAD(startAD, i);
+    const bs = adToBS(ad) || { day: '-', month: '-' };
+    return {
+      ad,
+      adDay: Number(ad.slice(8)),
+      bsDay: bs.day,
+      bsMonth: bs.month,
+      weekday: new Date(ad + 'T00:00:00Z').getUTCDay() // 0=Sun ... 6=Sat
+    };
+  });
+  return { calendar, year, month, startAD, endAD: days[length - 1].ad, label, days };
 }
 
 /**
