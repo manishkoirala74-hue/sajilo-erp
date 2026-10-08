@@ -230,7 +230,7 @@ export default function Dashboard() {
           <StatCard
             title="Cash Balance"
             value={!isLoadingCash ? mask(formatAmountShort(cashData?.cash_balance ?? 0)) : '…'}
-            subtitle={cashData?.fy_start_date ? `Since ${cashData.fy_start_date}` : 'Fiscal year to date'}
+            subtitle="Current Balance"
             icon={Banknote}
             color="emerald"
           />
@@ -240,7 +240,7 @@ export default function Dashboard() {
           <StatCard
             title="Bank Balance"
             value={!isLoadingCash ? mask(formatAmountShort(cashData?.bank_balance ?? 0)) : '…'}
-            subtitle={cashData?.fy_start_date ? `Since ${cashData.fy_start_date}` : 'Fiscal year to date'}
+            subtitle="Current Balance"
             icon={Landmark}
             color="blue"
           />
