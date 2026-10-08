@@ -115,12 +115,23 @@ export function getMonthPeriod(calendar, year, month) {
 }
 
 /**
- * Get today's date in BS
+ * Get today's date in BS respecting Nepal Standard Time (Asia/Kathmandu, UTC+05:45)
  */
 export function getTodayBS() {
-  const today = new Date();
-  const adStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
-  return adToBS(adStr);
+  try {
+    const nptFormatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Kathmandu',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    });
+    const adStr = nptFormatter.format(new Date());
+    return adToBS(adStr);
+  } catch (e) {
+    const today = new Date();
+    const adStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+    return adToBS(adStr);
+  }
 }
 
 /**

@@ -4,10 +4,12 @@ import { isEqual } from 'lodash';
 interface SettingsState {
   serverSettings: any;
   draftSettings: any;
+  companyLogoBase64: string | null;
   setServerSettings: (settings: any) => void;
   updateDraftSettings: (settings: any) => void;
   resetDraft: () => void;
   hasUnsavedChanges: () => boolean;
+  fetchAndCacheLogo: (url: string) => Promise<void>;
 }
 
 export const DEFAULT_SETTINGS = {
@@ -39,11 +41,29 @@ export const DEFAULT_SETTINGS = {
 export const useSettingsStore = create<SettingsState>((set, get) => ({
   serverSettings: {},
   draftSettings: {},
+  companyLogoBase64: null,
   
   setServerSettings: (settings) => set({ 
     serverSettings: settings, 
     draftSettings: settings // On load, drafts match server
   }),
+
+  fetchAndCacheLogo: async (url) => {
+    if (!url || get().companyLogoBase64) return;
+    try {
+      const res = await fetch(url);
+      const blob = await res.blob();
+      const base64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+      set({ companyLogoBase64: base64 });
+    } catch (e) {
+      console.warn("Failed to cache company logo", e);
+    }
+  },
   
   updateDraftSettings: (newSettings) => set((state) => ({
     draftSettings: { ...state.draftSettings, ...newSettings }

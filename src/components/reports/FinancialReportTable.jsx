@@ -10,6 +10,8 @@ import { cn } from '@/lib/utils';
 import { buildVisibleColumns } from '@/lib/reports/reportColumnUtils';
 import { exportFinancialXLSX } from '@/lib/reports/reportExcelExport';
 import { useAmountFormatter } from '@/hooks/useAmountFormatter';
+import { useAuth } from '@/lib/AuthContext';
+import { Loader2 } from 'lucide-react';
 
 const TYPE_BADGE = {
   Asset:     'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400',
@@ -462,3 +464,5 @@ export default function FinancialReportTable({
     </div>
   );
 }
+
+

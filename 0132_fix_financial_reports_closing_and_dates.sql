@@ -245,8 +245,6 @@ BEGIN
             a.account_type,
             a.ledger_type,
             a.normal_balance,
-            a.opening_balance,
-            a.opening_balance_type,
             COALESCE(fl.total_debit, 0) AS total_debit,
             COALESCE(fl.total_credit, 0) + CASE WHEN a.account_name = 'Current Year Earnings' THEN v_current_year_earnings ELSE 0 END AS total_credit
         FROM "ChartOfAccount" a
@@ -263,22 +261,16 @@ BEGIN
             ab.account_type,
             ab.ledger_type,
             ab.normal_balance,
-            -- Determine opening balance correctly
-            CASE 
-                WHEN ab.opening_balance_type = 'Dr' AND LOWER(ab.normal_balance) = 'debit' THEN COALESCE(ab.opening_balance, 0)
-                WHEN ab.opening_balance_type = 'Cr' AND LOWER(ab.normal_balance) = 'credit' THEN COALESCE(ab.opening_balance, 0)
-                WHEN ab.opening_balance_type = 'Cr' AND LOWER(ab.normal_balance) = 'debit' THEN -COALESCE(ab.opening_balance, 0)
-                WHEN ab.opening_balance_type = 'Dr' AND LOWER(ab.normal_balance) = 'credit' THEN -COALESCE(ab.opening_balance, 0)
-                ELSE COALESCE(ab.opening_balance, 0)
-            END AS base_ob,
+            -- Determine opening balance correctly (always 0 since it comes from GeneralLedgerLine)
+            0 AS base_ob,
             ab.total_debit,
             ab.total_credit,
             -- Closing balance logic based on normal_balance
             CASE 
                 WHEN LOWER(ab.normal_balance) = 'debit' THEN 
-                    (CASE WHEN ab.opening_balance_type = 'Dr' THEN COALESCE(ab.opening_balance, 0) ELSE -COALESCE(ab.opening_balance, 0) END) + ab.total_debit - ab.total_credit
+                    ab.total_debit - ab.total_credit
                 ELSE 
-                    (CASE WHEN ab.opening_balance_type = 'Cr' THEN COALESCE(ab.opening_balance, 0) ELSE -COALESCE(ab.opening_balance, 0) END) + ab.total_credit - ab.total_debit
+                    ab.total_credit - ab.total_debit
             END AS ind_closing_balance
         FROM account_balances ab
     ),

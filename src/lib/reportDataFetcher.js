@@ -82,10 +82,9 @@ export async function fetchReportData(reportId, fromDate, toDate, extraParams = 
         sajilo.entities.ChartOfAccount.filter({ is_active: true }, 'account_code', 2000),
         supabase.rpc('get_balance_sheet_rpc', { p_company_id, p_as_of_date: safeToDate })
       ]);
-      if (bsErr && bsErr.code !== 'PGRST202') throw bsErr;
 
-      // Fallback if RPC doesn't exist yet
-      if (bsErr && bsErr.code === 'PGRST202') {
+      // Fallback if RPC doesn't exist yet or fails (e.g. 42703 column missing)
+      if (bsErr) {
         const { data: tbData, error: tbErr } = await supabase.rpc('get_trial_balance_rpc', { p_company_id, p_from_date: '1970-01-01', p_to_date: safeToDate });
         if (tbErr) throw tbErr;
         const tbMap = {};
