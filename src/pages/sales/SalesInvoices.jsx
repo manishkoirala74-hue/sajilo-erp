@@ -402,18 +402,22 @@ export default function SalesInvoices() {
       let docId = form.id;
       const isAuto = settings && settings.invoice_numbering_method !== 'Manual';
 
+      let assignedInvoiceNumber = form.invoice_number;
+
       if (postStatus === 'Posted') {
         const idempotencyKey = crypto.randomUUID();
         const [itemsMap, glSettings] = await Promise.all([loadItemsMap(form.line_items.map(l => l.item_id)), loadSettings()]);
         
         const result = await checkoutSalesInvoice({ ...data, id: form.id }, itemsMap, glSettings, idempotencyKey);
         docId = result.invoice_id || form.id;
+        if (result.invoice_number) assignedInvoiceNumber = result.invoice_number;
 
         if (form._isNew && isAuto) {
           const next = (settings.invoice_next_number || 1) + 1;
           await sajilo.entities.CompanySettings.update(settings.id, { invoice_next_number: next });
           setSettings(s => ({ ...s, invoice_next_number: next }));
         }
+        toast.success(`Invoice ${assignedInvoiceNumber && assignedInvoiceNumber !== 'AUTO' ? assignedInvoiceNumber : ''} posted — stock & GL updated`);
       } else {
         // Standard Draft upsert
         if (!form._isNew && invoices.find(i => i.id === form.id)) {
@@ -422,6 +426,7 @@ export default function SalesInvoices() {
         } else {
           const created = await sajilo.entities.SalesInvoice.create({ ...payload, id: form.id });
           docId = created.id;
+          if (created?.invoice_number) assignedInvoiceNumber = created.invoice_number;
           
           if (isAuto) {
             const next = (settings.invoice_next_number || 1) + 1;
@@ -435,7 +440,7 @@ export default function SalesInvoices() {
       // Native Vector PDF cache generation
       try {
         const fullDocId = docId || form.id;
-        const fullDoc = { ...data, id: fullDocId, invoice_number: form.invoice_number };
+        const fullDoc = { ...data, id: fullDocId, invoice_number: assignedInvoiceNumber };
         const partner = customers.find(c => c.id === form.customer_id);
         
         await generateVectorPDF(

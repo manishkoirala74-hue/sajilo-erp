@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/api/sajiloClient';
 import { useAuth } from '@/lib/AuthContext';
+import ReportExportActions from '@/components/reports/ReportExportActions';
+import { exportAuditLogXLSX } from '@/lib/reports/reportExcelExport';
+import { generateReportVectorPDF } from '@/utils/reportPdfEngine';
 import { 
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow 
 } from '@/components/ui/table';
@@ -42,6 +45,48 @@ export default function CommunicationLogs() {
     }
   };
 
+  const handleExportExcel = async () => {
+    if (!logs || logs.length === 0) return;
+    const headers = ['Date / Time (UTC)', 'Module', 'Reference ID', 'Recipient Email', 'Type', 'Status', 'Error Log'];
+    const rows = logs.map(l => [
+      l.created_at ? new Date(l.created_at).toISOString() : '',
+      l.module || '',
+      l.reference_id || '',
+      l.recipient_email || '',
+      l.type || '',
+      l.status || '',
+      l.error_message || ''
+    ]);
+    await exportAuditLogXLSX({
+      filename: `Communication_Logs_${format(new Date(), 'yyyyMMdd_HHmmss')}.xlsx`,
+      title: 'Email Delivery Audit Trail',
+      headers,
+      rows,
+      currentUser: user,
+    });
+  };
+
+  const handleExportPdf = async () => {
+    if (!logs || logs.length === 0) return;
+    const headers = ['Date / Time', 'Module', 'Recipient Email', 'Type', 'Status', 'Error Log'];
+    const rows = logs.map(l => [
+      l.created_at ? format(new Date(l.created_at), 'yyyy-MM-dd HH:mm:ss') : '',
+      l.module || '',
+      l.recipient_email || '',
+      l.type || '',
+      l.status || '',
+      l.error_message || ''
+    ]);
+    await generateReportVectorPDF({
+      title: 'Email Delivery Logs',
+      subtitle: `Audit Trail - Exported by ${user?.full_name || user?.email || 'User'} on ${new Date().toISOString()}`,
+      columns: headers,
+      data: rows,
+      filename: `Communication_Logs_${format(new Date(), 'yyyyMMdd')}.pdf`,
+      orientation: 'landscape',
+      user
+    });
+  };
   const getTypeIcon = (type) => {
     if (type === 'EMAIL') return <Mail className="w-4 h-4 text-gray-500" />;
     return <Mail className="w-4 h-4 text-gray-500" />;
@@ -56,6 +101,10 @@ export default function CommunicationLogs() {
           <h2 className="text-2xl font-bold tracking-tight">Email Delivery Logs</h2>
           <p className="text-muted-foreground text-sm">Immutable audit trail of all background email deliveries.</p>
         </div>
+        <ReportExportActions
+          onExportExcel={handleExportExcel}
+          onExportPdf={handleExportPdf}
+        />
       </div>
 
       <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">

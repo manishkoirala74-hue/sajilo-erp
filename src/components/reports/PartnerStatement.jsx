@@ -1,6 +1,8 @@
 import { useState, useCallback, useEffect } from 'react';
 import { sajilo } from '@/api/sajiloClient';
 import ReportFilterBar from '@/components/reports/ReportFilterBar';
+import ReportExportActions from '@/components/reports/ReportExportActions';
+import { exportFlatXLSX } from '@/lib/reports/reportExcelExport';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { adToBS, formatBS } from '@/lib/nepaliDate';
 import VoucherLink from '@/components/shared/VoucherLink';
@@ -113,7 +115,12 @@ export default function PartnerStatement({ title, mode, initialFromDate, initial
 
       const journalMap = {};
       journals.forEach(j => { 
-        journalMap[j.id] = { date: j.entry_date ? j.entry_date.split('T')[0] : '', voucher: j.voucher_number || '' }; 
+        const vNum = j.voucher_no || j.voucher_number || '';
+        journalMap[j.id] = { 
+          date: j.entry_date ? j.entry_date.split('T')[0] : '', 
+          voucher: (vNum && vNum !== 'AUTO' && vNum !== 'REV-AUTO') ? vNum : (j.source_document_id || ''),
+          description: j.description || ''
+        }; 
       });
 
       let ob_dr = 0, ob_cr = 0;
@@ -136,7 +143,7 @@ export default function PartnerStatement({ title, mode, initialFromDate, initial
             bs_date_formatted: adToBS(date) ? formatBS(adToBS(date)) : '',
             voucher: jInfo.voucher,
             reference: line.reference_number || '',
-            description: line.description || '',
+            description: line.description || jInfo.description || '',
             debit: line.debit_amount || 0,
             credit: line.credit_amount || 0,
           });
@@ -194,6 +201,49 @@ export default function PartnerStatement({ title, mode, initialFromDate, initial
     return isNaN(d) ? adDateStr : `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${d.getFullYear()}`;
   };
 
+  const handleExportExcel = useCallback(async () => {
+    if (!transactions) return;
+    const pName = partner?.name || (isAR ? 'Customer' : 'Supplier');
+    const headers = ['Date', ...(filters.showBsDate ? ['Date (BS)'] : []), 'Voucher #', 'Description', 'Debit', 'Credit', 'Balance'];
+    
+    const rows = [
+      [displayDate(filters.fromDate), ...(filters.showBsDate ? [''] : []), '', '*** Opening Balance ***', '', '', summary.opening],
+      ...transactions.map(t => [
+        displayDate(t.date),
+        ...(filters.showBsDate ? [t.bs_date_formatted || ''] : []),
+        t.voucher || '',
+        t.description + (t.reference ? ` (Ref: ${t.reference})` : ''),
+        t.debit || '',
+        t.credit || '',
+        t.balance
+      ])
+    ];
+
+    const footer = [
+      `Closing Balance as of ${displayDate(filters.toDate)}`,
+      ...(filters.showBsDate ? [''] : []),
+      '',
+      '',
+      summary.debit,
+      summary.credit,
+      summary.closing
+    ];
+
+    await exportFlatXLSX({
+      filename: `${pName.replace(/\s+/g, '_')}_statement_${filters.fromDate}_${filters.toDate}.xlsx`,
+      reportTitle: `${isAR ? 'Customer Statement' : 'Vendor Statement'} - ${pName}`,
+      fromDate: filters.fromDate,
+      toDate: filters.toDate,
+      companyName: company?.company_name || 'Sajilo ERP',
+      headers,
+      rows,
+      footer,
+    });
+  }, [transactions, partner, isAR, filters, summary, company, displayDate]);
+
+  const handleExportPdf = useCallback(async () => {
+    window.print();
+  }, []);
   const extraOptions = (
     <div className="space-y-3">
       <div className="flex flex-col gap-1 min-w-[200px]">
@@ -235,7 +285,14 @@ export default function PartnerStatement({ title, mode, initialFromDate, initial
       ) : loading ? (
         <div className="py-10 text-center text-muted-foreground text-sm">Loading statement...</div>
       ) : (
-        <div className="bg-card border border-border shadow-sm p-8 sm:p-12 max-w-[210mm] mx-auto rounded-xl print:shadow-none print:border-none print:p-0 print:max-w-none text-foreground" style={{ fontFamily: "'Inter', sans-serif" }}>
+        <div className="space-y-3">
+          <div className="print:hidden flex justify-end max-w-[210mm] mx-auto">
+            <ReportExportActions
+              onExportExcel={handleExportExcel}
+              onExportPdf={handleExportPdf}
+            />
+          </div>
+          <div className="bg-card border border-border shadow-sm p-8 sm:p-12 max-w-[210mm] mx-auto rounded-xl print:shadow-none print:border-none print:p-0 print:max-w-none text-foreground" style={{ fontFamily: "'Inter', sans-serif" }}>
           
           {/* Header */}
           <div className="flex justify-between items-start border-b-2 border-primary/20 pb-6 mb-6">
@@ -371,6 +428,7 @@ export default function PartnerStatement({ title, mode, initialFromDate, initial
             <p className="font-mono">Ref: {partner?.id?.slice(0,8).toUpperCase()}-{new Date().getTime().toString().slice(-6)}</p>
           </div>
 
+        </div>
         </div>
       )}
     </div>

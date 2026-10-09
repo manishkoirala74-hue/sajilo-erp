@@ -9,6 +9,8 @@ import { ChevronRight, ChevronDown, FileSpreadsheet, Folder, FolderOpen, FileTex
 import { cn } from '@/lib/utils';
 import { buildVisibleColumns } from '@/lib/reports/reportColumnUtils';
 import { exportFinancialXLSX } from '@/lib/reports/reportExcelExport';
+import ReportExportActions from '@/components/reports/ReportExportActions';
+import { generateReportVectorPDF } from '@/utils/reportPdfEngine';
 import { useAmountFormatter } from '@/hooks/useAmountFormatter';
 import { useAuth } from '@/lib/AuthContext';
 import { Loader2 } from 'lucide-react';
@@ -318,28 +320,69 @@ export default function FinancialReportTable({
   }, 0);
   const totalLeaves = useMemo(() => countLeaves(tree), [tree]);
 
-  const handleExportXLSX = useCallback(() => {
-    // Build flat groups for export (legacy format — top-level groups with leaf children)
+  const handleExportXLSX = useCallback(async () => {
     const exportGroups = tree.map(root => ({
       ...root,
       children: root._children?.filter(c => c.ledger_type !== 'Group Ledger') || [],
     }));
-    try {
-      exportFinancialXLSX({
-        groups: exportGroups,
-        columns: buildVisibleColumns(columnState),
-        columnState,
-        companyName: companyName || '',
-        reportTitle: reportTitle || 'Financial Report',
-        fromDate,
-        toDate,
-        filename: filename || 'financial_report.xlsx',
-      });
-    } catch (err) {
-      console.error('[XLSX Export Error]', err);
-      alert('Export failed: ' + err.message);
-    }
+    await exportFinancialXLSX({
+      groups: exportGroups,
+      columns: buildVisibleColumns(columnState),
+      columnState,
+      companyName: companyName || '',
+      reportTitle: reportTitle || 'Financial Report',
+      fromDate,
+      toDate,
+      filename: filename || 'financial_report.xlsx',
+    });
   }, [tree, columnState, filename, companyName, reportTitle, fromDate, toDate]);
+  const handleExportPdf = useCallback(async () => {
+    const pdfRows = [];
+    const walk = (nodes, depth = 0) => {
+      for (const node of nodes) {
+        const isGroup = node.ledger_type === 'Group Ledger';
+        const totals = isGroup ? computeSubtreeTotals(node, reportType) : node;
+        const indent = '  '.repeat(depth);
+        pdfRows.push([
+          (node.account_code || ''),
+          indent + (node.account_name || ''),
+          totals.opening_debit ? fmtNPR(totals.opening_debit) : '',
+          totals.opening_credit ? fmtNPR(totals.opening_credit) : '',
+          totals.current_debit ? fmtNPR(totals.current_debit) : '',
+          totals.current_credit ? fmtNPR(totals.current_credit) : '',
+          totals.closing_debit ? fmtNPR(totals.closing_debit) : '',
+          totals.closing_credit ? fmtNPR(totals.closing_credit) : '',
+        ]);
+        if (node._children && node._children.length > 0) {
+          walk(node._children, depth + 1);
+        }
+      }
+    };
+    walk(tree);
+
+    const headers = ['Code', 'Account Name', 'Opening Dr', 'Opening Cr', 'Current Dr', 'Current Cr', 'Closing Dr', 'Closing Cr'];
+    const footer = [
+      'GRAND TOTAL',
+      '',
+      fmtNPR(grandTotals.opening_debit),
+      fmtNPR(grandTotals.opening_credit),
+      fmtNPR(grandTotals.current_debit),
+      fmtNPR(grandTotals.current_credit),
+      fmtNPR(grandTotals.closing_debit),
+      fmtNPR(grandTotals.closing_credit),
+    ];
+
+    await generateReportVectorPDF({
+      title: reportTitle || 'Financial Report',
+      columns: headers,
+      data: pdfRows,
+      footer,
+      fromDate,
+      toDate,
+      orientation: 'landscape',
+      filename: (filename || 'financial_report').replace(/\.xlsx$/i, '.pdf'),
+    });
+  }, [tree, reportType, fmtNPR, grandTotals, reportTitle, fromDate, toDate, filename]);
 
   if (!accounts || accounts.length === 0) {
     return <div className="text-center py-12 text-muted-foreground text-sm">No accounts found for the selected filters.</div>;
@@ -347,15 +390,12 @@ export default function FinancialReportTable({
 
   return (
     <div className="space-y-2">
-      {/* Export Button */}
+      {/* Export Actions Toolbar */}
       <div className="print:hidden flex justify-end">
-        <button
-          onClick={handleExportXLSX}
-          className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 border border-emerald-300 dark:border-emerald-500/30 rounded-lg bg-emerald-50 dark:bg-emerald-500/10 hover:bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 transition-colors"
-        >
-          <FileSpreadsheet className="w-3.5 h-3.5" />
-          Export Excel (.xlsx)
-        </button>
+        <ReportExportActions
+          onExportExcel={handleExportXLSX}
+          onExportPdf={handleExportPdf}
+        />
       </div>
 
       <div className="border border-border rounded-xl overflow-hidden print:border-0 print:rounded-none">

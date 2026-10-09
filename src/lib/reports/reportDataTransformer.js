@@ -360,7 +360,7 @@ function transformLedgerDetail(rawData, parameters, skipZeroRows) {
       data: {
         transaction_date: tx.entry_date,
         bs_date: parameters.showBsDate && tx.entry_date ? formatBS(adToBS(tx.entry_date)) : '',
-        voucher_number: tx.voucher_no ? tx.voucher_no.replace(/-/g, '-\u200B') : '',
+        voucher_number: (tx.voucher_no && tx.voucher_no !== 'AUTO' && tx.voucher_no !== 'REV-AUTO') ? tx.voucher_no.replace(/-/g, '-\u200B') : (tx.reference_no ? tx.reference_no.replace(/-/g, '-\u200B') : ''),
         description: deduplicateDescription(tx.description),
         debit: tx.debit_amount,
         credit: tx.credit_amount,

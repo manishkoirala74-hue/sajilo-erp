@@ -10,6 +10,8 @@ import { ArrowLeft, BarChart2, RefreshCcw, Printer } from 'lucide-react';
 import { format, subMonths } from 'date-fns';
 import { toast } from 'sonner';
 import ReportFilterBar from '@/components/reports/ReportFilterBar';
+import ReportExportActions from '@/components/reports/ReportExportActions';
+import { exportFlatXLSX } from '@/lib/reports/reportExcelExport';
 export default function GrossProfitMarginReport() {
   const navigate = useNavigate();
 
@@ -169,6 +171,42 @@ export default function GrossProfitMarginReport() {
     { key: 'grossMargin', label: 'Gross Margin (%)', render: (val) => <span className="font-bold text-primary">{(val || 0).toFixed(2)}%</span> }
   ];
 
+  const handleExportExcel = async () => {
+    if (!data || data.length === 0) {
+      toast.info('No data to export. Please generate the report first.');
+      return;
+    }
+    const headers = ['Item Code', 'Item Name', 'Category', 'Qty Sold', 'Revenue', 'COGS', 'Gross Profit', 'Margin %'];
+    const rows = data.map(r => [
+      r.item_code || '—',
+      r.item_name || '',
+      r.category_name || '—',
+      r.qtySold || 0,
+      r.revenue || 0,
+      r.cogs || 0,
+      r.grossProfit || 0,
+      `${(r.grossMargin || 0).toFixed(2)}%`
+    ]);
+    const footer = [
+      '',
+      'TOTAL',
+      '',
+      totalQtySold,
+      totalRevenue,
+      totalCogs,
+      totalGrossProfit,
+      `${totalGrossMargin.toFixed(2)}%`
+    ];
+    await exportFlatXLSX({
+      filename: `Gross_Profit_Margin_${filters.fromDate}_${filters.toDate}.xlsx`,
+      reportTitle: 'Gross Profit Margin Report',
+      fromDate: filters.fromDate,
+      toDate: filters.toDate,
+      headers,
+      rows,
+      footer
+    });
+  };
   const handlePrint = () => {
     window.print();
   };
@@ -245,10 +283,10 @@ export default function GrossProfitMarginReport() {
             <p className="text-sm text-muted-foreground">Analyze revenue, COGS, and gross margin per item</p>
           </div>
         </div>
-        <Button onClick={handlePrint} className="flex items-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white">
-          <Printer className="w-4 h-4" />
-          Print / PDF
-        </Button>
+        <ReportExportActions
+          onExportExcel={handleExportExcel}
+          onExportPdf={handlePrint}
+        />
       </div>
 
       <div className="bg-card rounded-2xl border border-stone-200 p-5 shadow-sm print:hidden">

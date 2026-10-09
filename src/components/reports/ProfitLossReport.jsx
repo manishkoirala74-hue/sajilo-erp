@@ -5,10 +5,12 @@ import BusinessHeader from '@/components/reports/BusinessHeader';
 import ReportFilterBar from '@/components/reports/ReportFilterBar';
 import { useAmountFormatter } from '@/hooks/useAmountFormatter';
 import { useCachedFilters, useCachedState, DEFAULT_FILTERS, useFmtNPR } from '@/components/reports/ReportViewer'; 
-import { exportFlatXLSX } from '@/lib/reports/reportExcelExport';
+import { exportProfitLossXLSX } from '@/lib/reports/reportExcelExport';
 import { generateReportVectorPDF } from '@/utils/reportPdfEngine';
 import { mapProfitLossForExport } from '@/utils/exportMappers';
+import ReportExportActions from '@/components/reports/ReportExportActions';
 import { useAuth } from '@/lib/AuthContext';
+
 
 export default function ProfitLossReport({ initialData, initialFromDate, initialToDate }) {
   const { formatNumber } = useAmountFormatter();
@@ -210,10 +212,27 @@ export default function ProfitLossReport({ initialData, initialFromDate, initial
       </div>
     );
 
-    const handleExport = () => downloadCSV('income_statement.xlsx',
-      ['Financial Particulars', 'Notes', 'Current Period (NPR)', 'Comparative Period (NPR)'],
-      [['', 'Not yet supported in hierarchical mode', '', '']]
-    );
+    const handleExportExcel = async () => {
+      await exportProfitLossXLSX({
+        sections,
+        totals: {
+          net_sales_cur, net_sales_comp,
+          cogs_total_cur, cogs_total_comp,
+          gross_profit_cur, gross_profit_comp,
+          total_opex_cur, total_opex_comp,
+          op_profit_cur, op_profit_comp,
+          pbt_cur, pbt_comp,
+          net_profit_cur, net_profit_comp
+        },
+        childrenMap,
+        filters,
+        companyName: activeCompany?.company_name || 'Company',
+        reportTitle: 'Income Statement',
+        fromDate: filters.fromDate,
+        toDate: filters.toDate,
+        filename: `Income_Statement_${filters.fromDate}_${filters.toDate}.xlsx`
+      });
+    };
 
         const handlePrintPdf = async () => {
       setIsExporting(true);
@@ -282,17 +301,14 @@ export default function ProfitLossReport({ initialData, initialFromDate, initial
         <div className='bg-card border border-border rounded-xl shadow-sm overflow-hidden p-6 print:p-0 print:border-none print:shadow-none'>
           <BusinessHeader reportTitle='INCOME STATEMENT' subtitle='(Profit & Loss Statement)' fromDate={filters.fromDate} toDate={filters.toDate} />
           
-          <div className='print:hidden flex justify-end gap-2 mb-6'>
+          <div className='print:hidden flex justify-end items-center gap-2 mb-6'>
             <Button variant='outline' size='sm' onClick={() => setFilters(f => ({ ...f, expandAll: !f.expandAll }))}>
               {filters.expandAll ? 'Collapse All' : 'Expand All'}
             </Button>
-            <Button variant='outline' size='sm' onClick={handlePrintPdf} disabled={isExporting}>
-              {isExporting ? <Loader2 className='w-4 h-4 mr-2 animate-spin' /> : <Printer className='w-4 h-4 mr-2' />} 
-              {isExporting ? 'Generating...' : 'Print / PDF'}
-            </Button>
-            <Button variant='outline' size='sm' onClick={handleExport}>
-              ↓ Export Excel
-            </Button>
+            <ReportExportActions
+              onExportExcel={handleExportExcel}
+              onExportPdf={handlePrintPdf}
+            />
           </div>
 
           <div className="table-scroll-container">

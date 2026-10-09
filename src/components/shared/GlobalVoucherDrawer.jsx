@@ -147,7 +147,7 @@ export default function GlobalVoucherDrawer() {
             
             const fakeDoc = {
               id: j.id,
-              voucher_number: j.voucher_no || j.source_document_id || cleanVoucherNumber,
+              voucher_number: (j.voucher_no && j.voucher_no !== 'AUTO' && j.voucher_no !== 'REV-AUTO') ? j.voucher_no : (j.source_document_id || cleanVoucherNumber),
               date: j.entry_date,
               remarks: j.narration || j.notes || j.description || 'Journal Entry',
               entries: mappedLines,

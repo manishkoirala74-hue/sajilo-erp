@@ -245,6 +245,7 @@ export default function PurchaseInvoices() {
       delete payload._isNew;
 
       let docId = form.id;
+      let assignedInvoiceNumber = form.invoice_number || data.invoice_number;
 
       if (postStatus === 'Posted') {
         const idempotencyKey = crypto.randomUUID();
@@ -252,7 +253,8 @@ export default function PurchaseInvoices() {
         
         const result = await checkoutPurchaseInvoice({ ...data, id: form.id }, itemsMap, glSettings, idempotencyKey);
         docId = result.invoice_id || form.id;
-        toast.success('Invoice posted — stock, WAC & GL updated');
+        if (result.invoice_number) assignedInvoiceNumber = result.invoice_number;
+        toast.success(`Purchase Invoice ${assignedInvoiceNumber && assignedInvoiceNumber !== 'AUTO' ? assignedInvoiceNumber : ''} posted — stock, WAC & GL updated`);
       } else {
         // Standard Draft upsert
         if (!form._isNew && invoices.find(i => i.id === form.id)) {
@@ -261,6 +263,7 @@ export default function PurchaseInvoices() {
         } else {
           const created = await sajilo.entities.PurchaseInvoice.create({ ...payload, id: form.id });
           docId = created.id;
+          if (created?.invoice_number) assignedInvoiceNumber = created.invoice_number;
           toast.success('Invoice saved as draft');
         }
       }
@@ -268,7 +271,7 @@ export default function PurchaseInvoices() {
       // Native Vector PDF cache generation
       try {
         const fullDocId = docId || form.id;
-        const fullDoc = { ...data, id: fullDocId, purchase_number: form.invoice_number || data.invoice_number };
+        const fullDoc = { ...data, id: fullDocId, purchase_number: assignedInvoiceNumber };
         const partner = vendors.find(v => v.id === form.vendor_id);
         
         await generateVectorPDF(

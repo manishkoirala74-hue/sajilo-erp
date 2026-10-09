@@ -6,6 +6,7 @@
 import { X, Printer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import BusinessHeader from '@/components/reports/BusinessHeader';
+import ReportExportActions from '@/components/reports/ReportExportActions';
 import PartnerStatement from '@/components/reports/PartnerStatement';
 import ProfitLossReport from '@/components/reports/ProfitLossReport';
 import FinancialReportTable from '@/components/reports/FinancialReportTable';
@@ -36,11 +37,18 @@ export function useFmtNPR() {
   };
 }
 // downloadCSV replaced by exportFlatXLSX — kept as no-op shim to avoid refactor of every call site
-function downloadCSV(filename, headers, rows, footer) {
+async function downloadCSV(filename, headers, rows, footer) {
   try {
-    exportFlatXLSX({ headers, rows, footer, reportTitle: filename.replace(/\.xlsx$/,'').replace(/_/g,' '), filename: filename.replace(/\.csv$/,'.xlsx') });
+    return await exportFlatXLSX({
+      headers,
+      rows,
+      footer,
+      reportTitle: filename.replace(/\.(xlsx|csv)$/i, '').replace(/_/g, ' '),
+      filename: filename.endsWith('.xlsx') ? filename : filename.replace(/\.csv$/i, '.xlsx'),
+    });
   } catch (err) {
     console.error('[XLSX export error]', err);
+    throw err;
   }
 }
 
@@ -159,25 +167,17 @@ function ReportTable({ title, subtitle, headers, rows, footer, onExport, onEmail
   return (
     <div className="space-y-3">
       <BusinessHeader reportTitle={title} fromDate={fromDate} toDate={toDate} subtitle={subtitle} />
-      <div className="flex justify-end gap-2">
-        {true && (
-          <button onClick={handlePrint}
-            className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 border border-slate-300 dark:border-slate-500/30 rounded-lg bg-slate-50 dark:bg-slate-500/10 hover:bg-slate-100 dark:bg-slate-500/20 text-slate-800 dark:text-slate-300 transition-colors">
-            <Printer className="w-3.5 h-3.5" /> Print / PDF
-          </button>
-        )}
+      <div className="flex justify-end gap-2 items-center print:hidden">
         {onEmail && (
           <button onClick={onEmail}
             className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 border border-blue-300 dark:border-blue-500/30 rounded-lg bg-blue-50 dark:bg-blue-500/10 hover:bg-blue-100 dark:bg-blue-500/20 text-blue-800 dark:text-blue-300 transition-colors">
             <Mail className="w-3.5 h-3.5" /> Email Report
           </button>
         )}
-        {onExport && (
-          <button onClick={onExport}
-            className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 border border-emerald-300 dark:border-emerald-500/30 rounded-lg bg-emerald-50 dark:bg-emerald-500/10 hover:bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 transition-colors">
-            ↓ Export Excel (.xlsx)
-          </button>
-        )}
+        <ReportExportActions
+          onExportExcel={onExport}
+          onExportPdf={handlePrint}
+        />
       </div>
       <div className="border border-border rounded-xl overflow-hidden">
         <div className="table-scroll-container overflow-x-auto" tabIndex={0} role="region" aria-label="Report data">
@@ -412,7 +412,27 @@ function CashFlowReport({ initialFromDate, initialToDate }) {
             fmtNPR(d.amount)
           ])}
           footer={['', ...(filters.showBsDate ? [''] : []), '', '', 'NET CASH FLOW', fmtNPR(data.netCashFlow)]}
-          onExport={() => {}}
+          onExport={async () => {
+            const columns = ['Date', ...(filters.showBsDate ? ['Date (BS)'] : []), 'Type', 'Voucher #', 'Description', 'Amount (NPR)'];
+            const excelRows = (data?.details || []).map(d => [
+              d.date,
+              ...(filters.showBsDate ? [d.bs_date_formatted || ''] : []),
+              d.type,
+              d.ref || '',
+              d.desc || '',
+              d.amount || 0,
+            ]);
+            const excelFooter = ['', ...(filters.showBsDate ? [''] : []), '', '', 'NET CASH FLOW', data?.netCashFlow || 0];
+            await exportFlatXLSX({
+              filename: `Cash_Flow_Summary_${filters.fromDate}_${filters.toDate}.xlsx`,
+              reportTitle: 'Cash Flow Summary (Direct Method)',
+              fromDate: filters.fromDate,
+              toDate: filters.toDate,
+              headers: columns,
+              rows: excelRows,
+              footer: excelFooter,
+            });
+          }}
           onPrintPdf={async () => {
             const columns = ['Date', ...(filters.showBsDate ? ['Date (BS)'] : []), 'Type', 'Voucher #', 'Description', 'Amount (NPR)'];
             const pdfData = data.details.map(d => [
@@ -567,7 +587,58 @@ function PartnerSummaryReport({ title, mode, reportId, initialFromDate, initialT
             headers={[...baseHeaders, ...metaHeaders]}
             rows={tableRows}
             footer={footerBuilder ? footerBuilder(data || []) : undefined}
-            onExport={() => {}}
+            onExport={async () => {
+              const excelRows = (data || []).map(r => {
+                const pName = r.customer_name || r.vendor_name || r.customer || r.vendor || r.name;
+                const partner = partnerMap[pName] || {};
+                const meta = [
+                  ...(metaCols.phone   ? [partner.phone || ''] : []),
+                  ...(metaCols.tax_id  ? [partner.tax_id_number || ''] : []),
+                  ...(metaCols.address ? [partner.address || ''] : []),
+                ];
+                if (reportId.includes('aging_summary')) {
+                  return [
+                    r.customer || r.vendor || 'Unknown',
+                    r.current || 0,
+                    r['30d'] || 0,
+                    r['60d'] || 0,
+                    r['60d+'] || 0,
+                    r.total || 0,
+                    ...meta,
+                  ];
+                } else if (reportId === 'customer_balance') {
+                  return [r.customer || '', r.total_invoiced || 0, r.total_paid || 0, r.balance || 0, ...meta];
+                } else if (reportId === 'vendor_balance') {
+                  return [r.vendor || '', r.total_billed || 0, r.total_paid || 0, r.balance || 0, ...meta];
+                }
+                return rowMapper(r, meta);
+              });
+
+              const excelFooter = (() => {
+                if (reportId.includes('aging_summary')) {
+                  return ['TOTAL',
+                    (data || []).reduce((s, r) => s + (r.current || 0), 0),
+                    (data || []).reduce((s, r) => s + (r['30d'] || 0), 0),
+                    (data || []).reduce((s, r) => s + (r['60d'] || 0), 0),
+                    (data || []).reduce((s, r) => s + (r['60d+'] || 0), 0),
+                    (data || []).reduce((s, r) => s + (r.total || 0), 0),
+                  ];
+                } else if (reportId === 'customer_balance' || reportId === 'vendor_balance') {
+                  return ['TOTAL', '', '', (data || []).reduce((s, r) => s + (r.balance || 0), 0)];
+                }
+                return footerBuilder ? footerBuilder(data || []) : undefined;
+              })();
+
+              await exportFlatXLSX({
+                filename: `${title.replace(/\s+/g, '_')}_${filters.fromDate}_${filters.toDate}.xlsx`,
+                reportTitle: title,
+                fromDate: filters.fromDate,
+                toDate: filters.toDate,
+                headers: [...baseHeaders, ...metaHeaders],
+                rows: excelRows,
+                footer: excelFooter,
+              });
+            }}
             onPrintPdf={() => {
               generateReportVectorPDF({
                 title,
@@ -939,30 +1010,36 @@ function GeneralLedgerDetailReport({ initialFromDate, initialToDate }) {
   const tableRows = [
     // OB Row
     ['', ...(filters.showBsDate ? [''] : []), '', 'Opening Balance', '', '', fmtNPR(summary.ob) + (summary.obIsDr ? ' Dr' : ' Cr')],
-    ...lines.map(l => [
-      l.date,
-      ...(filters.showBsDate ? [l.bs_date_formatted] : []),
-      l.voucher_no ? <VoucherLink voucherNumber={l.voucher_no}><span className="cursor-pointer text-primary">{l.voucher_no}</span></VoucherLink> : '',
-      l.description,
-      fmtNPR(l.dr),
-      fmtNPR(l.cr),
-      fmtNPR(l.bal) + (l.balIsDr ? ' Dr' : ' Cr')
-    ])
+    ...lines.map(l => {
+      const displayVoucher = (l.voucher_no && l.voucher_no !== 'AUTO' && l.voucher_no !== 'REV-AUTO') ? l.voucher_no : (l.reference_number || '');
+      return [
+        l.date,
+        ...(filters.showBsDate ? [l.bs_date_formatted] : []),
+        displayVoucher ? <VoucherLink voucherNumber={displayVoucher}><span className="cursor-pointer text-primary">{displayVoucher}</span></VoucherLink> : '',
+        l.description || 'Journal Entry',
+        fmtNPR(l.dr),
+        fmtNPR(l.cr),
+        fmtNPR(l.bal) + (l.balIsDr ? ' Dr' : ' Cr')
+      ];
+    })
   ];
 
   const handleExport = () => downloadCSV('general_ledger_detail.csv',
     ['Date', ...(filters.showBsDate ? ['Date (BS)'] : []), 'Voucher #', 'Description', 'Debit', 'Credit', 'Balance'],
     [
       ['', ...(filters.showBsDate ? [''] : []), '', 'Opening Balance', '', '', fmtNPR(summary.ob) + (summary.obIsDr ? ' Dr' : ' Cr')],
-      ...lines.map(l => [
-        l.date,
-        ...(filters.showBsDate ? [l.bs_date_formatted] : []),
-        l.voucher_no,
-        l.description,
-        fmtNPR(l.dr),
-        fmtNPR(l.cr),
-        fmtNPR(l.bal) + (l.balIsDr ? ' Dr' : ' Cr')
-      ])
+      ...lines.map(l => {
+        const displayVoucher = (l.voucher_no && l.voucher_no !== 'AUTO' && l.voucher_no !== 'REV-AUTO') ? l.voucher_no : (l.reference_number || '');
+        return [
+          l.date,
+          ...(filters.showBsDate ? [l.bs_date_formatted] : []),
+          displayVoucher,
+          l.description || 'Journal Entry',
+          fmtNPR(l.dr),
+          fmtNPR(l.cr),
+          fmtNPR(l.bal) + (l.balIsDr ? ' Dr' : ' Cr')
+        ];
+      })
     ]
   );
 
@@ -1271,6 +1348,8 @@ export default function ReportViewer({ reportId, data, fromDate, toDate, columnS
             <ReportTable title="Sales By Customer Monthly" fromDate={fd} toDate={td}
               headers={['Customer', 'Month', 'Revenue (NPR)']}
               rows={rows.map(r => [r.customer, r.month, fmtNPR(r.total)])}
+              footer={['TOTAL', '', fmtNPR(rows.reduce((s, r) => s + (r.total || 0), 0))]}
+              onExport={() => downloadCSV('sales_by_customer_monthly.xlsx', ['Customer', 'Month', 'Revenue (NPR)'], rows.map(r => [r.customer, r.month, r.total || 0]), ['TOTAL', '', rows.reduce((s, r) => s + (r.total || 0), 0)])}
             />
           )} />;
 
@@ -1280,6 +1359,8 @@ export default function ReportViewer({ reportId, data, fromDate, toDate, columnS
             <ReportTable title="Sales By Item Monthly" fromDate={fd} toDate={td}
               headers={['Item', 'Month', 'Qty Sold', 'Revenue (NPR)']}
               rows={rows.map(r => [r.item_name, r.month, r.qty_sold, fmtNPR(r.revenue)])}
+              footer={['TOTAL', '', rows.reduce((s, r) => s + (r.qty_sold || 0), 0), fmtNPR(rows.reduce((s, r) => s + (r.revenue || 0), 0))]}
+              onExport={() => downloadCSV('sales_by_item_monthly.xlsx', ['Item', 'Month', 'Qty Sold', 'Revenue (NPR)'], rows.map(r => [r.item_name, r.month, r.qty_sold || 0, r.revenue || 0]), ['TOTAL', '', rows.reduce((s, r) => s + (r.qty_sold || 0), 0), rows.reduce((s, r) => s + (r.revenue || 0), 0)])}
             />
           )} />;
 

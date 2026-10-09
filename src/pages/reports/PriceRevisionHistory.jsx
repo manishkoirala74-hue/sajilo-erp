@@ -10,6 +10,9 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import ReportFilterBar from '@/components/reports/ReportFilterBar';
+import ReportExportActions from '@/components/reports/ReportExportActions';
+import { exportFlatXLSX } from '@/lib/reports/reportExcelExport';
+import { generateReportVectorPDF } from '@/utils/reportPdfEngine';
 import { format } from 'date-fns';
 
 export default function PriceRevisionHistory() {
@@ -126,6 +129,76 @@ export default function PriceRevisionHistory() {
     }
   ];
 
+  const handleExportExcel = async () => {
+    if (!filteredData || filteredData.length === 0) {
+      toast.info('No price revision data to export.');
+      return;
+    }
+    const headers = [
+      'Date',
+      ...(displayBsDate ? ['Date (BS)'] : []),
+      'Item Code',
+      'Item Name',
+      'Category',
+      'Revision Type',
+      'Old Price',
+      'New Price',
+      'Change Amount',
+      'Change %',
+      'Remarks',
+      'Revised By'
+    ];
+    const rows = filteredData.map(r => {
+      const diff = Number(r.new_selling_price || 0) - Number(r.old_selling_price || 0);
+      const percent = Number(r.old_selling_price || 0) > 0 ? (diff / Number(r.old_selling_price)) * 100 : 0;
+      return [
+        formatToDmyAD(r.created_at),
+        ...(displayBsDate ? [formatToDmyBS(r.created_at)] : []),
+        r.Item?.item_code || '',
+        r.Item?.item_name || '',
+        r.ItemCategory?.category_name || '',
+        r.revision_type ? r.revision_type.replace(/_/g, ' ') : '',
+        Number(r.old_selling_price || 0),
+        Number(r.new_selling_price || 0),
+        diff,
+        `${percent.toFixed(1)}%`,
+        r.remarks || '',
+        r.User ? `${r.User.first_name || ''} ${r.User.last_name || ''}`.trim() : 'System'
+      ];
+    });
+    await exportFlatXLSX({
+      filename: `Price_Revision_History_${filters.fromDate}_${filters.toDate}.xlsx`,
+      reportTitle: 'Sales Price Revision History',
+      fromDate: filters.fromDate,
+      toDate: filters.toDate,
+      headers,
+      rows
+    });
+  };
+
+  const handleExportPdf = async () => {
+    if (!filteredData || filteredData.length === 0) return;
+    const headers = ['Date', 'Item', 'Old Price', 'New Price', 'Diff', 'Revised By'];
+    const rows = filteredData.map(r => {
+      const diff = Number(r.new_selling_price || 0) - Number(r.old_selling_price || 0);
+      return [
+        formatToDmyAD(r.created_at),
+        `${r.Item?.item_name || ''} (${r.Item?.item_code || ''})`,
+        `NPR ${Number(r.old_selling_price || 0).toLocaleString()}`,
+        `NPR ${Number(r.new_selling_price || 0).toLocaleString()}`,
+        `${diff >= 0 ? '+' : ''}${diff.toLocaleString()}`,
+        r.User ? `${r.User.first_name || ''} ${r.User.last_name || ''}`.trim() : 'System'
+      ];
+    });
+    await generateReportVectorPDF({
+      title: 'Sales Price Revision History',
+      fromDate: filters.fromDate,
+      toDate: filters.toDate,
+      columns: headers,
+      data: rows,
+      filename: `Price_Revision_History_${filters.fromDate}_${filters.toDate}.pdf`
+    });
+  };
   const filteredData = data.filter(d => 
     d.Item?.item_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     d.Item?.item_code?.toLowerCase().includes(searchTerm.toLowerCase()) ||

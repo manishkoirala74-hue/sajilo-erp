@@ -11,6 +11,9 @@ import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import SearchableSelect from '@/components/shared/SearchableSelect';
 import ReportFilterBar from '@/components/reports/ReportFilterBar';
+import ReportExportActions from '@/components/reports/ReportExportActions';
+import { exportFlatXLSX } from '@/lib/reports/reportExcelExport';
+import { generateReportVectorPDF } from '@/utils/reportPdfEngine';
 import VoucherLink from '@/components/shared/VoucherLink';
 import { format } from 'date-fns';
 
@@ -159,6 +162,55 @@ export default function PurchasePriceChangeHistory() {
     }
   ];
 
+  const handleExportExcel = async () => {
+    if (!filteredData || filteredData.length === 0) {
+      toast.info('No purchase price data to export.');
+      return;
+    }
+    const headers = [
+      'Item Code', 'Item Name', 'Category', 'Latest Supplier', 'Latest Purchase Date',
+      ...(displayBsDate ? ['Latest Purchase Date (BS)'] : []),
+      'Latest Price (NPR)'
+    ];
+    const rows = filteredData.map(r => [
+      r.item_code || '',
+      r.item_name || '',
+      r.category_name || '',
+      r.vendor_name || '',
+      formatToDmyAD(r.invoice_date),
+      ...(displayBsDate ? [formatToDmyBS(r.invoice_date)] : []),
+      Number(r.unit_price || 0)
+    ]);
+    await exportFlatXLSX({
+      filename: `Purchase_Price_Change_History_${filters.fromDate}_${filters.toDate}.xlsx`,
+      reportTitle: 'Purchase Price Change History',
+      fromDate: filters.fromDate,
+      toDate: filters.toDate,
+      headers,
+      rows
+    });
+  };
+
+  const handleExportPdf = async () => {
+    if (!filteredData || filteredData.length === 0) return;
+    const headers = ['Code', 'Item Name', 'Category', 'Supplier', 'Date', 'Price'];
+    const rows = filteredData.map(r => [
+      r.item_code || '',
+      r.item_name || '',
+      r.category_name || '',
+      r.vendor_name || '',
+      formatToDmyAD(r.invoice_date),
+      `NPR ${Number(r.unit_price || 0).toLocaleString()}`
+    ]);
+    await generateReportVectorPDF({
+      title: 'Purchase Price Change History',
+      fromDate: filters.fromDate,
+      toDate: filters.toDate,
+      columns: headers,
+      data: rows,
+      filename: `Purchase_Price_Change_History_${filters.fromDate}_${filters.toDate}.pdf`
+    });
+  };
   const filteredData = data.filter(d => {
     const matchesSearch = (d.item_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
                           (d.item_code || '').toLowerCase().includes(searchTerm.toLowerCase()) ||

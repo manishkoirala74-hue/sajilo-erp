@@ -293,7 +293,8 @@ export async function fetchReportData(reportId, fromDate, toDate, extraParams = 
 
       return lines.map(l => {
         const j = jMap[l.journal_id];
-        return { ...l, entry_date: (j?.entry_date || '').substring(0, 10), journal_memo: j?.memo || '', voucher_no: j?.voucher_no || '' };
+        const vNum = (j?.voucher_no && j?.voucher_no !== 'AUTO' && j?.voucher_no !== 'REV-AUTO') ? j.voucher_no : (j?.source_document_id || '');
+        return { ...l, entry_date: (j?.entry_date || '').substring(0, 10), journal_memo: j?.memo || '', voucher_no: vNum };
       });
     }
 

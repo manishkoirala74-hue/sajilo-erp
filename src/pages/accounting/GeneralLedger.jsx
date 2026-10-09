@@ -172,7 +172,10 @@ export default function GeneralLedger() {
                   <tr key={j.id} className="hover:bg-muted/20 cursor-pointer transition-colors" onClick={() => setSelectedJournal(j)}>
                     <td className="cell-density text-xs font-mono text-muted-foreground">{formatDate(j.entry_date)}</td>
                     <td className="cell-density text-xs font-mono" onClick={e => e.stopPropagation()}>
-                      <VoucherLink voucherNumber={j.voucher_no}>{j.voucher_no || '—'}</VoucherLink>
+                      {(() => {
+                        const vNum = (j.voucher_no && j.voucher_no !== 'AUTO' && j.voucher_no !== 'REV-AUTO') ? j.voucher_no : (j.source_document_id ? `DOC-${j.source_document_id.slice(0, 8)}` : '—');
+                        return <VoucherLink voucherNumber={vNum}>{vNum}</VoucherLink>;
+                      })()}
                     </td>
                     <td className="cell-density font-medium max-w-xs">
                       <p className="truncate" onClick={e => e.stopPropagation()}><VoucherTextLinkifier text={j.description} /></p>

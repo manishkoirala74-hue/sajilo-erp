@@ -8,104 +8,13 @@ import UserActivityLog from '@/pages/reports/UserActivityLog';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import ReportViewer from '@/components/reports/ReportViewer.jsx';
+import ReportSearch from '@/components/reports/ReportSearch';
+import { REPORT_CATEGORIES } from '@/config/reportsRegistry';
 import { fetchReportData } from '@/lib/reportDataFetcher';
 import { format } from 'date-fns';
 
 // ── Report Catalogue ──────────────────────────────────────────────────────────
-const CATEGORIES = [
-  {
-    id: 'accounting', label: 'Accounting', icon: BarChart2, color: 'purple',
-    reports: [
-      { id: 'trial_balance',   label: 'Trial Balance',             desc: 'All ledger accounts with debit and credit balances' },
-      { id: 'profit_loss',     label: 'Income Statement',          desc: 'Revenue vs expenses for a given period' },
-      { id: 'balance_sheet',   label: 'Balance Sheet',             desc: 'Assets, liabilities, and equity as of a date' },
-      { id: 'day_book',        label: 'Day Book',                  desc: 'All financial transactions for a selected date in dual-column format', isRoute: true, path: '/reports/accounting/day-book' },
-      { id: 'cash_flow',       label: 'Cash Flow Summary',         desc: 'Cash inflows and outflows (IAS 7 compliant)' },
-      { id: 'ledger_detail',   label: 'Detail General Ledger',     desc: 'All transactions for a specific account' },
-      { id: 'gl_summary',      label: 'General Ledger Summary',    desc: 'Summarized balances for all GL accounts' },
-      { id: 'journal_report',  label: 'Journal Report',            desc: 'All journal entries in the period' },
-      { id: 'txn_list',        label: 'Transaction List',          desc: 'All financial transactions by date' },
-    ]
-  },
-  {
-    id: 'receivable', label: 'Receivable', icon: Users, color: 'blue',
-    reports: [
-      { id: 'ar_aging',           label: 'Invoice Age',                    desc: 'Outstanding invoices by overdue period' },
-      { id: 'debtor_statement',   label: 'Customer Statement',             desc: 'Full transaction history per customer' },
-      { id: 'ar_aging_summary',   label: 'Customer Ageing Summary',        desc: 'AR aging grouped by customer' },
-      { id: 'customer_balance',   label: 'Customer Receivable Summary',    desc: 'Total receivables per customer' },
-      { id: 'employee_receivable',label: 'Employee Receivable Balance',    desc: 'Outstanding advances and receivables due from employees', isRoute: true, path: '/reports/employee-receivables' },
-      { id: 'customer_bill_due',  label: 'Customer Bill Due',              desc: 'Track and receive payments for outstanding customer invoices', isRoute: true, path: '/reports/customer-bill-due' },
-    ]
-  },
-  {
-    id: 'payable', label: 'Payable', icon: CreditCard, color: 'amber',
-    reports: [
-      { id: 'ap_aging',           label: 'Purchase Bill Age',              desc: 'Outstanding bills by overdue period' },
-      { id: 'vendor_statement',   label: 'Supplier Statement',             desc: 'Full transaction history per supplier' },
-      { id: 'ap_aging_summary',   label: 'Supplier Ageing Summary',        desc: 'AP aging grouped by supplier' },
-      { id: 'vendor_balance',     label: 'Supplier Payable Summary',       desc: 'Total payables per supplier' },
-      { id: 'employee_payable',   label: 'Employee Payable Balance',       desc: 'Unliquidated net wages owed to employees', isRoute: true, path: '/reports/employee-payables' },
-      { id: 'supplier_bill_due',  label: 'Supplier Bill Due',              desc: 'Track and make payments for outstanding supplier invoices', isRoute: true, path: '/reports/supplier-bill-due' },
-    ]
-  },
-  {
-    id: 'sales', label: 'Sales Report', icon: TrendingUp, color: 'indigo',
-    reports: [
-      { id: 'sales_summary',          label: 'Sales Summary',                  desc: 'Total sales revenue by date range' },
-      { id: 'sales_by_customer',       label: 'Sales By Customer',              desc: 'Revenue breakdown per customer' },
-      { id: 'sales_by_item',           label: 'Sales By Item',                  desc: 'Which products are selling the most' },
-      { id: 'sales_by_customer_monthly', label: 'Sales By Customer Monthly',    desc: 'Monthly breakdown per customer' },
-      { id: 'sales_by_item_monthly',   label: 'Sales By Item Monthly',          desc: 'Monthly breakdown per item' },
-      { id: 'sales_return_report',     label: 'Sales Master Report',            desc: 'All sales invoices and POS in the period' },
-    ]
-  },
-  {
-    id: 'purchase', label: 'Purchase Report', icon: ShoppingCart, color: 'emerald',
-    reports: [
-      { id: 'purchase_summary',     label: 'Purchase Summary',        desc: 'Total purchases by date range' },
-      { id: 'purchase_by_vendor',   label: 'Purchase By Supplier',    desc: 'Spend breakdown per supplier' },
-      { id: 'purchase_by_item',     label: 'Purchase By Item',        desc: 'Quantity and cost per item purchased' },
-      { id: 'unpaid_bills',         label: 'Unpaid Purchase Invoices',desc: 'All bills with pending payment' },
-      { id: 'purchase_price_change_history', label: 'Purchase Price Change History', desc: 'Audit trail of purchase price changes', isRoute: true, path: '/reports/purchase-price-change-history' },
-    ]
-  },
-  {
-    id: 'tax', label: 'Tax Report', icon: Receipt, color: 'red',
-    reports: [
-      { id: 'vat_summary',    label: 'VAT Summary Report',      desc: 'VAT collected on sales and paid on purchases' },
-      { id: 'vat_sales',      label: 'Sales VAT Register',      desc: 'VAT-applicable sales with tax breakdown' },
-      { id: 'vat_purchases',  label: 'Purchase VAT Register',   desc: 'VAT-applicable purchases with tax breakdown' },
-      { id: 'tds_report',     label: 'TDS Deduction Report',    desc: 'Tax Deducted at Source from payroll' },
-    ]
-  },
-  {
-    id: 'inventory', label: 'Inventory Report', icon: Warehouse, color: 'teal',
-    reports: [
-      { id: 'stock_summary',     label: 'Stock Summary',          desc: 'Current stock levels and total value' },
-      { id: 'stock_ledger_statement', label: 'Stock Ledger Statement', desc: 'Detailed stock statement for a specific item' },
-      { id: 'stock_by_location', label: 'Stock by Location',      desc: 'Current stock broken down by Godown' },
-      { id: 'low_stock',         label: 'Low Stock / Reorder',    desc: 'Items below reorder level' },
-      { id: 'stock_movement',    label: 'Stock Movement',         desc: 'All stock changes in the period' },
-      { id: 'item_valuation',    label: 'Item Valuation',         desc: 'Inventory value at cost' },
-      { id: 'category_summary',  label: 'Category-wise Summary',  desc: 'Stock grouped by category' },
-      { id: 'price_revision_history', label: 'Sales Price Revision History', desc: 'Audit trail of sales price changes', isRoute: true, path: '/reports/price-revision-history' },
-      { id: 'inventory_turnover', label: 'Inventory Turnover Ratio', desc: 'Turnover ratio, COGS, and DSI for inventory items', isRoute: true, path: '/reports/inventory-turnover' },
-      { id: 'gross_profit_margin', label: 'Gross Profit Margin Report', desc: 'Revenue, COGS, and Gross Margin per item', isRoute: true, path: '/reports/inventory/gross-profit-margin' },
-      { id: 'negative_stock', label: 'Negative Stock Exceptions', desc: 'Items currently below zero quantity', isRoute: true, path: '/reports/inventory/negative-stock-exceptions' },
-    ]
-  },
-  {
-    id: 'system', label: 'System Report', icon: Settings2, color: 'slate',
-    reports: [
-      { id: 'communication_logs', label: 'Communication Logs', desc: 'Audit trail of Email and WhatsApp deliveries', isRoute: true, path: '/reports/communication-logs' }
-    ]
-  },
-  {
-    id: 'activity_log', label: 'Activity Log', icon: History, color: 'slate',
-    reports: [], isCustom: true,
-  },
-];
+const CATEGORIES = REPORT_CATEGORIES;
 
 // ── Color Map ─────────────────────────────────────────────────────────────────
 const CM = {
@@ -132,13 +41,16 @@ export default function Reports() {
   const [generating, setGenerating]         = useState(null);
   const [viewer, setViewer]                 = useState(cachedViewer);
 
-  // Auto-open report from URL query parameter
+  // Auto-open report or switch category from URL query parameter
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const reportId = params.get('report');
-    if (reportId) {
+    const catParam = params.get('category');
+    if (catParam) {
+      setActiveCategory(catParam);
+      navigate('/reports', { replace: true });
+    } else if (reportId) {
       setViewer({ reportId, data: null });
-      // Clear the param so it doesn't reopen if they refresh after closing
       navigate('/reports', { replace: true });
     }
   }, [location.search, navigate]);
@@ -163,10 +75,13 @@ export default function Reports() {
   return (
     <>
     <div className="space-y-5 print:hidden">
-      {/* Page Header */}
-      <div>
-        <h2 className="text-xl font-bold text-foreground">Reports</h2>
-        <p className="text-sm text-muted-foreground mt-0.5">Generate, filter, and export business reports</p>
+      {/* Page Header & Search */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h2 className="text-xl font-bold text-foreground">Reports</h2>
+          <p className="text-sm text-muted-foreground mt-0.5">Generate, filter, and export business reports</p>
+        </div>
+        <ReportSearch className="w-full sm:w-80 md:w-96" />
       </div>
 
       <div className="flex flex-col md:flex-row gap-4 md:gap-5">

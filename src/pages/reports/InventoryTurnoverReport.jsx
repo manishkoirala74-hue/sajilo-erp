@@ -13,6 +13,8 @@ import DateInput from '@/components/shared/DateInput';
 import { format, subMonths, differenceInDays } from 'date-fns';
 import { toast } from 'react-hot-toast';
 import ReportFilterBar from '@/components/reports/ReportFilterBar';
+import ReportExportActions from '@/components/reports/ReportExportActions';
+import { exportFlatXLSX } from '@/lib/reports/reportExcelExport';
 
 export default function InventoryTurnoverReport() {
   const navigate = useNavigate();
@@ -223,6 +225,31 @@ export default function InventoryTurnoverReport() {
     )}
   ];
 
+  const handleExportExcel = async () => {
+    if (!data || data.length === 0) {
+      toast.error('No data to export.');
+      return;
+    }
+    const headers = ['Item Code', 'Item Name', 'Category', 'COGS', 'Avg Inventory', 'Turnover Ratio', 'DSI (Days)', 'Velocity'];
+    const rows = data.map(r => [
+      r.item_code || '—',
+      r.item_name || '',
+      r.category_name || '—',
+      r.cogs || 0,
+      r.avgInventory || 0,
+      r.turnoverRatio ? Number(r.turnoverRatio) : 0,
+      r.daysSalesOfInventory || 0,
+      r.velocityStatus || ''
+    ]);
+    await exportFlatXLSX({
+      filename: `Inventory_Turnover_${filters.fromDate}_${filters.toDate}.xlsx`,
+      reportTitle: 'Inventory Turnover Ratio Report',
+      fromDate: filters.fromDate,
+      toDate: filters.toDate,
+      headers,
+      rows
+    });
+  };
   const handlePrint = () => {
     window.print();
   };

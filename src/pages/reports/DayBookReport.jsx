@@ -8,6 +8,8 @@ import { ArrowLeft, BookOpen, Printer, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { BSDatePicker } from '@/components/reports/ReportFilterBar';
 import VoucherLink from '@/components/shared/VoucherLink';
+import ReportExportActions from '@/components/reports/ReportExportActions';
+import { exportFlatXLSX } from '@/lib/reports/reportExcelExport';
 import { toast } from 'sonner';
 
 const VOUCHER_TYPE_ABBR = {
@@ -73,6 +75,70 @@ export default function DayBookReport() {
   const grandLeftCash = leftCashTotal + leftOpeningBal + leftClosingBal;
   const grandRightCash = rightCashTotal + rightOpeningBal + rightClosingBal;
 
+  const handleExportExcel = async () => {
+    if (!data) {
+      toast.info('Please generate the day book first.');
+      return;
+    }
+    const headers = [
+      'Dr - Particulars', 'Dr - Voucher #', 'Dr - Type', 'Dr - Cash Amt', 'Dr - Amount',
+      'Cr - Particulars', 'Cr - Voucher #', 'Cr - Type', 'Cr - Cash Amt', 'Cr - Amount'
+    ];
+
+    const rows = [];
+    
+    // Opening balance row
+    if (openingBal >= 0) {
+      rows.push(['Opening Balance', '', '', leftOpeningBal, '', '', '', '', '', '']);
+    } else {
+      rows.push(['', '', '', '', '', 'Opening Balance (Overdrawn)', '', '', rightOpeningBal, '']);
+    }
+
+    // Zipped transaction rows
+    for (let i = 0; i < maxRows; i++) {
+      const left = debits[i];
+      const right = credits[i];
+      rows.push([
+        left?.account_name || '',
+        left?.voucher_number || '',
+        left ? (VOUCHER_TYPE_ABBR[left.voucher_type] || left.voucher_type) : '',
+        left?.cash_amount || '',
+        left?.non_cash_amount || '',
+        right?.account_name || '',
+        right?.voucher_number || '',
+        right ? (VOUCHER_TYPE_ABBR[right.voucher_type] || right.voucher_type) : '',
+        right?.cash_amount || '',
+        right?.non_cash_amount || ''
+      ]);
+    }
+
+    // Subtotal row
+    rows.push(['Total', '', '', leftCashTotal, leftAmtTotal, 'Total', '', '', rightCashTotal, rightAmtTotal]);
+
+    // Closing balance row
+    if (closingBal < 0) {
+      rows.push(['Closing Balance (Overdrawn)', '', '', leftClosingBal, '', '', '', '', '', '']);
+    } else {
+      rows.push(['', '', '', '', '', 'Closing Balance', '', '', rightClosingBal, '']);
+    }
+
+    // Grand total row
+    const footer = ['Grand Total', '', '', grandLeftCash, leftAmtTotal, 'Grand Total', '', '', grandRightCash, rightAmtTotal];
+
+    await exportFlatXLSX({
+      filename: `Day_Book_${date}.xlsx`,
+      reportTitle: `Day Book - ${date}`,
+      fromDate: date,
+      toDate: date,
+      headers,
+      rows,
+      footer
+    });
+  };
+
+  const handleExportPdf = () => {
+    window.print();
+  };
   return (
     <div className="flex flex-col gap-5 p-6 pb-24 max-w-[1400px] mx-auto print:p-2 print:pb-0">
       
@@ -89,9 +155,10 @@ export default function DayBookReport() {
             <p className="text-sm text-muted-foreground">All transactions for a single date</p>
           </div>
         </div>
-        <Button onClick={() => window.print()} className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl">
-          <Printer className="w-4 h-4 mr-2" /> Print
-        </Button>
+        <ReportExportActions
+          onExportExcel={handleExportExcel}
+          onExportPdf={handleExportPdf}
+        />
       </div>
 
       {/* ── Filter Bar ── */}

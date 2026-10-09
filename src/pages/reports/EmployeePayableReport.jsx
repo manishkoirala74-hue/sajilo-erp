@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react';
 import { sajilo } from '@/api/sajiloClient';
 import PageHeader from '@/components/shared/PageHeader';
+import ReportExportActions from '@/components/reports/ReportExportActions';
+import { exportFlatXLSX } from '@/lib/reports/reportExcelExport';
+import { generateReportVectorPDF } from '@/utils/reportPdfEngine';
 import DataTable from '@/components/shared/DataTable';
 import { FileText } from 'lucide-react';
 import ReportFilterBar from '@/components/reports/ReportFilterBar';
@@ -54,6 +57,49 @@ export default function EmployeePayableReport() {
     load();
   }, []);
 
+  const handleExportExcel = async () => {
+    if (!data || data.length === 0) return;
+    const headers = ['Emp Code', 'Employee Name', 'Department', 'Net Salary Payable'];
+    const rows = data.map(r => [
+      r.code || '—',
+      r.name || '',
+      r.dept || '—',
+      r.balance || 0
+    ]);
+    const total = data.reduce((s, r) => s + (r.balance || 0), 0);
+    const footer = ['TOTAL', '', '', total];
+    await exportFlatXLSX({
+      filename: `Employee_Payable_Balances_${filters.fromDate}_${filters.toDate}.xlsx`,
+      reportTitle: 'Employee Payable Balances',
+      fromDate: filters.fromDate,
+      toDate: filters.toDate,
+      headers,
+      rows,
+      footer
+    });
+  };
+
+  const handleExportPdf = async () => {
+    if (!data || data.length === 0) return;
+    const headers = ['Emp Code', 'Employee Name', 'Department', 'Balance'];
+    const rows = data.map(r => [
+      r.code || '—',
+      r.name || '',
+      r.dept || '—',
+      fmt(r.balance)
+    ]);
+    const total = data.reduce((s, r) => s + (r.balance || 0), 0);
+    const footer = ['TOTAL', '', '', fmt(total)];
+    await generateReportVectorPDF({
+      title: 'Employee Payable Balances',
+      fromDate: filters.fromDate,
+      toDate: filters.toDate,
+      columns: headers,
+      data: rows,
+      footer,
+      filename: `Employee_Payable_Balances_${filters.fromDate}_${filters.toDate}.pdf`
+    });
+  };
   const columns = [
     { key: 'code', label: 'Emp Code' },
     { key: 'name', label: 'Employee Name' },
@@ -63,7 +109,16 @@ export default function EmployeePayableReport() {
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Employee Payable Balances" subtitle="Unliquidated net wages owed to employees" icon={FileText} />
+      <PageHeader
+        title="Employee Payable Balances"
+        subtitle="Unliquidated net wages owed to employees"
+        icon={FileText}
+      >
+        <ReportExportActions
+          onExportExcel={handleExportExcel}
+          onExportPdf={handleExportPdf}
+        />
+      </PageHeader>
       <ReportFilterBar filters={filters} onChange={setFilters} onApply={load} showApplyButton />
       <DataTable columns={columns} data={data} searchKey="name" loading={loading} />
     </div>

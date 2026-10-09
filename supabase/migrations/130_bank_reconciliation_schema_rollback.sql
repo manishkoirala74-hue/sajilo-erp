@@ -1,0 +1,8 @@
+BEGIN;
+
+DROP FUNCTION IF EXISTS public.save_bank_reconciliation_session(UUID, UUID, DATE, NUMERIC, NUMERIC, NUMERIC, NUMERIC, NUMERIC, NUMERIC, NUMERIC, TEXT, TEXT, JSONB);
+DROP FUNCTION IF EXISTS public.get_bank_reconciliation_report(UUID, UUID, DATE, NUMERIC);
+DROP TABLE IF EXISTS public."BankReconciliationLine" CASCADE;
+DROP TABLE IF EXISTS public."BankReconciliation" CASCADE;
+
+COMMIT;

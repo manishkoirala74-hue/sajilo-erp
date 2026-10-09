@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react';
 import { sajilo, supabase } from '@/api/sajiloClient';
 import PageHeader from '@/components/shared/PageHeader';
+import ReportExportActions from '@/components/reports/ReportExportActions';
+import { exportFlatXLSX } from '@/lib/reports/reportExcelExport';
+import { generateReportVectorPDF } from '@/utils/reportPdfEngine';
 import DataTable from '@/components/shared/DataTable';
 import { FileText, DollarSign, Eye, Activity } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -268,6 +271,83 @@ export default function SupplierBillDue() {
     }
   };
 
+  const handleExportExcel = async () => {
+    if (!data || data.length === 0) return;
+    const headers = [
+      'S.N.', 'Supplier', 'Invoice No', 'Invoice Date',
+      ...(displayBsDate ? ['Invoice Date (BS)'] : []),
+      'Due Date',
+      ...(displayBsDate ? ['Due Date (BS)'] : []),
+      'Days Overdue', 'Bill Total', 'Payment', 'Balance Due'
+    ];
+    const rows = data.map((r, idx) => [
+      idx + 1,
+      r.vendor_name || '',
+      r.invoice_number || '',
+      r.invoice_date || '',
+      ...(displayBsDate ? [formatToDmyBS(r.invoice_date)] : []),
+      r.due_date || '',
+      ...(displayBsDate ? [formatToDmyBS(r.due_date)] : []),
+      r.daysOverDue || 0,
+      r.grand_total || 0,
+      r.paid_amount || 0,
+      r.due || 0
+    ]);
+    const totalGrand = data.reduce((s, r) => s + (r.grand_total || 0), 0);
+    const totalPaid = data.reduce((s, r) => s + (r.paid_amount || 0), 0);
+    const totalDue = data.reduce((s, r) => s + (r.due || 0), 0);
+    const footer = [
+      'TOTAL', '', '', '',
+      ...(displayBsDate ? [''] : []),
+      '',
+      ...(displayBsDate ? [''] : []),
+      '',
+      totalGrand,
+      totalPaid,
+      totalDue
+    ];
+    await exportFlatXLSX({
+      filename: `Supplier_Bill_Due_${filters.fromDate}_${filters.toDate}.xlsx`,
+      reportTitle: 'Supplier Bill Due Report',
+      fromDate: filters.fromDate,
+      toDate: filters.toDate,
+      headers,
+      rows,
+      footer
+    });
+  };
+
+  const handleExportPdf = async () => {
+    if (!data || data.length === 0) return;
+    const headers = [
+      'S.N.', 'Supplier', 'Invoice No', 'Date', 'Due Date', 'Overdue', 'Total', 'Paid', 'Due'
+    ];
+    const rows = data.map((r, idx) => [
+      String(idx + 1),
+      r.vendor_name || '',
+      r.invoice_number || '',
+      r.invoice_date || '',
+      r.due_date || '',
+      r.daysOverDue > 0 ? `${r.daysOverDue} d` : 'Current',
+      fmt(r.grand_total),
+      fmt(r.paid_amount),
+      fmt(r.due)
+    ]);
+    const totalGrand = data.reduce((s, r) => s + (r.grand_total || 0), 0);
+    const totalPaid = data.reduce((s, r) => s + (r.paid_amount || 0), 0);
+    const totalDue = data.reduce((s, r) => s + (r.due || 0), 0);
+    const footer = ['TOTAL', '', '', '', '', '', fmt(totalGrand), fmt(totalPaid), fmt(totalDue)];
+    await generateReportVectorPDF({
+      title: 'Supplier Bill Due Report',
+      fromDate: filters.fromDate,
+      toDate: filters.toDate,
+      columns: headers,
+      data: rows,
+      footer,
+      filename: `Supplier_Bill_Due_${filters.fromDate}_${filters.toDate}.pdf`,
+      orientation: 'landscape'
+    });
+  };
   const columns = [
     { key: 'sn', label: 'S.N.' },
     { key: 'vendor_name', label: 'Supplier' },
@@ -290,7 +370,19 @@ export default function SupplierBillDue() {
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Supplier Bill Due" subtitle="Track and make payments for outstanding supplier invoices" icon={FileText}  action={openReconModal} actionLabel="Settle Advances" actionIcon={Activity} />
+      <PageHeader
+        title="Supplier Bill Due"
+        subtitle="Track and record payments for outstanding supplier bills"
+        icon={FileText}
+        action={openReconModal}
+        actionLabel="Settle Advances"
+        actionIcon={Activity}
+      >
+        <ReportExportActions
+          onExportExcel={handleExportExcel}
+          onExportPdf={handleExportPdf}
+        />
+      </PageHeader>
       <ReportFilterBar filters={filters} onChange={setFilters} onApply={load} showApplyButton />
       <DataTable columns={columns} data={data} searchKey="vendor_name" loading={loading} />
 

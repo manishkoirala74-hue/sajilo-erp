@@ -4,6 +4,12 @@ import { RefreshCw, Search, History, ArrowUpDown, ArrowDown, ArrowUp, CheckCircl
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
+import ReportExportActions from '@/components/reports/ReportExportActions';
+import { exportAuditLogXLSX } from '@/lib/reports/reportExcelExport';
+import { generateReportVectorPDF } from '@/utils/reportPdfEngine';
+import { useAuth } from '@/lib/AuthContext';
+import { format } from 'date-fns';
+import { toast } from 'sonner';
 
 const TABS = [
   { id: 'opening_balance', label: 'Opening Balance Changes' },
@@ -15,6 +21,7 @@ const TABS = [
 ];
 
 export default function UserActivityLog() {
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('opening_balance');
   const [logs, setLogs] = useState([]);
   const [importLogs, setImportLogs] = useState([]);
@@ -90,6 +97,171 @@ export default function UserActivityLog() {
     return <span className={cn('text-xs font-medium', color)}>{diff > 0 ? '+' : ''}{diff.toLocaleString()}</span>;
   };
 
+  const handleExportExcel = async () => {
+    let headers = [];
+    let rows = [];
+    let tabTitle = 'User Activity Log';
+
+    if (activeTab === 'opening_balance') {
+      tabTitle = 'Opening Balance Audit Log';
+      headers = ['Account Code', 'Account Name', 'Account Group', 'Previous Balance', 'New Balance', 'Change', 'Changed By', 'Date', 'Remarks'];
+      rows = sorted.map(l => [
+        l.account_code || '',
+        l.account_name || '',
+        l.account_group || '',
+        l.previous_balance || 0,
+        l.new_balance || 0,
+        (l.new_balance || 0) - (l.previous_balance || 0),
+        l.changed_by || '',
+        l.created_date ? new Date(l.created_date).toISOString() : '',
+        l.remarks || ''
+      ]);
+    } else if (activeTab === 'item_imports') {
+      tabTitle = 'Item Imports Audit Log';
+      headers = ['File Name', 'Imported By', 'Status', 'Total Rows', 'Success Rows', 'Failed Rows', 'Date'];
+      rows = importLogs.map(l => [
+        l.file_name || '',
+        l.imported_by || '',
+        l.status || '',
+        l.total_rows || 0,
+        l.success_rows || 0,
+        l.failed_rows || 0,
+        l.created_date ? new Date(l.created_date).toISOString() : ''
+      ]);
+    } else if (activeTab === 'item_deletions') {
+      tabTitle = 'Item Deletions Audit Log';
+      headers = ['Item Name', 'Item Code', 'Deleted By', 'Reason', 'Date'];
+      rows = deletionLogs.map(l => [
+        l.item_name || '',
+        l.item_code || '',
+        l.deleted_by || '',
+        l.reason || '',
+        l.created_date ? new Date(l.created_date).toISOString() : ''
+      ]);
+    } else if (activeTab === 'partner_imports') {
+      tabTitle = 'Partner Imports Audit Log';
+      headers = ['File Name', 'Imported By', 'Status', 'Total Rows', 'Success Rows', 'Failed Rows', 'Date'];
+      rows = partnerImportLogs.map(l => [
+        l.file_name || '',
+        l.imported_by || '',
+        l.status || '',
+        l.total_rows || 0,
+        l.success_rows || 0,
+        l.failed_rows || 0,
+        l.created_date ? new Date(l.created_date).toISOString() : ''
+      ]);
+    } else if (activeTab === 'partner_deletions') {
+      tabTitle = 'Partner Deletions Audit Log';
+      headers = ['Partner Name', 'Type', 'Deleted By', 'Reason', 'Date'];
+      rows = partnerDeleteLogs.map(l => [
+        l.partner_name || '',
+        l.partner_type || '',
+        l.deleted_by || '',
+        l.reason || '',
+        l.created_date ? new Date(l.created_date).toISOString() : ''
+      ]);
+    } else if (activeTab === 'voucher_actions') {
+      tabTitle = 'Voucher Actions Audit Log';
+      headers = ['Voucher No', 'Voucher Type', 'Action', 'Performed By', 'Reason', 'Date'];
+      rows = voucherActionLogs.map(l => [
+        l.voucher_number || '',
+        l.voucher_type || '',
+        l.action || '',
+        l.performed_by || '',
+        l.reason || '',
+        l.created_date ? new Date(l.created_date).toISOString() : ''
+      ]);
+    }
+
+    if (rows.length === 0) {
+      toast.info('No activity log data to export in current tab.');
+      return;
+    }
+
+    await exportAuditLogXLSX({
+      filename: `${tabTitle.replace(/\s+/g, '_')}_${format(new Date(), 'yyyyMMdd_HHmmss')}.xlsx`,
+      title: tabTitle,
+      headers,
+      rows,
+      currentUser: user,
+    });
+  };
+
+  const handleExportPdf = async () => {
+    let headers = [];
+    let rows = [];
+    let tabTitle = 'User Activity Log';
+
+    if (activeTab === 'opening_balance') {
+      tabTitle = 'Opening Balance Audit Log';
+      headers = ['Code', 'Account Name', 'Previous', 'New', 'Changed By', 'Date'];
+      rows = sorted.map(l => [
+        l.account_code || '',
+        l.account_name || '',
+        String(l.previous_balance || 0),
+        String(l.new_balance || 0),
+        l.changed_by || '',
+        l.created_date ? format(new Date(l.created_date), 'yyyy-MM-dd HH:mm') : ''
+      ]);
+    } else if (activeTab === 'item_imports' || activeTab === 'partner_imports') {
+      const isItem = activeTab === 'item_imports';
+      tabTitle = isItem ? 'Item Imports Audit Log' : 'Partner Imports Audit Log';
+      headers = ['File Name', 'Imported By', 'Status', 'Total', 'Success', 'Failed', 'Date'];
+      const curList = isItem ? importLogs : partnerImportLogs;
+      rows = curList.map(l => [
+        l.file_name || '',
+        l.imported_by || '',
+        l.status || '',
+        String(l.total_rows || 0),
+        String(l.success_rows || 0),
+        String(l.failed_rows || 0),
+        l.created_date ? format(new Date(l.created_date), 'yyyy-MM-dd HH:mm') : ''
+      ]);
+    } else if (activeTab === 'item_deletions') {
+      tabTitle = 'Item Deletions Audit Log';
+      headers = ['Item Name', 'Item Code', 'Deleted By', 'Reason', 'Date'];
+      rows = deletionLogs.map(l => [
+        l.item_name || '',
+        l.item_code || '',
+        l.deleted_by || '',
+        l.reason || '',
+        l.created_date ? format(new Date(l.created_date), 'yyyy-MM-dd HH:mm') : ''
+      ]);
+    } else if (activeTab === 'partner_deletions') {
+      tabTitle = 'Partner Deletions Audit Log';
+      headers = ['Partner Name', 'Type', 'Deleted By', 'Reason', 'Date'];
+      rows = partnerDeleteLogs.map(l => [
+        l.partner_name || '',
+        l.partner_type || '',
+        l.deleted_by || '',
+        l.reason || '',
+        l.created_date ? format(new Date(l.created_date), 'yyyy-MM-dd HH:mm') : ''
+      ]);
+    } else if (activeTab === 'voucher_actions') {
+      tabTitle = 'Voucher Actions Audit Log';
+      headers = ['Voucher No', 'Type', 'Action', 'Performed By', 'Reason', 'Date'];
+      rows = voucherActionLogs.map(l => [
+        l.voucher_number || '',
+        l.voucher_type || '',
+        l.action || '',
+        l.performed_by || '',
+        l.reason || '',
+        l.created_date ? format(new Date(l.created_date), 'yyyy-MM-dd HH:mm') : ''
+      ]);
+    }
+
+    if (rows.length === 0) return;
+
+    await generateReportVectorPDF({
+      title: tabTitle,
+      subtitle: `Audit Trail - Exported by ${user?.full_name || user?.email || 'User'} on ${new Date().toISOString()}`,
+      columns: headers,
+      data: rows,
+      filename: `${tabTitle.replace(/\s+/g, '_')}_${format(new Date(), 'yyyyMMdd')}.pdf`,
+      orientation: 'landscape',
+      user
+    });
+  };
   return (
     <div className="space-y-4">
       {/* Header */}
@@ -103,6 +275,10 @@ export default function UserActivityLog() {
         <Button variant="outline" size="sm" onClick={fetchLogs} disabled={loading}>
           <RefreshCw className={cn('w-3.5 h-3.5 mr-1.5', loading && 'animate-spin')} /> Refresh
         </Button>
+        <ReportExportActions
+          onExportExcel={handleExportExcel}
+          onExportPdf={handleExportPdf}
+        />
       </div>
 
       {/* Tabs */}

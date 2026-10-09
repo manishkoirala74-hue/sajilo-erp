@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/api/sajiloClient';
 import PageHeader from '@/components/shared/PageHeader';
+import ReportExportActions from '@/components/reports/ReportExportActions';
+import { exportFlatXLSX } from '@/lib/reports/reportExcelExport';
+import { generateReportVectorPDF } from '@/utils/reportPdfEngine';
 import DataTable from '@/components/shared/DataTable';
 import { toast } from 'sonner';
 import ReportFilterBar from '@/components/reports/ReportFilterBar';
@@ -53,6 +56,52 @@ export default function NegativeStockExceptionReport() {
     }
   };
 
+  const handleExportExcel = async () => {
+    if (!data || data.length === 0) return;
+    const headers = ['Item Code', 'Item Name', 'Category', 'Godown / Location', 'Negative Qty'];
+    const rows = data.map(r => [
+      r.item_code || '—',
+      r.item_name || '',
+      r.category || '—',
+      r.godown_name || '—',
+      r.current_qty || 0
+    ]);
+    const totalNegative = data.reduce((s, r) => s + (r.current_qty || 0), 0);
+    const footer = ['TOTAL', '', '', '', totalNegative];
+    await exportFlatXLSX({
+      filename: `Negative_Stock_Exceptions_${format(new Date(), 'yyyyMMdd')}.xlsx`,
+      reportTitle: 'Negative Stock Exception Report',
+      fromDate: filters.fromDate,
+      toDate: filters.toDate,
+      headers,
+      rows,
+      footer
+    });
+  };
+
+  const handleExportPdf = async () => {
+    if (!data || data.length === 0) return;
+    const headers = ['Item Code', 'Item Name', 'Category', 'Godown / Location', 'Negative Qty'];
+    const rows = data.map(r => [
+      r.item_code || '—',
+      r.item_name || '',
+      r.category || '—',
+      r.godown_name || '—',
+      String(r.current_qty || 0)
+    ]);
+    const totalNegative = data.reduce((s, r) => s + (r.current_qty || 0), 0);
+    const footer = ['TOTAL', '', '', '', String(totalNegative)];
+    await generateReportVectorPDF({
+      title: 'Negative Stock Exception Report',
+      subtitle: 'Items with quantity on hand below zero',
+      fromDate: filters.fromDate,
+      toDate: filters.toDate,
+      columns: headers,
+      data: rows,
+      footer,
+      filename: `Negative_Stock_Exceptions_${format(new Date(), 'yyyyMMdd')}.pdf`
+    });
+  };
   const columns = [
     { key: 'item_code', label: 'Item Code' },
     { key: 'item_name', label: 'Item Name' },
