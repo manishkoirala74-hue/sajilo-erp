@@ -53,6 +53,7 @@ This document serves as the core set of architectural principles and lessons lea
 - **Data Normalization & Adapters:** When building global UI components (like a GlobalVoucherDrawer), data normalization adapters must rigorously support the specific schemas of all entity types being passed in (e.g., handling both debit/credit and debit_amount/credit_amount, ensuring fields like voucher_date and contact_name are part of fallback chains).
 - **Field Normalization for Remarks:** When extracting remarks, notes, or descriptions for global views or PDF generation, explicitly check all alias fields across different domains (e.g., `data.remarks || data.notes || data.narration || data.description`) to ensure metadata is never silently dropped.
 - **Line-Level vs Header-Level Narrations:** Recognize that some entities (like Invoices) store remarks at the document header, while others (like Financial Journals) store critical narrations at the line-item level. Generic table views and SQL data fetchers must explicitly `SELECT` and render line-level `description` fields in their matrix views, avoiding the pitfall of only fetching accounts and amounts.
+- **Sub-Ledger vs. Entity-Type Dual-Entry Rule:** Document-level entities (`entity_type = 'Customer'`) and General Ledger lines are decoupled in voucher transactions. Financial Vouchers post directly to the sub-ledger `ChartOfAccount` (`receivable_account_id` / `payable_account_id`) with `entity_type = null`. Ledger aggregations must never filter by `entity_type` alone.
 
 ## SQL Management
 
@@ -149,4 +150,53 @@ This document serves as the core set of architectural principles and lessons lea
   - During the 200–300ms hover/keystroke window before click or Enter, silently prefetch the Vite code-split bundle chunk and foundational TanStack Query data (e.g. active items, chart of accounts) with a 5-minute `staleTime`.
 - **Centralized Action Registry & Global Quick-Create (`actionRegistry.js`):** Unify all application routes, reports catalog, settings, and quick-create actions (`Alt+J`, `Alt+I`, `Alt+P`, `Alt+C`, `Alt+M`) into a single source of truth. Adding a new route or modal here automatically propagates across Command Palette, global shortcuts, and navigation drawers without touching disparate UI files.
 
+## 13. Centralized Report Architecture, Sub-Ledger Accounting & Dynamic Matrix Governance
+
+- **Centralized Layout Template & Design System (`reportTheme.js`):**
+  Never build one-off styling, arbitrary table padding, unstandardized fonts, or custom heading layouts on individual report pages. All report pages (both routed standalone reports like `DayBookReport` and modal reports inside `ReportViewer`) must inherit their layout from the central template (`src/config/reportTheme.js`).
+  - Standard tokens (`REPORT_TYPOGRAPHY`, `REPORT_COLORS`, `REPORT_DENSITY`) govern font families, heading scales, cell padding, header borders, and table density.
+  - All reports must embed the central `BusinessHeader` (displaying enterprise name, PAN/TAX ID, dynamic report title, date range, and currency with print-safe CSS).
+  - All reports must embed `ReportExportActions` for unified Excel and PDF exports with standardized visual loading spinners.
+  - **Single Point of Evolution:** Any future enhancement or update made to the central template in `reportTheme.js` must instantly propagate to all current and future reports without modifying individual report files.
+
+- **The Sub-Ledger Accounting Law (The `entity_type` Trap):**
+  In Sajilo ERP double-entry accounting, customer receivables and vendor payables are governed strictly through dedicated Sub-Ledger accounts in the Chart of Accounts (`BusinessPartner.receivable_account_id` and `payable_account_id`), nested under *Trade Receivables (Customers)* and *Trade Payables (Suppliers)*.
+  - **The Trap:** While Sales Invoices and Purchase Bills tag `entity_type = 'Customer'` / `'Vendor'` and `entity_id = partner.id`, Financial Vouchers (Receipt Vouchers, Payment Vouchers, Bank Transfers, and Contra/Journal Entries) post to `GeneralLedgerLine` with `entity_type = null` and `entity_id = null`.
+  - **The Standard:** **Never** filter `GeneralLedgerLine` by `.eq('entity_type', 'Customer')` or `.eq('entity_type', 'Vendor')` to calculate customer or vendor balances. Doing so ignores all vouchers and receipts, producing catastrophic balance errors or false zero balances.
+  - **The Aggregation Rule:** Ledger balance fetchers must aggregate debits and credits by `account_id IN (receivable_account_ids)` (or `payable_account_ids`), using `entity_id` solely as a secondary fallback.
+  - **Opening Balance Rule:** Always factor in `opening_balance` and `opening_balance_type` ('Dr' vs 'Cr') from `BusinessPartner` to guarantee net double-entry balance integrity ($$Total\ Invoiced - Total\ Paid + Opening\ Balance$$).
+
+- **Dynamic Matrix & Semantic Column Alignment Standard:**
+  **Eliminate hardcoded numeric column indices** (such as `rightCols = new Set([headers.length - 1, headers.length - 2])`).
+  - Hardcoded index sets collapse when optional metadata columns (e.g., Contact Number, PAN/TAX ID, Billing Address) are toggled dynamically on a report: text addresses get right-aligned while currency amounts get pushed left.
+  - **Semantic Dynamic Alignment:** Column alignment must be evaluated dynamically by:
+    1. *Header Keywords:* Inspecting header strings for currency tokens (`(NPR)`, `(Rs)`, `(%)`) and accounting keywords (`Amount`, `Debit`, `Credit`, `Balance`, `Total`, `Invoiced`, `Paid`, `Billed`, `Qty`, `Cost`, `Revenue`, `Value`, `WAC`, `Shortage`, `Current`, `Days`, `Gross`, `Net`).
+    2. *Value Heuristics:* Inspecting non-empty sample cell values for numeric types or currency prefix formatting (`NPR `, `(NPR `).
+  - Explicit alignment utility classes (`amount-cell tabular-nums text-right` vs `text-left`) must be applied uniformly to `<th scope="col">`, `<tbody> <td scope="row">`, and `<tfoot> <td>`.
+
+- **Dynamic Footer Matrix & Column Shift Prevention:**
+  In tabular reports supporting dynamic or configurable columns (e.g., optional partner metadata checkboxes), the table footer (`tfoot`), vector PDF footer, and Excel export footer **must strictly match the total column count of the headers**.
+  - If a table has 4 base columns and 3 optional metadata columns (7 columns total), a 4-item footer causes a severe column shift where totals align under unrelated metadata fields.
+  - **Footer Padding Rule:** Always pad dynamic footer arrays with `...metaHeaders.map(() => '')` (or dynamic empty padding) so that `footer.length === headers.length` across HTML tables, PDF engines (`jspdf-autotable`), and Excel spreadsheets (`exportFlatXLSX`).
+  - **Full Accounting Summaries:** Never leave summary columns blank (e.g., `['TOTAL', '', '', balance]`). Always compute and display complete accounting totals (e.g., Total Invoiced, Total Paid, and Net Balance) across all numeric columns.
+
+- **Report Lifecycle & Auto-Load Governance (The Commented-Hook Trap):**
+  When a report is opened with valid default filter parameters (such as the active fiscal year or default date range), it must **auto-load data immediately on mount**.
+  - **The Trap:** Never leave mount hooks disabled or commented out (e.g., `// useEffect(() => { load(); }, [load])`). Commented-out mount hooks leave reports in an uninitialized state (`hasLoaded = false`), misleading users with an empty screen or an unexplained *"Click Apply to generate"* placeholder.
+  - **The Standard:** Mount hooks must automatically trigger data fetching on initial component mount. Retain the `Apply` button for intentional user re-filtering without blocking initial navigation.
+
+- **Defensive Multi-Tenant Resolution in Client Data Fetchers:**
+  Client-side data fetchers (such as `reportDataFetcher.js`) that query Supabase directly must always defensively validate the active company context:
+  `const p_company_id = sajilo.getCompanyId(); if (!p_company_id) return [];`
+  - Passing `undefined` to Supabase query builders (e.g., `.eq('company_id', undefined)`) causes PostgREST to crash with PostgreSQL error `22P02: invalid input syntax for type uuid: "undefined"`.
+  - This unhandled exception crashes `Promise.all` routines, returning empty arrays and causing reports to render blank.
+
+- **Partner Statement & Ledger Presentation Uniformity:**
+  Single-partner statements (Customer Statement, Vendor Statement) and ledger drill-downs must follow the exact same architectural foundation and `ReportTheme` layout as multi-partner summary reports.
+  - Supplementary details (PAN/VAT number, contact details, billing address, credit limits) must be rendered using standardized information cards and badge chips that cleanly toggle off in print mode (`print:hidden` / `print-hide`).
+  - When generating vector PDFs or printing directly from the browser, statements must respect standard A4 margins (`size: A4 portrait` or `landscape`, `margin: 10mm`), ensuring table borders, corporate headers, and signature blocks never collide with page boundaries.
+
+- **Database RPC Type Signatures & Resilient Client Fallbacks:**
+  - **Strict Type Matching in RPCs:** When developing database functions (such as aging calculations or balance aggregations), avoid mixing `UUID` and `TEXT` types in equality operations (which triggers PostgreSQL `42883: operator does not exist: uuid = text`).
+  - **Resilient Client Fallbacks:** Because database RPCs may encounter permission differences, schema migrations, or legacy signatures in production, client-side data fetchers must always include robust client-side aggregation fallbacks (querying base ledger lines directly) to guarantee zero-downtime reporting even if an RPC fails.
 
