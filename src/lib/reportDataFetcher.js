@@ -531,28 +531,80 @@ export async function fetchReportData(reportId, fromDate, toDate, extraParams = 
 
     case 'customer_balance': {
       const p_company_id = sajilo.getCompanyId();
-      const [{ data: lines, error: lErr }, { data: customers, error: cErr }] = await Promise.all([
-        supabase.from('GeneralLedgerLine').select('entity_id, debit_amount, credit_amount')
-          .eq('company_id', p_company_id).eq('entity_type', 'Customer'),
-        supabase.from('BusinessPartner').select('id, name').eq('company_id', p_company_id)
-      ]);
-      if (lErr) throw lErr;
+      if (!p_company_id) return [];
 
-      const cMap = {};
-      (customers || []).forEach(c => { cMap[c.id] = c.name; });
+      const { data: customers, error: cErr } = await supabase
+        .from('BusinessPartner')
+        .select('id, name, receivable_account_id, opening_balance, opening_balance_type, phone, tax_id_number, address')
+        .eq('company_id', p_company_id)
+        .eq('is_customer', true);
 
-      const map = {};
-      (lines || []).forEach(l => {
-        const id = l.entity_id;
-        if (!id) return;
-        const name = cMap[id] || 'Unknown';
-        if (!map[id]) map[id] = { customer: name, total_invoiced: 0, total_paid: 0, balance: 0 };
-        map[id].balance        += (l.debit_amount || 0) - (l.credit_amount || 0);
-        if (l.debit_amount  > 0) map[id].total_invoiced += l.debit_amount;
-        if (l.credit_amount > 0) map[id].total_paid     += l.credit_amount;
+      if (cErr) throw cErr;
+      if (!customers || customers.length === 0) return [];
+
+      const receivableAccountIds = customers
+        .map(c => c.receivable_account_id)
+        .filter(Boolean);
+
+      let glLines = [];
+      if (receivableAccountIds.length > 0) {
+        for (let i = 0; i < receivableAccountIds.length; i += 100) {
+          const chunk = receivableAccountIds.slice(i, i + 100);
+          const { data: chunkLines, error: lErr } = await supabase
+            .from('GeneralLedgerLine')
+            .select('account_id, debit_amount, credit_amount, entity_id')
+            .eq('company_id', p_company_id)
+            .in('account_id', chunk);
+          if (lErr) throw lErr;
+          if (chunkLines) glLines = glLines.concat(chunkLines);
+        }
+      }
+
+      const accountTotals = {};
+      glLines.forEach(l => {
+        if (!accountTotals[l.account_id]) {
+          accountTotals[l.account_id] = { debit: 0, credit: 0 };
+        }
+        accountTotals[l.account_id].debit += (l.debit_amount || 0);
+        accountTotals[l.account_id].credit += (l.credit_amount || 0);
       });
-      // Return raw numbers — viewer uses fmtNPR()
-      return Object.values(map);
+
+      const customerIdSet = new Set(customers.map(c => c.id));
+      const entityTotals = {};
+      glLines.forEach(l => {
+        if (l.entity_id && customerIdSet.has(l.entity_id)) {
+          if (!entityTotals[l.entity_id]) entityTotals[l.entity_id] = { debit: 0, credit: 0 };
+          entityTotals[l.entity_id].debit += (l.debit_amount || 0);
+          entityTotals[l.entity_id].credit += (l.credit_amount || 0);
+        }
+      });
+
+      const map = customers.map(c => {
+        const ob = Math.abs(c.opening_balance || 0);
+        const isDr = (c.opening_balance_type || 'Dr') === 'Dr';
+        const obDr = isDr ? ob : 0;
+        const obCr = isDr ? 0 : ob;
+
+        const totals = accountTotals[c.receivable_account_id] || entityTotals[c.id] || { debit: 0, credit: 0 };
+        const totalInvoiced = totals.debit + obDr;
+        const totalPaid = totals.credit + obCr;
+        const balance = totalInvoiced - totalPaid;
+
+        return {
+          id: c.id,
+          customer: c.name,
+          customer_name: c.name,
+          phone: c.phone || '',
+          tax_id: c.tax_id_number || '',
+          address: c.address || '',
+          total_invoiced: totalInvoiced,
+          total_paid: totalPaid,
+          balance: balance,
+        };
+      });
+
+      map.sort((a, b) => b.balance - a.balance);
+      return map;
     }
 
     case 'debtor_statement': {
@@ -631,28 +683,80 @@ export async function fetchReportData(reportId, fromDate, toDate, extraParams = 
 
     case 'vendor_balance': {
       const p_company_id = sajilo.getCompanyId();
-      const [{ data: lines, error: lErr }, { data: vendors, error: vErr }] = await Promise.all([
-        supabase.from('GeneralLedgerLine').select('entity_id, debit_amount, credit_amount')
-          .eq('company_id', p_company_id).eq('entity_type', 'Vendor'),
-        supabase.from('Vendor').select('id, name').eq('company_id', p_company_id)
-      ]);
-      if (lErr) throw lErr;
+      if (!p_company_id) return [];
 
-      const vMap = {};
-      (vendors || []).forEach(v => { vMap[v.id] = v.name; });
+      const { data: vendors, error: vErr } = await supabase
+        .from('BusinessPartner')
+        .select('id, name, payable_account_id, opening_balance, opening_balance_type, phone, tax_id_number, address')
+        .eq('company_id', p_company_id)
+        .eq('is_vendor', true);
 
-      const map = {};
-      (lines || []).forEach(l => {
-        const id = l.entity_id;
-        if (!id) return;
-        const name = vMap[id] || 'Unknown';
-        if (!map[id]) map[id] = { vendor: name, total_billed: 0, total_paid: 0, balance: 0 };
-        map[id].balance        += (l.credit_amount || 0) - (l.debit_amount || 0);
-        if (l.credit_amount > 0) map[id].total_billed += l.credit_amount;
-        if (l.debit_amount  > 0) map[id].total_paid   += l.debit_amount;
+      if (vErr) throw vErr;
+      if (!vendors || vendors.length === 0) return [];
+
+      const payableAccountIds = vendors
+        .map(v => v.payable_account_id)
+        .filter(Boolean);
+
+      let glLines = [];
+      if (payableAccountIds.length > 0) {
+        for (let i = 0; i < payableAccountIds.length; i += 100) {
+          const chunk = payableAccountIds.slice(i, i + 100);
+          const { data: chunkLines, error: lErr } = await supabase
+            .from('GeneralLedgerLine')
+            .select('account_id, debit_amount, credit_amount, entity_id')
+            .eq('company_id', p_company_id)
+            .in('account_id', chunk);
+          if (lErr) throw lErr;
+          if (chunkLines) glLines = glLines.concat(chunkLines);
+        }
+      }
+
+      const accountTotals = {};
+      glLines.forEach(l => {
+        if (!accountTotals[l.account_id]) {
+          accountTotals[l.account_id] = { debit: 0, credit: 0 };
+        }
+        accountTotals[l.account_id].debit += (l.debit_amount || 0);
+        accountTotals[l.account_id].credit += (l.credit_amount || 0);
       });
-      // Return raw numbers — viewer uses fmtNPR()
-      return Object.values(map);
+
+      const vendorIdSet = new Set(vendors.map(v => v.id));
+      const entityTotals = {};
+      glLines.forEach(l => {
+        if (l.entity_id && vendorIdSet.has(l.entity_id)) {
+          if (!entityTotals[l.entity_id]) entityTotals[l.entity_id] = { debit: 0, credit: 0 };
+          entityTotals[l.entity_id].debit += (l.debit_amount || 0);
+          entityTotals[l.entity_id].credit += (l.credit_amount || 0);
+        }
+      });
+
+      const map = vendors.map(v => {
+        const ob = Math.abs(v.opening_balance || 0);
+        const isCr = (v.opening_balance_type || 'Cr') === 'Cr';
+        const obCr = isCr ? ob : 0;
+        const obDr = isCr ? 0 : ob;
+
+        const totals = accountTotals[v.payable_account_id] || entityTotals[v.id] || { debit: 0, credit: 0 };
+        const totalBilled = totals.credit + obCr;
+        const totalPaid = totals.debit + obDr;
+        const balance = totalBilled - totalPaid;
+
+        return {
+          id: v.id,
+          vendor: v.name,
+          vendor_name: v.name,
+          phone: v.phone || '',
+          tax_id: v.tax_id_number || '',
+          address: v.address || '',
+          total_billed: totalBilled,
+          total_paid: totalPaid,
+          balance: balance,
+        };
+      });
+
+      map.sort((a, b) => b.balance - a.balance);
+      return map;
     }
 
     case 'vendor_statement': {

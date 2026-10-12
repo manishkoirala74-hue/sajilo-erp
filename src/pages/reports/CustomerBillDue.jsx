@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { sajilo, supabase } from '@/api/sajiloClient';
-import PageHeader from '@/components/shared/PageHeader';
+import { ReportPageTemplate, StandardReportTable } from '@/components/reports';
 import ReportExportActions from '@/components/reports/ReportExportActions';
 import { exportFlatXLSX } from '@/lib/reports/reportExcelExport';
 import { generateReportVectorPDF } from '@/utils/reportPdfEngine';
@@ -369,22 +369,27 @@ export default function CustomerBillDue() {
   ];
 
   return (
-    <div className="space-y-4">
-      <PageHeader
-        title="Customer Bill Due"
-        subtitle="Track and receive payments for outstanding customer invoices"
-        icon={FileText}
-        action={openReconModal}
-        actionLabel="Settle Advances"
-        actionIcon={Activity}
-      >
-        <ReportExportActions
-          onExportExcel={handleExportExcel}
-          onExportPdf={handleExportPdf}
-        />
-      </PageHeader>
-      <ReportFilterBar filters={filters} onChange={setFilters} onApply={load} showApplyButton />
-      <DataTable columns={columns} data={data} searchKey="customer_name" loading={loading} />
+    <ReportPageTemplate
+      title="Customer Bill Due"
+      subtitle="Track and receive payments for outstanding customer invoices"
+      category="Receivable"
+      icon={FileText}
+      fromDate={filters.fromDate}
+      toDate={filters.toDate}
+      isLoading={loading}
+      onRefresh={load}
+      onExportExcel={handleExportExcel}
+      onExportPdf={handleExportPdf}
+      extraActions={
+        <Button size="sm" onClick={openReconModal} className="flex items-center gap-1.5 text-xs font-semibold rounded-lg shadow-sm">
+          <Activity className="w-3.5 h-3.5" /> Settle Advances
+        </Button>
+      }
+      filterSlot={
+        <ReportFilterBar filters={filters} onChange={setFilters} onApply={load} showApplyButton />
+      }
+    >
+      <StandardReportTable columns={columns} data={data} loading={loading} footer={data.length > 0 ? { customer_name: 'TOTAL', grand_total: fmt(data.reduce((s, r) => s + (r.grand_total || 0), 0)), paid_amount: fmt(data.reduce((s, r) => s + (r.paid_amount || 0), 0)), due: fmt(data.reduce((s, r) => s + (r.due || 0), 0)) } : null} />
 
       {/* Pay Modal */}
       <Dialog open={payModalOpen} onOpenChange={setPayModalOpen}>
@@ -516,6 +521,6 @@ export default function CustomerBillDue() {
         </DialogContent>
       </Dialog>
 
-    </div>
+    </ReportPageTemplate>
   );
 }

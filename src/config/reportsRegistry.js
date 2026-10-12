@@ -170,6 +170,24 @@ export const REPORT_CATEGORIES = [
         isRoute: true,
         path: '/reports/customer-bill-due',
       },
+      {
+        id: 'installment_due_report',
+        label: 'Installment Due Report (EMI)',
+        desc: 'Track pending, overdue, and upcoming installment schedules with aging and quick collection',
+        keywords: ['installment due', 'emi due', 'installment schedule', 'emi aging', 'overdue installment', 'collection forecast'],
+        permissionKey: 'reports.view',
+        isRoute: true,
+        path: '/reports/installment-due',
+      },
+      {
+        id: 'installment_collection_report',
+        label: 'Installment Collection Report',
+        desc: 'Audit realized EMI receipts, principal recovery, and recognized interest revenue',
+        keywords: ['installment collection', 'emi collection', 'emi receipts', 'interest realization', 'cash flow'],
+        permissionKey: 'reports.view',
+        isRoute: true,
+        path: '/reports/installment-collection',
+      },
     ]
   },
   {

@@ -2,10 +2,8 @@
 
 import * as React from "react"
 import { Check, ChevronDown } from "lucide-react"
-import { Command as CommandPrimitive } from "cmdk"
 import { cn } from "@/lib/utils"
 import { Popover, PopoverContent, PopoverAnchor } from "@/components/ui/popover"
-import { Command, CommandEmpty, CommandGroup, CommandItem, CommandList } from "@/components/ui/command"
 
 const SelectContext = React.createContext({})
 
@@ -13,44 +11,100 @@ const Select = ({ value, defaultValue, onValueChange, children, disabled, onOpen
   const [open, setOpen] = React.useState(false)
   const [search, setSearch] = React.useState("")
   const [labels, setLabels] = React.useState({})
+  const [items, setItems] = React.useState([])
+  const [activeIndex, setActiveIndex] = React.useState(0)
   
   const [internalValue, setInternalValue] = React.useState(defaultValue || "");
   const isControlled = value !== undefined;
   const actualValue = isControlled ? value : internalValue;
 
-  const handleValueChange = (v) => {
+  const handleValueChange = React.useCallback((v) => {
     if (!isControlled) setInternalValue(v);
     if (onValueChange) onValueChange(v);
-  }
+  }, [isControlled, onValueChange]);
 
-  const handleOpenChange = (newOpen) => {
+  const handleOpenChange = React.useCallback((newOpen) => {
     setOpen(newOpen);
     if (onOpenChange) onOpenChange(newOpen);
-    if (!newOpen) setSearch(""); 
-  }
+    if (!newOpen) {
+      setSearch("");
+      setActiveIndex(0);
+    }
+  }, [onOpenChange]);
 
   const registerItem = React.useCallback((val, label) => {
     setLabels(prev => {
       if (prev[val] === label) return prev;
       return { ...prev, [val]: label }
-    })
-  }, [])
+    });
+    setItems(prev => {
+      const idx = prev.findIndex(item => item.value === val);
+      if (idx >= 0) {
+        if (prev[idx].label === label) return prev;
+        const copy = [...prev];
+        copy[idx] = { value: val, label };
+        return copy;
+      }
+      return [...prev, { value: val, label }];
+    });
+  }, []);
+
+  const unregisterItem = React.useCallback((val) => {
+    setItems(prev => prev.filter(item => item.value !== val));
+  }, []);
+
+  // Filter items matching active search
+  const visibleItems = React.useMemo(() => {
+    if (!search.trim()) return items;
+    const q = search.toLowerCase();
+    return items.filter(item => item.label && item.label.toLowerCase().includes(q));
+  }, [items, search]);
+
+  // Reset active highlight when search query shifts
+  React.useEffect(() => {
+    setActiveIndex(0);
+  }, [search]);
 
   return (
     <SelectContext.Provider value={{ 
-      value: actualValue, onValueChange: handleValueChange, open, setOpen: handleOpenChange, search, setSearch, disabled, labels, registerItem 
+      value: actualValue, 
+      onValueChange: handleValueChange, 
+      open, 
+      setOpen: handleOpenChange, 
+      search, 
+      setSearch, 
+      disabled, 
+      labels, 
+      registerItem,
+      unregisterItem,
+      items,
+      visibleItems,
+      activeIndex,
+      setActiveIndex
     }}>
       <Popover open={open} onOpenChange={handleOpenChange}>
-        <Command shouldFilter={false} className="overflow-visible bg-transparent">
+        <div className="relative w-full">
           {children}
-        </Command>
+        </div>
       </Popover>
     </SelectContext.Provider>
   )
 }
 
-const SelectTrigger = React.forwardRef(({ className, children, onClick, ...props }, ref) => {
-  const { open, setOpen, disabled, search, setSearch, value, labels } = React.useContext(SelectContext)
+const SelectTrigger = React.forwardRef(({ className, children, onClick, onKeyDown, ...props }, ref) => {
+  const { 
+    open, 
+    setOpen, 
+    disabled, 
+    search, 
+    setSearch, 
+    value, 
+    labels, 
+    visibleItems, 
+    activeIndex, 
+    setActiveIndex, 
+    onValueChange 
+  } = React.useContext(SelectContext)
   
   let placeholder = "";
   React.Children.forEach(children, child => {
@@ -59,23 +113,59 @@ const SelectTrigger = React.forwardRef(({ className, children, onClick, ...props
     }
   });
 
-  const displayValue = open ? search : (value ? (labels[value] || value) : "");
+  const displayLabel = value ? (labels[value] || value) : "";
+
+  const handleKeyDown = (e) => {
+    if (!open) {
+      if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ' || (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey)) {
+        e.preventDefault();
+        setOpen(true);
+        if (e.key.length === 1 && e.key !== ' ') {
+          setSearch(e.key);
+        }
+      }
+      onKeyDown?.(e);
+      return;
+    }
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setActiveIndex(prev => (prev < visibleItems.length - 1 ? prev + 1 : 0));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setActiveIndex(prev => (prev > 0 ? prev - 1 : visibleItems.length - 1));
+    } else if (e.key === 'Enter' || e.key === 'Tab') {
+      if (visibleItems[activeIndex]) {
+        e.preventDefault();
+        onValueChange(visibleItems[activeIndex].value);
+        setOpen(false);
+      }
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      setOpen(false);
+    }
+
+    onKeyDown?.(e);
+  };
 
   return (
     <PopoverAnchor asChild>
       <div className={cn("relative w-full", className)}>
-        <CommandPrimitive.Input
+        <input
           ref={ref}
           disabled={disabled}
-          placeholder={placeholder}
-          value={displayValue}
-          onValueChange={(v) => {
+          placeholder={open && search ? placeholder : (displayLabel || placeholder)}
+          value={open ? search : displayLabel}
+          onChange={(e) => {
             if (!open) setOpen(true);
-            setSearch(v);
+            setSearch(e.target.value);
           }}
+          onKeyDown={handleKeyDown}
           onClick={(e) => {
-            setOpen(true);
-            if (onClick) onClick(e);
+            if (!disabled) {
+              setOpen(true);
+              if (onClick) onClick(e);
+            }
           }}
           className={cn(
             "flex h-11 sm:h-10 w-full rounded-xl border border-transparent bg-stone-100/80 px-3 py-2 pr-8 text-base sm:text-sm transition-all duration-200 ring-offset-background placeholder:text-stone-400 hover:bg-stone-200/50 focus:outline-none focus:bg-white focus:border-primary focus:ring-4 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-50",
@@ -99,14 +189,14 @@ SelectTrigger.displayName = "SelectTrigger"
 const SelectValue = React.forwardRef(() => null)
 SelectValue.displayName = "SelectValue"
 
-const SelectContent = React.forwardRef(({ className, children, position = "popper", searchable = true, ...props }, ref) => {
-  const { open } = React.useContext(SelectContext)
+const SelectContent = React.forwardRef(({ className, children, position = "popper", ...props }, ref) => {
+  const { open, visibleItems } = React.useContext(SelectContext)
 
   return (
     <>
       {!open && (
         <div className="hidden" style={{ display: 'none' }} aria-hidden="true">
-          <CommandList>{children}</CommandList>
+          {children}
         </div>
       )}
       {open && (
@@ -122,10 +212,13 @@ const SelectContent = React.forwardRef(({ className, children, position = "poppe
           onOpenAutoFocus={(e) => e.preventDefault()}
           {...props}
         >
-          <CommandList className="max-h-[300px] overflow-y-auto overflow-x-hidden p-1">
-            <CommandEmpty>No results found.</CommandEmpty>
-            {children}
-          </CommandList>
+          <div className="max-h-[300px] overflow-y-auto overflow-x-hidden p-1 scrollbar-hide-default" role="listbox">
+            {visibleItems.length === 0 ? (
+              <div className="py-6 text-center text-sm text-muted-foreground">No results found.</div>
+            ) : (
+              children
+            )}
+          </div>
         </PopoverContent>
       )}
     </>
@@ -134,7 +227,17 @@ const SelectContent = React.forwardRef(({ className, children, position = "poppe
 SelectContent.displayName = "SelectContent"
 
 const SelectItem = React.forwardRef(({ className, children, value, disabled, ...props }, ref) => {
-  const { value: selectedValue, onValueChange, setOpen, search, registerItem } = React.useContext(SelectContext)
+  const { 
+    value: selectedValue, 
+    onValueChange, 
+    setOpen, 
+    search, 
+    registerItem, 
+    unregisterItem,
+    visibleItems,
+    activeIndex,
+    setActiveIndex
+  } = React.useContext(SelectContext)
 
   const textContent = React.useMemo(() => {
     let text = "";
@@ -144,33 +247,42 @@ const SelectItem = React.forwardRef(({ className, children, value, disabled, ...
       else if (React.isValidElement(node)) extract(node.props.children);
     };
     extract(children);
-    return text;
+    return text.trim();
   }, [children]);
 
   React.useEffect(() => {
     registerItem(value, textContent);
-  }, [value, textContent, registerItem]);
+    return () => unregisterItem(value);
+  }, [value, textContent, registerItem, unregisterItem]);
 
   if (search && textContent && !textContent.toLowerCase().includes(search.toLowerCase())) {
     return null;
   }
 
   const isSelected = selectedValue === value;
+  const itemIndex = visibleItems.findIndex(i => i.value === value);
+  const isHighlighted = itemIndex >= 0 && itemIndex === activeIndex;
 
   return (
-    <CommandItem
+    <div
       ref={ref}
-      value={String(value)}
-      disabled={disabled}
-      onSelect={() => {
+      role="option"
+      aria-selected={isSelected}
+      data-disabled={disabled}
+      onClick={() => {
         if (!disabled) {
           onValueChange(value);
           setOpen(false);
         }
       }}
+      onMouseEnter={() => {
+        if (itemIndex >= 0) setActiveIndex(itemIndex);
+      }}
       className={cn(
-        "relative flex w-full cursor-pointer select-none items-center rounded-sm py-1.5 pl-2 pr-8 text-sm outline-none data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50",
-        isSelected ? "bg-accent text-accent-foreground font-medium" : "data-[selected=true]:bg-accent/50",
+        "relative flex w-full cursor-pointer select-none items-center rounded-sm py-1.5 pl-2 pr-8 text-sm outline-none transition-colors",
+        disabled && "pointer-events-none opacity-50",
+        isSelected && "bg-accent text-accent-foreground font-medium",
+        isHighlighted && "bg-accent/80 text-accent-foreground ring-1 ring-ring/30",
         className
       )}
       {...props}
@@ -179,18 +291,20 @@ const SelectItem = React.forwardRef(({ className, children, value, disabled, ...
         {isSelected && <Check className="h-4 w-4 text-primary" />}
       </span>
       {children}
-    </CommandItem>
+    </div>
   )
 })
 SelectItem.displayName = "SelectItem"
 
-const SelectGroup = React.forwardRef(({ className, ...props }, ref) => (
-  <CommandGroup ref={ref} className={cn("p-1", className)} {...props} />
+const SelectGroup = React.forwardRef(({ className, children, ...props }, ref) => (
+  <div ref={ref} className={cn("p-1", className)} {...props}>
+    {children}
+  </div>
 ))
 SelectGroup.displayName = "SelectGroup"
 
 const SelectLabel = React.forwardRef(({ className, ...props }, ref) => (
-  <div ref={ref} className={cn("px-2 py-1.5 text-sm font-semibold text-muted-foreground", className)} {...props} />
+  <div ref={ref} className={cn("px-2 py-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground", className)} {...props} />
 ))
 SelectLabel.displayName = "SelectLabel"
 

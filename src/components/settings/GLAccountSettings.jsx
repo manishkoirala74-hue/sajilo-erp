@@ -21,6 +21,8 @@ const GL_FIELDS = [
   { key: 'gl_default_inventory_account', label: 'Default Inventory Asset',         desc: 'Fallback if item has no inventory account', filterTypes: ['Asset'] },
   { key: 'gl_stock_variance_account',  label: 'Stock Variance / Write-off',        desc: 'Used for stock adjustment journals & item deletion write-offs', filterTypes: ['Expense'] },
   { key: 'gl_opening_equity_account',  label: 'Opening Balance Equity',            desc: 'Credited when posting opening stock on item import', filterTypes: ['Equity'] },
+  { key: 'gl_unearned_emi_interest',   label: 'Unearned EMI Interest (Liability)', desc: 'Deferred financing interest credited on EMI sales checkout', filterTypes: ['Liability'] },
+  { key: 'gl_emi_interest_income',     label: 'EMI Interest Income (Revenue)',     desc: 'Recognized interest income debited from unearned revenue upon installment collection', filterTypes: ['Revenue'] },
 ];
 
 // Ledger Group Parent mappings (Group Ledger accounts only)
@@ -135,6 +137,8 @@ export default function GLAccountSettings({ settings, onChange }) {
       map('gl_vat_receivable',           subs, '1510');  // VAT Receivable
       map('gl_opening_equity_account',   subs, '3200');  // Retained Earnings
       map('gl_stock_variance_account',   subs, '6700');  // Miscellaneous Expense
+      map('gl_unearned_emi_interest',    subs, '2140');  // Unearned EMI Interest
+      map('gl_emi_interest_income',      subs, '4400');  // EMI Interest Income
 
       // Group-ledger parent mappings
       mapGroup('gl_customer_ledger_group', groups, '1130'); // Trade Receivables (Customers)

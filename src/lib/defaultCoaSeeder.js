@@ -36,6 +36,7 @@ const DEFAULT_COA = [
   { code: '2111', name: 'Accounts Payable — Control', type: 'Liability', subtype: 'Current Liability', ledger_type: 'Sub Ledger', balance: 'Credit', parent: '2110' },
   { code: '2120', name: 'VAT Payable', type: 'Liability', subtype: 'Current Liability', ledger_type: 'Sub Ledger', balance: 'Credit', parent: '2100' },
   { code: '2130', name: 'TDS Payable', type: 'Liability', subtype: 'Current Liability', ledger_type: 'Sub Ledger', balance: 'Credit', parent: '2100' },
+  { code: '2140', name: 'Unearned EMI Interest', type: 'Liability', subtype: 'Current Liability', ledger_type: 'Sub Ledger', balance: 'Credit', parent: '2100' },
 
   { code: '2200', name: 'Non-Current Liabilities', type: 'Liability', subtype: 'Long Term Liability', ledger_type: 'Group Ledger', balance: 'Credit', parent: '2000' },
   { code: '2210', name: 'Bank Loans', type: 'Liability', subtype: 'Long Term Liability', ledger_type: 'Sub Ledger', balance: 'Credit', parent: '2200' },
@@ -53,6 +54,7 @@ const DEFAULT_COA = [
   { code: '4010', name: 'Sales Returns & Allowances', type: 'Revenue', subtype: 'Operating Revenue', ledger_type: 'Sub Ledger', balance: 'Debit', parent: '4000' },
   { code: '4200', name: 'Service Income', type: 'Revenue', subtype: 'Operating Revenue', ledger_type: 'Sub Ledger', balance: 'Credit', parent: '4000' },
   { code: '4300', name: 'Other Income', type: 'Revenue', subtype: 'Non-Operating Revenue', ledger_type: 'Sub Ledger', balance: 'Credit', parent: '4000' },
+  { code: '4400', name: 'EMI Interest Income', type: 'Revenue', subtype: 'Non-Operating Revenue', ledger_type: 'Sub Ledger', balance: 'Credit', parent: '4000' },
 
   // ── COGS (Debit) ──
   { code: '5000', name: 'Cost of Goods Sold (COGS)', type: 'Expense', subtype: 'Direct Expense', ledger_type: 'Group Ledger', balance: 'Debit' },

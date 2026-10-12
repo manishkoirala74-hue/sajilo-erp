@@ -18,6 +18,7 @@ import { useSettingsStore } from '@/store/settingsStore';
 import { useModalStore } from '@/store/modalStore';
 import { useLayoutMode } from '@/lib/LayoutModeContext';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
+import { prefetchRoute } from '@/lib/routePrefetcher';
 
 import { toast } from 'sonner';
 
@@ -137,8 +138,11 @@ export default function Sidebar() {
   const [expandedSubGroups, setExpandedSubGroups] = useState([]);
   const openModal = useModalStore(state => state.openModal);
 
-  // Desktop hover, focus & pin state model
-  const [isPinned, setIsPinned] = useState(() => localStorage.getItem('sajilo_sidebar_pinned') === 'true');
+  // Desktop hover, focus & pin state model (Default pinned on desktop for instant single-click navigation)
+  const [isPinned, setIsPinned] = useState(() => {
+    const stored = localStorage.getItem('sajilo_sidebar_pinned');
+    return stored !== null ? stored === 'true' : true;
+  });
   const [isHovered, setIsHovered] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
   const { documentMode } = useLayoutMode();
@@ -337,18 +341,12 @@ export default function Sidebar() {
     ];
     const isDisabled = !activeFiscalYear && disabledPaths.includes(item.path);
     
-    const linkContent = (
-      <Link
-        to={isDisabled ? '#' : item.path}
-        aria-current={active ? 'page' : undefined}
-        onClick={(e) => {
-          if (isDisabled) {
-            e.preventDefault();
-            toast.error("No active fiscal year. Please create one to access transactions.");
-          }
-        }}
+    const rowContent = (
+      <div
+        onMouseEnter={() => prefetchRoute(item.path)}
+        onFocus={() => prefetchRoute(item.path)}
         className={cn(
-          "group relative flex items-center gap-3 px-3 py-1.5 min-h-[40px] rounded-lg text-sm font-medium transition-all duration-200",
+          "group/nav-item relative flex items-center min-h-[40px] rounded-lg transition-colors duration-150",
           active
             ? "bg-primary text-white shadow-sm"
             : "text-slate-400 hover:text-white hover:bg-sidebar-hover",
@@ -356,23 +354,36 @@ export default function Sidebar() {
           isDisabled && "opacity-50 cursor-not-allowed"
         )}
       >
-        <item.icon className="w-4 h-4 shrink-0" />
-        <span className={cn(
-          "whitespace-nowrap overflow-hidden text-ellipsis transition-all duration-300 flex-1",
-          collapsed ? "opacity-0 w-0 hidden md:block" : "opacity-100"
-        )}>
-          {item.label}
-        </span>
+        <Link
+          to={isDisabled ? '#' : item.path}
+          aria-current={active ? 'page' : undefined}
+          onClick={(e) => {
+            if (isDisabled) {
+              e.preventDefault();
+              toast.error("No active fiscal year. Please create one to access transactions.");
+            }
+          }}
+          className="flex-1 flex items-center gap-3 px-3 py-2 min-w-0"
+        >
+          <item.icon className="w-4 h-4 shrink-0" />
+          <span className={cn(
+            "whitespace-nowrap overflow-hidden text-ellipsis transition-opacity duration-200 flex-1",
+            collapsed ? "opacity-0 w-0 hidden md:block" : "opacity-100"
+          )}>
+            {item.label}
+          </span>
+        </Link>
         {!collapsed && (
           <button
+            type="button"
             onClick={(e) => toggleFavorite(e, item.path)}
             className={cn(
-              "shrink-0 transition-all duration-200 hover:scale-110 flex items-center justify-center w-6 h-6 rounded-md",
+              "shrink-0 mr-2 transition-all duration-200 hover:scale-110 flex items-center justify-center w-6 h-6 rounded-md",
               active ? "text-white/80 hover:bg-white/10" : "text-slate-500 hover:text-yellow-400 hover:bg-slate-700/50",
               isFavoriteGroup 
-                ? "opacity-0 group-hover:opacity-100 text-yellow-400" 
-                : "opacity-0 group-hover:opacity-100",
-              (!isFavoriteGroup && isFav) && "hidden" // completely hide star from main list if pinned
+                ? "opacity-0 group-hover/nav-item:opacity-100 text-yellow-400" 
+                : "opacity-0 group-hover/nav-item:opacity-100",
+              (!isFavoriteGroup && isFav) && "hidden"
             )}
             title={isFavoriteGroup ? "Remove from Favorites" : "Add to Favorites"}
           >
@@ -383,19 +394,22 @@ export default function Sidebar() {
             )}
           </button>
         )}
-      </Link>
+      </div>
     );
 
+    // Bypass tooltip completely when expanded to eliminate click cancellation
+    if (!collapsed) {
+      return rowContent;
+    }
+
     return (
-      <Tooltip open={collapsed ? undefined : false}>
+      <Tooltip>
         <TooltipTrigger asChild>
-          {linkContent}
+          {rowContent}
         </TooltipTrigger>
-        {collapsed && (
-          <TooltipContent side="right" sideOffset={10}>
-            {item.label}
-          </TooltipContent>
-        )}
+        <TooltipContent side="right" sideOffset={10}>
+          {item.label}
+        </TooltipContent>
       </Tooltip>
     );
   };

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Search, ChevronRight, X, FileText, ArrowRight } from 'lucide-react';
 import { matchSorter } from 'match-sorter';
 import { getFlattenedReportIndex } from '@/config/reportsRegistry';
+import { prefetchRoute } from '@/lib/routePrefetcher';
 
 // Custom hook to detect clicks outside of an element
 function useOnClickOutside(ref, handler) {
@@ -81,6 +82,15 @@ export default function ReportSearch({ className = '' }) {
       } else if (results.length > 0) {
         handleSelect(results[0]);
       }
+    } else if (e.key === 'Tab') {
+      if (isOpen) {
+        if (selectedIndex >= 0 && selectedIndex < results.length) {
+          e.preventDefault();
+          handleSelect(results[selectedIndex]);
+        } else {
+          setIsOpen(false);
+        }
+      }
     } else if (e.key === 'Escape') {
       e.preventDefault();
       setIsOpen(false);
@@ -136,6 +146,11 @@ export default function ReportSearch({ className = '' }) {
           onFocus={() => {
             if (query.trim()) setIsOpen(true);
           }}
+          onBlur={(e) => {
+            if (!containerRef.current?.contains(e.relatedTarget)) {
+              setIsOpen(false);
+            }
+          }}
           onKeyDown={handleKeyDown}
           aria-expanded={isOpen}
           aria-controls="report-search-results"
@@ -184,7 +199,10 @@ export default function ReportSearch({ className = '' }) {
                       index === selectedIndex ? 'bg-primary/10 text-primary' : 'hover:bg-muted/60 text-foreground'
                     }`}
                     onClick={() => handleSelect(result)}
-                    onMouseEnter={() => setSelectedIndex(index)}
+                    onMouseEnter={() => {
+                      setSelectedIndex(index);
+                      prefetchRoute(result.path || (result.isRoute ? result.path : '/reports'));
+                    }}
                   >
                     <div className="flex items-start gap-3 min-w-0 pr-2">
                       <div className="p-1.5 rounded-lg bg-muted/60 mt-0.5 shrink-0 text-muted-foreground group-hover:text-primary">

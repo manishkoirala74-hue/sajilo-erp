@@ -81,6 +81,14 @@ const SearchableSelect = React.memo(React.forwardRef(function SearchableSelect({
       if (activeIndex >= 0 && activeIndex < flatVisibleOptions.length) {
         handleSelect(flatVisibleOptions[activeIndex].value);
       }
+    } else if (e.key === 'Tab') {
+      if (activeIndex >= 0 && activeIndex < flatVisibleOptions.length) {
+        handleSelect(flatVisibleOptions[activeIndex].value);
+      }
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      setOpen(false);
+      setSearch('');
     }
   };
 
@@ -144,9 +152,11 @@ const SearchableSelect = React.memo(React.forwardRef(function SearchableSelect({
             className
           )}
           onKeyDown={e => {
-            if (!open && e.key.length === 1 && e.key !== ' ' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+            if (!open && (e.key === 'ArrowDown' || e.key === 'Enter' || (e.key.length === 1 && e.key !== ' ' && !e.ctrlKey && !e.metaKey && !e.altKey))) {
               e.preventDefault();
-              setSearch(e.key);
+              if (e.key.length === 1 && e.key !== ' ') {
+                setSearch(e.key);
+              }
               setOpen(true);
               return;
             }
@@ -204,12 +214,7 @@ const SearchableSelect = React.memo(React.forwardRef(function SearchableSelect({
           ) : (
             flatVisibleOptions.length === 0
               ? <p className="px-3 py-4 text-sm text-center text-muted-foreground">No results</p>
-              : flatVisibleOptions.slice(0, 100).map(renderOption)
-          )}
-          {flatVisibleOptions.length > 100 && (
-            <p className="px-3 py-2 text-xs text-center text-muted-foreground border-t mt-1 bg-muted/20">
-              Showing first 100 results. Type to narrow search.
-            </p>
+              : flatVisibleOptions.map(renderOption)
           )}
         </div>
         {onCreateNew && (

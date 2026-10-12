@@ -29,6 +29,7 @@ import {
 } from '@/lib/reports/bankReconciliationService';
 import { generateBankReconciliationVectorPDF } from '@/utils/reportPdfEngine';
 import { exportBankReconciliationXLSX } from '@/lib/reports/reportExcelExport';
+import { ReportPageTemplate } from '@/components/reports';
 
 export default function BankReconciliationReport() {
   const navigate = useNavigate();
@@ -402,55 +403,35 @@ export default function BankReconciliationReport() {
   }, [activeUnclearedDeposits, searchTerm]);
 
   return (
-    <div className="flex flex-col gap-5 p-6 pb-28 max-w-[1440px] mx-auto print:p-2 print:pb-0">
-
-      {/* ── Screen Header ── */}
-      <div className="print:hidden flex items-center justify-between flex-wrap gap-4">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/reports')} className="rounded-xl">
-            <ArrowLeft className="w-5 h-5" />
-          </Button>
-          <div>
-            <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-lg bg-blue-100 dark:bg-blue-500/20 flex items-center justify-center">
-                <Landmark className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-              </div>
-              <h1 className="text-2xl font-bold text-foreground">Bank Reconciliation Report</h1>
-              {sessionStatus === 'Reconciled' && (
-                <span className="bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 text-xs px-2.5 py-0.5 rounded-full font-semibold flex items-center gap-1">
-                  <ShieldCheck className="w-3.5 h-3.5" /> Reconciled &amp; Locked
-                </span>
-              )}
-            </div>
-            <p className="text-sm text-muted-foreground mt-0.5">
-              Match ERP bank ledger with physical bank statements, verify in-transit items, and balance your books
-            </p>
-          </div>
-        </div>
-
-        {/* Action Controls */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <Button variant="outline" size="sm" onClick={() => window.print()} className="rounded-xl">
-            <Printer className="w-4 h-4 mr-1.5" /> Print
-          </Button>
-          <Button variant="outline" size="sm" onClick={handleExcelExport} disabled={isExcelExporting || !selectedBank} className="rounded-xl">
-            <FileSpreadsheet className="w-4 h-4 mr-1.5 text-emerald-600" />
-            {isExcelExporting ? 'Exporting…' : 'Excel (.xlsx)'}
-          </Button>
-          <Button variant="outline" size="sm" onClick={handleVectorPdfExport} disabled={isPdfExporting || !selectedBank} className="rounded-xl">
-            <Download className="w-4 h-4 mr-1.5 text-blue-600" />
-            {isPdfExporting ? 'Generating PDF…' : 'Audit PDF'}
-          </Button>
+    <ReportPageTemplate
+      title="Bank Reconciliation Report"
+      subtitle="Match ERP bank ledger with physical bank statements, verify in-transit items, and balance your books"
+      category="Accounting"
+      icon={Landmark}
+      fromDate={statementDate}
+      toDate={statementDate}
+      showBusinessHeader={false}
+      onExportExcel={handleExcelExport}
+      onExportPdf={handleVectorPdfExport}
+      onPrint={() => window.print()}
+      extraActions={
+        <>
+          {sessionStatus === 'Reconciled' && (
+            <span className="bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 text-xs px-2.5 py-1 rounded-full font-semibold flex items-center gap-1">
+              <ShieldCheck className="w-3.5 h-3.5" /> Reconciled & Locked
+            </span>
+          )}
           <Button
             onClick={() => handleSaveReconciliation(false)}
             disabled={isSaving || !selectedBank}
-            className="rounded-xl bg-primary text-primary-foreground hover:bg-primary/90"
+            className="rounded-lg text-xs font-semibold gap-1.5 shadow-sm"
           >
-            <Save className={`w-4 h-4 mr-1.5 ${isSaving ? 'animate-spin' : ''}`} />
+            <Save className={`w-3.5 h-3.5 ${isSaving ? 'animate-spin' : ''}`} />
             {isSaving ? 'Saving…' : 'Save Session'}
           </Button>
-        </div>
-      </div>
+        </>
+      }
+    >
 
       {/* ── Unsaved Changes Buffer Banner ── */}
       {dirtyLineIds.size > 0 && (
@@ -1282,6 +1263,6 @@ export default function BankReconciliationReport() {
         </DialogContent>
       </Dialog>
 
-    </div>
+    </ReportPageTemplate>
   );
 }

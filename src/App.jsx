@@ -89,6 +89,8 @@ const PriceRevisionHistory = React.lazy(() => import('@/pages/reports/PriceRevis
 const GrossProfitMarginReport = React.lazy(() => import('@/pages/reports/GrossProfitMarginReport'));
 const CustomerBillDue = React.lazy(() => import('@/pages/reports/CustomerBillDue'));
 const SupplierBillDue = React.lazy(() => import('@/pages/reports/SupplierBillDue'));
+const InstallmentDueReport = React.lazy(() => import('@/pages/reports/InstallmentDueReport'));
+const InstallmentCollectionReport = React.lazy(() => import('@/pages/reports/InstallmentCollectionReport'));
 const PurchasePriceChangeHistory = React.lazy(() => import('@/pages/reports/PurchasePriceChangeHistory'));
 const NegativeStockExceptionReport = React.lazy(() => import('@/pages/reports/NegativeStockExceptionReport'));
 const ComposeEmail = React.lazy(() => import('@/pages/email/ComposeEmail'));
@@ -261,6 +263,8 @@ const AuthenticatedApp = () => {
           <Route path="/reports/inventory/gross-profit-margin" element={<GrossProfitMarginReport />} />
           <Route path="/reports/customer-bill-due" element={<CustomerBillDue />} />
           <Route path="/reports/supplier-bill-due" element={<SupplierBillDue />} />
+          <Route path="/reports/installment-due" element={<InstallmentDueReport />} />
+          <Route path="/reports/installment-collection" element={<InstallmentCollectionReport />} />
           <Route path="/reports/purchase-price-change-history" element={<PurchasePriceChangeHistory />} />
           <Route path="/reports/inventory/negative-stock-exceptions" element={<NegativeStockExceptionReport />} />
           <Route path="/profile" element={<Profile />} />
@@ -347,19 +351,31 @@ import { WorkspaceProvider } from '@/lib/WorkspaceContext';
 
 import { useSyncAuditLogs } from '@/hooks/useSyncAuditLogs';
 
+import { shortcutManager } from '@/lib/shortcutManager';
+
 const router = createBrowserRouter([{ path: '*', element: <><AuthenticatedApp /><GlobalVoucherDrawer /><ModalRegistry /></> }]);
 
 function App() {
   useSyncAuditLogs();
   React.useEffect(() => {
-    const handleKeyDown = (e) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
-        e.preventDefault();
-        useModalStore.getState().openModal('COMMAND_PALETTE');
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown); // Critical Cleanup
+    shortcutManager.registerGlobalShortcut('ctrl+k', () => {
+      useModalStore.getState().openModal('COMMAND_PALETTE');
+    });
+    shortcutManager.registerGlobalShortcut('alt+j', () => {
+      useModalStore.getState().openModal('JOURNAL_ENTRY_MODAL');
+    });
+    shortcutManager.registerGlobalShortcut('alt+i', () => {
+      router.navigate('/sales/invoices');
+    });
+    shortcutManager.registerGlobalShortcut('alt+p', () => {
+      router.navigate('/purchase/invoices');
+    });
+    shortcutManager.registerGlobalShortcut('alt+c', () => {
+      router.navigate('/partners/customers');
+    });
+    shortcutManager.registerGlobalShortcut('alt+m', () => {
+      router.navigate('/inventory/items');
+    });
   }, []);
 
   return (

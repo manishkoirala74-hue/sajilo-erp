@@ -11,6 +11,8 @@ import { useSettingsStore } from '@/store/settingsStore';
 import { canAccessRoute, hasPermission } from '@/lib/permissionResolver';
 import { useAuth } from '@/lib/AuthContext';
 import { getFlattenedReportIndex } from '@/pages/reports/config/reportNavConfig';
+import { QUICK_CREATE_ACTIONS } from '@/config/actionRegistry';
+import { prefetchRoute } from '@/lib/routePrefetcher';
 
 export default function CommandPaletteModal({ open, onOpenChange }) {
   const { quickActions } = useUserPreferencesStore();
@@ -22,11 +24,13 @@ export default function CommandPaletteModal({ open, onOpenChange }) {
   const serverSettings = useSettingsStore(state => state.serverSettings);
 
   const onSelect = (action) => {
+    if (!action) return;
     if (action.type === 'MODAL') {
-      openModal(action.target);
-    } else if (action.type === 'ROUTE') {
+      openModal(action.target, action.modalProps);
+    } else if (action.type === 'ROUTE' && action.target) {
       navigate(action.target);
       closeModal();
+      onOpenChange?.(false);
     }
   };
 
@@ -42,7 +46,14 @@ export default function CommandPaletteModal({ open, onOpenChange }) {
   const reportNav = useMemo(() => {
     return getFlattenedReportIndex()
       .filter(report => !report.permissionKey || hasPermission({ user, activeCompany, activeRole, permissionKey: report.permissionKey }))
-      .map(item => ({ ...item, type: 'ROUTE', id: `REP_${item.path}`, target: item.path, icon: item.icon }));
+      .map(item => ({ 
+        ...item, 
+        type: 'ROUTE', 
+        id: `REP_${item.id || item.navPath}`, 
+        target: item.navPath || item.path, 
+        iconComponent: item.categoryIcon,
+        keywords: item.keywords 
+      }));
   }, [user, activeCompany, activeRole]);
 
   // 3. Settings Routes
@@ -50,6 +61,18 @@ export default function CommandPaletteModal({ open, onOpenChange }) {
     return getFlattenedSettingsIndex()
       .filter(s => !s.permissionKey || hasPermission({ user, activeCompany, activeRole, permissionKey: s.permissionKey }))
       .map(item => ({ ...item, type: 'ROUTE', id: `SET_${item.path}`, target: item.path, icon: 'Settings' }));
+  }, [user, activeCompany, activeRole]);
+
+  // 4. Global Quick Create Actions
+  const quickCreateNav = useMemo(() => {
+    return QUICK_CREATE_ACTIONS
+      .filter(a => !a.permissionKey || hasPermission({ user, activeCompany, activeRole, permissionKey: a.permissionKey }))
+      .map(item => ({
+        ...item,
+        id: item.id,
+        iconComponent: item.icon,
+        keywords: item.keywords || []
+      }));
   }, [user, activeCompany, activeRole]);
 
   // Determine React-level Search Mode (for dataset swapping and dedup)
@@ -63,7 +86,7 @@ export default function CommandPaletteModal({ open, onOpenChange }) {
     );
   }, [quickActions, user, activeRole, activeCompany]);
 
-  // BUG FIX 1: Only deduplicate when the user is NOT searching. 
+  // Deduplicate pinned items when NOT searching
   const pinnedTargets = new Set(
     (!isSearching && !isSettingsMode) 
       ? secureQuickActions.filter(a => a.type === 'ROUTE').map(a => a.target) 
@@ -72,9 +95,11 @@ export default function CommandPaletteModal({ open, onOpenChange }) {
 
   // React handles swapping the dataset to feed the correct items to CMDK
   const displayedNavigationItems = useMemo(() => {
-    const sourceList = isSettingsMode ? settingsNav : [...operationalNav, ...reportNav];
+    const sourceList = isSettingsMode 
+      ? settingsNav 
+      : [...quickCreateNav, ...operationalNav, ...reportNav];
     return sourceList.filter(item => !pinnedTargets.has(item.target));
-  }, [isSettingsMode, settingsNav, operationalNav, reportNav, pinnedTargets]);
+  }, [isSettingsMode, settingsNav, quickCreateNav, operationalNav, reportNav, pinnedTargets]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -145,10 +170,21 @@ export default function CommandPaletteModal({ open, onOpenChange }) {
                     key={action.id}
                     value={`${action.label} ${action.keywords?.join(' ') || ''}`}
                     onSelect={() => onSelect(action)}
+                    onMouseEnter={() => {
+                      if (action.target) prefetchRoute(action.target);
+                    }}
+                    onFocus={() => {
+                      if (action.target) prefetchRoute(action.target);
+                    }}
                     className="flex items-center gap-3 px-3 py-2.5 text-sm rounded-lg cursor-pointer aria-selected:bg-primary/20 aria-selected:text-primary text-slate-300 hover:text-slate-200 transition-colors group"
                   >
-                    <Icon className="w-4 h-4 text-slate-400 group-aria-selected:text-primary" />
-                    {action.label}
+                    <Icon className="w-4 h-4 text-slate-400 group-aria-selected:text-primary shrink-0" />
+                    <span className="flex-1 truncate">{action.label}</span>
+                    {action.shortcut && (
+                      <kbd className="hidden sm:inline-flex items-center text-[10px] font-mono text-slate-400 bg-slate-800/80 border border-slate-700/80 px-1.5 py-0.5 rounded ml-auto">
+                        {action.shortcut}
+                      </kbd>
+                    )}
                   </Command.Item>
                 );
               })}

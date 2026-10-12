@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Search, ChevronRight, X } from 'lucide-react';
 import { matchSorter } from 'match-sorter';
 import { getFlattenedSettingsIndex } from '../config/settingsNavConfig';
+import { prefetchRoute } from '@/lib/routePrefetcher';
 
 // Custom hook to detect clicks outside of an element
 function useOnClickOutside(ref, handler) {
@@ -80,6 +81,15 @@ export default function SettingsSearch() {
       } else if (results.length > 0) {
         handleSelect(results[0]);
       }
+    } else if (e.key === 'Tab') {
+      if (isOpen) {
+        if (selectedIndex >= 0 && selectedIndex < results.length) {
+          e.preventDefault();
+          handleSelect(results[selectedIndex]);
+        } else {
+          setIsOpen(false);
+        }
+      }
     } else if (e.key === 'Escape') {
       e.preventDefault();
       setIsOpen(false);
@@ -124,6 +134,11 @@ export default function SettingsSearch() {
           }}
           onFocus={() => {
             if (query.trim()) setIsOpen(true);
+          }}
+          onBlur={(e) => {
+            if (!containerRef.current?.contains(e.relatedTarget)) {
+              setIsOpen(false);
+            }
           }}
           onKeyDown={handleKeyDown}
           aria-expanded={isOpen}
@@ -171,7 +186,10 @@ export default function SettingsSearch() {
                     index === selectedIndex ? 'bg-primary/10 text-primary' : 'hover:bg-muted text-foreground'
                   }`}
                   onClick={() => handleSelect(result)}
-                  onMouseEnter={() => setSelectedIndex(index)}
+                  onMouseEnter={() => {
+                    setSelectedIndex(index);
+                    prefetchRoute(result.path);
+                  }}
                 >
                   <div className="flex flex-col overflow-hidden">
                     <span className="text-sm font-medium truncate">

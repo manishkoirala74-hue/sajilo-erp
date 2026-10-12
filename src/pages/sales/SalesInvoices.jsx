@@ -1,7 +1,7 @@
 import { useSearchParams, useLocation, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { sajilo } from '@/api/sajiloClient';
-import { Plus, Eye, CheckCircle2, XCircle, Ban, AlertTriangle, Pencil, RotateCcw } from 'lucide-react';
+import { Plus, Eye, CheckCircle2, XCircle, Ban, AlertTriangle, Pencil, RotateCcw, CalendarClock, History, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -13,6 +13,10 @@ import DataTable from '@/components/shared/DataTable';
 import FormGrid from '@/components/layout/FormGrid';
 import FormRow from '@/components/layout/FormRow';
 import LineItemsEditor from '@/components/invoices/LineItemsEditor';
+import InstallmentScheduleEditor from '@/components/invoices/InstallmentScheduleEditor';
+import ReschedulePaymentModal from '@/components/invoices/ReschedulePaymentModal';
+import DueDateHistoryDrawer from '@/components/invoices/DueDateHistoryDrawer';
+import { fetchInvoiceInstallments } from '@/lib/invoiceDueDateService';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import DateInput from '@/components/shared/DateInput';
@@ -37,7 +41,16 @@ const emptySI = {
   payment_mode: 'Credit', cash_bank_account_id: '', cash_bank_account_name: '',
   status: 'Draft', payment_status: 'Unpaid',
   goods_subtotal: 0, sundry_charges_total: 0, total_tax_amount: 0, grand_total: 0,
-  notes: '', line_items: []
+  notes: '', line_items: [],
+  is_installment: false,
+  down_payment_amount: 0,
+  down_payment_account_id: '',
+  installment_frequency: 'Monthly',
+  installment_count: 6,
+  installment_interest_rate: 0,
+  installment_interest_type: 'ZeroInterest',
+  total_interest_amount: 0,
+  installments: [],
 };
 
 export default function SalesInvoices() {
@@ -92,6 +105,12 @@ export default function SalesInvoices() {
   // Duplicate warning state
   const [dupWarning, setDupWarning] = useState(false);
   const [pendingPostStatus, setPendingPostStatus] = useState(null);
+
+  // Reschedule & Due Date History state
+  const [rescheduleTarget, setRescheduleTarget] = useState(null); // { invoice, installment }
+  const [historyTarget, setHistoryTarget] = useState(null);       // invoice object
+  const [viewDetailInstallments, setViewDetailInstallments] = useState([]);
+  const [loadingViewInstallments, setLoadingViewInstallments] = useState(false);
 
   // Promise-based confirm modal state
   const [confirmModal, setConfirmModal] = useState({ isOpen: false, message: '', resolve: null });
@@ -164,6 +183,7 @@ export default function SalesInvoices() {
 
   const closeViewDetail = () => {
     setViewDetail(null);
+    setViewDetailInstallments([]);
     if (searchParams.get('view')) {
       if (location.state?.from) {
         navigate(location.state.from);
@@ -173,6 +193,18 @@ export default function SalesInvoices() {
       }
     }
   };
+
+  useEffect(() => {
+    if (viewDetail?.id && viewDetail.is_installment) {
+      setLoadingViewInstallments(true);
+      fetchInvoiceInstallments(viewDetail.id)
+        .then(res => setViewDetailInstallments(res || []))
+        .catch(err => console.error('Error fetching invoice installments:', err))
+        .finally(() => setLoadingViewInstallments(false));
+    } else {
+      setViewDetailInstallments([]);
+    }
+  }, [viewDetail?.id, viewDetail?.is_installment]);
 
   const handleDownloadPDF = async (invoice) => {
     toast.loading('Generating PDF...', { id: 'pdf-gen' });
@@ -249,8 +281,22 @@ export default function SalesInvoices() {
     setShowForm(true);
   };
 
-  const openEdit = (row) => {
-    setForm({ ...emptySI, ...row, _isNew: false });
+  const openEdit = async (row) => {
+    let installments = [];
+    if (row.is_installment) {
+      try {
+        installments = await fetchInvoiceInstallments(row.id);
+      } catch (e) {
+        console.error('Error fetching installments for invoice:', e);
+      }
+    }
+    setForm({
+      ...emptySI,
+      ...row,
+      payment_mode: row.is_installment ? 'Installment' : (row.payment_mode || 'Credit'),
+      installments: installments || [],
+      _isNew: false
+    });
     setDupWarning(false);
     setPendingPostStatus(null);
     setShowForm(true);
@@ -288,8 +334,18 @@ export default function SalesInvoices() {
   };
 
   const handleSave = async (postStatus = 'Draft', skipStockCheck = false) => {
-    if (form.payment_mode === 'Credit' && !form.customer_name) { toast.error('Select a customer'); return; }
+    if (['Credit', 'Installment'].includes(form.payment_mode) && !form.customer_name) { toast.error('Select a customer'); return; }
     if (['Cash', 'Bank'].includes(form.payment_mode) && !form.cash_bank_account_id) { toast.error('Select a Cash/Bank ledger account'); return; }
+    if (form.payment_mode === 'Installment') {
+      if (!form.installments || form.installments.length === 0) {
+        toast.error('Installment schedule must be generated before saving an EMI invoice');
+        return;
+      }
+      if (Number(form.down_payment_amount || 0) > 0 && !form.down_payment_account_id) {
+        toast.error('Select a deposit account for Day 0 Down Payment');
+        return;
+      }
+    }
     if (!form.invoice_number) { toast.error('Invoice number is required'); return; }
     if (!form.grand_total || form.grand_total <= 0) { toast.error('Total amount cannot be empty or zero'); return; }
     if (settings?.enable_godown_management && !form.godown_id) { toast.error('Godown / Location is required'); return; }
@@ -373,13 +429,16 @@ export default function SalesInvoices() {
     setSaving(true);
     try {
       const isCashOrBank = ['Cash', 'Bank'].includes(form.payment_mode);
+      const isInstallment = form.payment_mode === 'Installment' || form.is_installment;
       const data = { 
         ...form, 
+        is_installment: isInstallment,
         status: postStatus,
-        payment_status: isCashOrBank ? 'Paid' : form.payment_status 
+        payment_status: isCashOrBank ? 'Paid' : (isInstallment && Number(form.down_payment_amount || 0) > 0 ? 'Partial' : form.payment_status),
+        installment_status: isInstallment ? 'Active' : 'NotApplicable',
       };
 
-      // Ensure cash_bank_account_id is strictly null if it's Credit
+      // Ensure cash_bank_account_id is strictly null if it's Credit or Installment without cash
       if (!isCashOrBank) {
         data.cash_bank_account_id = null;
         data.cash_bank_account_name = null;
@@ -434,6 +493,35 @@ export default function SalesInvoices() {
             setSettings(s => ({ ...s, invoice_next_number: next }));
           }
           toast.success('Invoice saved as draft');
+        }
+
+        // Persist draft installments if any
+        if (isInstallment && data.installments?.length > 0) {
+          try {
+            const compId = sajilo.getCompanyId();
+            const slices = data.installments.map(inst => ({
+              company_id: compId,
+              invoice_type: 'SalesInvoice',
+              invoice_id: docId,
+              invoice_number: assignedInvoiceNumber || form.invoice_number,
+              partner_id: form.customer_id,
+              partner_name: form.customer_name,
+              installment_no: inst.installment_no,
+              is_down_payment: !!inst.is_down_payment,
+              due_date: inst.due_date,
+              original_due_date: inst.original_due_date || inst.due_date,
+              principal_amount: inst.principal_amount || 0,
+              interest_amount: inst.interest_amount || 0,
+              total_amount: inst.total_amount || 0,
+              paid_amount: 0,
+              status: 'Pending',
+              notes: inst.notes || ''
+            }));
+            await sajilo.client.from('InvoiceInstallment').delete().eq('invoice_id', docId);
+            await sajilo.client.from('InvoiceInstallment').insert(slices);
+          } catch (instErr) {
+            console.warn('Draft installment save error:', instErr);
+          }
         }
       }
 
@@ -518,9 +606,16 @@ export default function SalesInvoices() {
 
   const columns = [
     { key: 'invoice_number', label: 'Invoice #', render: (val, row) => (
-      <VoucherLink voucherNumber={val}>
-        <span className={`cursor-pointer font-mono font-semibold ${row.status === 'Cancelled' ? 'line-through text-muted-foreground' : row.status === 'Rejected' ? 'text-orange-500 line-through' : 'text-primary'}`}>{val}</span>
-      </VoucherLink>
+      <div className="flex items-center gap-1.5">
+        <VoucherLink voucherNumber={val}>
+          <span className={`cursor-pointer font-mono font-semibold ${row.status === 'Cancelled' ? 'line-through text-muted-foreground' : row.status === 'Rejected' ? 'text-orange-500 line-through' : 'text-primary'}`}>{val}</span>
+        </VoucherLink>
+        {row.is_installment && (
+          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300">
+            EMI
+          </span>
+        )}
+      </div>
     )},
     { key: 'customer_name', label: 'Customer', render: (val, row) => {
       let displayName = val;
@@ -546,9 +641,29 @@ export default function SalesInvoices() {
             <Eye className="w-4 h-4" />
           </Button>
           {row.status === 'Posted' && (
-            <Button variant="ghost" size="icon" className={row.payment_status === 'Paid' ? 'text-amber-500' : 'text-emerald-500'} title={`Mark as ${row.payment_status === 'Paid' ? 'Unpaid' : 'Paid'}`} onClick={() => togglePaymentStatus(row)}>
-              {row.payment_status === 'Paid' ? <RotateCcw className="w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />}
-            </Button>
+            <>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="text-indigo-600 hover:text-indigo-700 print:hidden" 
+                title="Reschedule Payment / Due Date" 
+                onClick={() => setRescheduleTarget({ invoice: row, installment: null })}
+              >
+                <CalendarClock className="w-4 h-4" />
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="text-stone-600 hover:text-stone-800 print:hidden" 
+                title="View Due Date Modification History" 
+                onClick={() => setHistoryTarget(row)}
+              >
+                <History className="w-4 h-4" />
+              </Button>
+              <Button variant="ghost" size="icon" className={row.payment_status === 'Paid' ? 'text-amber-500' : 'text-emerald-500'} title={`Mark as ${row.payment_status === 'Paid' ? 'Unpaid' : 'Paid'}`} onClick={() => togglePaymentStatus(row)}>
+                {row.payment_status === 'Paid' ? <RotateCcw className="w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />}
+              </Button>
+            </>
           )}
           {(row.status === 'Draft' || row.status === 'Posted') && canEdit && (
             <Button variant="ghost" size="icon" className="text-primary print:hidden" title="Edit Invoice" onClick={() => openEdit(row)}>
@@ -635,12 +750,20 @@ export default function SalesInvoices() {
                   <FormRow fullWidth>
                     <Label>Payment Mode</Label>
                     <div className="flex gap-2 mt-1">
-                      {['Credit', 'Cash', 'Bank'].map(mode => (
+                      {['Credit', 'Cash', 'Bank', 'Installment'].map(mode => (
                         <Button 
                           key={mode} 
                           type="button"
                           variant={form.payment_mode === mode ? 'default' : 'outline'}
-                          onClick={() => setForm(f => ({ ...f, payment_mode: mode, cash_bank_account_id: '', cash_bank_account_name: '', customer_id: '', customer_name: '' }))}
+                          onClick={() => setForm(f => ({
+                            ...f,
+                            payment_mode: mode,
+                            is_installment: mode === 'Installment',
+                            cash_bank_account_id: '',
+                            cash_bank_account_name: '',
+                            customer_id: ['Credit', 'Installment'].includes(mode) ? f.customer_id : '',
+                            customer_name: ['Credit', 'Installment'].includes(mode) ? f.customer_name : ''
+                          }))}
                           className="flex-1 rounded-xl"
                         >
                           {mode}
@@ -669,7 +792,7 @@ export default function SalesInvoices() {
                     )}
                   </FormRow>
                   
-                  {form.payment_mode === 'Credit' ? (
+                  {['Credit', 'Installment'].includes(form.payment_mode) ? (
                     <div>
                       <Label>Customer *</Label>
                       <SearchableSelect
@@ -763,6 +886,42 @@ export default function SalesInvoices() {
                 <LineItemsEditor value={form.line_items} onChange={handleLineChange} taxTypes={taxTypes} hideTotals={true} />
               </div>
 
+              {form.payment_mode === 'Installment' && (
+                <div className="bg-card rounded-2xl border border-stone-200 p-5 shadow-sm">
+                  <h3 className="font-semibold text-lg text-foreground mb-1">Installment (EMI) Financing Plan</h3>
+                  <p className="text-xs text-muted-foreground mb-4">Configure down payment, repayment intervals, tenure, and financing interest</p>
+                  <InstallmentScheduleEditor
+                    invoiceAmount={(form.goods_subtotal || 0) + (form.total_tax_amount || 0) + (form.sundry_charges_total || 0)}
+                    invoiceDate={form.invoice_date}
+                    accounts={accounts}
+                    bankAccounts={accounts}
+                    initialValues={{
+                      frequency: form.installment_frequency,
+                      tenureMonths: form.installment_count,
+                      interestRate: form.installment_interest_rate,
+                      interestType: form.installment_interest_type,
+                      downPayment: form.down_payment_amount,
+                      downPaymentAccountId: form.down_payment_account_id,
+                    }}
+                    onScheduleChange={({ schedule, totalInterest, grandTotalWithInterest, downPayment, downPaymentAccountId, frequency, interestRate, interestType, tenure }) => {
+                      setForm(f => ({
+                        ...f,
+                        is_installment: true,
+                        installments: schedule,
+                        total_interest_amount: totalInterest,
+                        grand_total: grandTotalWithInterest,
+                        down_payment_amount: downPayment,
+                        down_payment_account_id: downPaymentAccountId,
+                        installment_frequency: frequency,
+                        installment_interest_rate: interestRate,
+                        installment_interest_type: interestType,
+                        installment_count: tenure,
+                      }));
+                    }}
+                  />
+                </div>
+              )}
+
               <div className="bg-card rounded-2xl border border-stone-200 p-5 shadow-sm">
                 <h3 className="font-semibold text-lg text-foreground mb-4">Attachments</h3>
                 <FileUpload 
@@ -792,10 +951,28 @@ export default function SalesInvoices() {
                       <span className="font-semibold text-orange-600">NPR {(form.sundry_charges_total || 0).toLocaleString()}</span>
                     </div>
                   )}
+                  {form.payment_mode === 'Installment' && form.total_interest_amount > 0 && (
+                    <div className="flex justify-between items-center text-indigo-600 dark:text-indigo-400">
+                      <span className="font-medium">Financing Interest ({form.installment_interest_rate}%)</span>
+                      <span className="font-semibold">+ NPR {Number(form.total_interest_amount || 0).toLocaleString()}</span>
+                    </div>
+                  )}
+                  {form.payment_mode === 'Installment' && form.down_payment_amount > 0 && (
+                    <div className="flex justify-between items-center text-emerald-600 dark:text-emerald-400">
+                      <span className="font-medium">Day 0 Down Payment</span>
+                      <span className="font-semibold">- NPR {Number(form.down_payment_amount || 0).toLocaleString()}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between items-center text-xl font-bold border-t border-stone-100 pt-4 mt-4">
                     <span className="text-foreground">Invoice Total</span>
                     <span className="text-foreground">NPR {(form.grand_total || 0).toLocaleString()}</span>
                   </div>
+                  {form.payment_mode === 'Installment' && form.down_payment_amount > 0 && (
+                    <div className="flex justify-between items-center text-xs text-muted-foreground pt-1">
+                      <span>Remaining Balance in EMI:</span>
+                      <span className="font-semibold text-foreground">NPR {((form.grand_total || 0) - (form.down_payment_amount || 0)).toLocaleString()}</span>
+                    </div>
+                  )}
                   <div className="pt-4 flex items-center gap-2 text-muted-foreground text-xs justify-center">
                     <span className="flex-1 border-t border-stone-200"></span>
                     No linked source document
@@ -839,6 +1016,22 @@ export default function SalesInvoices() {
               </div>
               {viewDetail && (
                 <div className="flex items-center gap-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="h-7 text-xs print:hidden text-indigo-600 border-indigo-200 hover:bg-indigo-50 dark:hover:bg-indigo-900/20" 
+                    onClick={() => setRescheduleTarget({ invoice: viewDetail, installment: null })}
+                  >
+                    <CalendarClock className="w-3.5 h-3.5 mr-1" /> Reschedule
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="h-7 text-xs print:hidden text-stone-600" 
+                    onClick={() => setHistoryTarget(viewDetail)}
+                  >
+                    <History className="w-3.5 h-3.5 mr-1" /> History
+                  </Button>
                   <Button variant="outline" size="sm" className="h-7 text-xs print:hidden" onClick={() => handleDownloadPDF(viewDetail)}>
                     <Download className="w-3.5 h-3.5 mr-1.5" /> Download PDF
                   </Button>
@@ -895,6 +1088,72 @@ export default function SalesInvoices() {
                       ))}
                     </tbody>
                   </table>
+                </div>
+              )}
+              
+              {viewDetail.is_installment && (
+                <div className="border-t pt-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-semibold flex items-center gap-1.5 text-violet-700 dark:text-violet-400">
+                      Installment (EMI) Schedule
+                    </p>
+                    <span className="text-xs text-muted-foreground">
+                      {viewDetail.installment_frequency} · {viewDetail.installment_count} installments · {viewDetail.installment_interest_rate}% {viewDetail.installment_interest_type}
+                    </span>
+                  </div>
+                  {loadingViewInstallments ? (
+                    <p className="text-xs text-muted-foreground py-2">Loading schedule...</p>
+                  ) : viewDetailInstallments.length > 0 ? (
+                    <div className="border rounded-xl overflow-hidden text-xs">
+                      <table className="w-full text-left">
+                        <thead className="bg-muted text-muted-foreground">
+                          <tr>
+                            <th className="p-2">#</th>
+                            <th className="p-2">Due Date</th>
+                            <th className="p-2 text-right">Principal</th>
+                            <th className="p-2 text-right">Interest</th>
+                            <th className="p-2 text-right">Total</th>
+                            <th className="p-2 text-right">Paid</th>
+                            <th className="p-2 text-center">Status</th>
+                            <th className="p-2 text-right print:hidden">Action</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border">
+                          {viewDetailInstallments.map((inst) => (
+                            <tr key={inst.id} className="hover:bg-muted/40">
+                              <td className="p-2 font-mono font-medium">
+                                {inst.is_down_payment ? 'DP #0' : `#${inst.installment_no}`}
+                              </td>
+                              <td className="p-2 font-mono">
+                                <DualDateDisplay date={inst.due_date} />
+                              </td>
+                              <td className="p-2 text-right">NPR {Number(inst.principal_amount).toLocaleString()}</td>
+                              <td className="p-2 text-right">NPR {Number(inst.interest_amount).toLocaleString()}</td>
+                              <td className="p-2 text-right font-semibold">NPR {Number(inst.total_amount).toLocaleString()}</td>
+                              <td className="p-2 text-right text-emerald-600">NPR {Number(inst.paid_amount).toLocaleString()}</td>
+                              <td className="p-2 text-center">
+                                <StatusBadge status={inst.status} />
+                              </td>
+                              <td className="p-2 text-right print:hidden">
+                                {inst.status !== 'Paid' && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-6 px-1.5 text-[11px] text-indigo-600"
+                                    onClick={() => setRescheduleTarget({ invoice: viewDetail, installment: inst })}
+                                  >
+                                    Reschedule
+                                  </Button>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground py-2 italic">No installment records found.</p>
+                  )}
                 </div>
               )}
               
@@ -1056,6 +1315,29 @@ export default function SalesInvoices() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* ── CONTROLLED PAYMENT RESCHEDULING MODAL ── */}
+      <ReschedulePaymentModal
+        isOpen={!!rescheduleTarget}
+        onClose={() => setRescheduleTarget(null)}
+        invoice={rescheduleTarget?.invoice}
+        installment={rescheduleTarget?.installment}
+        invoiceType="SalesInvoice"
+        onSuccess={() => {
+          fetchInvoices();
+          if (viewDetail?.id) {
+            fetchInvoiceInstallments(viewDetail.id).then(res => setViewDetailInstallments(res || []));
+          }
+        }}
+      />
+
+      {/* ── DUE DATE AUDIT HISTORY DRAWER ── */}
+      <DueDateHistoryDrawer
+        isOpen={!!historyTarget}
+        onClose={() => setHistoryTarget(null)}
+        invoice={historyTarget}
+        invoiceType="SalesInvoice"
+      />
     </div>
   );
 }

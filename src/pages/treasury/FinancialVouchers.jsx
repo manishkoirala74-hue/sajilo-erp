@@ -31,6 +31,7 @@ import VoucherLink from '@/components/shared/VoucherLink';
 import DateInput from '@/components/shared/DateInput';
 import { useNavigationBlocker } from '@/hooks/useNavigationBlocker';
 import { getPredictedVoucherNumber } from '@/utils/documentSequence';
+import { allocateInstallmentReceipt, reverseReceiptVoucher } from '@/lib/invoiceDueDateService';
 
 const emptyVoucher = {
   voucher_type: '', voucher_date: new Date().toISOString().split('T')[0],
@@ -373,12 +374,26 @@ export default function FinancialVouchers() {
         }));
         await postFinancialVoucher({ ...savedVoucher, lines: linesToPost }, false, idempotencyKey);
         
-        // Update Paid Amounts for Invoices
+        // Update Paid Amounts for Invoices & EMI Waterfall Allocation
         if ((form.voucher_type === 'Receipt' || form.voucher_type === 'Payment') && billAllocations.length > 0) {
           for (const alloc of billAllocations) {
             const table = form.voucher_type === 'Receipt' ? 'SalesInvoice' : 'PurchaseInvoice';
             try {
-              // Fetch current
+              if (form.voucher_type === 'Receipt') {
+                const { data: invData } = await sajilo.client.from('SalesInvoice').select('is_installment').eq('id', alloc.invoice_id).maybeSingle();
+                if (invData?.is_installment) {
+                  await allocateInstallmentReceipt({
+                    invoiceId: alloc.invoice_id,
+                    receiptVoucherId: savedVoucher.id,
+                    voucherNumber: savedVoucher.voucher_number,
+                    receiptAmount: Number(alloc.allocated_amount || 0),
+                    receiptDate: savedVoucher.voucher_date
+                  });
+                  continue;
+                }
+              }
+
+              // Standard non-installment bill allocation
               const res = await sajilo.client.from(table).select('paid_amount, grand_total').eq('id', alloc.invoice_id).single();
               if (res.data) {
                 const newPaid = (res.data.paid_amount || 0) + alloc.allocated_amount;
@@ -424,6 +439,15 @@ export default function FinancialVouchers() {
       const user = await sajilo.auth.me();
 
       if (selected.status === 'Posted') {
+        // Reverse EMI installment slices and contra-reverse linked interest micro-journals
+        if (selected.voucher_type === 'Receipt') {
+          try {
+            await reverseReceiptVoucher(selected.id, actionReason || 'Manual void');
+          } catch (emiRevErr) {
+            console.warn('EMI reverseReceiptVoucher notice:', emiRevErr);
+          }
+        }
+
         // Immutable Ledger: Do not hard delete. Reverse GL lines and update status.
         const idempotencyKey = crypto.randomUUID();
         await postFinancialVoucher({ id: selected.id, company_id: selected.company_id }, true, idempotencyKey);

@@ -1,20 +1,14 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useMemo } from 'react';
 import { sajilo } from '@/api/sajiloClient';
-import PageHeader from '@/components/shared/PageHeader';
-import DataTable from '@/components/shared/DataTable';
-import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, BarChart2, RefreshCcw, Printer } from 'lucide-react';
+import { Label } from '@/components/ui/label';
+import { BarChart2 } from 'lucide-react';
 import { format, subMonths } from 'date-fns';
 import { toast } from 'sonner';
 import ReportFilterBar from '@/components/reports/ReportFilterBar';
-import ReportExportActions from '@/components/reports/ReportExportActions';
-import { exportFlatXLSX } from '@/lib/reports/reportExcelExport';
-export default function GrossProfitMarginReport() {
-  const navigate = useNavigate();
+import { ReportPageTemplate, StandardReportTable } from '@/components/reports';
 
+export default function GrossProfitMarginReport() {
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -27,13 +21,12 @@ export default function GrossProfitMarginReport() {
 
   useEffect(() => {
     fetchCategories();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchCategories = async () => {
     try {
       const cats = await sajilo.entities.ItemCategory.list('category_name');
-      setCategories(cats);
+      setCategories(cats || []);
     } catch (e) {
       console.error(e);
     }
@@ -72,16 +65,13 @@ export default function GrossProfitMarginReport() {
       ledgers.forEach(l => {
         const txnDate = (l.transaction_date || '').substring(0, 10);
         if (txnDate >= fromDateStr && txnDate <= toDateStr) {
-          // Process outgoing stock (Sales & POS) and incoming returns
           if (l.transaction_type === 'SalesInvoice' || l.transaction_type === 'POSSale') {
             const itemObj = itemsMap.get(l.item_id);
             if (itemObj) {
               const qtyOut = Math.abs(l.quantity_out || 0);
               const qtyIn = Math.abs(l.quantity_in || 0);
-              
               if (qtyOut === 0 && qtyIn === 0) return;
 
-              // Use new strict columns with fallbacks for legacy data
               const rev = Number(l.net_amount || l.total_amount || 0);
               const wac = Number(l.wac_at_post || itemObj.weighted_average_cost || itemObj.purchase_price || 0);
               
@@ -90,8 +80,6 @@ export default function GrossProfitMarginReport() {
                 itemObj.revenue += rev;
                 itemObj.cogs += qtyOut * wac;
               }
-              
-              // Handle cancellation reversals
               if (qtyIn > 0) {
                 itemObj.qtySold -= qtyIn;
                 itemObj.revenue -= rev;
@@ -103,7 +91,6 @@ export default function GrossProfitMarginReport() {
             if (itemObj) {
               const qtyIn = Math.abs(l.quantity_in || 0);
               const qtyOut = Math.abs(l.quantity_out || 0);
-              
               if (qtyIn === 0 && qtyOut === 0) return;
 
               const rev = Number(l.net_amount || l.total_amount || 0);
@@ -114,8 +101,6 @@ export default function GrossProfitMarginReport() {
                 itemObj.revenue -= rev;
                 itemObj.cogs -= qtyIn * wac;
               }
-              
-              // Handle cancellation reversals
               if (qtyOut > 0) {
                 itemObj.qtySold += qtyOut;
                 itemObj.revenue += rev;
@@ -151,157 +136,98 @@ export default function GrossProfitMarginReport() {
     } catch (e) {
       console.error("Report Generation Error:", e);
       toast.error('Failed to generate report: ' + (e.message || 'Unknown error'));
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
-  const columns = [
-    { key: 'sn', label: 'S.N.', render: (val) => <span className="text-muted-foreground">{val}</span> },
-    { key: 'item', label: 'Item', render: (_, row) => (
-      <div>
-        <p className="font-medium text-foreground">{row.name}</p>
-        <p className="text-xs text-muted-foreground">{row.sku}</p>
-      </div>
-    )},
-    { key: 'category', label: 'Category', render: (val) => <span className="text-muted-foreground">{val}</span> },
-    { key: 'qtySold', label: 'Qty Sold', render: (val) => <span className="text-muted-foreground">{(val || 0).toLocaleString()}</span> },
-    { key: 'revenue', label: 'Revenue (Sales Value)', render: (val) => <span className="font-medium text-foreground">{(val || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}</span> },
-    { key: 'cogs', label: 'Cost of Goods Sold (COGS)', render: (val) => <span className="text-muted-foreground">{(val || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}</span> },
-    { key: 'grossProfit', label: 'Gross Profit (NPR)', render: (val) => <span className={`font-semibold ${val >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{(val || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}</span> },
-    { key: 'grossMargin', label: 'Gross Margin (%)', render: (val) => <span className="font-bold text-primary">{(val || 0).toFixed(2)}%</span> }
-  ];
-
-  const handleExportExcel = async () => {
-    if (!data || data.length === 0) {
-      toast.info('No data to export. Please generate the report first.');
-      return;
-    }
-    const headers = ['Item Code', 'Item Name', 'Category', 'Qty Sold', 'Revenue', 'COGS', 'Gross Profit', 'Margin %'];
-    const rows = data.map(r => [
-      r.item_code || '—',
-      r.item_name || '',
-      r.category_name || '—',
-      r.qtySold || 0,
-      r.revenue || 0,
-      r.cogs || 0,
-      r.grossProfit || 0,
-      `${(r.grossMargin || 0).toFixed(2)}%`
-    ]);
-    const footer = [
-      '',
-      'TOTAL',
-      '',
-      totalQtySold,
-      totalRevenue,
-      totalCogs,
-      totalGrossProfit,
-      `${totalGrossMargin.toFixed(2)}%`
-    ];
-    await exportFlatXLSX({
-      filename: `Gross_Profit_Margin_${filters.fromDate}_${filters.toDate}.xlsx`,
-      reportTitle: 'Gross Profit Margin Report',
-      fromDate: filters.fromDate,
-      toDate: filters.toDate,
-      headers,
-      rows,
-      footer
-    });
-  };
-  const handlePrint = () => {
-    window.print();
-  };
-
-  const totalQtySold = (data || []).reduce((acc, row) => acc + (row.qtySold || 0), 0);
-  const totalRevenue = (data || []).reduce((acc, row) => acc + (row.revenue || 0), 0);
-  const totalCogs = (data || []).reduce((acc, row) => acc + (row.cogs || 0), 0);
-  const totalGrossProfit = (data || []).reduce((acc, row) => acc + (row.grossProfit || 0), 0);
+  // Calculations for Totals
+  const totalQtySold = useMemo(() => (data || []).reduce((acc, row) => acc + (row.qtySold || 0), 0), [data]);
+  const totalRevenue = useMemo(() => (data || []).reduce((acc, row) => acc + (row.revenue || 0), 0), [data]);
+  const totalCogs = useMemo(() => (data || []).reduce((acc, row) => acc + (row.cogs || 0), 0), [data]);
+  const totalGrossProfit = useMemo(() => (data || []).reduce((acc, row) => acc + (row.grossProfit || 0), 0), [data]);
   const totalGrossMargin = totalRevenue > 0 ? (totalGrossProfit / totalRevenue) * 100 : 0;
 
-  const footerContent = data?.length > 0 ? [
-    '',
-    'TOTAL',
-    '',
-    totalQtySold.toLocaleString(),
-    totalRevenue.toLocaleString(undefined, {minimumFractionDigits: 2}),
-    totalCogs.toLocaleString(undefined, {minimumFractionDigits: 2}),
-    totalGrossProfit.toLocaleString(undefined, {minimumFractionDigits: 2}),
-    `${totalGrossMargin.toFixed(2)}%`
-  ] : undefined;
+  const columns = useMemo(() => [
+    { key: 'sn', label: 'S.N.', width: '60px', align: 'center', headerAlign: 'text-center' },
+    { key: 'sku', label: 'Item Code', preset: 'code', stickyFirst: true },
+    { key: 'name', label: 'Item Name', preset: 'description' },
+    { key: 'category', label: 'Category', preset: 'category' },
+    { key: 'qtySold', label: 'Qty Sold', preset: 'quantity' },
+    { key: 'revenue', label: 'Revenue (NPR)', preset: 'amount' },
+    { key: 'cogs', label: 'COGS (NPR)', preset: 'amount' },
+    { 
+      key: 'grossProfit', 
+      label: 'Gross Profit (NPR)', 
+      preset: 'amount',
+      render: (val) => (
+        <span className={`font-mono text-xs tabular-nums font-semibold ${val >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+          {Number(val || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+        </span>
+      )
+    },
+    { 
+      key: 'grossMargin', 
+      label: 'Margin (%)', 
+      preset: 'percentage',
+      render: (val) => (
+        <span className="font-mono text-xs tabular-nums font-bold text-primary">
+          {(val || 0).toFixed(2)}%
+        </span>
+      ),
+      exportValue: (row) => `${(row.grossMargin || 0).toFixed(2)}%`
+    }
+  ], []);
+
+  const footer = useMemo(() => {
+    if (!data || data.length === 0) return null;
+    return {
+      sn: '',
+      sku: 'TOTAL',
+      name: '',
+      category: '',
+      qtySold: totalQtySold,
+      revenue: totalRevenue,
+      cogs: totalCogs,
+      grossProfit: totalGrossProfit,
+      grossMargin: `${totalGrossMargin.toFixed(2)}%`
+    };
+  }, [data, totalQtySold, totalRevenue, totalCogs, totalGrossProfit, totalGrossMargin]);
 
   return (
-    <div className="flex flex-col gap-6 p-6 pb-24 max-w-7xl mx-auto print:p-0 print:pb-0">
-
-      
-      {/* ── PRINT-ONLY VIEW ── */}
-      <div className="hidden print:block w-full">
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">Gross Profit Margin Report</h1>
-          <p className="text-gray-500">Date Between: {filters.fromDate} to {filters.toDate}</p>
-        </div>
-        <table className="w-full text-sm text-left border-collapse border border-gray-200">
-          <thead>
-            <tr className="bg-gray-100">
-              {columns.map(c => (
-                <th key={c.key} className="border border-gray-200 p-2 font-semibold text-gray-700">{c.label}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {(data || []).map((row, i) => (
-              <tr key={i} className="border-b border-gray-200">
-                {columns.map(c => (
-                  <td key={c.key} className="border border-gray-200 p-2">
-                    {c.render ? c.render(row[c.key], row) : row[c.key]}
-                  </td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-          {footerContent && (
-            <tfoot>
-              <tr className="bg-gray-100 font-bold">
-                {footerContent.map((col, i) => (
-                  <td key={i} className="border border-gray-200 p-2">{col}</td>
-                ))}
-              </tr>
-            </tfoot>
-          )}
-        </table>
-      </div>
-
-      {/* ── SCREEN VIEW ── */}
-      <div className="print:hidden flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/reports')} className="rounded-xl">
-            <ArrowLeft className="w-5 h-5" />
-          </Button>
-          <div>
-            <h2 className="text-2xl font-bold text-foreground flex items-center gap-2">
-              <BarChart2 className="w-6 h-6 text-primary" />
-              Gross Profit Margin
-            </h2>
-            <p className="text-sm text-muted-foreground">Analyze revenue, COGS, and gross margin per item</p>
+    <ReportPageTemplate
+      title="Gross Profit Margin"
+      subtitle="Analyze item sales revenue, cost of goods sold (COGS), and gross profit margins"
+      category="Inventory"
+      icon={BarChart2}
+      fromDate={filters.fromDate}
+      toDate={filters.toDate}
+      isLoading={loading}
+      onRefresh={generateReport}
+      exportConfig={{
+        columns,
+        data,
+        footer,
+        filename: `Gross_Profit_Margin_${filters.fromDate}_${filters.toDate}`,
+      }}
+      filterSlot={
+        <div className="bg-card rounded-xl border border-border p-4 shadow-sm flex flex-wrap items-end gap-4">
+          <div className="flex-1 min-w-[280px]">
+            <ReportFilterBar
+              filters={filters}
+              onChange={setFilters}
+              onApply={generateReport}
+              showApplyButton
+            />
           </div>
-        </div>
-        <ReportExportActions
-          onExportExcel={handleExportExcel}
-          onExportPdf={handlePrint}
-        />
-      </div>
-
-      <div className="bg-card rounded-2xl border border-stone-200 p-5 shadow-sm print:hidden">
-        <div className="flex flex-wrap items-end gap-4 mb-6">
-          <div className="flex-1 w-full lg:w-auto">
-             <ReportFilterBar filters={filters} onChange={setFilters} onApply={generateReport} showApplyButton />
-          </div>
-          <div className="flex-1 min-w-[200px]">
-            <Label className="text-xs mb-1.5 block text-muted-foreground">Select All Item or Item Category</Label>
+          <div className="w-full sm:w-64">
+            <Label className="text-xs mb-1.5 block text-muted-foreground font-medium">Filter by Category</Label>
             <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-              <SelectTrigger className="bg-stone-100 border-transparent rounded-xl">
+              <SelectTrigger className="bg-muted/40 border-border rounded-lg text-xs">
                 <SelectValue placeholder="All Categories" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Select All Item</SelectItem>
+                <SelectItem value="all">All Categories</SelectItem>
                 {categories.map(c => (
                   <SelectItem key={c.id} value={c.id}>{c.category_name}</SelectItem>
                 ))}
@@ -309,16 +235,15 @@ export default function GrossProfitMarginReport() {
             </Select>
           </div>
         </div>
-
-        <DataTable 
-          columns={columns} 
-          data={data} 
-          loading={loading}
-          searchKey="name"
-          searchPlaceholder="Search items..."
-          footerContent={footerContent}
-        />
-      </div>
-    </div>
+      }
+    >
+      <StandardReportTable
+        columns={columns}
+        data={data}
+        loading={loading}
+        footer={footer}
+        emptyMessage="No sales data found for the selected date range. Click 'Generate' to fetch."
+      />
+    </ReportPageTemplate>
   );
 }

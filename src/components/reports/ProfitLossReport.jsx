@@ -10,6 +10,7 @@ import { generateReportVectorPDF } from '@/utils/reportPdfEngine';
 import { mapProfitLossForExport } from '@/utils/exportMappers';
 import ReportExportActions from '@/components/reports/ReportExportActions';
 import { useAuth } from '@/lib/AuthContext';
+import { REPORT_TYPOGRAPHY, REPORT_COLORS } from '@/config/reportTheme';
 
 
 export default function ProfitLossReport({ initialData, initialFromDate, initialToDate }) {
@@ -313,7 +314,7 @@ export default function ProfitLossReport({ initialData, initialFromDate, initial
 
           <div className="table-scroll-container">
             <table className="table-fluid-grid text-sm">
-              <thead>
+              <thead className={`${REPORT_COLORS.headerBg} ${REPORT_COLORS.headerBorder}`}>
                 <tr className='border-b border-border'>
                   <th className='px-3 py-2 text-left font-semibold text-foreground w-[50%] sticky left-0 bg-slate-100 dark:bg-[#1e293b] z-20 border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]'>Financial Particulars</th>
                   <th className='px-3 py-2 text-center font-semibold text-foreground w-[10%]'>Notes</th>

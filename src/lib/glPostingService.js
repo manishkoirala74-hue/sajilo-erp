@@ -373,12 +373,62 @@ export async function checkoutSalesInvoice(invoiceData, itemsMap, settings, idem
     lines.push({ account_id: s.gl_vat_payable_id, debit_amount: 0, credit_amount: invoice.total_tax_amount });
   }
 
+  // EMI Accrual Interest Accounting (IFRS 15 / GAAP Unearned Revenue)
+  if (invoice.is_installment && Number(invoice.total_interest_amount || 0) > 0) {
+    let unearnedAccId = s.gl_unearned_emi_interest_id;
+    if (!unearnedAccId) {
+      const compId = invoice.company_id || sajilo.getCompanyId();
+      const { data: unearnedAcc } = await supabase
+        .from('ChartOfAccount')
+        .select('id')
+        .eq('company_id', compId)
+        .ilike('account_name', '%Unearned%Interest%')
+        .maybeSingle();
+      if (unearnedAcc) unearnedAccId = unearnedAcc.id;
+    }
+    if (!unearnedAccId) {
+      throw new Error('ERR_STRICT_ACCOUNT_MAPPING: Missing Unearned EMI Interest Liability Account in Company Settings. Please configure this in Settings.');
+    }
+    lines.push({
+      account_id: unearnedAccId,
+      account_category: 'liability',
+      debit_amount: 0,
+      credit_amount: Number(invoice.total_interest_amount),
+      description: `Unearned EMI Financing Interest (${invoice.installment_count || 1} installments)`
+    });
+  }
+
+  // Day 0 Frictionless Down Payment Settlement at Checkout
+  if (invoice.is_installment && Number(invoice.down_payment_amount || 0) > 0 && invoice.down_payment_account_id) {
+    const dpDesc = `Day 0 Down Payment received at checkout (${invoice.invoice_number || 'AUTO'})`;
+    lines.push({
+      account_id: invoice.down_payment_account_id,
+      account_category: 'bank',
+      debit_amount: Number(invoice.down_payment_amount),
+      credit_amount: 0,
+      entity_type: 'Customer',
+      entity_id: invoice.customer_id,
+      due_date: invoice.invoice_date,
+      description: dpDesc
+    });
+    lines.push({
+      account_id: arId,
+      account_category: 'accounts receivable',
+      debit_amount: 0,
+      credit_amount: Number(invoice.down_payment_amount),
+      entity_type: 'Customer',
+      entity_id: invoice.customer_id,
+      due_date: invoice.invoice_date,
+      description: `Day 0 Down Payment AR Credit (${invoice.invoice_number || 'AUTO'})`
+    });
+  }
+
   try {
     const data = await sajilo.rpc('rpc_checkout_sales_invoice', {
       p_payload: invoice,
       p_idempotency_key: idempotencyKey,
       p_gl_lines: lines
-    }, ['SalesInvoice', 'Item', 'GeneralLedgerLine', 'GeneralLedgerJournal', 'InventoryHistory', 'ChartOfAccount']);
+    }, ['SalesInvoice', 'Item', 'GeneralLedgerLine', 'GeneralLedgerJournal', 'InventoryHistory', 'ChartOfAccount', 'InvoiceInstallment']);
     if (!data || !data.invoice_id) throw new Error('ERR_SILENT_FAIL: CRITICAL_SILENT_FAIL - The database failed to return a saved invoice ID.');
     return data;
   } catch (error) {

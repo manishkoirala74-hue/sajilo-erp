@@ -24,4 +24,6 @@ export const MASTER_QUICK_ACTIONS = [
   // Payables & Receivables (Routes)
   { id: 'REP_CBD', type: 'ROUTE', target: '/reports/customer-bill-due', label: 'Customer Bill Due', icon: 'FileWarning', category: 'Payables & Receivables', keywords: ['cbd', 'customer', 'bill', 'due', 'receivable', 'aging'] },
   { id: 'REP_SBD', type: 'ROUTE', target: '/reports/supplier-bill-due', label: 'Supplier Bill Due', icon: 'FileWarning', category: 'Payables & Receivables', keywords: ['sbd', 'supplier', 'bill', 'due', 'payable', 'aging'] },
+  { id: 'REP_IDR', type: 'ROUTE', target: '/reports/installment-due', label: 'Installment Due Report (EMI)', icon: 'CalendarClock', category: 'Payables & Receivables', keywords: ['emi', 'installment', 'due', 'schedule', 'overdue', 'aging'] },
+  { id: 'REP_ICR', type: 'ROUTE', target: '/reports/installment-collection', label: 'Installment Collection Report', icon: 'Receipt', category: 'Payables & Receivables', keywords: ['emi', 'installment', 'collection', 'interest', 'realization', 'cash'] },
 ];

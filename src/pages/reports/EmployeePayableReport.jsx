@@ -1,15 +1,9 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { sajilo } from '@/api/sajiloClient';
-import PageHeader from '@/components/shared/PageHeader';
-import ReportExportActions from '@/components/reports/ReportExportActions';
-import { exportFlatXLSX } from '@/lib/reports/reportExcelExport';
-import { generateReportVectorPDF } from '@/utils/reportPdfEngine';
-import DataTable from '@/components/shared/DataTable';
-import { FileText } from 'lucide-react';
-import ReportFilterBar from '@/components/reports/ReportFilterBar';
+import { FileText, Users } from 'lucide-react';
 import { format } from 'date-fns';
-
-const fmt = n => `NPR ${Number(n || 0).toLocaleString()}`;
+import ReportFilterBar from '@/components/reports/ReportFilterBar';
+import { ReportPageTemplate, StandardReportTable } from '@/components/reports';
 
 export default function EmployeePayableReport() {
   const [data, setData] = useState([]);
@@ -20,8 +14,9 @@ export default function EmployeePayableReport() {
   });
 
   const load = async () => {
-      setLoading(true);
-      // We query GeneralLedgerLine where entity_type = 'Employee' and credit_amount > debit_amount (Net Payables)
+    setLoading(true);
+    try {
+      // Query GeneralLedgerLine where entity_type = 'Employee'
       const res = await sajilo.auth.supabase
         .from('GeneralLedgerLine')
         .select(`
@@ -50,77 +45,77 @@ export default function EmployeePayableReport() {
 
       const arr = Object.values(balances).filter(b => b.balance !== 0);
       setData(arr);
+    } catch (err) {
+      console.error('[EmployeePayableReport error]', err);
+    } finally {
       setLoading(false);
+    }
   };
 
   useEffect(() => {
     load();
   }, []);
 
-  const handleExportExcel = async () => {
-    if (!data || data.length === 0) return;
-    const headers = ['Emp Code', 'Employee Name', 'Department', 'Net Salary Payable'];
-    const rows = data.map(r => [
-      r.code || '—',
-      r.name || '',
-      r.dept || '—',
-      r.balance || 0
-    ]);
-    const total = data.reduce((s, r) => s + (r.balance || 0), 0);
-    const footer = ['TOTAL', '', '', total];
-    await exportFlatXLSX({
-      filename: `Employee_Payable_Balances_${filters.fromDate}_${filters.toDate}.xlsx`,
-      reportTitle: 'Employee Payable Balances',
-      fromDate: filters.fromDate,
-      toDate: filters.toDate,
-      headers,
-      rows,
-      footer
-    });
-  };
+  const totalBalance = useMemo(() => (data || []).reduce((s, r) => s + (r.balance || 0), 0), [data]);
 
-  const handleExportPdf = async () => {
-    if (!data || data.length === 0) return;
-    const headers = ['Emp Code', 'Employee Name', 'Department', 'Balance'];
-    const rows = data.map(r => [
-      r.code || '—',
-      r.name || '',
-      r.dept || '—',
-      fmt(r.balance)
-    ]);
-    const total = data.reduce((s, r) => s + (r.balance || 0), 0);
-    const footer = ['TOTAL', '', '', fmt(total)];
-    await generateReportVectorPDF({
-      title: 'Employee Payable Balances',
-      fromDate: filters.fromDate,
-      toDate: filters.toDate,
-      columns: headers,
-      data: rows,
-      footer,
-      filename: `Employee_Payable_Balances_${filters.fromDate}_${filters.toDate}.pdf`
-    });
-  };
-  const columns = [
-    { key: 'code', label: 'Emp Code' },
-    { key: 'name', label: 'Employee Name' },
-    { key: 'dept', label: 'Department' },
-    { key: 'balance', label: 'Net Salary Payable', render: v => <span className="font-bold text-emerald-600 dark:text-emerald-400">{fmt(v)}</span> }
-  ];
+  const columns = useMemo(() => [
+    { key: 'code', label: 'Emp Code', preset: 'code', stickyFirst: true },
+    { key: 'name', label: 'Employee Name', preset: 'description' },
+    { key: 'dept', label: 'Department', preset: 'category' },
+    { 
+      key: 'balance', 
+      label: 'Net Salary Payable (NPR)', 
+      preset: 'amount',
+      render: (v) => (
+        <span className="font-mono text-xs tabular-nums font-bold text-emerald-600 dark:text-emerald-400">
+          {Number(v || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+        </span>
+      )
+    }
+  ], []);
+
+  const footer = useMemo(() => {
+    if (!data || data.length === 0) return null;
+    return {
+      code: 'TOTAL',
+      name: '',
+      dept: '',
+      balance: totalBalance
+    };
+  }, [data, totalBalance]);
 
   return (
-    <div className="space-y-4">
-      <PageHeader
-        title="Employee Payable Balances"
-        subtitle="Unliquidated net wages owed to employees"
-        icon={FileText}
-      >
-        <ReportExportActions
-          onExportExcel={handleExportExcel}
-          onExportPdf={handleExportPdf}
+    <ReportPageTemplate
+      title="Employee Payable Balances"
+      subtitle="Unliquidated net wages and salaries owed to employees"
+      category="Payable"
+      icon={Users}
+      fromDate={filters.fromDate}
+      toDate={filters.toDate}
+      isLoading={loading}
+      onRefresh={load}
+      exportConfig={{
+        columns,
+        data,
+        footer,
+        filename: `Employee_Payable_Balances_${filters.fromDate}_${filters.toDate}`,
+      }}
+      filterSlot={
+        <ReportFilterBar
+          filters={filters}
+          onChange={setFilters}
+          onApply={load}
+          showApplyButton
         />
-      </PageHeader>
-      <ReportFilterBar filters={filters} onChange={setFilters} onApply={load} showApplyButton />
-      <DataTable columns={columns} data={data} searchKey="name" loading={loading} />
-    </div>
+      }
+    >
+      <StandardReportTable
+        columns={columns}
+        data={data}
+        loading={loading}
+        footer={footer}
+        emptyMessage="No outstanding employee payables found."
+      />
+    </ReportPageTemplate>
   );
 }

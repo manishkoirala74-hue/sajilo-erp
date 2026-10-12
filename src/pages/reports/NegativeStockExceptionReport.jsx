@@ -1,13 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/api/sajiloClient';
-import PageHeader from '@/components/shared/PageHeader';
-import ReportExportActions from '@/components/reports/ReportExportActions';
-import { exportFlatXLSX } from '@/lib/reports/reportExcelExport';
-import { generateReportVectorPDF } from '@/utils/reportPdfEngine';
-import DataTable from '@/components/shared/DataTable';
+import { AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import ReportFilterBar from '@/components/reports/ReportFilterBar';
 import { format } from 'date-fns';
+import { ReportPageTemplate, StandardReportTable } from '@/components/reports';
 
 export default function NegativeStockExceptionReport() {
   const [data, setData] = useState([]);
@@ -56,74 +53,68 @@ export default function NegativeStockExceptionReport() {
     }
   };
 
-  const handleExportExcel = async () => {
-    if (!data || data.length === 0) return;
-    const headers = ['Item Code', 'Item Name', 'Category', 'Godown / Location', 'Negative Qty'];
-    const rows = data.map(r => [
-      r.item_code || '—',
-      r.item_name || '',
-      r.category || '—',
-      r.godown_name || '—',
-      r.current_qty || 0
-    ]);
-    const totalNegative = data.reduce((s, r) => s + (r.current_qty || 0), 0);
-    const footer = ['TOTAL', '', '', '', totalNegative];
-    await exportFlatXLSX({
-      filename: `Negative_Stock_Exceptions_${format(new Date(), 'yyyyMMdd')}.xlsx`,
-      reportTitle: 'Negative Stock Exception Report',
-      fromDate: filters.fromDate,
-      toDate: filters.toDate,
-      headers,
-      rows,
-      footer
-    });
-  };
+  const totalNegative = useMemo(() => (data || []).reduce((s, r) => s + (r.current_qty || 0), 0), [data]);
 
-  const handleExportPdf = async () => {
-    if (!data || data.length === 0) return;
-    const headers = ['Item Code', 'Item Name', 'Category', 'Godown / Location', 'Negative Qty'];
-    const rows = data.map(r => [
-      r.item_code || '—',
-      r.item_name || '',
-      r.category || '—',
-      r.godown_name || '—',
-      String(r.current_qty || 0)
-    ]);
-    const totalNegative = data.reduce((s, r) => s + (r.current_qty || 0), 0);
-    const footer = ['TOTAL', '', '', '', String(totalNegative)];
-    await generateReportVectorPDF({
-      title: 'Negative Stock Exception Report',
-      subtitle: 'Items with quantity on hand below zero',
-      fromDate: filters.fromDate,
-      toDate: filters.toDate,
-      columns: headers,
-      data: rows,
-      footer,
-      filename: `Negative_Stock_Exceptions_${format(new Date(), 'yyyyMMdd')}.pdf`
-    });
-  };
-  const columns = [
-    { key: 'item_code', label: 'Item Code' },
-    { key: 'item_name', label: 'Item Name' },
-    { key: 'category', label: 'Category' },
-    { key: 'godown_name', label: 'Godown / Location' },
+  const columns = useMemo(() => [
+    { key: 'item_code', label: 'Item Code', preset: 'code', stickyFirst: true },
+    { key: 'item_name', label: 'Item Name', preset: 'description' },
+    { key: 'category', label: 'Category', preset: 'category' },
+    { key: 'godown_name', label: 'Godown / Location', preset: 'description' },
     { 
       key: 'current_qty', 
-      label: 'Negative Qty',
-      render: (v) => <span className="font-semibold text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/30 px-2 py-1 rounded">{v}</span>
+      label: 'Deficit Quantity', 
+      preset: 'quantity',
+      render: (v) => (
+        <span className="font-mono text-xs tabular-nums font-bold text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-950/40 border border-red-200 dark:border-red-900/50 px-2.5 py-0.5 rounded-full">
+          {Number(v || 0).toLocaleString()}
+        </span>
+      )
     }
-  ];
+  ], []);
+
+  const footer = useMemo(() => {
+    if (!data || data.length === 0) return null;
+    return {
+      item_code: 'TOTAL DEFICIT',
+      item_name: '',
+      category: '',
+      godown_name: '',
+      current_qty: totalNegative
+    };
+  }, [data, totalNegative]);
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Negative Stock Exception Report"
-        subtitle="Items with quantity on hand below zero"
+    <ReportPageTemplate
+      title="Negative Stock Exception Report"
+      subtitle="Critical audit: identifies inventory ledgers where physical or system stock is below zero"
+      category="Inventory"
+      icon={AlertTriangle}
+      fromDate={filters.fromDate}
+      toDate={filters.toDate}
+      isLoading={loading}
+      onRefresh={fetchData}
+      exportConfig={{
+        columns,
+        data,
+        footer,
+        filename: `Negative_Stock_Exceptions_${format(new Date(), 'yyyyMMdd')}`,
+      }}
+      filterSlot={
+        <ReportFilterBar
+          filters={filters}
+          onChange={setFilters}
+          onApply={fetchData}
+          showApplyButton
+        />
+      }
+    >
+      <StandardReportTable
+        columns={columns}
+        data={data}
+        loading={loading}
+        footer={footer}
+        emptyMessage="Great news! No negative stock items detected."
       />
-      <ReportFilterBar filters={filters} onChange={setFilters} onApply={fetchData} showApplyButton />
-      <div className="bg-card border rounded-xl overflow-hidden shadow-sm">
-        <DataTable columns={columns} data={data} loading={loading} searchKey="item_name" />
-      </div>
-    </div>
+    </ReportPageTemplate>
   );
 }

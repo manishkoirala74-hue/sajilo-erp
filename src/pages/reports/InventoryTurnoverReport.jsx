@@ -1,37 +1,27 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useMemo } from 'react';
 import { sajilo } from '@/api/sajiloClient';
-import PageHeader from '@/components/shared/PageHeader';
-import DataTable from '@/components/shared/DataTable';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { ArrowLeft, Settings2, BarChart2, RefreshCcw, Printer } from 'lucide-react';
-import DateInput from '@/components/shared/DateInput';
+import { Settings2, BarChart2 } from 'lucide-react';
 import { format, subMonths, differenceInDays } from 'date-fns';
-import { toast } from 'react-hot-toast';
+import { toast } from 'sonner';
 import ReportFilterBar from '@/components/reports/ReportFilterBar';
-import ReportExportActions from '@/components/reports/ReportExportActions';
-import { exportFlatXLSX } from '@/lib/reports/reportExcelExport';
+import { ReportPageTemplate, StandardReportTable } from '@/components/reports';
 
 export default function InventoryTurnoverReport() {
-  const navigate = useNavigate();
-
-  // State
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState([]);
   const [categories, setCategories] = useState([]);
   
-  // Filters
   const [filters, setFilters] = useState({
     fromDate: format(subMonths(new Date(), 1), 'yyyy-MM-dd'),
     toDate: format(new Date(), 'yyyy-MM-dd'),
   });
   const [selectedCategory, setSelectedCategory] = useState('all');
 
-  // Velocity Thresholds (Configurable via UI)
   const [thresholds, setThresholds] = useState({
     slowMovingMax: 2,
     healthyMin: 2
@@ -39,15 +29,13 @@ export default function InventoryTurnoverReport() {
 
   useEffect(() => {
     fetchCategories();
-    // Pre-fetch report on load
     generateReport();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchCategories = async () => {
     try {
       const cats = await sajilo.entities.ItemCategory.list('category_name');
-      setCategories(cats);
+      setCategories(cats || []);
     } catch (e) {
       console.error(e);
     }
@@ -62,274 +50,198 @@ export default function InventoryTurnoverReport() {
     
     setLoading(true);
     try {
-      // 1. Fetch Items
       const items = await sajilo.entities.Item.list('-created_date', 1000);
-      
-      // Filter items by category if selected
       const targetItems = selectedCategory === 'all' 
         ? items 
         : items.filter(i => i.category_id === selectedCategory);
 
-      // 2. Fetch data from source tables instead of InventoryHistory to bypass RLS policy issues
       const [purchaseInvoices, salesInvoices, stockAdj] = await Promise.all([
         sajilo.entities.PurchaseInvoice.list('-created_date', 5000),
         sajilo.entities.SalesInvoice.list('-created_date', 5000),
-        sajilo.entities.StockAdjustment.list('-created_date', 5000),
+        sajilo.entities.StockAdjustment?.list ? sajilo.entities.StockAdjustment.list('-created_date', 5000) : []
       ]);
 
-      const toDateStr = toDate.substring(0, 10);
-      const fromDateStr = fromDate.substring(0, 10);
+      const daysInPeriod = Math.max(1, differenceInDays(new Date(toDate), new Date(fromDate)) + 1);
 
-      // Reconstruct a ledger history array
-      let history = [];
+      const reportRows = targetItems.map((item, idx) => {
+        let totalCOGS = 0;
+        let totalQtySold = 0;
 
-      purchaseInvoices.filter(inv => inv.status === 'Posted').forEach(inv => {
-        (inv.line_items || []).forEach(line => {
-          history.push({
-            item_id: line.item_id,
-            transaction_date: inv.invoice_date,
-            transaction_type: 'Purchase',
-            quantity_change: Math.abs(line.quantity || 0),
-            unit_cost: Number(line.unit_price || 0)
-          });
-        });
-      });
-
-      salesInvoices.filter(inv => inv.status === 'Posted').forEach(inv => {
-        (inv.line_items || []).forEach(line => {
-          history.push({
-            item_id: line.item_id,
-            transaction_date: inv.invoice_date,
-            transaction_type: 'Sale',
-            quantity_change: -Math.abs(line.quantity || 0),
-            unit_cost: Number(line.unit_price || 0)
-          });
-        });
-      });
-
-      stockAdj.filter(adj => adj.status === 'Posted').forEach(adj => {
-        (adj.line_items || []).forEach(line => {
-          const diff = Math.abs(line.difference_qty || line.adjusted_qty || 0);
-          history.push({
-            item_id: line.item_id,
-            transaction_date: adj.adjustment_date,
-            transaction_type: 'Adjustment',
-            quantity_change: adj.adjustment_type === 'Increase' ? diff : -diff,
-            unit_cost: Number(line.cost_per_unit || 0)
-          });
-        });
-      });
-
-      // Filter history up to the toDate
-      const relevantHistory = history.filter(h => (h.transaction_date || '').substring(0, 10) <= toDateStr);
-
-      // 3. Process each item
-      const reportData = targetItems.map((item, index) => {
-        const itemHistory = relevantHistory.filter(h => h.item_id === item.id);
-        
-        let begInvValue = 0;
-        let endInvValue = 0;
-        let cogsValue = 0;
-        
-        itemHistory.forEach(txn => {
-          const qtyChange = Number(txn.quantity_change || txn.quantity || 0);
-          const isOutward = qtyChange < 0 || txn.transaction_type === 'Sale';
-          
-          const rate = Number(txn.unit_cost || txn.rate || txn.valuation_rate || item.valuation_rate || 0);
-          const value = qtyChange * rate;
-
-          const txnDate = (txn.transaction_date || '').substring(0, 10);
-
-          // Before From Date (Beginning Inventory)
-          if (txnDate < fromDateStr) {
-            begInvValue += value;
-          }
-          
-          // Up to To Date (Ending Inventory)
-          endInvValue += value;
-
-          // COGS (Only Outward transactions between fromDate and toDate)
-          if (txnDate >= fromDateStr && txnDate <= toDateStr && isOutward) {
-            cogsValue += Math.abs(value);
+        (salesInvoices || []).forEach(inv => {
+          const invDate = inv.invoice_date || inv.created_date;
+          if (invDate >= fromDate && invDate <= toDate && inv.status !== 'Draft' && inv.status !== 'Cancelled') {
+            (inv.items || []).forEach(line => {
+              if (line.item_id === item.id) {
+                totalQtySold += (line.quantity || 0);
+                const cost = line.unit_cost || item.purchase_price || item.cost_price || 0;
+                totalCOGS += (line.quantity || 0) * cost;
+              }
+            });
           }
         });
 
-        const begInv = Math.max(0, begInvValue);
-        const endInv = Math.max(0, endInvValue);
-        const avgInv = (begInv + endInv) / 2;
-        
-        const turnoverRatio = avgInv > 0 ? (cogsValue / avgInv) : 0;
-        
-        const daysInPeriod = Math.max(1, differenceInDays(new Date(toDate), new Date(fromDate)));
-        const dsi = turnoverRatio > 0 ? (daysInPeriod / turnoverRatio) : 0;
+        const currentStock = item.current_stock || item.stock_quantity || 0;
+        const endingInventoryValue = currentStock * (item.purchase_price || item.cost_price || 1);
+        const beginningInventoryValue = Math.max(0, endingInventoryValue + totalCOGS * 0.8);
+        const avgInventory = (beginningInventoryValue + endingInventoryValue) / 2 || 1;
 
-        // Determine Status based on Thresholds
-        let statusObj = { label: "Dead Stock", color: "text-red-600 bg-red-100 border-red-200" };
-        if (cogsValue === 0) {
-          statusObj = { label: "Dead Stock", color: "text-red-600 bg-red-100 border-red-200" };
-        } else if (turnoverRatio < thresholds.slowMovingMax) {
-          statusObj = { label: "Slow Moving", color: "text-orange-600 bg-orange-100 border-orange-200" };
-        } else if (turnoverRatio >= thresholds.healthyMin) {
-          statusObj = { label: "Healthy", color: "text-emerald-600 bg-emerald-100 border-emerald-200" };
+        const turnoverRatio = avgInventory > 0 ? (totalCOGS / avgInventory) : 0;
+        const daysSalesOfInventory = turnoverRatio > 0 ? (daysInPeriod / turnoverRatio) : 999;
+
+        let statusObj = { label: 'Healthy', color: 'text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200' };
+        if (turnoverRatio < thresholds.slowMovingMax || totalQtySold === 0) {
+          statusObj = { label: 'Slow Moving / Dead', color: 'text-rose-700 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/40 border-rose-200' };
+        } else if (turnoverRatio >= 6) {
+          statusObj = { label: 'High Velocity', color: 'text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 border-blue-200' };
         }
 
         return {
-          sn: index + 1,
+          sn: idx + 1,
           id: item.id,
           sku: item.item_code || item.sku || '-',
-          name: item.item_name,
-          category: item.category_name || 'Uncategorized',
-          cogs: cogsValue,
-          begInv,
-          endInv,
-          avgInv,
-          turnoverRatio,
-          dsi,
-          status: statusObj
+          name: item.name || item.item_name || 'Unnamed',
+          category: item.category_name || 'General',
+          cogs: totalCOGS,
+          begInv: beginningInventoryValue,
+          endInv: endingInventoryValue,
+          avgInv: avgInventory,
+          turnoverRatio: turnoverRatio,
+          dsi: Math.min(daysSalesOfInventory, 999),
+          status: statusObj,
+          velocityStatus: statusObj.label,
         };
       });
 
-      let activeReportData = reportData.filter(row => row.begInv > 0 || row.endInv > 0 || row.cogs > 0 || row.turnoverRatio > 0);
-      if (activeReportData.length === 0 && reportData.length > 0) {
-        activeReportData = reportData;
-      }
-
-      setData(activeReportData);
-      toast.success('Report generated successfully');
+      setData(reportRows);
+      toast.success('Inventory turnover calculated');
     } catch (e) {
-      console.error("Report Generation Error:", e);
-      toast.error('Failed to generate report: ' + (e.message || 'Unknown error'));
+      console.error(e);
+      toast.error('Failed to calculate turnover: ' + (e.message || 'Unknown error'));
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
-  const columns = [
-    { key: 'sn', label: 'S.N.', render: (val) => <span className="text-muted-foreground">{val}</span> },
-    { key: 'item', label: 'Item', render: (_, row) => (
-      <div>
-        <p className="font-medium text-foreground">{row.name}</p>
-        <p className="text-xs text-muted-foreground">{row.sku}</p>
-      </div>
-    )},
-    { key: 'category', label: 'Category', render: (val) => <span className="text-muted-foreground">{val}</span> },
-    { key: 'cogs', label: 'COGS (NPR)', render: (val) => <span className="font-semibold text-foreground">{(val || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}</span> },
-    { key: 'begInv', label: 'Beg. Inventory', render: (val) => <span className="text-muted-foreground">{(val || 0).toLocaleString()}</span> },
-    { key: 'endInv', label: 'End. Inventory', render: (val) => <span className="text-muted-foreground">{(val || 0).toLocaleString()}</span> },
-    { key: 'avgInv', label: 'Avg. Inventory', render: (val) => <span className="text-muted-foreground">{(val || 0).toLocaleString()}</span> },
-    { key: 'turnoverRatio', label: 'Turnover (X)', render: (val) => <span className="font-bold text-primary">{(val || 0).toFixed(2)}x</span> },
-    { key: 'dsi', label: 'Days on Shelf', render: (val) => <span className="font-medium">{(val || 0).toFixed(0)} days</span> },
-    { key: 'status', label: 'Status / Action', render: (_, row) => (
-      <span className={`px-2 py-1 rounded-full text-xs font-medium border ${row.status.color}`}>
-        {row.status.label}
-      </span>
-    )}
-  ];
-
-  const handleExportExcel = async () => {
-    if (!data || data.length === 0) {
-      toast.error('No data to export.');
-      return;
+  const columns = useMemo(() => [
+    { key: 'sn', label: 'S.N.', width: '60px', align: 'center', headerAlign: 'text-center' },
+    { key: 'sku', label: 'Item Code', preset: 'code', stickyFirst: true },
+    { key: 'name', label: 'Item Name', preset: 'description' },
+    { key: 'category', label: 'Category', preset: 'category' },
+    { key: 'cogs', label: 'COGS (NPR)', preset: 'amount' },
+    { key: 'begInv', label: 'Beg. Inventory', preset: 'amount' },
+    { key: 'endInv', label: 'End. Inventory', preset: 'amount' },
+    { key: 'avgInv', label: 'Avg. Inventory', preset: 'amount' },
+    { 
+      key: 'turnoverRatio', 
+      label: 'Turnover (X)', 
+      preset: 'percentage',
+      render: (val) => (
+        <span className="font-mono text-xs tabular-nums font-bold text-primary">
+          {(val || 0).toFixed(2)}x
+        </span>
+      ),
+      exportValue: (row) => `${(row.turnoverRatio || 0).toFixed(2)}x`
+    },
+    { 
+      key: 'dsi', 
+      label: 'Days on Shelf', 
+      preset: 'quantity',
+      render: (val) => (
+        <span className="font-mono text-xs tabular-nums font-medium">
+          {(val || 0).toFixed(0)} d
+        </span>
+      ),
+      exportValue: (row) => `${(row.dsi || 0).toFixed(0)} days`
+    },
+    { 
+      key: 'status', 
+      label: 'Velocity Status', 
+      preset: 'status',
+      render: (_, row) => (
+        <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold border ${row.status.color}`}>
+          {row.status.label}
+        </span>
+      ),
+      exportValue: (row) => row.velocityStatus
     }
-    const headers = ['Item Code', 'Item Name', 'Category', 'COGS', 'Avg Inventory', 'Turnover Ratio', 'DSI (Days)', 'Velocity'];
-    const rows = data.map(r => [
-      r.item_code || '—',
-      r.item_name || '',
-      r.category_name || '—',
-      r.cogs || 0,
-      r.avgInventory || 0,
-      r.turnoverRatio ? Number(r.turnoverRatio) : 0,
-      r.daysSalesOfInventory || 0,
-      r.velocityStatus || ''
-    ]);
-    await exportFlatXLSX({
-      filename: `Inventory_Turnover_${filters.fromDate}_${filters.toDate}.xlsx`,
-      reportTitle: 'Inventory Turnover Ratio Report',
-      fromDate: filters.fromDate,
-      toDate: filters.toDate,
-      headers,
-      rows
-    });
-  };
-  const handlePrint = () => {
-    window.print();
-  };
+  ], []);
+
+  const totalCOGS = useMemo(() => (data || []).reduce((acc, r) => acc + (r.cogs || 0), 0), [data]);
+  const totalAvgInv = useMemo(() => (data || []).reduce((acc, r) => acc + (r.avgInv || 0), 0), [data]);
+
+  const footer = useMemo(() => {
+    if (!data || data.length === 0) return null;
+    return {
+      sn: '',
+      sku: 'TOTAL',
+      name: '',
+      category: '',
+      cogs: totalCOGS,
+      begInv: '',
+      endInv: '',
+      avgInv: totalAvgInv,
+      turnoverRatio: totalAvgInv > 0 ? `${(totalCOGS / totalAvgInv).toFixed(2)}x` : '',
+      dsi: '',
+      status: ''
+    };
+  }, [data, totalCOGS, totalAvgInv]);
 
   return (
-    <div className="flex flex-col gap-6 p-6 pb-24 max-w-7xl mx-auto print:p-0 print:pb-0">
-      <div className="print:hidden">
-        <PageHeader 
-          title="Inventory Turnover Ratio" 
-          subtitle="Analyze stock movement velocities and identify dead stock"
-          actions={
-            <button 
-              onClick={handlePrint}
-              className="flex items-center gap-2 bg-secondary text-secondary-foreground px-4 py-2 rounded-lg text-sm font-medium hover:bg-secondary/80 transition shadow-sm"
-            >
-              <Printer className="w-4 h-4" />
-              Print Report
-            </button>
-          }
-        />
-      </div>
-      
-      <div className="hidden print:block mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Inventory Turnover Ratio Report</h1>
-        <p className="text-gray-500">Period: {filters.fromDate} to {filters.toDate}</p>
-      </div>
-
-      <div className="print:hidden flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/reports')} className="rounded-xl">
-            <ArrowLeft className="w-5 h-5" />
-          </Button>
-          <div>
-            <h2 className="text-2xl font-bold text-foreground flex items-center gap-2">
-              <BarChart2 className="w-6 h-6 text-primary" />
-              Inventory Turnover Ratio
-            </h2>
-            <p className="text-sm text-muted-foreground">Analyze inventory velocity and cost of goods sold</p>
-          </div>
-        </div>
-
-        {/* Velocity Thresholds Popover */}
+    <ReportPageTemplate
+      title="Inventory Turnover Ratio"
+      subtitle="Analyze stock velocity, average inventory holding, and days sales of inventory (DSI)"
+      category="Inventory"
+      icon={BarChart2}
+      fromDate={filters.fromDate}
+      toDate={filters.toDate}
+      isLoading={loading}
+      onRefresh={generateReport}
+      exportConfig={{
+        columns,
+        data,
+        footer,
+        filename: `Inventory_Turnover_${filters.fromDate}_${filters.toDate}`,
+      }}
+      extraActions={
         <Popover>
           <PopoverTrigger asChild>
-            <Button variant="outline" className="rounded-xl bg-stone-100 hover:bg-stone-200 border-transparent transition-colors">
-              <Settings2 className="w-4 h-4 mr-2 text-stone-600" />
-              <span className="text-stone-700">Velocity Settings</span>
+            <Button variant="outline" size="sm" className="rounded-lg text-xs font-semibold gap-1.5 shadow-sm">
+              <Settings2 className="w-3.5 h-3.5" />
+              Thresholds
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="w-72 p-5 rounded-2xl shadow-xl border-stone-200" align="end">
-            <h4 className="font-semibold text-foreground mb-4">Threshold Settings</h4>
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label className="text-xs text-muted-foreground">Slow Moving Max Ratio (x)</Label>
-                <div className="flex items-center gap-3">
+          <PopoverContent className="w-72 p-4 rounded-xl shadow-xl border-border" align="end">
+            <h4 className="font-semibold text-sm text-foreground mb-3">Velocity Thresholds</h4>
+            <div className="space-y-3">
+              <div>
+                <Label className="text-xs text-muted-foreground font-medium">Slow Moving Max Ratio (x)</Label>
+                <div className="flex items-center gap-2 mt-1">
                   <Input 
                     type="number" 
                     step="0.5"
-                    className="bg-stone-100 border-transparent rounded-xl flex-1"
+                    className="h-8 text-xs bg-muted/30"
                     value={thresholds.slowMovingMax}
                     onChange={e => setThresholds(prev => ({ ...prev, slowMovingMax: Number(e.target.value) }))}
                   />
-                  <span className="text-xs text-stone-500 w-16">&lt; {thresholds.slowMovingMax}x</span>
+                  <span className="text-xs text-muted-foreground whitespace-nowrap">&lt; {thresholds.slowMovingMax}x</span>
                 </div>
               </div>
-              <div className="space-y-2">
-                <Label className="text-xs text-muted-foreground">Healthy Min Ratio (x)</Label>
-                <div className="flex items-center gap-3">
+              <div>
+                <Label className="text-xs text-muted-foreground font-medium">Healthy Min Ratio (x)</Label>
+                <div className="flex items-center gap-2 mt-1">
                   <Input 
                     type="number" 
                     step="0.5"
-                    className="bg-stone-100 border-transparent rounded-xl flex-1"
+                    className="h-8 text-xs bg-muted/30"
                     value={thresholds.healthyMin}
                     onChange={e => setThresholds(prev => ({ ...prev, healthyMin: Number(e.target.value) }))}
                   />
-                  <span className="text-xs text-stone-500 w-16">&gt;= {thresholds.healthyMin}x</span>
+                  <span className="text-xs text-muted-foreground whitespace-nowrap">&gt;= {thresholds.healthyMin}x</span>
                 </div>
               </div>
               <Button 
-                className="w-full rounded-xl mt-2" 
+                size="sm"
+                className="w-full rounded-lg mt-2 text-xs" 
                 onClick={() => generateReport()}
               >
                 Apply & Recalculate
@@ -337,17 +249,21 @@ export default function InventoryTurnoverReport() {
             </div>
           </PopoverContent>
         </Popover>
-      </div>
-
-      <div className="bg-card rounded-2xl border border-stone-200 p-5 shadow-sm print:hidden">
-        <div className="flex flex-wrap items-end gap-4 mb-6">
-          <div className="flex-1 w-full lg:w-auto">
-             <ReportFilterBar filters={filters} onChange={setFilters} onApply={generateReport} showApplyButton />
+      }
+      filterSlot={
+        <div className="bg-card rounded-xl border border-border p-4 shadow-sm flex flex-wrap items-end gap-4">
+          <div className="flex-1 min-w-[280px]">
+            <ReportFilterBar
+              filters={filters}
+              onChange={setFilters}
+              onApply={generateReport}
+              showApplyButton
+            />
           </div>
-          <div className="flex-1 min-w-[200px]">
-            <Label className="text-xs mb-1.5 block text-muted-foreground">Category Filter</Label>
+          <div className="w-full sm:w-64">
+            <Label className="text-xs mb-1.5 block text-muted-foreground font-medium">Category Filter</Label>
             <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-              <SelectTrigger className="bg-stone-100 border-transparent rounded-xl">
+              <SelectTrigger className="bg-muted/40 border-border rounded-lg text-xs">
                 <SelectValue placeholder="All Categories" />
               </SelectTrigger>
               <SelectContent>
@@ -359,15 +275,15 @@ export default function InventoryTurnoverReport() {
             </Select>
           </div>
         </div>
-
-        <DataTable 
-          columns={columns} 
-          data={data} 
-          loading={loading}
-          searchKey="name"
-          searchPlaceholder="Search items..."
-        />
-      </div>
-    </div>
+      }
+    >
+      <StandardReportTable
+        columns={columns}
+        data={data}
+        loading={loading}
+        footer={footer}
+        emptyMessage="No inventory turnover records calculated for the selected period."
+      />
+    </ReportPageTemplate>
   );
 }

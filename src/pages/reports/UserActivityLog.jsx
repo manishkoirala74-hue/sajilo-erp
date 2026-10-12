@@ -10,6 +10,7 @@ import { generateReportVectorPDF } from '@/utils/reportPdfEngine';
 import { useAuth } from '@/lib/AuthContext';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
+import { REPORT_TYPOGRAPHY, REPORT_COLORS } from '@/config/reportTheme';
 
 const TABS = [
   { id: 'opening_balance', label: 'Opening Balance Changes' },
@@ -267,10 +268,10 @@ export default function UserActivityLog() {
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h3 className="font-semibold text-base flex items-center gap-2">
-            <History className="w-4 h-4 text-primary" /> User & Activity Log
-          </h3>
-          <p className="text-xs text-muted-foreground mt-0.5">Track all changes made to opening balances and account configurations</p>
+          <h2 className={REPORT_TYPOGRAPHY.pageTitle}>
+            <History className="w-5 h-5 text-primary" /> User &amp; Activity Audit Log
+          </h2>
+          <p className={REPORT_TYPOGRAPHY.pageSubtitle}>Track all modifications made to opening balances, data imports, and account configurations</p>
         </div>
         <Button variant="outline" size="sm" onClick={fetchLogs} disabled={loading}>
           <RefreshCw className={cn('w-3.5 h-3.5 mr-1.5', loading && 'animate-spin')} /> Refresh
@@ -309,7 +310,7 @@ export default function UserActivityLog() {
 
           <div className="bg-card border border-border rounded-xl overflow-hidden">
             <table className="table-fluid-grid text-sm">
-              <thead className="cell-density bg-muted/30 border-b border-border">
+              <thead className={cn("cell-density", REPORT_COLORS.headerBg, REPORT_COLORS.headerBorder)}>
                 <tr>
                   <th className="cell-density text-left  text-xs font-semibold text-muted-foreground">File Name</th>
                   <th className="cell-density text-left  text-xs font-semibold text-muted-foreground">Imported By</th>
@@ -382,7 +383,7 @@ export default function UserActivityLog() {
 
           <div className="bg-card border border-border rounded-xl overflow-hidden">
             <table className="table-fluid-grid text-sm">
-              <thead className="cell-density bg-muted/30 border-b border-border">
+              <thead className={cn("cell-density", REPORT_COLORS.headerBg, REPORT_COLORS.headerBorder)}>
                 <tr>
                   <th className="cell-density text-left  text-xs font-semibold text-muted-foreground">Item Code</th>
                   <th className="cell-density text-left  text-xs font-semibold text-muted-foreground">Item Name</th>
@@ -447,7 +448,7 @@ export default function UserActivityLog() {
 
           <div className="bg-card border border-border rounded-xl overflow-hidden">
             <table className="table-fluid-grid text-sm">
-              <thead className="cell-density bg-muted/30 border-b border-border">
+              <thead className={cn("cell-density", REPORT_COLORS.headerBg, REPORT_COLORS.headerBorder)}>
                 <tr>
                   <th className="cell-density text-left  text-xs font-semibold text-muted-foreground">File Name</th>
                   <th className="cell-density text-left  text-xs font-semibold text-muted-foreground">Type</th>
@@ -535,7 +536,7 @@ export default function UserActivityLog() {
 
           <div className="bg-card border border-border rounded-xl overflow-hidden">
             <table className="table-fluid-grid text-sm">
-              <thead className="cell-density bg-muted/30 border-b border-border">
+              <thead className={cn("cell-density", REPORT_COLORS.headerBg, REPORT_COLORS.headerBorder)}>
                 <tr>
                   <th className="cell-density text-left  text-xs font-semibold text-muted-foreground">Partner Name</th>
                   <th className="cell-density text-left  text-xs font-semibold text-muted-foreground">Type</th>
@@ -615,7 +616,7 @@ export default function UserActivityLog() {
 
           <div className="bg-card border border-border rounded-xl overflow-hidden">
             <table className="table-fluid-grid text-sm">
-              <thead className="cell-density bg-muted/30 border-b border-border">
+              <thead className={cn("cell-density", REPORT_COLORS.headerBg, REPORT_COLORS.headerBorder)}>
                 <tr>
                   <th className="cell-density text-left  text-xs font-semibold text-muted-foreground">Voucher #</th>
                   <th className="cell-density text-left  text-xs font-semibold text-muted-foreground">Type</th>
@@ -684,7 +685,7 @@ export default function UserActivityLog() {
 
           <div className="bg-card border border-border rounded-xl overflow-hidden">
             <table className="table-fluid-grid text-sm">
-              <thead className="cell-density bg-muted/30 border-b border-border">
+              <thead className={cn("cell-density", REPORT_COLORS.headerBg, REPORT_COLORS.headerBorder)}>
                 <tr>
                   <th className="cell-density text-left">
                     <button onClick={() => handleSort('account_code')} className="flex items-center text-xs font-semibold text-muted-foreground">

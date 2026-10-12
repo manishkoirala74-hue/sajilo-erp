@@ -8,7 +8,16 @@ import { sajilo } from '@/api/sajiloClient';
 import { adToBS, formatBS, formatAD } from '@/lib/nepaliDate';
 import { useAuth } from '@/lib/AuthContext';
 
-export default function BusinessHeader({ reportTitle, fromDate, toDate, subtitle }) {
+export default function BusinessHeader({
+  reportTitle,
+  fromDate,
+  toDate,
+  subtitle,
+  showLogo = true,
+  showCompanyAddress = true,
+  showCompanyPan = true,
+  showCompanyContact = true,
+}) {
   const { activeCompany } = useAuth();
   const [settings, setSettings] = useState(null);
 
@@ -32,29 +41,33 @@ export default function BusinessHeader({ reportTitle, fromDate, toDate, subtitle
   return (
     <div className="flex items-start gap-4 pb-4 mb-4 border-b-2 border-border print:pb-3 print:mb-3">
       {/* Logo — left anchor */}
-      <div className="shrink-0 w-16 h-16 flex items-center justify-center">
-        {settings?.company_logo_url
-          ? <img src={settings.company_logo_url} alt="logo" className="h-16 w-16 object-contain rounded-md" />
-          : <div className="h-14 w-14 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-bold text-xl">
-              {activeCompany?.name?.[0] || '?'}
-            </div>
-        }
-      </div>
+      {showLogo && (
+        <div className="shrink-0 w-16 h-16 flex items-center justify-center">
+          {settings?.company_logo_url
+            ? <img src={settings.company_logo_url} alt="logo" className="h-16 w-16 object-contain rounded-md" />
+            : <div className="h-14 w-14 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-bold text-xl">
+                {activeCompany?.name?.[0] || '?'}
+              </div>
+          }
+        </div>
+      )}
 
       {/* Company + Report info — centered */}
       <div className="flex-1 text-center">
-        <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest print:text-[9px]">
-          {activeCompany?.tax_id ? `PAN: ${activeCompany.tax_id}` : ''}
-        </p>
-        <h2 className="text-lg font-extrabold text-foreground leading-tight print:text-base">
-          {activeCompany?.name || '—'}
-        </h2>
-        {activeCompany?.address && (
-          <p className="text-xs text-muted-foreground print:text-[10px]">{activeCompany.address}</p>
+        {showCompanyPan && (activeCompany?.tax_id || settings?.tax_id) && (
+          <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest print:text-[9px]">
+            PAN: {activeCompany?.tax_id || settings?.tax_id}
+          </p>
         )}
-        {(activeCompany?.phone || activeCompany?.email) && (
+        <h2 className="text-lg font-extrabold text-foreground leading-tight print:text-base">
+          {activeCompany?.name || settings?.company_name || '—'}
+        </h2>
+        {showCompanyAddress && (activeCompany?.address || settings?.address) && (
+          <p className="text-xs text-muted-foreground print:text-[10px]">{activeCompany?.address || settings?.address}</p>
+        )}
+        {showCompanyContact && ((activeCompany?.phone || settings?.phone) || (activeCompany?.email || settings?.email)) && (
           <p className="text-xs text-muted-foreground print:text-[10px]">
-            {[activeCompany.phone, activeCompany.email].filter(Boolean).join(' | ')}
+            {[activeCompany?.phone || settings?.phone, activeCompany?.email || settings?.email].filter(Boolean).join(' | ')}
           </p>
         )}
       </div>

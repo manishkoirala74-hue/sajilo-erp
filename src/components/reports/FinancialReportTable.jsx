@@ -14,6 +14,7 @@ import { generateReportVectorPDF } from '@/utils/reportPdfEngine';
 import { useAmountFormatter } from '@/hooks/useAmountFormatter';
 import { useAuth } from '@/lib/AuthContext';
 import { Loader2 } from 'lucide-react';
+import { REPORT_TYPOGRAPHY, REPORT_COLORS } from '@/config/reportTheme';
 
 const TYPE_BADGE = {
   Asset:     'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400',
@@ -418,7 +419,7 @@ export default function FinancialReportTable({
               })}
             </colgroup>
 
-            <thead className="cell-density bg-muted border-b-2 border-border sticky top-0 z-10">
+            <thead className={cn("cell-density sticky top-0 z-10", REPORT_COLORS.headerBg, REPORT_COLORS.headerBorder)}>
               <tr>
                 {columns.map(col => {
                   if (col.key === 'opening_debit') return <th key="opening_grp" colSpan={2} className="cell-density text-right text-[11px] font-bold text-foreground uppercase tracking-wider print:text-[9px] border-b border-border">Opening Balance</th>;
@@ -477,7 +478,7 @@ export default function FinancialReportTable({
               )}
             </tbody>
 
-            <tfoot className="bg-secondary border-t-2 border-border print:bg-slate-200">
+            <tfoot className={cn(REPORT_TYPOGRAPHY.tableFooter, "print:bg-slate-200")}>
               <tr>
                 {columns.map(col => {
                   if (col.key === 'account_code') return (

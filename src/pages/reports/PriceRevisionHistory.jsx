@@ -1,19 +1,14 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { supabase, sajilo } from '@/api/sajiloClient';
-import PageHeader from '@/components/shared/PageHeader';
-import DataTable from '@/components/shared/DataTable';
 import { useDateFormat } from '@/lib/DateFormatContext';
 import { formatToDmyAD, formatToDmyBS } from '@/lib/nepaliDate';
-import { History, Calendar as CalendarIcon, Download, Search } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { History, Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import ReportFilterBar from '@/components/reports/ReportFilterBar';
-import ReportExportActions from '@/components/reports/ReportExportActions';
-import { exportFlatXLSX } from '@/lib/reports/reportExcelExport';
-import { generateReportVectorPDF } from '@/utils/reportPdfEngine';
 import { format } from 'date-fns';
+import { ReportPageTemplate, StandardReportTable } from '@/components/reports';
 
 export default function PriceRevisionHistory() {
   const { displayBsDate } = useDateFormat();
@@ -34,12 +29,11 @@ export default function PriceRevisionHistory() {
           *,
           Item ( item_code, item_name ),
           ItemCategory ( category_name ),
-          User:created_by ( full_name )
+          User:created_by ( full_name, first_name, last_name, email )
         `)
         .eq('company_id', sajilo.getCompanyId());
 
       if (filters?.fromDate) query = query.gte('created_at', filters.fromDate);
-      // To ensure we get entries up to the end of the toDate
       if (filters?.toDate) query = query.lt('created_at', new Date(new Date(filters.toDate).getTime() + 86400000).toISOString());
 
       const { data: logs, error } = await query.order('created_at', { ascending: false });
@@ -58,191 +52,154 @@ export default function PriceRevisionHistory() {
     fetchHistory();
   }, []);
 
-  const columns = [
+  const filteredData = useMemo(() => {
+    return data.filter(d => 
+      d.Item?.item_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      d.Item?.item_code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      d.remarks?.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [data, searchTerm]);
+
+  const columns = useMemo(() => [
     { 
-      label: 'Date', 
+      label: 'Date (AD)', 
       key: 'created_at',
-      render: (v) => <span className="whitespace-nowrap">{formatToDmyAD(v)}</span>
+      preset: 'date',
+      render: (v) => formatToDmyAD(v),
+      exportValue: (r) => formatToDmyAD(r.created_at)
     },
     ...(displayBsDate ? [{
       label: 'Date (BS)', 
       key: 'created_at_bs',
-      render: (_, row) => <span className="whitespace-nowrap">{formatToDmyBS(row.created_at)}</span>
+      preset: 'date',
+      render: (_, row) => formatToDmyBS(row.created_at),
+      exportValue: (r) => formatToDmyBS(r.created_at)
     }] : []),
     {
-      label: 'Item',
-      key: 'item_id',
-      render: (_, row) => (
-        <div>
-          <p className="font-medium">{row.Item?.item_name || 'Unknown'}</p>
-          <p className="text-xs text-muted-foreground">{row.Item?.item_code}</p>
-        </div>
-      )
+      label: 'Item Code',
+      key: 'item_code',
+      preset: 'code',
+      render: (_, row) => row.Item?.item_code || '—',
+      exportValue: (row) => row.Item?.item_code || '—'
+    },
+    {
+      label: 'Item Name',
+      key: 'item_name',
+      preset: 'description',
+      render: (_, row) => row.Item?.item_name || 'Unknown',
+      exportValue: (row) => row.Item?.item_name || 'Unknown'
     },
     {
       label: 'Category',
-      key: 'category_id',
-      render: (_, row) => <span className="text-muted-foreground">{row.ItemCategory?.category_name || '-'}</span>
+      key: 'category_name',
+      preset: 'category',
+      render: (_, row) => row.ItemCategory?.category_name || '—',
+      exportValue: (row) => row.ItemCategory?.category_name || '—'
     },
     {
       label: 'Revision Type',
       key: 'revision_type',
-      render: (v) => <Badge variant="outline" className="text-[10px]">{v ? v.replace(/_/g, ' ') : '-'}</Badge>
+      preset: 'status',
+      render: (v) => (
+        <Badge variant="outline" className="text-[10px] uppercase font-semibold">
+          {v ? v.replace(/_/g, ' ') : '—'}
+        </Badge>
+      ),
+      exportValue: (row) => row.revision_type ? row.revision_type.replace(/_/g, ' ') : '—'
     },
     {
-      label: 'Old Price',
+      label: 'Old Price (NPR)',
       key: 'old_selling_price',
-      render: (v) => <span className="text-muted-foreground">NPR {Number(v).toLocaleString()}</span>
+      preset: 'amount',
+      render: (v) => Number(v || 0).toLocaleString(undefined, { minimumFractionDigits: 2 }),
+      exportValue: (row) => Number(row.old_selling_price || 0)
     },
     {
-      label: 'New Price',
+      label: 'New Price (NPR)',
       key: 'new_selling_price',
-      render: (v) => <span className="font-medium text-primary">NPR {Number(v).toLocaleString()}</span>
+      preset: 'amount',
+      render: (v) => (
+        <span className="font-bold text-primary font-mono">
+          {Number(v || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+        </span>
+      ),
+      exportValue: (row) => Number(row.new_selling_price || 0)
     },
     {
-      label: 'Change',
+      label: 'Difference',
       key: 'adjustment_value',
+      preset: 'amount',
       render: (_, row) => {
-        const diff = Number(row.new_selling_price) - Number(row.old_selling_price);
-        const percent = Number(row.old_selling_price) > 0 ? (diff / Number(row.old_selling_price)) * 100 : 0;
+        const diff = Number(row.new_selling_price || 0) - Number(row.old_selling_price || 0);
+        const percent = Number(row.old_selling_price || 0) > 0 ? (diff / Number(row.old_selling_price)) * 100 : 0;
         return (
-          <span className={diff > 0 ? 'text-green-600' : diff < 0 ? 'text-red-600' : 'text-muted-foreground'}>
-            {diff > 0 ? '+' : ''}{diff.toLocaleString()} ({diff > 0 ? '+' : ''}{percent.toFixed(1)}%)
+          <span className={`font-mono text-xs tabular-nums font-semibold ${diff > 0 ? 'text-emerald-600 dark:text-emerald-400' : diff < 0 ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground'}`}>
+            {diff > 0 ? '+' : ''}{diff.toLocaleString(undefined, { minimumFractionDigits: 2 })} ({diff > 0 ? '+' : ''}{percent.toFixed(1)}%)
           </span>
         );
+      },
+      exportValue: (row) => {
+        const diff = Number(row.new_selling_price || 0) - Number(row.old_selling_price || 0);
+        return diff;
       }
     },
     {
       label: 'Remarks (Reason)',
       key: 'remarks',
-      render: (v) => <span className="text-xs text-muted-foreground">{v}</span>
+      preset: 'description',
+      render: (v) => <span className="text-xs text-muted-foreground">{v || '—'}</span>
     },
     {
       label: 'Revised By',
       key: 'created_by',
+      width: '130px',
       render: (_, row) => (
-        <div className="text-xs">
-          <p>{row.User ? `${row.User.first_name} ${row.User.last_name}` : 'System'}</p>
-          <p className="text-muted-foreground">{row.User?.email}</p>
-        </div>
-      )
+        <span className="text-xs text-foreground font-medium">
+          {row.User?.full_name || (row.User?.first_name ? `${row.User.first_name} ${row.User.last_name || ''}` : 'System')}
+        </span>
+      ),
+      exportValue: (row) => row.User?.full_name || row.User?.email || 'System'
     }
-  ];
-
-  const handleExportExcel = async () => {
-    if (!filteredData || filteredData.length === 0) {
-      toast.info('No price revision data to export.');
-      return;
-    }
-    const headers = [
-      'Date',
-      ...(displayBsDate ? ['Date (BS)'] : []),
-      'Item Code',
-      'Item Name',
-      'Category',
-      'Revision Type',
-      'Old Price',
-      'New Price',
-      'Change Amount',
-      'Change %',
-      'Remarks',
-      'Revised By'
-    ];
-    const rows = filteredData.map(r => {
-      const diff = Number(r.new_selling_price || 0) - Number(r.old_selling_price || 0);
-      const percent = Number(r.old_selling_price || 0) > 0 ? (diff / Number(r.old_selling_price)) * 100 : 0;
-      return [
-        formatToDmyAD(r.created_at),
-        ...(displayBsDate ? [formatToDmyBS(r.created_at)] : []),
-        r.Item?.item_code || '',
-        r.Item?.item_name || '',
-        r.ItemCategory?.category_name || '',
-        r.revision_type ? r.revision_type.replace(/_/g, ' ') : '',
-        Number(r.old_selling_price || 0),
-        Number(r.new_selling_price || 0),
-        diff,
-        `${percent.toFixed(1)}%`,
-        r.remarks || '',
-        r.User ? `${r.User.first_name || ''} ${r.User.last_name || ''}`.trim() : 'System'
-      ];
-    });
-    await exportFlatXLSX({
-      filename: `Price_Revision_History_${filters.fromDate}_${filters.toDate}.xlsx`,
-      reportTitle: 'Sales Price Revision History',
-      fromDate: filters.fromDate,
-      toDate: filters.toDate,
-      headers,
-      rows
-    });
-  };
-
-  const handleExportPdf = async () => {
-    if (!filteredData || filteredData.length === 0) return;
-    const headers = ['Date', 'Item', 'Old Price', 'New Price', 'Diff', 'Revised By'];
-    const rows = filteredData.map(r => {
-      const diff = Number(r.new_selling_price || 0) - Number(r.old_selling_price || 0);
-      return [
-        formatToDmyAD(r.created_at),
-        `${r.Item?.item_name || ''} (${r.Item?.item_code || ''})`,
-        `NPR ${Number(r.old_selling_price || 0).toLocaleString()}`,
-        `NPR ${Number(r.new_selling_price || 0).toLocaleString()}`,
-        `${diff >= 0 ? '+' : ''}${diff.toLocaleString()}`,
-        r.User ? `${r.User.first_name || ''} ${r.User.last_name || ''}`.trim() : 'System'
-      ];
-    });
-    await generateReportVectorPDF({
-      title: 'Sales Price Revision History',
-      fromDate: filters.fromDate,
-      toDate: filters.toDate,
-      columns: headers,
-      data: rows,
-      filename: `Price_Revision_History_${filters.fromDate}_${filters.toDate}.pdf`
-    });
-  };
-  const filteredData = data.filter(d => 
-    d.Item?.item_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    d.Item?.item_code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    d.remarks?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  ], [displayBsDate]);
 
   return (
-    <div className="space-y-6">
-      <PageHeader 
-        title="Sales Price Revision History" 
-        description="Immutable audit trail of all historical changes to item selling prices."
-        icon={History}
-      />
-      <ReportFilterBar filters={filters} onChange={setFilters} onApply={fetchHistory} showApplyButton />
-
-      <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden flex flex-col">
-        <div className="p-4 border-b border-border flex items-center justify-between gap-4">
-          <div className="relative w-72">
+    <ReportPageTemplate
+      title="Sales Price Revision History"
+      subtitle="Immutable audit trail of all historical adjustments to item sales prices"
+      category="Inventory"
+      icon={History}
+      fromDate={filters.fromDate}
+      toDate={filters.toDate}
+      isLoading={loading}
+      onRefresh={fetchHistory}
+      exportConfig={{
+        columns,
+        data: filteredData,
+        filename: `Price_Revision_History_${filters.fromDate}_${filters.toDate}`,
+      }}
+      filterSlot={
+        <div className="bg-card border border-border rounded-xl p-4 shadow-sm flex flex-col sm:flex-row items-stretch sm:items-end justify-between gap-4">
+          <div className="flex-1">
+            <ReportFilterBar filters={filters} onChange={setFilters} onApply={fetchHistory} showApplyButton />
+          </div>
+          <div className="relative w-full sm:w-72">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <Input 
               placeholder="Search items, codes, remarks..." 
-              className="pl-9 bg-background"
+              className="pl-9 bg-muted/40 text-xs rounded-lg"
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
             />
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={fetchHistory} disabled={loading} className="print:hidden">
-              Refresh
-            </Button>
-            <Button variant="outline" size="sm" className="hidden sm:flex print:hidden">
-              <Download className="w-4 h-4 mr-2" />
-              Export CSV
-            </Button>
-          </div>
         </div>
-        
-        <DataTable 
-          data={filteredData}
-          columns={columns}
-          loading={loading}
-          emptyMessage="No price revision history found."
-        />
-      </div>
-    </div>
+      }
+    >
+      <StandardReportTable
+        columns={columns}
+        data={filteredData}
+        loading={loading}
+        emptyMessage="No price revision records found for the selected filter."
+      />
+    </ReportPageTemplate>
   );
 }

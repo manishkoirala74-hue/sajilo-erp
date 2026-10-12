@@ -18,6 +18,9 @@ const MODULES = ['General', 'Sales', 'Purchase', 'Manufacturing', 'Payroll', 'As
 export default function JournalEntryModal({ open, onClose, accounts, onSaved }) {
   const [form, setForm] = useState({ entry_date: new Date().toISOString().split('T')[0], description: '', reference_module: 'General', notes: '' });
   const [employees, setEmployees] = useState([]);
+  const [internalAccounts, setInternalAccounts] = useState([]);
+  const effectiveAccounts = accounts || internalAccounts;
+
   const [lines, setLines] = useState([
     { account_id: '', account_code: '', account_name: '', account_type: '', debit_amount: 0, credit_amount: 0, description: '', entity_type: '', entity_id: '' },
     { account_id: '', account_code: '', account_name: '', account_type: '', debit_amount: 0, credit_amount: 0, description: '', entity_type: '', entity_id: '' },
@@ -27,8 +30,13 @@ export default function JournalEntryModal({ open, onClose, accounts, onSaved }) 
   useEffect(() => {
     if (open) {
       sajilo.entities.Employee.list('full_name', 500).then(setEmployees);
+      if (!accounts || accounts.length === 0) {
+        sajilo.entities.Account.list('account_code', 1000).then(data => {
+          setInternalAccounts(data || []);
+        });
+      }
     }
-  }, [open]);
+  }, [open, accounts]);
 
   const totalDebit = lines.reduce((s, l) => s + (Number(l.debit_amount) || 0), 0);
   const totalCredit = lines.reduce((s, l) => s + (Number(l.credit_amount) || 0), 0);
@@ -37,7 +45,7 @@ export default function JournalEntryModal({ open, onClose, accounts, onSaved }) 
   const setLine = (i, key, val) => setLines(ls => ls.map((l, idx) => idx === i ? { ...l, [key]: val } : l));
 
   const selectAccount = (i, accountId) => {
-    const acc = accounts.find(a => a.id === accountId);
+    const acc = effectiveAccounts.find(a => a.id === accountId);
     if (acc) setLines(ls => ls.map((l, idx) => idx === i ? { ...l, account_id: acc.id, account_code: acc.account_code, account_name: acc.account_name, account_type: acc.account_type } : l));
   };
 
@@ -144,7 +152,7 @@ export default function JournalEntryModal({ open, onClose, accounts, onSaved }) 
                     value={line.account_id}
                     onValueChange={v => selectAccount(i, v)}
                     placeholder="Select account"
-                    options={accounts.filter(a => a.ledger_type === 'Sub Ledger' && a.is_active).map(a => ({
+                    options={(effectiveAccounts || []).filter(a => a.ledger_type === 'Sub Ledger' && a.is_active).map(a => ({
                       value: a.id, label: a.account_name, sub: a.account_code
                     }))}
                   />

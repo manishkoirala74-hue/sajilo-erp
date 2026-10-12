@@ -1,16 +1,15 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase, sajilo } from '@/api/sajiloClient';
 import { useDateFormat } from '@/lib/DateFormatContext';
 import { format } from 'date-fns';
-import { ArrowLeft, BookOpen, Printer, RefreshCw } from 'lucide-react';
+import { BookOpen, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { BSDatePicker } from '@/components/reports/ReportFilterBar';
 import VoucherLink from '@/components/shared/VoucherLink';
-import ReportExportActions from '@/components/reports/ReportExportActions';
 import { exportFlatXLSX } from '@/lib/reports/reportExcelExport';
 import { toast } from 'sonner';
+import { ReportPageTemplate } from '@/components/reports';
 
 const VOUCHER_TYPE_ABBR = {
   Receipt:         'Rcpt',
@@ -33,7 +32,6 @@ const fetchDayBookData = async (companyId, date) => {
 };
 
 export default function DayBookReport() {
-  const navigate = useNavigate();
   const { formatDate } = useDateFormat();
   const companyId = sajilo.getCompanyId();
 
@@ -44,7 +42,7 @@ export default function DayBookReport() {
     queryKey: ['day-book', companyId, date],
     queryFn: () => fetchDayBookData(companyId, date),
     staleTime: 60 * 1000,
-    enabled: false, // Wait for manual Generation
+    enabled: false,
   });
 
   const openingBal = data?.opening_cash || 0;
@@ -52,26 +50,19 @@ export default function DayBookReport() {
   const debits = data?.debits || [];
   const credits = data?.credits || [];
 
-  // Zip the arrays to the max length for the dual column layout
   const maxRows = Math.max(debits.length, credits.length);
   
-  // Calculate Totals
   const leftCashTotal = debits.reduce((sum, r) => sum + (r.cash_amount || 0), 0);
   const leftAmtTotal  = debits.reduce((sum, r) => sum + (r.non_cash_amount || 0), 0);
   const rightCashTotal = credits.reduce((sum, r) => sum + (r.cash_amount || 0), 0);
   const rightAmtTotal  = credits.reduce((sum, r) => sum + (r.non_cash_amount || 0), 0);
   
-  // ── Overdraft & Balance Routing Logic ──
-  
-  // Step 1: Route Opening Balance
   const leftOpeningBal = openingBal > 0 ? openingBal : 0;
   const rightOpeningBal = openingBal < 0 ? Math.abs(openingBal) : 0;
 
-  // Step 2: Route Closing Balance (to force the ledger to balance)
   const leftClosingBal = closingBal < 0 ? Math.abs(closingBal) : 0;
   const rightClosingBal = closingBal >= 0 ? closingBal : 0;
 
-  // Step 3: Compute Grand Totals safely
   const grandLeftCash = leftCashTotal + leftOpeningBal + leftClosingBal;
   const grandRightCash = rightCashTotal + rightOpeningBal + rightClosingBal;
 
@@ -86,15 +77,12 @@ export default function DayBookReport() {
     ];
 
     const rows = [];
-    
-    // Opening balance row
     if (openingBal >= 0) {
       rows.push(['Opening Balance', '', '', leftOpeningBal, '', '', '', '', '', '']);
     } else {
       rows.push(['', '', '', '', '', 'Opening Balance (Overdrawn)', '', '', rightOpeningBal, '']);
     }
 
-    // Zipped transaction rows
     for (let i = 0; i < maxRows; i++) {
       const left = debits[i];
       const right = credits[i];
@@ -112,17 +100,14 @@ export default function DayBookReport() {
       ]);
     }
 
-    // Subtotal row
     rows.push(['Total', '', '', leftCashTotal, leftAmtTotal, 'Total', '', '', rightCashTotal, rightAmtTotal]);
 
-    // Closing balance row
     if (closingBal < 0) {
       rows.push(['Closing Balance (Overdrawn)', '', '', leftClosingBal, '', '', '', '', '', '']);
     } else {
       rows.push(['', '', '', '', '', 'Closing Balance', '', '', rightClosingBal, '']);
     }
 
-    // Grand total row
     const footer = ['Grand Total', '', '', grandLeftCash, leftAmtTotal, 'Grand Total', '', '', grandRightCash, rightAmtTotal];
 
     await exportFlatXLSX({
@@ -139,55 +124,33 @@ export default function DayBookReport() {
   const handleExportPdf = () => {
     window.print();
   };
+
   return (
-    <div className="flex flex-col gap-5 p-6 pb-24 max-w-[1400px] mx-auto print:p-2 print:pb-0">
-      
-      {/* ── Screen Header ── */}
-      <div className="print:hidden flex items-center justify-between flex-wrap gap-3">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/reports')} className="rounded-xl">
-            <ArrowLeft className="w-5 h-5" />
+    <ReportPageTemplate
+      title="Day Book"
+      subtitle="Dual-column cash & ledger transaction journal for a selected single date"
+      category="Accounting"
+      icon={BookOpen}
+      fromDate={date}
+      toDate={date}
+      isLoading={isLoading || isFetching}
+      error={error}
+      onRefresh={() => refetch()}
+      onExportExcel={handleExportExcel}
+      onExportPdf={handleExportPdf}
+      filterSlot={
+        <div className="bg-card border border-border rounded-xl p-4 flex flex-wrap items-end gap-5 shadow-sm">
+          <BSDatePicker label="Transaction Date" adValue={date} onChange={setDate} />
+          <Button onClick={() => refetch()} disabled={isLoading || isFetching} className="self-end rounded-lg">
+            <RefreshCw className={`w-4 h-4 mr-2 ${(isLoading || isFetching) ? 'animate-spin' : ''}`} />
+            Generate Day Book
           </Button>
-          <div>
-            <h2 className="text-2xl font-bold text-foreground flex items-center gap-2">
-              <BookOpen className="w-6 h-6 text-primary" /> Day Book
-            </h2>
-            <p className="text-sm text-muted-foreground">All transactions for a single date</p>
-          </div>
         </div>
-        <ReportExportActions
-          onExportExcel={handleExportExcel}
-          onExportPdf={handleExportPdf}
-        />
-      </div>
-
-      {/* ── Filter Bar ── */}
-      <div className="print:hidden bg-card border border-border rounded-xl p-4 flex flex-wrap items-end gap-5">
-        <BSDatePicker label="Date" adValue={date} onChange={setDate} />
-        <Button onClick={() => refetch()} disabled={isLoading || isFetching} className="self-end rounded-lg">
-          <RefreshCw className={`w-4 h-4 mr-2 ${(isLoading || isFetching) ? 'animate-spin' : ''}`} />
-          Generate
-        </Button>
-      </div>
-
-      {error && (
-        <div className="bg-red-50 text-red-600 p-4 rounded-xl border border-red-200 font-mono text-sm">
-          <strong>Error loading Day Book:</strong><br />
-          {error.message || JSON.stringify(error)}
-        </div>
-      )}
-
-      {/* ── Table ── */}
+      }
+    >
       {data && (
-        <div className="bg-card border border-border rounded-xl overflow-hidden font-mono text-sm">
-          {/* Print Title */}
-          <div className="hidden print:block text-center py-3 border-b border-border">
-            <p className="text-lg font-bold">Day Book</p>
-            <p className="text-xs text-muted-foreground">Date: {formatDate(date)}</p>
-          </div>
-
+        <div className="bg-card border border-border rounded-xl overflow-hidden font-mono text-sm shadow-sm">
           <div className="overflow-x-auto" role="region" aria-label="Day Book table" tabIndex={0}>
-            {/* Added print-exact-colors to preserve visual hierarchy styling during print/PDF generation */}
             <table className="w-full text-xs border-collapse min-w-[900px] print-exact-colors">
               <thead>
                 <tr className="bg-primary text-primary-foreground">
@@ -206,12 +169,11 @@ export default function DayBookReport() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                
                 {/* ── Opening Balance ── */}
-                <tr className="bg-[var(--background)] text-[var(--foreground)]">
+                <tr className="bg-muted/10">
                   {openingBal >= 0 ? (
                     <>
-                      <td className="px-3 py-1.5 font-bold sticky left-0 bg-[var(--background)] z-10">Opening Balance</td>
+                      <td className="px-3 py-1.5 font-bold sticky left-0 bg-card z-10">Opening Balance</td>
                       <td className="px-3 py-1.5"></td>
                       <td className="px-3 py-1.5 text-right font-bold">{leftOpeningBal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                       <td className="px-3 py-1.5 border-r-2 border-border"></td>
@@ -219,7 +181,7 @@ export default function DayBookReport() {
                     </>
                   ) : (
                     <>
-                      <td colSpan={4} className="border-r-2 border-border sticky left-0 bg-[var(--background)] z-10"></td>
+                      <td colSpan={4} className="border-r-2 border-border sticky left-0 bg-card z-10"></td>
                       <td className="px-3 py-1.5 font-bold">Opening Balance (Overdrawn)</td>
                       <td className="px-3 py-1.5"></td>
                       <td className="px-3 py-1.5 text-right font-bold text-red-600">{rightOpeningBal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
@@ -231,7 +193,7 @@ export default function DayBookReport() {
                 {/* ── Transaction Zipped Rows ── */}
                 {maxRows === 0 ? (
                   <tr>
-                    <td colSpan={8} className="px-3 py-8 text-center text-muted-foreground">No transactions found</td>
+                    <td colSpan={8} className="px-3 py-8 text-center text-muted-foreground">No transactions recorded for {formatDate(date)}</td>
                   </tr>
                 ) : Array.from({ length: maxRows }).map((_, i) => {
                   const left = debits[i];
@@ -247,8 +209,8 @@ export default function DayBookReport() {
                         </>}
                       </td>
                       <td className="px-3 py-1.5 text-muted-foreground">{left ? (VOUCHER_TYPE_ABBR[left.voucher_type] || left.voucher_type) : ''}</td>
-                      <td className="px-3 py-1.5 text-right">{left?.cash_amount > 0 ? left.cash_amount.toLocaleString(undefined, { minimumFractionDigits: 2 }) : ''}</td>
-                      <td className="px-3 py-1.5 text-right border-r-2 border-border">{left?.non_cash_amount > 0 ? left.non_cash_amount.toLocaleString(undefined, { minimumFractionDigits: 2 }) : ''}</td>
+                      <td className="px-3 py-1.5 text-right font-mono">{left?.cash_amount > 0 ? left.cash_amount.toLocaleString(undefined, { minimumFractionDigits: 2 }) : ''}</td>
+                      <td className="px-3 py-1.5 text-right font-mono border-r-2 border-border">{left?.non_cash_amount > 0 ? left.non_cash_amount.toLocaleString(undefined, { minimumFractionDigits: 2 }) : ''}</td>
 
                       {/* Right Side */}
                       <td className="px-3 py-1.5">
@@ -258,61 +220,61 @@ export default function DayBookReport() {
                         </>}
                       </td>
                       <td className="px-3 py-1.5 text-muted-foreground">{right ? (VOUCHER_TYPE_ABBR[right.voucher_type] || right.voucher_type) : ''}</td>
-                      <td className="px-3 py-1.5 text-right">{right?.cash_amount > 0 ? right.cash_amount.toLocaleString(undefined, { minimumFractionDigits: 2 }) : ''}</td>
-                      <td className="px-3 py-1.5 text-right">{right?.non_cash_amount > 0 ? right.non_cash_amount.toLocaleString(undefined, { minimumFractionDigits: 2 }) : ''}</td>
+                      <td className="px-3 py-1.5 text-right font-mono">{right?.cash_amount > 0 ? right.cash_amount.toLocaleString(undefined, { minimumFractionDigits: 2 }) : ''}</td>
+                      <td className="px-3 py-1.5 text-right font-mono">{right?.non_cash_amount > 0 ? right.non_cash_amount.toLocaleString(undefined, { minimumFractionDigits: 2 }) : ''}</td>
                     </tr>
                   );
                 })}
 
                 {/* ── Sub Total ── */}
-                <tr className="bg-[var(--background)]/50 font-semibold border-t-2 border-border text-[var(--foreground)]">
-                  <td className="px-3 py-2 text-right sticky left-0 bg-[var(--background)] z-10">Total</td>
+                <tr className="bg-muted/30 font-semibold border-t-2 border-border">
+                  <td className="px-3 py-2 text-right sticky left-0 bg-card z-10">Total</td>
                   <td className="px-3 py-2"></td>
-                  <td className="px-3 py-2 text-right">{leftCashTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                  <td className="px-3 py-2 text-right border-r-2 border-border">{leftAmtTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                  <td className="px-3 py-2 text-right font-mono">{leftCashTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                  <td className="px-3 py-2 text-right font-mono border-r-2 border-border">{leftAmtTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                   <td className="px-3 py-2 text-right">Total</td>
                   <td className="px-3 py-2"></td>
-                  <td className="px-3 py-2 text-right">{rightCashTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                  <td className="px-3 py-2 text-right">{rightAmtTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                  <td className="px-3 py-2 text-right font-mono">{rightCashTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                  <td className="px-3 py-2 text-right font-mono">{rightAmtTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                 </tr>
 
                 {/* ── Closing Balance ── */}
-                <tr className="bg-[var(--background)] text-[var(--foreground)]">
+                <tr className="bg-muted/10">
                   {closingBal < 0 ? (
                     <>
-                      <td className="px-3 py-1.5 font-bold sticky left-0 bg-[var(--background)] z-10">Closing Balance (Overdrawn)</td>
+                      <td className="px-3 py-1.5 font-bold sticky left-0 bg-card z-10">Closing Balance (Overdrawn)</td>
                       <td className="px-3 py-1.5"></td>
-                      <td className="px-3 py-1.5 text-right font-bold text-red-600">{leftClosingBal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                      <td className="px-3 py-1.5 text-right font-bold text-red-600 font-mono">{leftClosingBal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                       <td className="px-3 py-1.5 border-r-2 border-border"></td>
                       <td colSpan={4}></td>
                     </>
                   ) : (
                     <>
-                      <td colSpan={4} className="border-r-2 border-border sticky left-0 bg-[var(--background)] z-10"></td>
+                      <td colSpan={4} className="border-r-2 border-border sticky left-0 bg-card z-10"></td>
                       <td className="px-3 py-1.5 font-bold">Closing Balance</td>
                       <td className="px-3 py-1.5"></td>
-                      <td className="px-3 py-1.5 text-right font-bold">{rightClosingBal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                      <td className="px-3 py-1.5 text-right font-bold font-mono">{rightClosingBal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                       <td className="px-3 py-1.5"></td>
                     </>
                   )}
                 </tr>
 
                 {/* ── Grand Total ── */}
-                <tr className="bg-[var(--background)] text-[var(--foreground)] font-bold border-t-2 border-border">
-                  <td className="px-3 py-2 text-right sticky left-0 bg-[var(--background)] z-10">Grand Total</td>
+                <tr className="bg-muted/60 font-bold border-t-2 border-border">
+                  <td className="px-3 py-2 text-right sticky left-0 bg-card z-10">Grand Total</td>
                   <td className="px-3 py-2"></td>
-                  <td className="px-3 py-2 text-right">{grandLeftCash.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                  <td className="px-3 py-2 text-right border-r-2 border-border">{leftAmtTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                  <td className="px-3 py-2 text-right font-mono">{grandLeftCash.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                  <td className="px-3 py-2 text-right font-mono border-r-2 border-border">{leftAmtTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                   <td className="px-3 py-2 text-right">Grand Total</td>
                   <td className="px-3 py-2"></td>
-                  <td className="px-3 py-2 text-right">{grandRightCash.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                  <td className="px-3 py-2 text-right">{rightAmtTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                  <td className="px-3 py-2 text-right font-mono">{grandRightCash.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                  <td className="px-3 py-2 text-right font-mono">{rightAmtTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                 </tr>
               </tbody>
             </table>
           </div>
         </div>
       )}
-    </div>
+    </ReportPageTemplate>
   );
 }

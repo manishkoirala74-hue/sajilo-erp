@@ -1,21 +1,17 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { supabase, sajilo } from '@/api/sajiloClient';
-import PageHeader from '@/components/shared/PageHeader';
-import DataTable from '@/components/shared/DataTable';
 import { useDateFormat } from '@/lib/DateFormatContext';
 import { formatToDmyAD, formatToDmyBS } from '@/lib/nepaliDate';
-import { History, Search, Download } from 'lucide-react';
+import { History, Search, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import SearchableSelect from '@/components/shared/SearchableSelect';
 import ReportFilterBar from '@/components/reports/ReportFilterBar';
-import ReportExportActions from '@/components/reports/ReportExportActions';
-import { exportFlatXLSX } from '@/lib/reports/reportExcelExport';
-import { generateReportVectorPDF } from '@/utils/reportPdfEngine';
 import VoucherLink from '@/components/shared/VoucherLink';
 import { format } from 'date-fns';
+import { ReportPageTemplate, StandardReportTable } from '@/components/reports';
 
 export default function PurchasePriceChangeHistory() {
   const { displayBsDate } = useDateFormat();
@@ -39,7 +35,6 @@ export default function PurchasePriceChangeHistory() {
     try {
       const companyId = sajilo.getCompanyId();
       
-      // Fetch master list from the latest purchase price view
       const { data: latestPrices, error } = await supabase
         .from('vw_latest_purchase_price')
         .select('*')
@@ -49,7 +44,6 @@ export default function PurchasePriceChangeHistory() {
       
       setData(latestPrices || []);
       
-      // Extract unique categories for filter
       const uniqueCats = Array.from(new Set((latestPrices || []).map(item => item.category_id).filter(Boolean)))
         .map(catId => {
           const item = latestPrices.find(i => i.category_id === catId);
@@ -75,7 +69,6 @@ export default function PurchasePriceChangeHistory() {
     try {
       const companyId = sajilo.getCompanyId();
       
-      // Fetch full history for the specific item, chronologically ordered
       const { data: history, error } = await supabase
         .from('vw_purchase_price_history')
         .select('*')
@@ -86,7 +79,6 @@ export default function PurchasePriceChangeHistory() {
 
       if (error) throw error;
       
-      // Calculate price change %
       let processedHistory = [];
       for (let i = 0; i < (history || []).length; i++) {
         const current = history[i];
@@ -98,8 +90,8 @@ export default function PurchasePriceChangeHistory() {
           const oldPrice = Number(previous.unit_price) || 0;
           const newPrice = Number(current.unit_price) || 0;
           
-          diff = newPrice - oldPrice;
           if (oldPrice > 0) {
+            diff = newPrice - oldPrice;
             percentChange = (diff / oldPrice) * 100;
           }
         }
@@ -110,183 +102,159 @@ export default function PurchasePriceChangeHistory() {
           percentChange
         });
       }
-
-      // Reverse to show latest first in modal
+      
       setHistoryData(processedHistory.reverse());
-
     } catch (error) {
       console.error(error);
-      toast.error('Failed to load item history');
+      toast.error('Failed to load item price trend');
     } finally {
       setHistoryLoading(false);
     }
   };
 
-  const masterColumns = [
+  const filteredData = useMemo(() => {
+    return data.filter(d => {
+      const matchesSearch = (d.item_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                            (d.item_code || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                            (d.vendor_name || '').toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesCategory = selectedCategory === 'all' || d.category_id === selectedCategory;
+      return matchesSearch && matchesCategory;
+    });
+  }, [data, searchTerm, selectedCategory]);
+
+  const masterColumns = useMemo(() => [
     {
-      label: 'Item',
+      label: 'Item Code',
+      key: 'item_code',
+      preset: 'code',
+      stickyFirst: true,
+      render: (v) => <span className="font-mono text-xs font-semibold text-foreground/80">{v || '—'}</span>,
+    },
+    {
+      label: 'Item Name',
       key: 'item_name',
-      render: (_, row) => (
-        <div>
-          <p className="font-medium text-primary cursor-pointer hover:underline" onClick={() => openHistoryModal(row)}>
-            {row.item_name || 'Unknown'}
-          </p>
-          <p className="text-xs text-muted-foreground">{row.item_code}</p>
-        </div>
-      )
+      preset: 'description',
     },
     {
       label: 'Category',
-      key: 'category_id',
-      render: (_, row) => <span className="text-muted-foreground">{row.category_name || '-'}</span>
+      key: 'category_name',
+      preset: 'category',
+      render: (v) => <span className="text-muted-foreground">{v || '—'}</span>
     },
     {
-      label: 'Latest Supplier',
+      label: 'Last Supplier',
       key: 'vendor_name',
-      render: (v) => <span className="text-muted-foreground">{v || '-'}</span>
+      preset: 'description',
+      render: (v) => <span className="font-medium text-foreground">{v || '—'}</span>
     },
     {
-      label: 'Latest Purchase Date',
+      label: 'Last Purchase Date',
       key: 'invoice_date',
-      render: (v) => <span className="whitespace-nowrap">{formatToDmyAD(v)}</span>
+      preset: 'date',
+      render: (v, row) => (
+        <span>
+          {formatToDmyAD(v)}
+          {displayBsDate && <span className="text-[10px] text-muted-foreground block">({formatToDmyBS(row.invoice_date)})</span>}
+        </span>
+      ),
+      exportValue: (row) => formatToDmyAD(row.invoice_date)
     },
-    ...(displayBsDate ? [{
-      label: 'Latest Purchase Date (BS)',
-      key: 'invoice_date_bs',
-      render: (_, row) => <span className="whitespace-nowrap">{formatToDmyBS(row.invoice_date)}</span>
-    }] : []),
     {
-      label: 'Latest Price',
+      label: 'Latest Price (NPR)',
       key: 'unit_price',
-      render: (v) => <span className="font-medium text-primary">NPR {Number(v).toLocaleString()}</span>
+      preset: 'amount',
+      render: (v) => (
+        <span className="font-mono font-bold text-foreground">
+          {Number(v || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+        </span>
+      ),
+      exportValue: (row) => Number(row.unit_price || 0)
+    },
+    {
+      label: 'Action',
+      key: 'actions',
+      preset: 'actions',
+      render: (_, row) => (
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          onClick={() => openHistoryModal(row)}
+          className="h-7 px-2 text-xs text-primary hover:text-primary hover:bg-primary/10 gap-1 rounded-md"
+        >
+          <Eye className="w-3.5 h-3.5" />
+          Trends
+        </Button>
+      )
     }
-  ];
-
-  const handleExportExcel = async () => {
-    if (!filteredData || filteredData.length === 0) {
-      toast.info('No purchase price data to export.');
-      return;
-    }
-    const headers = [
-      'Item Code', 'Item Name', 'Category', 'Latest Supplier', 'Latest Purchase Date',
-      ...(displayBsDate ? ['Latest Purchase Date (BS)'] : []),
-      'Latest Price (NPR)'
-    ];
-    const rows = filteredData.map(r => [
-      r.item_code || '',
-      r.item_name || '',
-      r.category_name || '',
-      r.vendor_name || '',
-      formatToDmyAD(r.invoice_date),
-      ...(displayBsDate ? [formatToDmyBS(r.invoice_date)] : []),
-      Number(r.unit_price || 0)
-    ]);
-    await exportFlatXLSX({
-      filename: `Purchase_Price_Change_History_${filters.fromDate}_${filters.toDate}.xlsx`,
-      reportTitle: 'Purchase Price Change History',
-      fromDate: filters.fromDate,
-      toDate: filters.toDate,
-      headers,
-      rows
-    });
-  };
-
-  const handleExportPdf = async () => {
-    if (!filteredData || filteredData.length === 0) return;
-    const headers = ['Code', 'Item Name', 'Category', 'Supplier', 'Date', 'Price'];
-    const rows = filteredData.map(r => [
-      r.item_code || '',
-      r.item_name || '',
-      r.category_name || '',
-      r.vendor_name || '',
-      formatToDmyAD(r.invoice_date),
-      `NPR ${Number(r.unit_price || 0).toLocaleString()}`
-    ]);
-    await generateReportVectorPDF({
-      title: 'Purchase Price Change History',
-      fromDate: filters.fromDate,
-      toDate: filters.toDate,
-      columns: headers,
-      data: rows,
-      filename: `Purchase_Price_Change_History_${filters.fromDate}_${filters.toDate}.pdf`
-    });
-  };
-  const filteredData = data.filter(d => {
-    const matchesSearch = (d.item_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          (d.item_code || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          (d.vendor_name || '').toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = selectedCategory === 'all' || d.category_id === selectedCategory;
-    return matchesSearch && matchesCategory;
-  });
+  ], [displayBsDate]);
 
   return (
-    <div className="space-y-6">
-      <PageHeader 
-        title="Purchase Price Change History" 
-        description="Track how the purchase prices of items have changed over time across different suppliers."
-        icon={History}
-      />
-      <ReportFilterBar filters={filters} onChange={setFilters} onApply={fetchData} showApplyButton />
-
-      <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden flex flex-col">
-        <div className="p-4 border-b border-border flex items-center justify-between gap-4 flex-wrap">
-          <div className="flex items-center gap-3">
-            <div className="relative w-72">
+    <ReportPageTemplate
+      title="Purchase Price Change History"
+      subtitle="Track procurement cost variations and supplier price trends over time"
+      category="Purchase"
+      icon={History}
+      fromDate={filters.fromDate}
+      toDate={filters.toDate}
+      isLoading={loading}
+      onRefresh={fetchData}
+      exportConfig={{
+        columns: masterColumns.filter(c => c.key !== 'actions'),
+        data: filteredData,
+        filename: `Purchase_Price_Change_History_${filters.fromDate}_${filters.toDate}`,
+      }}
+      filterSlot={
+        <div className="bg-card border border-border rounded-xl p-4 shadow-sm flex flex-col sm:flex-row items-stretch sm:items-end justify-between gap-4">
+          <div className="flex-1">
+            <ReportFilterBar filters={filters} onChange={setFilters} onApply={fetchData} showApplyButton />
+          </div>
+          <div className="flex items-center gap-3 w-full sm:w-auto">
+            <div className="relative flex-1 sm:w-64">
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
               <Input 
-                placeholder="Search items, codes, suppliers..." 
-                className="pl-9 bg-background"
+                placeholder="Search items, suppliers..." 
+                className="pl-9 bg-muted/40 text-xs rounded-lg"
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
               />
             </div>
-            <div className="w-64">
+            <div className="w-56">
               <SearchableSelect
-                options={[{value: 'all', label: 'All Categories'}, ...categories]}
+                options={[{ value: 'all', label: 'All Categories' }, ...categories]}
                 value={selectedCategory}
                 onChange={setSelectedCategory}
-                placeholder="Filter by Category"
+                placeholder="Filter Category"
               />
             </div>
           </div>
-          
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={fetchData} disabled={loading} className="print:hidden">
-              Refresh
-            </Button>
-            <Button variant="outline" size="sm" className="hidden sm:flex print:hidden">
-              <Download className="w-4 h-4 mr-2" />
-              Export CSV
-            </Button>
-          </div>
         </div>
-        
-        <DataTable 
-          data={filteredData}
-          columns={masterColumns}
-          loading={loading}
-          emptyMessage="No purchase price history found."
-        />
-      </div>
+      }
+    >
+      <StandardReportTable
+        columns={masterColumns}
+        data={filteredData}
+        loading={loading}
+        emptyMessage="No purchase price history records found."
+      />
 
       {/* Detail Modal */}
       <Dialog open={!!selectedItem} onOpenChange={() => setSelectedItem(null)}>
         <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-xl">
-              Purchase History: <span className="text-primary">{selectedItem?.item_name}</span>
+              Purchase History Trend: <span className="text-primary">{selectedItem?.item_name}</span>
               <span className="text-sm font-normal text-muted-foreground ml-2">({selectedItem?.item_code})</span>
             </DialogTitle>
           </DialogHeader>
           
           <div className="mt-4">
             {historyLoading ? (
-              <div className="flex justify-center p-8 text-muted-foreground">Loading history...</div>
+              <div className="flex justify-center p-8 text-muted-foreground">Loading history trend...</div>
             ) : historyData.length === 0 ? (
-              <div className="flex justify-center p-8 text-muted-foreground">No purchase history found for this item.</div>
+              <div className="flex justify-center p-8 text-muted-foreground">No purchase records found for this item.</div>
             ) : (
               <div className="border border-border rounded-lg overflow-hidden">
-                <table className="table-fluid-grid w-full text-sm">
+                <table className="table-fluid-grid w-full text-xs">
                   <thead className="bg-muted/50 border-b border-border">
                     <tr>
                       <th className="cell-density text-left font-semibold">Date</th>
@@ -295,32 +263,31 @@ export default function PurchasePriceChangeHistory() {
                       <th className="cell-density text-left font-semibold">Invoice #</th>
                       <th className="cell-density text-right font-semibold">Quantity</th>
                       <th className="cell-density text-right font-semibold">Unit Price</th>
-                      <th className="cell-density text-right font-semibold">Change</th>
+                      <th className="cell-density text-right font-semibold">Variation</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
                     {historyData.map((row, i) => {
-                      const isFirstEntry = i === historyData.length - 1; // Since we reversed the array
-                      
+                      const isFirstEntry = i === historyData.length - 1;
                       return (
                         <tr key={row.invoice_id || i} className="hover:bg-muted/30 transition-colors">
                           <td className="cell-density whitespace-nowrap">{formatToDmyAD(row.invoice_date)}</td>
                           {displayBsDate && <td className="cell-density whitespace-nowrap">{formatToDmyBS(row.invoice_date)}</td>}
-                          <td className="cell-density">{row.vendor_name || '-'}</td>
-                          <td className="cell-density text-muted-foreground">
-                            {row.invoice_number ? <VoucherLink voucherNumber={row.invoice_number}><span className="text-primary hover:underline cursor-pointer">{row.invoice_number}</span></VoucherLink> : '—'}
+                          <td className="cell-density font-medium">{row.vendor_name || '—'}</td>
+                          <td className="cell-density text-muted-foreground font-mono">
+                            {row.invoice_number ? <VoucherLink voucherNumber={row.invoice_number}>{row.invoice_number}</VoucherLink> : '—'}
                           </td>
-                          <td className="cell-density text-right">{Number(row.quantity).toLocaleString()}</td>
-                          <td className="cell-density text-right font-medium">
-                            NPR {Number(row.unit_price).toLocaleString()}
+                          <td className="cell-density text-right font-mono">{Number(row.quantity).toLocaleString()}</td>
+                          <td className="cell-density text-right font-mono font-bold">
+                            NPR {Number(row.unit_price).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                           </td>
-                          <td className="cell-density text-right">
+                          <td className="cell-density text-right font-mono">
                             {isFirstEntry ? (
-                              <span className="text-muted-foreground text-xs">Initial</span>
+                              <span className="text-muted-foreground text-xs">Base</span>
                             ) : (
-                              <span className={row.diff > 0 ? 'text-red-600' : row.diff < 0 ? 'text-green-600' : 'text-muted-foreground'}>
-                                {row.diff > 0 ? '+' : ''}{row.diff.toLocaleString()} 
-                                <span className="ml-1 text-xs opacity-80">
+                              <span className={row.diff > 0 ? 'text-red-600 font-semibold' : row.diff < 0 ? 'text-emerald-600 font-semibold' : 'text-muted-foreground'}>
+                                {row.diff > 0 ? '+' : ''}{row.diff.toLocaleString(undefined, { minimumFractionDigits: 2 })} 
+                                <span className="ml-1 text-[11px] opacity-80">
                                   ({row.diff > 0 ? '+' : ''}{row.percentChange.toFixed(1)}%)
                                 </span>
                               </span>
@@ -336,7 +303,6 @@ export default function PurchasePriceChangeHistory() {
           </div>
         </DialogContent>
       </Dialog>
-
-    </div>
+    </ReportPageTemplate>
   );
 }

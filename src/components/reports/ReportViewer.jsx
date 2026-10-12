@@ -23,6 +23,7 @@ import { Mail } from 'lucide-react';
 import { useDateFormat } from '@/lib/DateFormatContext';
 import { adToBS, formatBS } from '@/lib/nepaliDate';
 import { useAmountFormatter } from '@/hooks/useAmountFormatter';
+import { REPORT_TYPOGRAPHY, REPORT_COLORS } from '@/config/reportTheme';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -162,7 +163,14 @@ function ReportTable({ title, subtitle, headers, rows, footer, onExport, onEmail
     });
   };
 
-  const rightCols = new Set([headers.length - 1, headers.length - 2]); // last 2 cols = numeric
+  const isNumericHeader = (h) => typeof h === 'string' && (/\((NPR|Rs|%)\)|Amount|Debit|Credit|Balance|Total|Invoiced|Paid|Billed|Qty|Cost|Revenue|Value|WAC|Shortage|Current|Days|Gross|Net/i.test(h));
+  const isColNumeric = (colIdx) => {
+    if (isNumericHeader(headers[colIdx])) return true;
+    const sample = rows.find(r => r[colIdx] !== undefined && r[colIdx] !== null && r[colIdx] !== '' && r[colIdx] !== '—');
+    if (!sample) return false;
+    const val = sample[colIdx];
+    return typeof val === 'number' || (typeof val === 'string' && /^(\()?NPR\s/.test(val.trim()));
+  };
 
   return (
     <div className="space-y-3">
@@ -182,13 +190,13 @@ function ReportTable({ title, subtitle, headers, rows, footer, onExport, onEmail
       <div className="border border-border rounded-xl overflow-hidden">
         <div className="table-scroll-container overflow-x-auto" tabIndex={0} role="region" aria-label="Report data">
           <table className="table-fluid-grid text-sm print:text-[10pt]">
-            <thead className="cell-density bg-slate-100 dark:bg-slate-500/20 border-b-2 border-border sticky top-0 z-10 shadow-sm">
+            <thead className={`cell-density ${REPORT_COLORS.headerBg} ${REPORT_COLORS.headerBorder} sticky top-0 z-10 shadow-sm`}>
               <tr>
                 {headers.map((h, i) => {
-                  const isNum = rightCols.has(i);
+                  const isNum = isColNumeric(i);
                   const stickyClasses = i === 0 ? 'sticky left-0 top-0 z-30 bg-slate-100 dark:bg-[#1e293b] border-r border-border md:border-r-0 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]' : '';
                   return (
-                    <th key={i} scope="col" className={`cell-density font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider ${isNum ? 'amount-cell tabular-nums' : 'text-align-left'} ${stickyClasses}`}>
+                    <th key={i} scope="col" className={`cell-density ${REPORT_TYPOGRAPHY.tableHead} ${isNum ? 'amount-cell tabular-nums text-right' : 'text-left'} ${stickyClasses}`}>
                       {h}
                     </th>
                   );
@@ -201,10 +209,10 @@ function ReportTable({ title, subtitle, headers, rows, footer, onExport, onEmail
                 : rows.map((row, i) => (
                   <tr key={i} className="hover:bg-muted/20 print:hover:bg-transparent print:break-inside-avoid print:bg-white print:text-black">
                     {row.map((cell, j) => {
-                      const isNum = rightCols.has(j);
+                      const isNum = isColNumeric(j);
                       const stickyClasses = j === 0 ? 'sticky left-0 bg-card z-20 border-r border-border md:border-r-0 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]' : '';
                       return (
-                        <td key={j} className={`cell-density print:text-[10pt] ${isNum ? 'amount-cell tabular-nums' : 'text-align-left'} ${stickyClasses}`} {...(j === 0 ? { scope: "row" } : {})}>
+                        <td key={j} className={`cell-density print:text-[10pt] ${isNum ? 'amount-cell tabular-nums text-right' : 'text-left'} ${stickyClasses}`} {...(j === 0 ? { scope: "row" } : {})}>
                           {cell}
                         </td>
                       );
@@ -213,13 +221,13 @@ function ReportTable({ title, subtitle, headers, rows, footer, onExport, onEmail
                 ))}
             </tbody>
             {footer && (
-              <tfoot className="bg-slate-100 dark:bg-slate-500/20 border-t-2 border-slate-400 font-semibold">
+              <tfoot className={REPORT_TYPOGRAPHY.tableFooter}>
                 <tr>
                   {footer.map((cell, j) => {
-                    const isNum = rightCols.has(j);
+                    const isNum = isColNumeric(j);
                     const stickyClasses = j === 0 ? 'sticky left-0 bg-slate-100 dark:bg-[#1e293b] z-10 border-r border-border shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]' : '';
                     return (
-                      <td key={j} className={`cell-density print:text-[10pt] font-bold ${isNum ? 'amount-cell tabular-nums' : 'text-align-left'} ${stickyClasses}`}>
+                      <td key={j} className={`cell-density print:text-[10pt] font-bold ${isNum ? 'amount-cell tabular-nums text-right' : 'text-left'} ${stickyClasses}`}>
                         {cell}
                       </td>
                     );
@@ -490,10 +498,17 @@ function PartnerSummaryReport({ title, mode, reportId, initialFromDate, initialT
     setLoading(false);
   }, [filters.fromDate, filters.toDate, reportId, isAR]);
 
-  // useEffect(() => { load(); }, [load]);
+  useEffect(() => { load(); }, [load]);
 
   const partnerMap = {};
   partners.forEach(p => { partnerMap[p.name] = p; });
+
+  const metaHeaders = [
+    ...(metaCols.phone   ? ['Contact No.'] : []),
+    ...(metaCols.tax_id  ? ['PAN/TAX ID']  : []),
+    ...(metaCols.address ? ['Address']     : []),
+  ];
+  const metaPadding = metaHeaders.map(() => '');
 
   let baseHeaders = [];
   let rowMapper = () => [];
@@ -518,26 +533,35 @@ function PartnerSummaryReport({ title, mode, reportId, initialFromDate, initialT
       fmtNPR(rows.reduce((s, r) => s + (r['60d']  || 0), 0)),
       fmtNPR(rows.reduce((s, r) => s + (r['60d+'] || 0), 0)),
       fmtNPR(rows.reduce((s, r) => s + (r.total   || 0), 0)),
+      ...metaPadding,
     ];
   } else if (reportId === 'customer_balance') {
     baseHeaders = ['Customer', 'Total Invoiced (NPR)', 'Total Paid (NPR)', 'Balance (NPR)'];
     rowMapper = (r, meta) => [r.customer, fmtNPR(r.total_invoiced), fmtNPR(r.total_paid), fmtNPR(r.balance), ...meta];
-    footerBuilder = (rows) => ['TOTAL', '', '', fmtNPR(rows.reduce((s, r) => s + (r.balance || 0), 0))];
+    footerBuilder = (rows) => [
+      'TOTAL',
+      fmtNPR(rows.reduce((s, r) => s + (r.total_invoiced || 0), 0)),
+      fmtNPR(rows.reduce((s, r) => s + (r.total_paid || 0), 0)),
+      fmtNPR(rows.reduce((s, r) => s + (r.balance || 0), 0)),
+      ...metaPadding,
+    ];
   } else if (reportId === 'vendor_balance') {
     baseHeaders = ['Supplier', 'Total Billed (NPR)', 'Total Paid (NPR)', 'Balance (NPR)'];
     rowMapper = (r, meta) => [r.vendor, fmtNPR(r.total_billed), fmtNPR(r.total_paid), fmtNPR(r.balance), ...meta];
-    footerBuilder = (rows) => ['TOTAL', '', '', fmtNPR(rows.reduce((s, r) => s + (r.balance || 0), 0))];
+    footerBuilder = (rows) => [
+      'TOTAL',
+      fmtNPR(rows.reduce((s, r) => s + (r.total_billed || 0), 0)),
+      fmtNPR(rows.reduce((s, r) => s + (r.total_paid || 0), 0)),
+      fmtNPR(rows.reduce((s, r) => s + (r.balance || 0), 0)),
+      ...metaPadding,
+    ];
   } else if (reportId === 'debtor_statement' || reportId === 'vendor_statement') {
      // fallback if mapped here
      baseHeaders = ['Partner', 'Balance'];
      rowMapper = (r, meta) => [r.name, r.balance, ...meta];
+     footerBuilder = (rows) => ['TOTAL', '', ...metaPadding];
   }
 
-  const metaHeaders = [
-    ...(metaCols.phone   ? ['Contact No.'] : []),
-    ...(metaCols.tax_id  ? ['PAN/TAX ID']  : []),
-    ...(metaCols.address ? ['Address']     : []),
-  ];
   const headers = [...baseHeaders, ...metaHeaders];
 
   const tableRows = (data || []).map(r => {
@@ -622,9 +646,24 @@ function PartnerSummaryReport({ title, mode, reportId, initialFromDate, initialT
                     (data || []).reduce((s, r) => s + (r['60d'] || 0), 0),
                     (data || []).reduce((s, r) => s + (r['60d+'] || 0), 0),
                     (data || []).reduce((s, r) => s + (r.total || 0), 0),
+                    ...metaPadding,
                   ];
-                } else if (reportId === 'customer_balance' || reportId === 'vendor_balance') {
-                  return ['TOTAL', '', '', (data || []).reduce((s, r) => s + (r.balance || 0), 0)];
+                } else if (reportId === 'customer_balance') {
+                  return [
+                    'TOTAL',
+                    (data || []).reduce((s, r) => s + (r.total_invoiced || 0), 0),
+                    (data || []).reduce((s, r) => s + (r.total_paid || 0), 0),
+                    (data || []).reduce((s, r) => s + (r.balance || 0), 0),
+                    ...metaPadding,
+                  ];
+                } else if (reportId === 'vendor_balance') {
+                  return [
+                    'TOTAL',
+                    (data || []).reduce((s, r) => s + (r.total_billed || 0), 0),
+                    (data || []).reduce((s, r) => s + (r.total_paid || 0), 0),
+                    (data || []).reduce((s, r) => s + (r.balance || 0), 0),
+                    ...metaPadding,
+                  ];
                 }
                 return footerBuilder ? footerBuilder(data || []) : undefined;
               })();

@@ -4,6 +4,8 @@ import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader } from '@/components/ui/dialog';
 
+import JournalEntryModal from '@/components/accounting/JournalEntryModal';
+
 // A helper wrapper if a modal component doesn't have its own Back button logic
 // but most Radix UI Dialogs handle their own headers. We can pass goBack as a prop.
 export default function ModalRegistry() {
@@ -27,6 +29,8 @@ export default function ModalRegistry() {
   switch (activeModal) {
     case 'COMMAND_PALETTE':
       return <CommandPaletteModal {...commonProps} />;
+    case 'JOURNAL_ENTRY_MODAL':
+      return <JournalEntryModal open={true} onClose={() => closeModal()} {...modalProps} />;
     default:
       return null;
   }
