@@ -189,3 +189,124 @@ export const formatDualDateString = (dateStr, showBS = true) => {
   if (!showBS) return adString;
   return `${adString} / ${formatToDmyBS(dateStr)} BS`;
 };
+
+export const BS_MONTH_LABELS = [
+  'Baisakh', 'Jestha', 'Ashad', 'Shrawan', 'Bhadra', 'Ashoj',
+  'Kartik', 'Mangsir', 'Poush', 'Magh', 'Falgun', 'Chaitra'
+];
+
+export const BS_MONTH_SHORT_LABELS = [
+  'Bai', 'Jes', 'Ash', 'Shr', 'Bha', 'Aso',
+  'Kar', 'Mgs', 'Pou', 'Mag', 'Fal', 'Cha'
+];
+
+/**
+ * Returns local ISO date string (YYYY-MM-DD) avoiding UTC offset bugs.
+ * Respects Nepal Standard Time (UTC+05:45).
+ */
+export const getLocalDateString = (dateObj = new Date()) => {
+  try {
+    const nptFormatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Kathmandu',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    });
+    return nptFormatter.format(dateObj);
+  } catch (_) {
+    const offset = dateObj.getTimezoneOffset() * 60000;
+    return new Date(dateObj.getTime() - offset).toISOString().slice(0, 10);
+  }
+};
+
+/**
+ * 1. KPI BOUNDARY: Returns current Month-To-Date (MTD) date boundaries.
+ * Strictly guarantees top KPI cards reflect only the current month's figures.
+ *
+ * @param {'AD' | 'BS'} calendarMode 
+ * @returns {{ startDate: string, endDate: string, currentMonthLabel: string }}
+ */
+export function getCurrentMonthRange(calendarMode = 'AD') {
+  const today = new Date();
+  const endDate = getLocalDateString(today);
+
+  if (calendarMode === 'BS') {
+    const todayBS = getTodayBS();
+    const startDate = bsToAD(todayBS.year, todayBS.month, 1);
+    const currentMonthLabel = `${BS_MONTH_LABELS[todayBS.month - 1]} ${todayBS.year}`;
+    return { startDate, endDate, currentMonthLabel };
+  }
+
+  const y = today.getFullYear();
+  const m = String(today.getMonth() + 1).padStart(2, '0');
+  const startDate = `${y}-${m}-01`;
+  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const currentMonthLabel = `${monthNames[today.getMonth()]} ${y}`;
+
+  return { startDate, endDate, currentMonthLabel };
+}
+
+/**
+ * 2. CHART BOUNDARY: Returns rolling 6-month buckets and query boundaries.
+ * Fully immune to 31st day-overflow and early morning UTC rollback.
+ *
+ * @param {'AD' | 'BS'} calendarMode 
+ * @param {number} monthCount Default 6
+ * @returns {{ startDate: string, endDate: string, buckets: Array<object> }}
+ */
+export function getDashboardChartRange(calendarMode = 'AD', monthCount = 6) {
+  const today = new Date();
+  const endDate = getLocalDateString(today);
+
+  if (calendarMode === 'BS') {
+    const todayBS = getTodayBS();
+    const buckets = [];
+
+    for (let i = monthCount - 1; i >= 0; i--) {
+      let m = todayBS.month - i;
+      let y = todayBS.year;
+      while (m <= 0) {
+        m += 12;
+        y -= 1;
+      }
+      const key = `${y}-${String(m).padStart(2, '0')}`;
+      const label = BS_MONTH_LABELS[m - 1];
+      const shortLabel = BS_MONTH_SHORT_LABELS[m - 1];
+      buckets.push({
+        key,
+        label,
+        shortLabel,
+        year: y,
+        month: m,
+        tooltipLabel: `${label} ${y}`
+      });
+    }
+
+    const earliest = buckets[0];
+    const startDate = bsToAD(earliest.year, earliest.month, 1);
+    return { startDate, endDate, buckets };
+  }
+
+  // Fallback / Standard Gregorian (AD)
+  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const buckets = [];
+
+  for (let i = monthCount - 1; i >= 0; i--) {
+    const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    const label = monthNames[d.getMonth()];
+    buckets.push({
+      key,
+      label,
+      shortLabel: label,
+      year: d.getFullYear(),
+      month: d.getMonth() + 1,
+      tooltipLabel: `${label} ${d.getFullYear()}`
+    });
+  }
+
+  const earliestBucket = buckets[0];
+  const startDate = `${earliestBucket.year}-${String(earliestBucket.month).padStart(2, '0')}-01`;
+
+  return { startDate, endDate, buckets };
+}

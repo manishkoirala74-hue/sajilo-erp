@@ -34,7 +34,7 @@ const RegionalSettings = () => {
         <div className="grid grid-cols-2 gap-4">
           <div>
             <Label className="text-foreground">Default Date Format</Label>
-            <p className="text-xs text-muted-foreground mb-2">This sets the default calendar mode across the app</p>
+            <p className="text-xs text-muted-foreground mb-2">This sets the default calendar mode across the app, including Dashboard charts, monthly aggregations, and transaction dates.</p>
             <Select 
               value={draftSettings.date_format || 'AD'} 
               onValueChange={v => updateDraftSettings({ date_format: v })}

@@ -1,7 +1,7 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { useAuth } from '@/lib/AuthContext';
 import { useTheme } from '@/lib/ThemeContext';
-import { sajilo } from '@/api/sajiloClient';
+import { useDateFormat } from '@/lib/DateFormatContext';
 import {
   TrendingUp, ShoppingCart, Users, FileText, AlertCircle, Clock, ArrowRight,
   Eye, EyeOff, Building, Landmark, Banknote
@@ -26,26 +26,46 @@ import {
 } from '@/hooks/useSajiloQuery';
 import { triggerHaptic } from '@/utils/haptics';
 import { useAmountFormatter } from '@/hooks/useAmountFormatter';
+import {
+  getDashboardChartRange,
+  getCurrentMonthRange,
+  formatToDmyBS,
+  formatToDmyAD,
+  adToBS
+} from '@/lib/nepaliDate';
 
 export default function Dashboard() {
   const { availableCompanies, isLoadingAuth, activeCompany } = useAuth();
   const { formatAmountShort } = useAmountFormatter();
+  const { dateFormat } = useDateFormat();
+  const isBS = dateFormat === 'BS';
   const activeCompanyId = activeCompany?.id || null;
   
-  // --- Date Range Calculation ---
-  const today = new Date();
-  const endDate = today.toISOString().slice(0, 10);
-  const fd = new Date();
-  fd.setMonth(fd.getMonth() - 5);
-  fd.setDate(1);
-  const startDate = fd.toISOString().slice(0, 10);
+  // --- Decoupled Date Ranges (V4 Architecture) ---
+  // 1. 6-Month Rolling Boundary for Area & Bar Charts
+  const chartRange = useMemo(() => {
+    return getDashboardChartRange(dateFormat, 6);
+  }, [dateFormat]);
+
+  // 2. Current Month-To-Date (MTD) Boundary for Top KPI Summary Cards
+  const kpiRange = useMemo(() => {
+    return getCurrentMonthRange(dateFormat);
+  }, [dateFormat]);
 
   // --- Independent Queries ---
-  const { data: metrics = [], isLoading: isLoadingMetrics } = useDailyMetricsQuery(activeCompanyId, startDate, endDate);
+  const { data: metrics = [], isLoading: isLoadingMetrics } = useDailyMetricsQuery(
+    activeCompanyId,
+    chartRange.startDate,
+    chartRange.endDate
+  );
   const { data: recentDocs, isLoading: isLoadingRecentDocs } = useRecentDocumentsQuery();
-  const { data: summary, isLoading: isLoadingSummary } = useDashboardSummaryQuery(activeCompanyId, startDate, endDate);
-  const { data: recentSales = [], isLoading: isLoadingRecentSales } = useRecentSalesQuery();
-  const { data: pendingApprovals = [], isLoading: isLoadingApprovals } = usePendingApprovalsQuery();
+  const { data: summary, isLoading: isLoadingSummary } = useDashboardSummaryQuery(
+    activeCompanyId,
+    kpiRange.startDate,
+    kpiRange.endDate
+  );
+  const { data: recentSales = [] } = useRecentSalesQuery();
+  const { data: pendingApprovals = [] } = usePendingApprovalsQuery();
   // Decoupled from useDashboardSummaryQuery — lightweight GL-only query with 5-min staleTime.
   // See useCashBalanceQuery in useSajiloQuery.js and migrations 208–210 for context.
   const { data: cashData, isLoading: isLoadingCash } = useCashBalanceQuery(activeCompanyId);
@@ -55,28 +75,41 @@ export default function Dashboard() {
 
   // Aggregate daily metrics into monthly chart data
   const chartData = useMemo(() => {
-    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     const monthlyMap = {};
     
-    for (let i = 5; i >= 0; i--) {
-      const d = new Date();
-      d.setMonth(d.getMonth() - i);
-      const mKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-      monthlyMap[mKey] = { month: monthNames[d.getMonth()], sortKey: mKey, sales: 0, purchases: 0 };
-    }
+    chartRange.buckets.forEach(b => {
+      monthlyMap[b.key] = {
+        month: b.label,
+        shortLabel: b.shortLabel,
+        sortKey: b.key,
+        year: b.year,
+        tooltipLabel: b.tooltipLabel,
+        sales: 0,
+        purchases: 0
+      };
+    });
 
     metrics.forEach(m => {
-      if (m.metric_date) {
-        const mKey = m.metric_date.substring(0, 7);
-        if (monthlyMap[mKey]) {
-          monthlyMap[mKey].sales += (parseFloat(m.total_sales_amount) || 0);
-          monthlyMap[mKey].purchases += (parseFloat(m.total_purchases_amount) || 0);
+      if (!m.metric_date) return;
+
+      let bucketKey = null;
+      if (isBS) {
+        const bs = adToBS(m.metric_date);
+        if (bs) {
+          bucketKey = `${bs.year}-${String(bs.month).padStart(2, '0')}`;
         }
+      } else {
+        bucketKey = m.metric_date.substring(0, 7);
+      }
+
+      if (bucketKey && monthlyMap[bucketKey]) {
+        monthlyMap[bucketKey].sales += (parseFloat(m.total_sales_amount) || 0);
+        monthlyMap[bucketKey].purchases += (parseFloat(m.total_purchases_amount) || 0);
       }
     });
 
     return Object.values(monthlyMap).sort((a, b) => a.sortKey.localeCompare(b.sortKey));
-  }, [metrics]);
+  }, [metrics, chartRange.buckets, isBS]);
 
   const loading = isLoadingAuth || isLoadingSummary || isLoadingMetrics;
 
@@ -173,7 +206,9 @@ export default function Dashboard() {
                   <span className="font-semibold text-sm text-foreground truncate" title={doc.title}>{doc.title}</span>
                   <StatusBadge status={doc.status} />
                 </div>
-                <p className="text-[11px] text-muted-foreground mb-3">{doc.type} • {doc.date}</p>
+                <p className="text-[11px] text-muted-foreground mb-3">
+                  {doc.type} • {isBS ? (formatToDmyBS(doc.date) || doc.date) : (formatToDmyAD(doc.date) || doc.date)}
+                </p>
                 <div className="font-mono text-sm font-semibold">
                   {mask(formatAmountShort(doc.amount))}
                 </div>
@@ -189,7 +224,7 @@ export default function Dashboard() {
           <StatCard
             title="Total Sales Revenue"
             value={mask(formatAmountShort(summary?.total_sales || 0))}
-            subtitle="All posted invoices"
+            subtitle={isBS ? `This Month (${kpiRange.currentMonthLabel})` : "This Month"}
             icon={TrendingUp}
             color="indigo"
             trend="up"
@@ -200,7 +235,7 @@ export default function Dashboard() {
           <StatCard
             title="Total Purchases"
             value={mask(formatAmountShort(summary?.total_purchases || 0))}
-            subtitle="All posted bills"
+            subtitle={isBS ? `This Month (${kpiRange.currentMonthLabel})` : "This Month"}
             icon={ShoppingCart}
             color="amber"
           />
@@ -264,9 +299,15 @@ export default function Dashboard() {
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke={theme === 'dark' ? '#334155' : '#f0f0f0'} />
-              <XAxis dataKey="month" tick={{ fontSize: 12, fill: theme === 'dark' ? '#94a3b8' : '#64748b' }} />
+              <XAxis 
+                dataKey="shortLabel" 
+                tick={{ fontSize: 11, fill: theme === 'dark' ? '#94a3b8' : '#64748b' }} 
+                axisLine={false}
+                tickLine={false}
+              />
               <YAxis tickFormatter={v => `${v / 1000}K`} tick={{ fontSize: 11, fill: theme === 'dark' ? '#94a3b8' : '#64748b' }} />
               <Tooltip 
+                labelFormatter={(_, payload) => payload?.[0]?.payload?.tooltipLabel || payload?.[0]?.payload?.month}
                 formatter={v => formatAmountShort(v)} 
                 contentStyle={{ backgroundColor: theme === 'dark' ? '#1e293b' : '#fff', borderColor: theme === 'dark' ? '#334155' : '#e2e8f0', color: theme === 'dark' ? '#f8fafc' : '#0f172a' }}
               />
@@ -281,9 +322,15 @@ export default function Dashboard() {
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" stroke={theme === 'dark' ? '#334155' : '#f0f0f0'} />
-              <XAxis dataKey="month" tick={{ fontSize: 12, fill: theme === 'dark' ? '#94a3b8' : '#64748b' }} />
+              <XAxis 
+                dataKey="shortLabel" 
+                tick={{ fontSize: 11, fill: theme === 'dark' ? '#94a3b8' : '#64748b' }} 
+                axisLine={false}
+                tickLine={false}
+              />
               <YAxis tickFormatter={v => `${v / 1000}K`} tick={{ fontSize: 11, fill: theme === 'dark' ? '#94a3b8' : '#64748b' }} />
               <Tooltip 
+                labelFormatter={(_, payload) => payload?.[0]?.payload?.tooltipLabel || payload?.[0]?.payload?.month}
                 formatter={v => formatAmountShort(v)}
                 contentStyle={{ backgroundColor: theme === 'dark' ? '#1e293b' : '#fff', borderColor: theme === 'dark' ? '#334155' : '#e2e8f0', color: theme === 'dark' ? '#f8fafc' : '#0f172a' }}
               />
@@ -323,7 +370,12 @@ export default function Dashboard() {
                         </VoucherLink>
                       ) : '—'}
                     </p>
-                    <p className="text-xs text-muted-foreground">{inv.customer_name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {inv.customer_name}
+                      {(inv.invoice_date || inv.created_date) && (
+                        <> • {isBS ? (formatToDmyBS(inv.invoice_date || inv.created_date) || (inv.invoice_date || inv.created_date)) : (formatToDmyAD(inv.invoice_date || inv.created_date) || (inv.invoice_date || inv.created_date))}</>
+                      )}
+                    </p>
                   </div>
                   <div className="text-right">
                     <p className="text-sm font-semibold">{mask(formatAmountShort(inv.grand_total || 0))}</p>
