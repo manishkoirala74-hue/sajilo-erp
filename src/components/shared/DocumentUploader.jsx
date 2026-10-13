@@ -16,7 +16,7 @@ export default function DocumentUploader({ urls = [], onChange, label = 'Attachm
       const newUrls = [];
       for (const file of files) {
         try {
-          const { file_url } = await sajilo.integrations.Core.UploadFile({ file });
+          const { file_url } = await sajilo.integrations.Core.UploadFile({ file, folder: 'documents' });
           newUrls.push(file_url);
         } catch (err) {
           toast.error(`Failed to upload "${file.name}": ${err.message || 'Unknown error'}`);

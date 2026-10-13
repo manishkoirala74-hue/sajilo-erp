@@ -44,7 +44,10 @@ function handleDBError(error) {
 // Ensure items map and settings are loaded if not passed
 export async function loadItemsMap(itemIds) {
   if (!itemIds || itemIds.length === 0) return {};
-  const { data } = await supabase.from('Item').select('id, current_unit_cost, weighted_average_cost, is_physical').in('id', itemIds);
+  const { data } = await supabase
+    .from('Item')
+    .select('id, item_name, current_unit_cost, weighted_average_cost, is_physical, item_type, sales_account_id, purchase_account_id, inventory_account_id, category_id')
+    .in('id', itemIds);
   const map = {};
   for (const item of (data || [])) map[item.id] = item;
   return map;
@@ -421,6 +424,54 @@ export async function checkoutSalesInvoice(invoiceData, itemsMap, settings, idem
       due_date: invoice.invoice_date,
       description: `Day 0 Down Payment AR Credit (${invoice.invoice_number || 'AUTO'})`
     });
+  }
+
+  // ─── Perpetual Inventory: Cost of Goods Sold (COGS) & Inventory Out ───
+  if (!invoice.is_from_challan) {
+    for (const line of (invoice.line_items || [])) {
+      const item = itemsMap[line.item_id];
+      const isPhysical = item ? (item.is_physical !== false && item.item_type !== 'Service') : false;
+      if (isPhysical) {
+        const unitCost = Number(item.current_unit_cost || item.weighted_average_cost || 0);
+        const qty = Number(line.quantity || 0);
+        const totalCost = Math.round(qty * unitCost * 100) / 100;
+
+        const cogsAccId = item.purchase_account_id || s.gl_default_cogs_account_id || s.gl_cogs_account_id;
+        const invAccId = item.inventory_account_id || s.gl_default_inventory_account_id || s.gl_inventory_account_id;
+
+        if (!cogsAccId) {
+          throw new Error(`ERR_MISSING_ACCOUNT: No Cost of Goods Sold (COGS) account mapped for item "${line.item_name || item?.item_name || 'Item'}". Please configure in Settings → GL Account Mappings or on the Item.`);
+        }
+        if (!invAccId) {
+          throw new Error(`ERR_MISSING_ACCOUNT: No Inventory asset account mapped for item "${line.item_name || item?.item_name || 'Item'}". Please configure in Settings → GL Account Mappings or on the Item.`);
+        }
+
+        lines.push({
+          account_id: cogsAccId,
+          account_category: 'cogs',
+          item_id: line.item_id,
+          debit_amount: totalCost,
+          credit_amount: 0,
+          description: `COGS for ${invoice.invoice_number && invoice.invoice_number !== 'AUTO' ? invoice.invoice_number : (line.item_name || 'Item')}`
+        });
+
+        lines.push({
+          account_id: invAccId,
+          account_category: 'inventory',
+          item_id: line.item_id,
+          debit_amount: 0,
+          credit_amount: totalCost,
+          description: `Inventory Out for ${invoice.invoice_number && invoice.invoice_number !== 'AUTO' ? invoice.invoice_number : (line.item_name || 'Item')}`
+        });
+      }
+    }
+  }
+
+  // ─── Zero-Trust Double-Entry Journal Balance Verification ───
+  const totalDebit = lines.reduce((sum, l) => sum + Number(l.debit_amount || 0), 0);
+  const totalCredit = lines.reduce((sum, l) => sum + Number(l.credit_amount || 0), 0);
+  if (Math.abs(totalDebit - totalCredit) > 0.01) {
+    throw new Error(`ERR_UNBALANCED_JOURNAL: Generated GL journal is mathematically unbalanced. Debits: ${totalDebit}, Credits: ${totalCredit}.`);
   }
 
   try {

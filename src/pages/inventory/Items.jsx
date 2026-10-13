@@ -32,6 +32,7 @@ const emptyItem = {
   is_active: true, is_vat_applicable: false,
   tax_type_ids: [], // multi-tax: list of TaxType IDs applied to this item
   description: '', barcode: '', hs_code: '',
+  image_url: '', image_urls: [],
   attributes: { model: '', specifications: '', color: '', size: '', weight: '', custom_metadata: [] }
 };
 
@@ -276,7 +277,7 @@ export default function Items() {
           toast.error(`"${file.name}" exceeds ${imgSettings.max_size_mb}MB limit`); continue;
         }
         try {
-          const { file_url } = await sajilo.integrations.Core.UploadFile({ file });
+          const { file_url } = await sajilo.integrations.Core.UploadFile({ file, folder: 'items' });
           setForm(prev => ({ ...prev, image_urls: [...(prev.image_urls || []), file_url], image_url: file_url }));
         } catch (err) {
           toast.error(`Failed to upload "${file.name}": ${err.message || 'Unknown error'}`);
@@ -310,7 +311,8 @@ export default function Items() {
 
     setSaving(true);
     try {
-      const { image_urls, total_asset_value, ...payload } = form;
+      const { image_urls: _image_urls, total_asset_value: _total_asset_value, ...payload } = form;
+      payload.image_url = form.image_url || (form.image_urls && form.image_urls[0]) || null;
       const taxIds = Array.isArray(form.tax_type_ids) ? form.tax_type_ids : [];
       payload.tax_type_ids = taxIds;
       payload.is_vat_applicable = taxIds.length > 0;

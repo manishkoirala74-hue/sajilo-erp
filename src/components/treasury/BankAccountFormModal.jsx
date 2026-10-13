@@ -76,15 +76,6 @@ export default function BankAccountFormModal({ account, onSave, onClose }) {
     setForm(prev => ({ ...prev, ledger_group_id: id, ledger_group_name: grp?.account_name || '' }));
   };
 
-  const generateAccountCode = (parentCode, siblingAccounts) => {
-    const siblings = siblingAccounts.filter(a =>
-      a.parent_account_id === form.ledger_group_id && a.ledger_type === 'Sub Ledger'
-    );
-    const codes = siblings.map(a => parseInt(a.account_code)).filter(n => !isNaN(n));
-    const maxCode = codes.length > 0 ? Math.max(...codes) : parseInt(parentCode + '00');
-    return String(maxCode + 1);
-  };
-
   const handleFileUpload = async (e) => {
     const files = Array.from(e.target.files);
     if (!files.length) return;
@@ -93,7 +84,7 @@ export default function BankAccountFormModal({ account, onSave, onClose }) {
       const newUrls = [];
       for (const file of files) {
         try {
-          const { file_url } = await sajilo.integrations.Core.UploadFile({ file });
+          const { file_url } = await sajilo.integrations.Core.UploadFile({ file, folder: 'bank-accounts' });
           newUrls.push(file_url);
         } catch (err) {
           toast.error(`Failed to upload "${file.name}": ${err.message || 'Unknown error'}`);
@@ -133,7 +124,6 @@ export default function BankAccountFormModal({ account, onSave, onClose }) {
         return;
       }
 
-      const parentGroup = ledgerGroups.find(g => g.id === form.ledger_group_id);
       const isLiability = form.account_category === 'Overdraft' || form.account_category === 'Cash Credit' || form.account_type === 'Liability';
 
       const newGLAccount = await createSubLedger({

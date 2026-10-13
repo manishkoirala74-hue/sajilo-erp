@@ -241,6 +241,7 @@ const buildEntityMethods = (tableName) => {
 };
 
 export const sajilo = {
+  client: supabase,
   rpc: async (functionName, payload, invalidateTables = []) => {
     const { data, error } = await supabase.rpc(functionName, payload);
     if (error) throw error;
@@ -336,16 +337,99 @@ export const sajilo = {
     }
   },
   storage: {
+    uploadFile: async (options) => {
+      const file = options?.file || options;
+      if (!file) throw new Error('No file provided for upload');
+      
+      const bucket = options?.bucket || 'erp_documents';
+      const folder = options?.folder || 'uploads';
+      const pathPrefix = options?.pathPrefix;
+
+      // Resolve company context for multi-tenant path enforcement
+      let companyId = sajilo.getCompanyId();
+      if (!companyId && typeof localStorage !== 'undefined') {
+        companyId = localStorage.getItem('activeCompanyId');
+      }
+      if (!companyId) {
+        try {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+            const { data: ucs } = await supabase.from('UserCompany').select('company_id').eq('user_id', user.id).limit(1);
+            if (ucs && ucs[0]?.company_id) {
+              companyId = ucs[0].company_id;
+              sajilo.setCompanyId(companyId);
+            }
+          }
+        } catch (err) {
+          console.warn('Could not resolve company for upload:', err);
+        }
+      }
+
+      const originalName = file.name || 'file';
+      const ext = originalName.includes('.') ? originalName.split('.').pop() : 'bin';
+      const baseName = originalName.includes('.')
+        ? originalName.substring(0, originalName.lastIndexOf('.')).replace(/[^a-zA-Z0-9_\-]/g, '_').substring(0, 50)
+        : originalName.replace(/[^a-zA-Z0-9_\-]/g, '_').substring(0, 50);
+      const safeFileName = `${baseName}_${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`;
+
+      let filePath;
+      if (pathPrefix) {
+        const cleanPrefix = pathPrefix.replace(/^\/+/, '');
+        if (bucket === 'erp_documents' && companyId && !cleanPrefix.startsWith(companyId)) {
+          filePath = `${companyId}/${cleanPrefix}${cleanPrefix.endsWith('/') ? '' : '/'}${safeFileName}`;
+        } else {
+          filePath = `${cleanPrefix}${cleanPrefix.endsWith('/') ? '' : '/'}${safeFileName}`;
+        }
+      } else if (companyId) {
+        filePath = `${companyId}/${folder}/${safeFileName}`;
+      } else {
+        filePath = `${folder}/${safeFileName}`;
+      }
+
+      const { data, error } = await supabase.storage
+        .from(bucket)
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: false,
+          contentType: file.type || undefined
+        });
+
+      if (error) throw error;
+
+      const { data: publicUrlData } = supabase.storage
+        .from(bucket)
+        .getPublicUrl(filePath);
+
+      return {
+        file_url: publicUrlData.publicUrl,
+        url: publicUrlData.publicUrl,
+        file_path: filePath,
+        path: filePath,
+        fileName: safeFileName,
+        originalName: file.name
+      };
+    },
     uploadFiles: async (bucket, files, pathPrefix = '') => {
+      let resolvedPrefix = pathPrefix;
+      if (bucket === 'erp_documents') {
+        const companyId = sajilo.getCompanyId() || (typeof localStorage !== 'undefined' ? localStorage.getItem('activeCompanyId') : '');
+        if (companyId && !resolvedPrefix.startsWith(companyId)) {
+          resolvedPrefix = `${companyId}/${resolvedPrefix.replace(/^\/+/, '')}`;
+        }
+      }
       const uploadPromises = Array.from(files).map(async (file) => {
-        const fileExt = file.name.split('.').pop();
-        const fileName = `${pathPrefix}${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+        const fileExt = file.name ? file.name.split('.').pop() : 'bin';
+        const baseName = file.name
+          ? file.name.substring(0, file.name.lastIndexOf('.')).replace(/[^a-zA-Z0-9_\-]/g, '_').substring(0, 50)
+          : 'file';
+        const fileName = `${resolvedPrefix}${baseName}_${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
         
         const { data, error } = await supabase.storage
           .from(bucket)
           .upload(fileName, file, {
             cacheControl: '3600',
-            upsert: false
+            upsert: false,
+            contentType: file.type || undefined
           });
 
         if (error) throw error;
@@ -358,6 +442,17 @@ export const sajilo = {
       });
       
       return Promise.all(uploadPromises);
+    }
+  },
+  integrations: {
+    Core: {
+      UploadFile: async (args) => {
+        const file = args?.file || args;
+        const bucket = args?.bucket || 'erp_documents';
+        const folder = args?.folder || 'uploads';
+        const pathPrefix = args?.pathPrefix;
+        return sajilo.storage.uploadFile({ file, bucket, folder, pathPrefix });
+      }
     }
   },
   users: {
