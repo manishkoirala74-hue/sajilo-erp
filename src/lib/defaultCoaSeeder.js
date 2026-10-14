@@ -81,12 +81,14 @@ export async function seedDefaultChartOfAccounts() {
   const codeToId = {};
   const codeToName = {};
 
-  // Fetch existing system accounts to avoid duplicates
-  const existingAccounts = await sajilo.entities.ChartOfAccount.filter({ is_system_account: true }, 'account_code', 1000);
+  // Fetch all existing accounts for the active company to avoid duplicates and resolve hierarchy
+  const existingAccounts = await sajilo.entities.ChartOfAccount.list('account_code', 2000);
   const existingMap = {};
   if (existingAccounts && existingAccounts.length > 0) {
     existingAccounts.forEach(acc => {
       existingMap[acc.account_code] = acc;
+      codeToId[acc.account_code] = acc.id;
+      codeToName[acc.account_code] = acc.account_name;
     });
   }
 
@@ -138,13 +140,25 @@ export async function seedDefaultChartOfAccounts() {
         is_bank_account: false,
       };
 
-      if (acc.parent && codeToId[acc.parent]) {
-        payload.parent_account_id = codeToId[acc.parent];
-        payload.parent_account_name = codeToName[acc.parent];
+      const parentId = (acc.parent && codeToId[acc.parent]) || existingAccounts?.find(a => a.account_code === acc.parent)?.id;
+      const parentName = (acc.parent && codeToName[acc.parent]) || existingAccounts?.find(a => a.account_code === acc.parent)?.account_name;
+      if (parentId) {
+        payload.parent_account_id = parentId;
+        payload.parent_account_name = parentName;
       }
 
-      const created = await sajilo.entities.ChartOfAccount.create(payload);
-      return { code: acc.code, id: created.id, name: created.account_name };
+      try {
+        const created = await sajilo.entities.ChartOfAccount.create(payload);
+        return { code: acc.code, id: created.id, name: created.account_name };
+      } catch (createErr) {
+        // If creation fails due to existing record, fetch existing and continue
+        const existing = await sajilo.entities.ChartOfAccount.filter({ account_code: acc.code }, 'account_code', 1);
+        if (existing && existing.length > 0) {
+          return { code: acc.code, id: existing[0].id, name: existing[0].account_name };
+        }
+        console.error(`Failed to seed account ${acc.code} (${acc.name}):`, createErr);
+        throw createErr;
+      }
     });
 
     const results = await Promise.all(promises);

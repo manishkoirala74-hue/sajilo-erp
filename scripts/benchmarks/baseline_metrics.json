@@ -1,0 +1,100 @@
+{
+  "capturedAt": "2026-10-14T07:55:51.610Z",
+  "companyId": "a10e6e72-13ca-46f0-82ba-5cd421da6e2d",
+  "totalWaterfallDurationMs": 8828.75,
+  "totalPayloadBytes": 523389,
+  "totalPayloadKB": 511.12,
+  "metrics": [
+    {
+      "name": "Company.select(*)",
+      "durationMs": 2223.7,
+      "payloadBytes": 392629,
+      "rowCount": 3,
+      "success": true
+    },
+    {
+      "name": "RPC: get_user_auth_context",
+      "durationMs": 1164.57,
+      "payloadBytes": 27,
+      "rowCount": 1,
+      "success": true
+    },
+    {
+      "name": "DailyMetricsRollup.select",
+      "durationMs": 549.89,
+      "payloadBytes": 7220,
+      "rowCount": 35,
+      "success": true
+    },
+    {
+      "name": "SalesInvoice.recent(5)",
+      "durationMs": 452.45,
+      "payloadBytes": 7367,
+      "rowCount": 5,
+      "success": true
+    },
+    {
+      "name": "PurchaseInvoice.recent(5)",
+      "durationMs": 403.8,
+      "payloadBytes": 7505,
+      "rowCount": 5,
+      "success": true
+    },
+    {
+      "name": "FiscalYear.select",
+      "durationMs": 374.74,
+      "payloadBytes": 659,
+      "rowCount": 2,
+      "success": true
+    },
+    {
+      "name": "ItemCategory.list",
+      "durationMs": 432.87,
+      "payloadBytes": 1746,
+      "rowCount": 3,
+      "success": true
+    },
+    {
+      "name": "UnitOfMeasure.list",
+      "durationMs": 455.6,
+      "payloadBytes": 2,
+      "rowCount": 0,
+      "success": true
+    },
+    {
+      "name": "ChartOfAccount.list(500)",
+      "durationMs": 432.06,
+      "payloadBytes": 78966,
+      "rowCount": 93,
+      "success": true
+    },
+    {
+      "name": "DiscountScheme.list",
+      "durationMs": 501.39,
+      "payloadBytes": 2,
+      "rowCount": 0,
+      "success": true
+    },
+    {
+      "name": "TaxType.list",
+      "durationMs": 407.9,
+      "payloadBytes": 463,
+      "rowCount": 1,
+      "success": true
+    },
+    {
+      "name": "Godown.list",
+      "durationMs": 603.2,
+      "payloadBytes": 737,
+      "rowCount": 2,
+      "success": true
+    },
+    {
+      "name": "CompanySettings.list",
+      "durationMs": 826.58,
+      "payloadBytes": 26066,
+      "rowCount": 1,
+      "success": true
+    }
+  ]
+}

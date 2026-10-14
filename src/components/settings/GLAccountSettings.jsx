@@ -49,6 +49,8 @@ function HealthCheckBanner({ settings }) {
     { key: 'gl_vat_receivable_id', label: 'VAT Receivable (Purchases)', critical: true },
     { key: 'gl_customer_ledger_group_id', label: 'Customer Ledger Group', critical: false },
     { key: 'gl_supplier_ledger_group_id', label: 'Supplier Ledger Group', critical: false },
+    { key: 'gl_unearned_emi_interest_id', label: 'Unearned EMI Interest', critical: false },
+    { key: 'gl_emi_interest_income_id', label: 'EMI Interest Income', critical: false },
   ];
 
   const missingCritical = checks.filter(c => c.critical && !settings[c.key]);
@@ -80,8 +82,8 @@ export default function GLAccountSettings({ settings, onChange }) {
 
   const loadAccounts = () => {
     Promise.all([
-      sajilo.entities.ChartOfAccount.filter({ ledger_type: 'Sub Ledger',   is_active: true }, 'account_name', 300),
-      sajilo.entities.ChartOfAccount.filter({ ledger_type: 'Group Ledger', is_active: true }, 'account_code', 300),
+      sajilo.entities.ChartOfAccount.filter({ ledger_type: 'Sub Ledger',   is_active: true }, 'account_name', 2000),
+      sajilo.entities.ChartOfAccount.filter({ ledger_type: 'Group Ledger', is_active: true }, 'account_code', 1000),
     ]).then(([subs, groups]) => {
       setSubAccounts(subs);
       setGroupAccounts(groups);
@@ -99,26 +101,32 @@ export default function GLAccountSettings({ settings, onChange }) {
       await seedDefaultChartOfAccounts();
       // After seeding, reload accounts and auto-populate CompanySettings with standard defaults
       const [subs, groups] = await Promise.all([
-        sajilo.entities.ChartOfAccount.filter({ ledger_type: 'Sub Ledger',   is_active: true }, 'account_name', 300),
-        sajilo.entities.ChartOfAccount.filter({ ledger_type: 'Group Ledger', is_active: true }, 'account_code', 300),
+        sajilo.entities.ChartOfAccount.filter({ ledger_type: 'Sub Ledger',   is_active: true }, 'account_name', 2000),
+        sajilo.entities.ChartOfAccount.filter({ ledger_type: 'Group Ledger', is_active: true }, 'account_code', 1000),
       ]);
       setSubAccounts(subs);
       setGroupAccounts(groups);
 
-      // Build lookup helpers
-      const byCode = (list, code) => list.find(a => a.account_code === code);
+      // Build lookup helpers with robust code and keyword fallback
+      const byCodeOrKeywords = (list, code, keywords = []) => {
+        let acc = list.find(a => String(a.account_code || '').trim() === String(code).trim());
+        if (!acc && keywords.length > 0) {
+          acc = list.find(a => keywords.every(kw => a.account_name?.toLowerCase().includes(kw.toLowerCase())));
+        }
+        return acc;
+      };
 
       // Standard default mappings
       const defaults = {};
-      const map = (baseKey, list, code) => {
-        const acc = byCode(list, code);
+      const map = (baseKey, list, code, keywords = []) => {
+        const acc = byCodeOrKeywords(list, code, keywords);
         if (acc) {
           defaults[`${baseKey}_id`]   = acc.id;
           defaults[`${baseKey}_name`] = acc.account_name;
         }
       };
-      const mapGroup = (baseKey, list, code) => {
-        const acc = byCode(list, code);
+      const mapGroup = (baseKey, list, code, keywords = []) => {
+        const acc = byCodeOrKeywords(list, code, keywords);
         if (acc) {
           defaults[`${baseKey}_id`]   = acc.id;
           defaults[`${baseKey}_name`] = `${acc.account_code} – ${acc.account_name}`;
@@ -126,23 +134,23 @@ export default function GLAccountSettings({ settings, onChange }) {
       };
 
       // Sub-ledger GL accounts
-      map('gl_accounts_receivable',      subs, '1131');  // AR Control
-      map('gl_accounts_payable',         subs, '2111');  // AP Control
-      map('gl_default_sales_account',    subs, '4100');  // Sales Revenue
-      map('gl_default_cogs_account',     subs, '5100');  // Cost of Sales
-      map('gl_default_inventory_account',subs, '1140');  // Inventory
-      map('gl_sales_return_account',     subs, '4010');  // Sales Returns
-      map('gl_purchase_return_account',  subs, '5010');  // Purchase Returns
-      map('gl_vat_payable',              subs, '2120');  // VAT Payable
-      map('gl_vat_receivable',           subs, '1510');  // VAT Receivable
-      map('gl_opening_equity_account',   subs, '3200');  // Retained Earnings
-      map('gl_stock_variance_account',   subs, '6700');  // Miscellaneous Expense
-      map('gl_unearned_emi_interest',    subs, '2140');  // Unearned EMI Interest
-      map('gl_emi_interest_income',      subs, '4400');  // EMI Interest Income
+      map('gl_accounts_receivable',      subs, '1131', ['accounts receivable', 'control']);  // AR Control
+      map('gl_accounts_payable',         subs, '2111', ['accounts payable', 'control']);     // AP Control
+      map('gl_default_sales_account',    subs, '4100', ['sales revenue']);                  // Sales Revenue
+      map('gl_default_cogs_account',     subs, '5100', ['cost of sales']);                   // Cost of Sales
+      map('gl_default_inventory_account',subs, '1140', ['inventory']);                       // Inventory
+      map('gl_sales_return_account',     subs, '4010', ['sales return']);                    // Sales Returns
+      map('gl_purchase_return_account',  subs, '5010', ['purchase return']);                 // Purchase Returns
+      map('gl_vat_payable',              subs, '2120', ['vat payable']);                     // VAT Payable
+      map('gl_vat_receivable',           subs, '1510', ['vat receivable']);                  // VAT Receivable
+      map('gl_opening_equity_account',   subs, '3200', ['retained earnings']);               // Retained Earnings
+      map('gl_stock_variance_account',   subs, '6700', ['miscellaneous expense']);           // Miscellaneous Expense
+      map('gl_unearned_emi_interest',    subs, '2140', ['unearned', 'interest']);            // 2140 - Unearned EMI Interest (Liability)
+      map('gl_emi_interest_income',      subs, '4400', ['interest', 'income']);              // 4400 - EMI Interest Income (Revenue)
 
       // Group-ledger parent mappings
-      mapGroup('gl_customer_ledger_group', groups, '1130'); // Trade Receivables (Customers)
-      mapGroup('gl_supplier_ledger_group', groups, '2110'); // Trade Payables (Suppliers)
+      mapGroup('gl_customer_ledger_group', groups, '1130', ['trade receivables']);           // Trade Receivables (Customers)
+      mapGroup('gl_supplier_ledger_group', groups, '2110', ['trade payables']);              // Trade Payables (Suppliers)
 
       // Push merged defaults to parent Settings form
       if (Object.keys(defaults).length > 0) {
@@ -152,7 +160,7 @@ export default function GLAccountSettings({ settings, onChange }) {
       toast.success("Default Chart of Accounts restored and GL mappings pre-populated.");
     } catch (e) {
       console.error('Restore defaults error:', e);
-      toast.error("Failed to restore default accounts.");
+      toast.error("Failed to restore default accounts: " + (e?.message || 'Unknown error'));
     }
     setSeeding(false);
   };
@@ -220,8 +228,10 @@ export default function GLAccountSettings({ settings, onChange }) {
                       ))}
                     </SelectContent>
                   </Select>
-                  {settings[`${f.key}_name`] && (
-                    <p className="text-xs text-indigo-600 dark:text-indigo-400 mt-0.5">✓ {settings[`${f.key}_name`]}</p>
+                  {(settings[`${f.key}_name`] || (groupAccounts.find(a => a.id === settings[`${f.key}_id`]) ? `${groupAccounts.find(a => a.id === settings[`${f.key}_id`]).account_code} – ${groupAccounts.find(a => a.id === settings[`${f.key}_id`]).account_name}` : '')) && (
+                    <p className="text-xs text-indigo-600 dark:text-indigo-400 mt-0.5">
+                      ✓ {settings[`${f.key}_name`] || (groupAccounts.find(a => a.id === settings[`${f.key}_id`]) ? `${groupAccounts.find(a => a.id === settings[`${f.key}_id`]).account_code} – ${groupAccounts.find(a => a.id === settings[`${f.key}_id`]).account_name}` : '')}
+                    </p>
                   )}
                 </div>
               </div>
@@ -266,8 +276,10 @@ export default function GLAccountSettings({ settings, onChange }) {
                       ))}
                     </SelectContent>
                   </Select>
-                  {settings[`${f.key}_name`] && (
-                    <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-0.5">✓ {settings[`${f.key}_name`]}</p>
+                  {(settings[`${f.key}_name`] || subAccounts.find(a => a.id === settings[`${f.key}_id`])?.account_name) && (
+                    <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-0.5">
+                      ✓ {settings[`${f.key}_name`] || subAccounts.find(a => a.id === settings[`${f.key}_id`])?.account_name}
+                    </p>
                   )}
                 </div>
               </div>

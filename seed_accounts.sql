@@ -43,6 +43,10 @@ SELECT '1133', 'Semi-Finished Goods', 'Asset', 'Sub Ledger', 'Debit', true, id F
 UNION ALL
 SELECT '2199', 'Difference in Opening Balance', 'Liability', 'Sub Ledger', 'Credit', true, id FROM "ChartOfAccount" WHERE account_code = '2100'
 UNION ALL
+SELECT '2140', 'Unearned EMI Interest', 'Liability', 'Sub Ledger', 'Credit', true, id FROM "ChartOfAccount" WHERE account_code = '2100'
+UNION ALL
 SELECT '4100', 'Sales Revenue', 'Revenue', 'Sub Ledger', 'Credit', true, id FROM "ChartOfAccount" WHERE account_code = '4000'
+UNION ALL
+SELECT '4400', 'EMI Interest Income', 'Revenue', 'Sub Ledger', 'Credit', true, id FROM "ChartOfAccount" WHERE account_code = '4000'
 UNION ALL
 SELECT '5100', 'Cost of Sales', 'COGS', 'Sub Ledger', 'Debit', true, id FROM "ChartOfAccount" WHERE account_code = '5000';

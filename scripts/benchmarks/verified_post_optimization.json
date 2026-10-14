@@ -1,0 +1,82 @@
+{
+  "capturedAt": "2026-10-14T09:12:20.544Z",
+  "baselineDate": "2026-10-14T07:55:51.610Z",
+  "companyId": "a10e6e72-13ca-46f0-82ba-5cd421da6e2d",
+  "companyPayload": {
+    "beforeBytes": 392629,
+    "afterBytes": 1778,
+    "reductionPercent": "99.55%",
+    "beforeKB": 383.43,
+    "afterKB": 1.74
+  },
+  "dashboardArchitecture": {
+    "beforeRequestsCount": 6,
+    "afterRequestsCount": 1,
+    "requestsReduction": "83% reduction (6 -> 1)"
+  },
+  "postMetrics": [
+    {
+      "name": "Company.select(*)",
+      "durationMs": 1394.58,
+      "payloadBytes": 1778,
+      "rowCount": 3,
+      "success": true
+    },
+    {
+      "name": "RPC: get_user_auth_context",
+      "durationMs": 378.77,
+      "payloadBytes": 27,
+      "rowCount": 1,
+      "success": true
+    },
+    {
+      "name": "RPC: get_dashboard_analytics_payload (Consolidated)",
+      "durationMs": 445.85,
+      "payloadBytes": 10897,
+      "rowCount": 1,
+      "success": true
+    },
+    {
+      "name": "ItemCategory.list",
+      "durationMs": 375.67,
+      "payloadBytes": 1746,
+      "rowCount": 3,
+      "success": true
+    },
+    {
+      "name": "UnitOfMeasure.list",
+      "durationMs": 375.24,
+      "payloadBytes": 2,
+      "rowCount": 0,
+      "success": true
+    },
+    {
+      "name": "ChartOfAccount.list",
+      "durationMs": 724.73,
+      "payloadBytes": 78966,
+      "rowCount": 93,
+      "success": true
+    },
+    {
+      "name": "DiscountScheme.list",
+      "durationMs": 378.85,
+      "payloadBytes": 2,
+      "rowCount": 0,
+      "success": true
+    },
+    {
+      "name": "TaxType.list",
+      "durationMs": 375.37,
+      "payloadBytes": 463,
+      "rowCount": 1,
+      "success": true
+    },
+    {
+      "name": "Godown.list",
+      "durationMs": 372.86,
+      "payloadBytes": 737,
+      "rowCount": 2,
+      "success": true
+    }
+  ]
+}

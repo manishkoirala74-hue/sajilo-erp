@@ -20,6 +20,19 @@ const GLMapping = () => {
       setServerSettings({ ...draftSettings });
       toast.success("GL Account Mappings saved successfully");
     } catch (e) {
+      if (e?.message && (e.message.includes('gl_unearned_emi_interest_name') || e.message.includes('gl_emi_interest_income_name'))) {
+        try {
+          const fallbackDraft = { ...draftSettings };
+          delete fallbackDraft.gl_unearned_emi_interest_name;
+          delete fallbackDraft.gl_emi_interest_income_name;
+          await sajilo.entities.CompanySettings.update(fallbackDraft.id, fallbackDraft);
+          setServerSettings({ ...draftSettings });
+          toast.success("GL Account Mappings saved successfully");
+          return;
+        } catch (retryErr) {
+          console.error("GL Save fallback error:", retryErr);
+        }
+      }
       console.error("GL Save error:", e);
       toast.error(`Failed to save GL Account Mappings: ${e.message}`);
     }

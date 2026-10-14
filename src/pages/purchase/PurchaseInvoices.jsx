@@ -1,7 +1,7 @@
 import { useSearchParams, useLocation, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { sajilo } from '@/api/sajiloClient';
-import { Plus, Eye, XCircle, Pencil, CheckCircle2, RotateCcw } from 'lucide-react';
+import { Plus, Eye, XCircle, Pencil, CheckCircle2, RotateCcw, AlertTriangle, Mail } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -18,12 +18,12 @@ import { format } from 'date-fns';
 import DateInput from '@/components/shared/DateInput';
 import DualDateDisplay from '@/components/shared/DualDateDisplay';
 import { checkoutPurchaseInvoice, cancelPurchaseInvoice, loadItemsMap, loadSettings } from '@/lib/glPostingService';
-import { computeTotalTax, loadActiveTaxTypes } from '@/lib/taxService';
+import { computeTotalTax } from '@/lib/taxService';
 import { useSajiloSync } from '@/hooks/useSajiloSync';
 import { usePermissions, useAuth } from '@/lib/AuthContext';
+import { useMasterData } from '@/hooks/useMasterData';
 import { useNavigationBlocker } from '@/hooks/useNavigationBlocker';
 import SearchableSelect from '@/components/shared/SearchableSelect';
-import { Mail } from 'lucide-react';
 import VoucherLink from '@/components/shared/VoucherLink';
 import { generateVectorPDF } from '@/utils/pdfGenerator';
 import FileUpload from '@/components/shared/FileUpload';
@@ -42,7 +42,8 @@ const emptyPI = {
 
 export default function PurchaseInvoices() {
   const { hasAccess } = usePermissions();
-  const { activeCompany, mainGodownId, activeGodowns, activeFiscalYear } = useAuth();
+  const { activeCompany, mainGodownId, activeGodowns, activeFiscalYear, globalSettings } = useAuth();
+  const { accounts: masterAccounts, taxTypes: masterTaxTypes, godowns: masterGodowns } = useMasterData();
   
   const [invoices, setInvoices] = useState([]);
   const [vendors, setVendors] = useState([]);
@@ -71,6 +72,12 @@ export default function PurchaseInvoices() {
     }
   }, [form, showForm]);
 
+  useEffect(() => {
+    if (masterAccounts?.length > 0) setAccounts(masterAccounts);
+    if (masterTaxTypes?.length > 0) setTaxTypes(masterTaxTypes);
+    if (masterGodowns?.length > 0) setGodowns(masterGodowns);
+  }, [masterAccounts, masterTaxTypes, masterGodowns]);
+
   const [saving, setSaving] = useState(false);
   const [filterStatus, setFilterStatus] = useState('all');
 
@@ -84,20 +91,16 @@ export default function PurchaseInvoices() {
       sajilo.entities.PurchaseInvoice.list('-created_date', 50),
       sajilo.entities.BusinessPartner.filter({ is_active: true }),
       sajilo.entities.PurchaseOrder.filter({ status: 'Approved' }),
-      sajilo.entities.ChartOfAccount.filter({ is_active: true }, 'account_code', 500),
-      sajilo.entities.Godown.filter({ status: 'Active' }),
-      sajilo.entities.CompanySettings.list(),
-      loadActiveTaxTypes(),
       sajilo.entities.DocumentSequenceConfig.list(),
-    ]).then(([inv, vs, pos, accs, gds, sett, txTypes, seqConfigs]) => {
+    ]).then(([inv, vs, pos, seqConfigs]) => {
       setInvoices(inv);
       // Purchase module: show vendors + customers flagged as treated_as_vendor
       setVendors(vs.filter(v => v.is_vendor || v.treated_as_vendor));
       setApprovedPOs(pos);
-      setAccounts(accs);
-      setGodowns(gds || []);
-      setSettings(sett?.length > 0 ? sett[0] : {});
-      setTaxTypes(txTypes || []);
+      setSettings(globalSettings || {});
+      if (masterAccounts?.length > 0) setAccounts(masterAccounts);
+      if (masterGodowns?.length > 0) setGodowns(masterGodowns);
+      if (masterTaxTypes?.length > 0) setTaxTypes(masterTaxTypes);
       setSequenceConfigs(seqConfigs || []);
       setLoading(false);
     }).catch(err => {

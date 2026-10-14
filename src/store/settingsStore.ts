@@ -36,6 +36,8 @@ export const DEFAULT_SETTINGS = {
   dep_accumulated_machinery_account_id: '', dep_accumulated_machinery_account_name: '',
   dep_accumulated_office_account_id: '', dep_accumulated_office_account_name: '',
   dep_accumulated_vehicle_account_id: '', dep_accumulated_vehicle_account_name: '',
+  gl_unearned_emi_interest_id: '', gl_unearned_emi_interest_name: '',
+  gl_emi_interest_income_id: '', gl_emi_interest_income_name: '',
 };
 
 export const useSettingsStore = create<SettingsState>((set, get) => ({

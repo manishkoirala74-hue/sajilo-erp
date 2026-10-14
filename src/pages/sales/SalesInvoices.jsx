@@ -1,6 +1,7 @@
 import { useSearchParams, useLocation, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { sajilo } from '@/api/sajiloClient';
+import { useMasterData } from '@/hooks/useMasterData';
 import { Plus, Eye, CheckCircle2, XCircle, Ban, AlertTriangle, Pencil, RotateCcw, CalendarClock, History, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
@@ -55,7 +56,8 @@ const emptySI = {
 
 export default function SalesInvoices() {
   const { hasAccess } = usePermissions();
-  const { activeCompany, mainGodownId, activeGodowns, activeFiscalYear } = useAuth();
+  const { activeCompany, mainGodownId, activeGodowns, activeFiscalYear, globalSettings } = useAuth();
+  const { accounts: masterAccounts, taxTypes: masterTaxTypes, godowns: masterGodowns } = useMasterData();
   const canCreate = hasAccess('sales_invoices', 'create');
   const canEdit = hasAccess('sales_invoices', 'edit');
   const canReverse = hasAccess('sales_invoices', 'reverse');
@@ -128,29 +130,35 @@ export default function SalesInvoices() {
 
   const [sequenceConfigs, setSequenceConfigs] = useState([]);
 
+  useEffect(() => {
+    if (masterAccounts?.length > 0) setAccounts(masterAccounts);
+    if (masterTaxTypes?.length > 0) setTaxTypes(masterTaxTypes);
+    if (masterGodowns?.length > 0) {
+      setGodowns(masterGodowns);
+      const defaultGd = masterGodowns.find(g => g.is_main || g.is_default) || masterGodowns[0];
+      if (defaultGd && !defaultGodownId) setDefaultGodownId(defaultGd.id);
+    }
+  }, [masterAccounts, masterTaxTypes, masterGodowns, defaultGodownId]);
+
   const loadData = async () => {
     Promise.all([
       sajilo.entities.SalesInvoice.list('-created_date', 50),
       sajilo.entities.BusinessPartner.filter({ is_active: true }),
       sajilo.entities.SalesOrder.filter({ fulfillment_status: 'Confirmed' }),
-      sajilo.entities.CompanySettings.list(),
-      sajilo.entities.ChartOfAccount.filter({ is_active: true }, 'account_code', 500),
-      loadActiveTaxTypes(),
-      sajilo.entities.Godown.filter({ status: 'Active' }),
       sajilo.entities.DocumentSequenceConfig.list(),
-    ]).then(([inv, cs, sos, sett, accs, txTypes, gds, seqConfigs]) => {
-      setInvoices(inv);
-      setCustomers(cs.filter(c => c.is_customer || c.treat_as_customer));
-      setSalesOrders(sos);
-      setSettings(sett.length > 0 ? sett[0] : {});
-      setAccounts(accs);
-      setTaxTypes(txTypes || []);
-      setGodowns(gds || []);
-      setSequenceConfigs(seqConfigs || []);
-      if (gds && gds.length > 0) {
-        const defaultGd = gds.find(g => g.is_main || g.is_default) || gds[0];
-        setDefaultGodownId(defaultGd.id);
+    ]).then(([inv, cs, sos, seqConfigs]) => {
+      setInvoices(inv || []);
+      setCustomers((cs || []).filter(c => c.is_customer || c.treat_as_customer));
+      setSalesOrders(sos || []);
+      setSettings(globalSettings || {});
+      if (masterAccounts?.length > 0) setAccounts(masterAccounts);
+      if (masterTaxTypes?.length > 0) setTaxTypes(masterTaxTypes);
+      if (masterGodowns?.length > 0) {
+        setGodowns(masterGodowns);
+        const defaultGd = masterGodowns.find(g => g.is_main || g.is_default) || masterGodowns[0];
+        if (defaultGd && !defaultGodownId) setDefaultGodownId(defaultGd.id);
       }
+      setSequenceConfigs(seqConfigs || []);
       setLoading(false);
     }).catch(err => {
       console.error(err);

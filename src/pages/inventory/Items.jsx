@@ -1,6 +1,8 @@
 import { useSearchParams } from 'react-router-dom';
 import { useState, useEffect, useMemo } from 'react';
 import { sajilo } from '@/api/sajiloClient';
+import { useMasterData } from '@/hooks/useMasterData';
+import { useAuth } from '@/lib/AuthContext';
 import { loadActiveTaxTypes } from '@/lib/taxService';
 import { Plus, Edit2, Package, AlertTriangle, Upload, X, History, CheckSquare, Square, Minus, Trash2, Ban } from 'lucide-react';
 import SearchableSelect from '@/components/shared/SearchableSelect';
@@ -175,14 +177,11 @@ function BulkActionBar({ selectedIds, onClear, accounts, categories, onBulkUpdat
 export default function Items() {
   
 
+  const { globalSettings } = useAuth();
+  const { categories, uoms, accounts, discountSchemes, taxTypes, isLoading: loadingMasterData } = useMasterData();
+
   const [items, setItems] = useState([]);
-  const [categories, setCategories] = useState([]);
-  const [uoms, setUoms] = useState([]);
-  const [accounts, setAccounts] = useState([]);
-  const [discountSchemes, setDiscountSchemes] = useState([]);
-  const [taxTypes, setTaxTypes] = useState([]);
-  const [settings, setSettings] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loadingItems, setLoadingItems] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(emptyItem);
@@ -190,33 +189,28 @@ export default function Items() {
   const [filterType, setFilterType] = useState('all');
   const [filterCategory, setFilterCategory] = useState('all');
   const [uploading, setUploading] = useState(false);
-  const [imgSettings, setImgSettings] = useState({ max_size_mb: 2, max_count: 3 });
   const [historyItem, setHistoryItem] = useState(null);
   const [selectedIds, setSelectedIds] = useState([]);
   const [search, setSearch] = useState('');
 
+  const settings = globalSettings || null;
+  const imgSettings = useMemo(() => ({
+    max_size_mb: settings?.item_image_max_size_mb || 2,
+    max_count: settings?.item_image_max_count || 3
+  }), [settings]);
+
+  const loading = loadingItems && items.length === 0;
+
   useEffect(() => {
-    Promise.all([
-      sajilo.entities.Item.list('-created_date'),
-      sajilo.entities.ItemCategory.list('category_name'),
-      sajilo.entities.UnitOfMeasure.filter({ is_active: true }, 'uom_code', 200),
-      sajilo.entities.ChartOfAccount.filter({ is_active: true }, 'account_code', 500),
-      sajilo.entities.DiscountScheme.filter({ is_active: true }, 'scheme_name', 200),
-      sajilo.entities.CompanySettings.list(),
-      loadActiveTaxTypes(),
-    ]).then(([its, cats, us, accs, ds, cs, txTypes]) => {
-      setItems(its);
-      setCategories(cats);
-      setUoms(us);
-      setAccounts(accs);
-      setDiscountSchemes(ds);
-      setTaxTypes((txTypes || []).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0)));
-      if (cs[0]) {
-        setSettings(cs[0]);
-        setImgSettings({ max_size_mb: cs[0].item_image_max_size_mb || 2, max_count: cs[0].item_image_max_count || 3 });
-      }
-      setLoading(false);
-    });
+    sajilo.entities.Item.list('-created_date')
+      .then(its => {
+        setItems(its || []);
+        setLoadingItems(false);
+      })
+      .catch(err => {
+        console.error('Failed to load items:', err);
+        setLoadingItems(false);
+      });
   }, []);
   const [searchParams, setSearchParams] = useSearchParams();
   useEffect(() => {

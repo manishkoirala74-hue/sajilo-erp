@@ -431,6 +431,20 @@
     },
     "gl_dual_ledger_group_name": {
       "type": "string"
+    },
+    "gl_unearned_emi_interest_id": {
+      "type": "string",
+      "description": "Unearned EMI Interest (Liability) control account for installment sales"
+    },
+    "gl_unearned_emi_interest_name": {
+      "type": "string"
+    },
+    "gl_emi_interest_income_id": {
+      "type": "string",
+      "description": "EMI Interest Income (Revenue) account recognized on installment collections"
+    },
+    "gl_emi_interest_income_name": {
+      "type": "string"
     }
   },
   "required": [

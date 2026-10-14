@@ -1,5 +1,6 @@
 import { useSearchParams, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
+import { useMasterData } from '@/hooks/useMasterData';
 import { useState, useEffect, useRef } from 'react';
 import { sajilo } from '@/api/sajiloClient';
 import DualDateDisplay from '@/components/shared/DualDateDisplay';
@@ -154,7 +155,13 @@ export default function FinancialVouchers() {
   const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
   const navigate = useNavigate();
-  const { activeCompany, activeFiscalYear, hasAccess, checkPermissionKey } = useAuth();
+  const { activeCompany, activeFiscalYear, hasAccess, checkPermissionKey, globalSettings } = useAuth();
+  const { accounts: masterAccounts } = useMasterData();
+
+  useEffect(() => {
+    if (masterAccounts?.length > 0) setAllAccounts(masterAccounts);
+    if (globalSettings) setSettings(globalSettings);
+  }, [masterAccounts, globalSettings]);
 
   useEffect(() => {
     const viewId = searchParams.get('view');
@@ -187,19 +194,17 @@ export default function FinancialVouchers() {
     }
   };
 
-  useSajiloSync(['ChartOfAccount'], fetchData);
+  useSajiloSync(['BusinessPartner'], fetchData);
 
   async function fetchData() {
     setLoading(true);
-    const [data, accounts, settingsData, partners, seqConfigs] = await Promise.all([
+    const [data, partners, seqConfigs] = await Promise.all([
       sajilo.entities.FinancialVoucher.list('-created_at', 200),
-      sajilo.entities.ChartOfAccount.filter({ is_active: true }, 'account_code', 1000),
-      sajilo.entities.CompanySettings.list(),
       sajilo.entities.BusinessPartner.list(),
       sajilo.entities.DocumentSequenceConfig.list(),
     ]);
     setVouchers(data);
-    setAllAccounts(accounts);
+    if (masterAccounts?.length > 0) setAllAccounts(masterAccounts);
     setSequenceConfigs(seqConfigs || []);
     
     const pIds = new Set();
@@ -211,7 +216,7 @@ export default function FinancialVouchers() {
     }
     setPartnerAccounts(pIds);
 
-    if (settingsData && settingsData.length > 0) setSettings(settingsData[0]);
+    if (globalSettings) setSettings(globalSettings);
     setLoading(false);
   }
 

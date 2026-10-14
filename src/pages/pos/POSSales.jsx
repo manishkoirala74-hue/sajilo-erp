@@ -7,7 +7,6 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import SearchableSelect from '@/components/shared/SearchableSelect';
-import VoucherLink from '@/components/shared/VoucherLink';
 import FormGrid from '@/components/layout/FormGrid';
 import StatusBadge from '@/components/shared/StatusBadge';
 import { toast } from 'sonner';
@@ -16,10 +15,10 @@ import { useDateFormat } from '@/lib/DateFormatContext';
 import { cn } from '@/lib/utils';
 import POSSaleDetailModal from '@/components/pos/POSSaleDetailModal';
 import { postPOSSale, loadItemsMap, loadSettings } from '@/lib/glPostingService';
-import { loadActiveTaxTypes, computeTotalTax } from '@/lib/taxService';
+import { computeTotalTax } from '@/lib/taxService';
 import { useSajiloSync } from '@/hooks/useSajiloSync';
 import { useAuth } from '@/lib/AuthContext';
-
+import { useMasterData } from '@/hooks/useMasterData';
 import { useCompanySettings } from '@/hooks/useCompanySettings';
 
 const fmt = n => `NPR ${Number(n || 0).toLocaleString()}`;
@@ -47,10 +46,31 @@ export default function POSSales() {
   const [taxTypes, setTaxTypes] = useState([]);
   const { hasAccess, activeFiscalYear } = useAuth();
   const { inventory } = useCompanySettings();
+  const { accounts: masterAccounts, taxTypes: masterTaxTypes } = useMasterData();
   const [showNegativeStockWarning, setShowNegativeStockWarning] = useState(false);
   const [negativeStockItems, setNegativeStockItems] = useState([]);
 
   const isCredit = paymentMethod === 'Credit';
+
+  useEffect(() => {
+    if (masterAccounts?.length > 0) {
+      const drawerAccounts = masterAccounts.filter(a =>
+        a.ledger_type === 'Sub Ledger' &&
+        a.account_type === 'Asset' &&
+        (
+          (a.account_name || '').toLowerCase().includes('cash') ||
+          (a.account_name || '').toLowerCase().includes('bank') ||
+          (a.account_name || '').toLowerCase().includes('petty')
+        )
+      );
+      setCashAccounts(drawerAccounts);
+      if (drawerAccounts.length > 0 && !selectedCashAccountId) {
+        setSelectedCashAccountId(drawerAccounts[0].id);
+        setSelectedCashAccountName(drawerAccounts[0].account_name);
+      }
+    }
+    if (masterTaxTypes?.length > 0) setTaxTypes(masterTaxTypes);
+  }, [masterAccounts, masterTaxTypes]);
 
   const refreshHistory = async () => {
     const hist = await sajilo.entities.POSSale.list('-created_date', 100);
@@ -63,29 +83,28 @@ export default function POSSales() {
       sajilo.entities.Item.filter({ is_active: true }, 'item_name', 500),
       sajilo.entities.POSSale.list('-created_date', 100),
       sajilo.entities.BusinessPartner.filter({ is_active: true }, 'name', 500),
-      sajilo.entities.ChartOfAccount.filter({ is_active: true }, 'account_code', 1000),
-      loadActiveTaxTypes(),
-    ]).then(([its, hist, partners, accounts, txTypes]) => {
+    ]).then(([its, hist, partners]) => {
       setItems(its.filter(i => i.item_type !== 'Raw Material'));
       setHistory(hist);
       setSaleCount(hist.length);
       setCustomers(partners.filter(p => p.is_customer || p.treat_as_customer));
-      const drawerAccounts = accounts.filter(a =>
-        a.ledger_type === 'Sub Ledger' &&
-        a.account_type === 'Asset' &&
-        (
-          (a.account_name || '').toLowerCase().includes('cash') ||
-          (a.account_name || '').toLowerCase().includes('bank') ||
-          (a.account_name || '').toLowerCase().includes('petty')
-        )
-      );
-      setCashAccounts(drawerAccounts);
-      setTaxTypes(txTypes || []);
-      // Auto-select the first drawer account if none selected
-      if (drawerAccounts.length > 0 && !selectedCashAccountId) {
-        setSelectedCashAccountId(drawerAccounts[0].id);
-        setSelectedCashAccountName(drawerAccounts[0].account_name);
+      if (masterAccounts?.length > 0) {
+        const drawerAccounts = masterAccounts.filter(a =>
+          a.ledger_type === 'Sub Ledger' &&
+          a.account_type === 'Asset' &&
+          (
+            (a.account_name || '').toLowerCase().includes('cash') ||
+            (a.account_name || '').toLowerCase().includes('bank') ||
+            (a.account_name || '').toLowerCase().includes('petty')
+          )
+        );
+        setCashAccounts(drawerAccounts);
+        if (drawerAccounts.length > 0 && !selectedCashAccountId) {
+          setSelectedCashAccountId(drawerAccounts[0].id);
+          setSelectedCashAccountName(drawerAccounts[0].account_name);
+        }
       }
+      if (masterTaxTypes?.length > 0) setTaxTypes(masterTaxTypes);
     });
   };
 
@@ -93,7 +112,7 @@ export default function POSSales() {
     loadData();
   }, []);
 
-  useSajiloSync(['Item', 'BusinessPartner', 'ChartOfAccount'], loadData);
+  useSajiloSync(['Item', 'BusinessPartner'], loadData);
 
   const filteredItems = items.filter(i =>
     !search || i.item_name.toLowerCase().includes(search.toLowerCase()) || (i.item_code || '').toLowerCase().includes(search.toLowerCase())

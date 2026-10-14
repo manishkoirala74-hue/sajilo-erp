@@ -17,12 +17,7 @@ import {
 } from 'recharts';
 
 import { 
-  useDailyMetricsQuery,
-  useRecentDocumentsQuery,
-  useDashboardSummaryQuery,
-  useRecentSalesQuery,
-  usePendingApprovalsQuery,
-  useCashBalanceQuery,
+  useDashboardAnalyticsQuery,
 } from '@/hooks/useSajiloQuery';
 import { triggerHaptic } from '@/utils/haptics';
 import { useAmountFormatter } from '@/hooks/useAmountFormatter';
@@ -52,23 +47,46 @@ export default function Dashboard() {
     return getCurrentMonthRange(dateFormat);
   }, [dateFormat]);
 
-  // --- Independent Queries ---
-  const { data: metrics = [], isLoading: isLoadingMetrics } = useDailyMetricsQuery(
+  // --- High-Speed Consolidated Dashboard Analytics Query (Single HTTP Roundtrip) ---
+  const { data: analytics, isLoading: isLoadingAnalytics } = useDashboardAnalyticsQuery(
     activeCompanyId,
     chartRange.startDate,
     chartRange.endDate
   );
-  const { data: recentDocs, isLoading: isLoadingRecentDocs } = useRecentDocumentsQuery();
-  const { data: summary, isLoading: isLoadingSummary } = useDashboardSummaryQuery(
-    activeCompanyId,
-    kpiRange.startDate,
-    kpiRange.endDate
-  );
-  const { data: recentSales = [] } = useRecentSalesQuery();
-  const { data: pendingApprovals = [] } = usePendingApprovalsQuery();
-  // Decoupled from useDashboardSummaryQuery — lightweight GL-only query with 5-min staleTime.
-  // See useCashBalanceQuery in useSajiloQuery.js and migrations 208–210 for context.
-  const { data: cashData, isLoading: isLoadingCash } = useCashBalanceQuery(activeCompanyId);
+
+  const summary = analytics?.summary || {};
+  const metrics = analytics?.daily_metrics || [];
+  const recentSales = analytics?.recent_sales || [];
+  const recentBills = analytics?.recent_bills || [];
+  const pendingApprovals = analytics?.pending_approvals || [];
+  const cashData = analytics?.cash_bank || { cash_balance: 0, bank_balance: 0 };
+  const isLoadingCash = isLoadingAnalytics;
+  const isLoadingRecentDocs = isLoadingAnalytics;
+
+  const recentDocs = useMemo(() => {
+    const combined = [
+      ...recentSales.map(doc => ({
+        id: doc.id,
+        type: 'Sales Invoice',
+        title: doc.invoice_number || 'Draft',
+        amount: doc.grand_total,
+        status: doc.status,
+        date: doc.invoice_date || doc.created_at,
+        path: `/sales/invoices`
+      })),
+      ...recentBills.map(doc => ({
+        id: doc.id,
+        type: 'Purchase Bill',
+        title: doc.invoice_number || doc.vendor_invoice_no || 'Draft',
+        amount: doc.grand_total,
+        status: doc.status,
+        date: doc.invoice_date || doc.created_at,
+        path: `/purchase/invoices`
+      }))
+    ];
+    combined.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+    return combined.slice(0, 5);
+  }, [recentSales, recentBills]);
 
   const [amountsVisible, setAmountsVisible] = useState(true);
   const { theme } = useTheme();
@@ -111,7 +129,7 @@ export default function Dashboard() {
     return Object.values(monthlyMap).sort((a, b) => a.sortKey.localeCompare(b.sortKey));
   }, [metrics, chartRange.buckets, isBS]);
 
-  const loading = isLoadingAuth || isLoadingSummary || isLoadingMetrics;
+  const loading = isLoadingAuth || isLoadingAnalytics;
 
   const mask = (val) => amountsVisible ? val : '••••••';
 

@@ -1,4 +1,4 @@
-import React, { Component } from 'react';
+import React, { Component, useState, useEffect } from 'react';
 import { Toaster } from "@/components/ui/toaster"
 import { QueryClientProvider } from '@tanstack/react-query'
 import { sajilo } from '@/api/sajiloClient';
@@ -143,16 +143,30 @@ import Onboarding from '@/pages/Onboarding';
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin, user, isAuthenticated, globalSettings } = useAuth();
   const passwordExpiryDays = globalSettings?.password_expiry_days ?? 0;
+  const [showConnectingState, setShowConnectingState] = useState(false);
 
+  useEffect(() => {
+    const timer = setTimeout(() => setShowConnectingState(true), 2500);
+    return () => clearTimeout(timer);
+  }, []);
 
   if (isLoadingPublicSettings || isLoadingAuth) {
     return (
       <div className="fixed inset-0 flex items-center justify-center bg-background">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4 text-center px-4">
+          <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center shadow-lg shadow-primary/20">
             <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
           </div>
-          <p className="text-sm text-muted-foreground">Loading Sajilo ERP...</p>
+          <div>
+            <p className="text-sm font-medium text-foreground">
+              {showConnectingState ? "Connecting to secure database..." : "Loading Sajilo ERP..."}
+            </p>
+            {showConnectingState && (
+              <p className="text-xs text-muted-foreground mt-1 animate-pulse">
+                Establishing encrypted cloud connection
+              </p>
+            )}
+          </div>
         </div>
       </div>
     );

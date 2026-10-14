@@ -116,6 +116,53 @@ export function useRecentDocumentsQuery(companyId) {
   });
 }
 
+export function useDashboardAnalyticsQuery(companyId, startDate, endDate) {
+  const activeCompany = companyId || sajilo.getCompanyId();
+  const today = new Date().toISOString().slice(0, 10);
+
+  return useQuery({
+    queryKey: [
+      'Company', activeCompany,
+      'DailyMetricsRollup', 'SalesInvoice', 'PurchaseInvoice', 'PurchaseOrder', 'Item', 'BusinessPartner',
+      'dashboardAnalytics', startDate, endDate
+    ],
+    queryFn: async () => {
+      // 1. High-speed single consolidated RPC
+      try {
+        const { data, error } = await sajilo.auth.supabase.rpc('get_dashboard_analytics_payload', {
+          p_company_id: activeCompany,
+          p_start_date: startDate,
+          p_end_date: endDate,
+          p_as_of_date: today
+        });
+        if (!error && data) return data;
+      } catch (e) {
+        console.warn('Consolidated RPC fallback triggered:', e);
+      }
+
+      // 2. Resilient fallback to individual calls
+      const [summary, dailyMetrics, recentSales, recentPurchases, cashBank] = await Promise.all([
+        sajilo.auth.supabase.rpc('get_dashboard_summary', { p_company_id: activeCompany, p_start_date: startDate, p_end_date: endDate }).then(r => r.data).catch(() => null),
+        sajilo.auth.supabase.from('DailyMetricsRollup').select('*').eq('company_id', activeCompany).gte('metric_date', startDate).lte('metric_date', endDate).order('metric_date', { ascending: false }).then(r => r.data).catch(() => []),
+        sajilo.entities.SalesInvoice.filter({ status: 'Posted' }, '-created_date', 5).catch(() => []),
+        sajilo.entities.PurchaseInvoice.filter({}, '-created_date', 5).catch(() => []),
+        sajilo.auth.supabase.rpc('get_cash_bank_balance', { p_company_id: activeCompany, p_as_of_date: today }).then(r => r.data).catch(() => ({ cash_balance: 0, bank_balance: 0 }))
+      ]);
+
+      return {
+        summary: summary || {},
+        daily_metrics: dailyMetrics || [],
+        recent_sales: recentSales || [],
+        recent_bills: recentPurchases || [],
+        pending_approvals: [],
+        cash_bank: cashBank || { cash_balance: 0, bank_balance: 0 }
+      };
+    },
+    enabled: !!activeCompany && !!startDate && !!endDate,
+    staleTime: 60 * 1000,
+  });
+}
+
 export function useDashboardSummaryQuery(companyId, startDate, endDate) {
   const activeCompany = companyId || sajilo.getCompanyId();
   return useQuery({

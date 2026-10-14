@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { sajilo } from '@/api/sajiloClient';
+import { useMasterData } from '@/hooks/useMasterData';
+import { useAuth } from '@/lib/AuthContext';
 import { Plus, Edit2, Tag } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -18,6 +20,8 @@ const emptyForm = {
 };
 
 export default function Categories() {
+  const { globalSettings } = useAuth();
+  const { categories: masterCats, accounts: masterAccounts, discountSchemes: masterDiscounts, isLoading: masterLoading } = useMasterData();
   const [categories, setCategories] = useState([]);
   const [accounts, setAccounts] = useState([]);
   const [discountSchemes, setDiscountSchemes] = useState([]);
@@ -29,19 +33,16 @@ export default function Categories() {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    Promise.all([
-      sajilo.entities.ItemCategory.list('category_name'),
-      sajilo.entities.ChartOfAccount.filter({ is_active: true }, 'account_code', 500),
-      sajilo.entities.DiscountScheme.filter({ is_active: true }, 'scheme_name', 200),
-      sajilo.entities.CompanySettings.list(),
-    ]).then(([cats, accs, ds, cs]) => {
-      setCategories(cats);
-      setAccounts(accs);
-      setDiscountSchemes(ds);
-      if (cs[0]) setSettings(cs[0]);
+    if (globalSettings) setSettings(globalSettings);
+    if (masterAccounts?.length > 0) setAccounts(masterAccounts);
+    if (masterDiscounts?.length > 0) setDiscountSchemes(masterDiscounts);
+    if (masterCats?.length > 0) {
+      setCategories(masterCats);
       setLoading(false);
-    });
-  }, []);
+    } else if (!masterLoading) {
+      setLoading(false);
+    }
+  }, [globalSettings, masterAccounts, masterDiscounts, masterCats, masterLoading]);
 
   const fetchCategories = async () => {
     const data = await sajilo.entities.ItemCategory.list('category_name');

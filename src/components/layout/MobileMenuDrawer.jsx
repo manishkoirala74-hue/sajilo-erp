@@ -76,7 +76,7 @@ const buildNavGroups = (settings) => {
 
 export default function MobileMenuDrawer({ isOpen, onClose }) {
   const location = useLocation();
-  const { activeFiscalYear } = useAuth();
+  const { activeFiscalYear, globalSettings } = useAuth();
   const [navGroups, setNavGroups] = useState([]);
   
   // Use sessionStorage for persistent drawer state
@@ -95,15 +95,10 @@ export default function MobileMenuDrawer({ isOpen, onClose }) {
   useEffect(() => {
     if (serverSettings && Object.keys(serverSettings).length > 0) {
       setSettings(serverSettings);
-    } else {
-      sajilo.entities.CompanySettings.list().then(data => {
-        const s = data[0] || {};
-        setSettings(s);
-      }).catch(() => {
-        setSettings({});
-      });
+    } else if (globalSettings && Object.keys(globalSettings).length > 0) {
+      setSettings(globalSettings);
     }
-  }, [serverSettings]);
+  }, [serverSettings, globalSettings]);
 
   useEffect(() => {
     if (settings) {

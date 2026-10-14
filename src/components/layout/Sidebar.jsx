@@ -130,7 +130,7 @@ export const buildNavGroups = (settings) => {
 export default function Sidebar() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, logout, activeFiscalYear, activeRole, activeCompany } = useAuth();
+  const { user, logout, activeFiscalYear, activeRole, activeCompany, globalSettings } = useAuth();
   const { sidebarVisibility } = usePermissions();
   const [settings, setSettings] = useState(null);
   const [navGroups, setNavGroups] = useState(buildNavGroups(null));
@@ -233,13 +233,10 @@ export default function Sidebar() {
   useEffect(() => {
     if (serverSettings && Object.keys(serverSettings).length > 0) {
       setSettings(serverSettings);
-    } else {
-      sajilo.entities.CompanySettings.list().then(data => {
-        const s = data[0] || {};
-        setSettings(s);
-      });
+    } else if (globalSettings && Object.keys(globalSettings).length > 0) {
+      setSettings(globalSettings);
     }
-  }, [serverSettings]);
+  }, [serverSettings, globalSettings]);
 
   useEffect(() => {
     const groups = buildNavGroups(settings);
