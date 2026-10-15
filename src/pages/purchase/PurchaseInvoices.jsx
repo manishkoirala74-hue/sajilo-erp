@@ -36,7 +36,7 @@ const emptyPI = {
   due_date: format(new Date(Date.now() + 30 * 86400000), 'yyyy-MM-dd'),
   payment_mode: 'Credit', cash_bank_account_id: '', cash_bank_account_name: '',
   status: 'Draft', payment_status: 'Unpaid',
-  subtotal: 0, vat_amount: 0, landed_cost_total: 0, grand_total: 0,
+  subtotal: 0, vat_amount: 0, total_tax_amount: 0, landed_cost_total: 0, grand_total: 0,
   notes: '', line_items: []
 };
 
@@ -171,7 +171,7 @@ export default function PurchaseInvoices() {
       ...emptyPI, 
       id: crypto.randomUUID(), 
       invoice_number: 'AUTO', 
-      godown_id: mainGodownId || '', 
+      godown_id: mainGodownId || (godowns.find(g => g.is_main)?.id) || (godowns[0]?.id) || '', 
       invoice_date: safeDate,
       due_date: format(new Date(new Date(safeDate).getTime() + 30 * 86400000), 'yyyy-MM-dd'),
       _isNew: true 
@@ -180,13 +180,19 @@ export default function PurchaseInvoices() {
   };
 
   const openEdit = (row) => {
-    setForm({ ...emptyPI, ...row, _isNew: false });
+    setForm({ 
+      ...emptyPI, 
+      ...row, 
+      total_tax_amount: row.total_tax_amount ?? row.vat_amount ?? 0,
+      _isNew: false 
+    });
     setShowForm(true);
   };
 
   const fetchFromPO = (poId) => {
     const po = approvedPOs.find(p => p.id === poId);
     if (po) {
+      const tax = po.vat_amount || po.total_tax_amount || 0;
       setForm(f => ({
         ...f,
         po_reference_id: po.id,
@@ -195,7 +201,8 @@ export default function PurchaseInvoices() {
         vendor_name: po.vendor_name,
         line_items: po.line_items || [],
         subtotal: po.subtotal,
-        vat_amount: po.vat_amount,
+        vat_amount: tax,
+        total_tax_amount: tax,
         grand_total: po.total_amount,
       }));
       toast.success('Data fetched from PO');
@@ -208,6 +215,7 @@ export default function PurchaseInvoices() {
     setForm(f => ({
       ...f, line_items: lines, subtotal,
       vat_amount: vatAmount,
+      total_tax_amount: vatAmount,
       grand_total: subtotal + vatAmount + (f.landed_cost_total || 0)
     }));
   };
@@ -436,7 +444,7 @@ export default function PurchaseInvoices() {
           </DialogHeader>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-4 pb-24">
             {/* LEFT COLUMN */}
-            <div className="lg:col-span-2 space-y-6">
+            <div className="lg:col-span-2 space-y-6 min-w-0">
               <div className="bg-card rounded-2xl border border-stone-200 p-5 shadow-sm">
                 <h3 className="font-semibold text-lg text-foreground mb-4">Vendor & invoice context</h3>
                 <FormGrid>
@@ -469,7 +477,7 @@ export default function PurchaseInvoices() {
                         }}
                         placeholder="Select vendor"
                         className="mt-1"
-                        onCreateNew={() => window.open('/purchase/vendors/new', '_blank')}
+                        onCreateNew={() => window.open('/partners/suppliers?new=1', '_blank')}
                         createNewText="New Vendor"
                       />
                       </FormRow>
@@ -672,12 +680,13 @@ export default function PurchaseInvoices() {
                 <div className="border-t pt-3">
                   <p className="text-sm font-semibold mb-2">Line Items</p>
                   <table className="table-fluid-grid text-xs">
-                    <thead><tr className="border-b text-muted-foreground"><th className="cell-density text-left py-1">Item</th><th className="cell-density text-right py-1">Qty</th><th className="cell-density text-right py-1">Price</th><th className="cell-density text-right py-1">Total</th></tr></thead>
+                    <thead><tr className="border-b text-muted-foreground"><th className="cell-density text-left py-1">Item</th><th className="cell-density text-right py-1">Qty</th><th className="cell-density text-center py-1">Unit</th><th className="cell-density text-right py-1">Price</th><th className="cell-density text-right py-1">Total</th></tr></thead>
                     <tbody>
                       {viewDetail.line_items.map((l, i) => (
                         <tr key={i} className="border-b last:border-0">
                           <td className="cell-density py-1">{l.item_name}</td>
                           <td className="cell-density text-right py-1">{l.quantity}</td>
+                          <td className="cell-density text-center py-1 uppercase text-muted-foreground font-medium">{l.unit_of_measure || '-'}</td>
                           <td className="cell-density text-right py-1">NPR {Number(l.unit_price).toLocaleString()}</td>
                           <td className="cell-density text-right py-1 font-medium">NPR {Number(l.line_total).toLocaleString()}</td>
                         </tr>

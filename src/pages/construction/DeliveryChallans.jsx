@@ -78,6 +78,7 @@ export default function DeliveryChallans() {
     if (field === 'item_id') {
       const item = items.find(i => i.id === val);
       lines[idx].item_name = item ? item.item_name : '';
+      lines[idx].unit_of_measure = item ? (item.unit_of_measure || '') : '';
       
       if (form.godown_id) {
         const stock = await checkStock(val, form.godown_id);
@@ -217,6 +218,7 @@ export default function DeliveryChallans() {
                 <thead>
                   <tr className="border-b">
                     <th className="text-left p-2">Item</th>
+                    <th className="text-center p-2 w-20">Unit</th>
                     <th className="text-right p-2 w-32">Available</th>
                     <th className="text-right p-2 w-32">Qty to Issue</th>
                     <th className="w-10"></th>
@@ -232,6 +234,9 @@ export default function DeliveryChallans() {
                             {items.map(itm => <SelectItem key={itm.id} value={itm.id}>{itm.item_name}</SelectItem>)}
                           </SelectContent>
                         </Select>
+                      </td>
+                      <td className="p-2 text-center text-xs uppercase font-medium text-muted-foreground">
+                        {line.unit_of_measure || '-'}
                       </td>
                       <td className={`p-2 text-right ${line.available_stock < line.quantity ? 'text-destructive font-bold' : ''}`}>
                         {line.item_id ? line.available_stock : '-'}

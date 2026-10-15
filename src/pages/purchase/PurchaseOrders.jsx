@@ -262,7 +262,7 @@ export default function PurchaseOrders() {
                 }}
                 placeholder="Select vendor"
                 className="mt-1"
-                onCreateNew={() => window.open('/purchase/vendors/new', '_blank')}
+                onCreateNew={() => window.open('/partners/suppliers?new=1', '_blank')}
                 createNewText="New Vendor"
               />
             </div>
@@ -341,6 +341,7 @@ export default function PurchaseOrders() {
                         <tr>
                           <th className="cell-density text-left">Item</th>
                           <th className="cell-density text-right">Qty</th>
+                          <th className="cell-density text-center">Unit</th>
                           <th className="cell-density text-right">Price</th>
                           <th className="cell-density text-right">Total</th>
                         </tr>
@@ -348,8 +349,9 @@ export default function PurchaseOrders() {
                       <tbody className="divide-y divide-border">
                         {viewDetail.line_items.map((line, i) => (
                           <tr key={i}>
-                            <td className="cell-density ">{line.item_name}</td>
+                            <td className="cell-density">{line.item_name}</td>
                             <td className="cell-density text-right">{line.quantity}</td>
+                            <td className="cell-density text-center uppercase text-muted-foreground font-medium">{line.unit_of_measure || '-'}</td>
                             <td className="cell-density text-right">NPR {Number(line.unit_price).toLocaleString()}</td>
                             <td className="cell-density text-right font-medium">NPR {Number(line.line_total).toLocaleString()}</td>
                           </tr>

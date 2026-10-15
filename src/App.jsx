@@ -211,8 +211,13 @@ const AuthenticatedApp = () => {
           <Route path="/" element={<Dashboard />} />
           <Route path="/partners" element={<BusinessPartners />} />
           <Route path="/partners/customers" element={<Customers />} />
+          <Route path="/partners/customers/new" element={<Navigate to="/partners/customers?new=1" replace />} />
+          <Route path="/sales/customers/new" element={<Navigate to="/partners/customers?new=1" replace />} />
           <Route path="/partners/suppliers" element={<Suppliers />} />
+          <Route path="/partners/suppliers/new" element={<Navigate to="/partners/suppliers?new=1" replace />} />
+          <Route path="/purchase/vendors/new" element={<Navigate to="/partners/suppliers?new=1" replace />} />
           <Route path="/inventory/items" element={<Items />} />
+          <Route path="/inventory/items/new" element={<Navigate to="/inventory/items?new=1" replace />} />
           <Route path="/inventory/transfers" element={<StockTransfers />} />
           <Route path="/inventory/categories" element={<Categories />} />
           <Route path="/inventory/godowns" element={<Godowns />} />

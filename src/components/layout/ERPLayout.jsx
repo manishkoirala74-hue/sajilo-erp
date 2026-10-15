@@ -117,7 +117,7 @@ export default function ERPLayout() {
 
         <React.Suspense fallback={<DomainSkeletonLoader />}>
           <main className={cn('flex-1 overflow-y-auto print:overflow-visible animate-fade-in', documentMode ? 'p-0 pb-20 md:pb-0' : 'p-4 md:p-6 pb-20 md:pb-6')}>
-            <Outlet />
+            <Outlet key={activeCompany?.id || 'no-company'} />
           </main>
         </React.Suspense>
       </div>

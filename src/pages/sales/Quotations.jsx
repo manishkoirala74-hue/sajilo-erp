@@ -361,7 +361,7 @@ export default function Quotations() {
                   onChange={handleCustomerSelect}
                   placeholder="Select customer…"
                   className="mt-1"
-                  onCreateNew={() => window.open('/sales/customers/new', '_blank')}
+                  onCreateNew={() => window.open('/partners/customers?new=1', '_blank')}
                   createNewText="New Customer"
                 />
               </div>

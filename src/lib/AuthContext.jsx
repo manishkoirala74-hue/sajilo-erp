@@ -52,6 +52,11 @@ export const AuthProvider = ({ children }) => {
     setIsSwitchingCompany(true);
     sajilo.setCompanyId(companyId);
     
+    // Clear all in-memory query cache so stale company data is immediately discarded
+    queryClient.clear();
+    sajilo.clearCache();
+    window.dispatchEvent(new CustomEvent('company_switched', { detail: { companyId } }));
+    
     try {
       const { data: ctx, error } = await sajilo.auth.supabase.rpc('get_user_auth_context', {
         p_company_id: companyId
@@ -114,6 +119,15 @@ export const AuthProvider = ({ children }) => {
         start_date: `${currentYear}-04-01`,
         end_date: `${currentYear + 1}-03-31`,
         is_active: true
+      });
+
+      // Guarantee initial default Godown for inventory operations
+      await sajilo.entities.Godown.create({
+        company_id: newCompany.id,
+        name: 'Main Location',
+        godown_name: 'Main Location',
+        is_main: true,
+        status: 'Active'
       });
 
       if (user) {

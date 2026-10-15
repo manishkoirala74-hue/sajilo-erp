@@ -12,8 +12,8 @@ const GL_FIELDS = [
   { key: 'gl_accounts_payable',        label: 'Accounts Payable (AP)',             desc: 'Default control account for vendor credit balances', filterTypes: ['Liability'] },
   { key: 'gl_cash_account',            label: 'Default Cash Account',              desc: 'Used for cash sales and purchases', filterTypes: ['Asset'] },
   { key: 'gl_bank_account',            label: 'Default Bank Account',              desc: 'Used for bank transfers/cheque sales and purchases', filterTypes: ['Asset'] },
-  { key: 'gl_vat_payable',             label: 'VAT Payable Account',               desc: 'Control account for output VAT (sales)', filterTypes: ['Liability'] },
-  { key: 'gl_vat_receivable',          label: 'VAT Receivable Account',            desc: 'Control account for input VAT (purchases)', filterTypes: ['Asset'] },
+  { key: 'gl_vat_payable',             label: 'VAT Account / Output VAT (Sales)',  desc: 'Current Liability ledger. In South Asian / Nepal practice, this same ledger records both input and output VAT.', filterTypes: ['Liability'] },
+  { key: 'gl_vat_receivable',          label: 'VAT Account / Input VAT (Purchases)', desc: 'Debited on purchases. In Nepal/India, select the same 2120 VAT Control account (or 1510 if using dual-ledger).', filterTypes: ['Liability', 'Asset'] },
   { key: 'gl_sales_return_account',    label: 'Sales Returns & Allowances',        desc: 'Contra-revenue — debited on sales return', filterTypes: ['Revenue'] },
   { key: 'gl_purchase_return_account', label: 'Purchase Returns & Allowances',     desc: 'Contra-COGS — credited on purchase return', filterTypes: ['Expense'] },
   { key: 'gl_default_sales_account',   label: 'Default Sales Revenue',             desc: 'Fallback if item has no sales account', filterTypes: ['Revenue'] },
@@ -45,8 +45,8 @@ function HealthCheckBanner({ settings }) {
   const checks = [
     { key: 'gl_default_cogs_account_id', label: 'Default COGS', critical: true },
     { key: 'gl_default_inventory_account_id', label: 'Default Inventory', critical: true },
-    { key: 'gl_vat_payable_id', label: 'VAT Payable (Sales)', critical: true },
-    { key: 'gl_vat_receivable_id', label: 'VAT Receivable (Purchases)', critical: true },
+    { key: 'gl_vat_payable_id', label: 'VAT Account (Sales / Output)', critical: true },
+    { key: 'gl_vat_receivable_id', label: 'VAT Account (Purchases / Input)', critical: true },
     { key: 'gl_customer_ledger_group_id', label: 'Customer Ledger Group', critical: false },
     { key: 'gl_supplier_ledger_group_id', label: 'Supplier Ledger Group', critical: false },
     { key: 'gl_unearned_emi_interest_id', label: 'Unearned EMI Interest', critical: false },
@@ -141,8 +141,19 @@ export default function GLAccountSettings({ settings, onChange }) {
       map('gl_default_inventory_account',subs, '1140', ['inventory']);                       // Inventory
       map('gl_sales_return_account',     subs, '4010', ['sales return']);                    // Sales Returns
       map('gl_purchase_return_account',  subs, '5010', ['purchase return']);                 // Purchase Returns
-      map('gl_vat_payable',              subs, '2120', ['vat payable']);                     // VAT Payable
-      map('gl_vat_receivable',           subs, '1510', ['vat receivable']);                  // VAT Receivable
+      
+      // VAT Accounts: In Nepal / India practice, 2120 is the unified single VAT ledger.
+      const vat2120 = byCodeOrKeywords(subs, '2120', ['vat payable', 'vat account', 'value added tax']);
+      if (vat2120) {
+        defaults['gl_vat_payable_id'] = vat2120.id;
+        defaults['gl_vat_payable_name'] = vat2120.account_name;
+        defaults['gl_vat_receivable_id'] = vat2120.id;
+        defaults['gl_vat_receivable_name'] = vat2120.account_name;
+      } else {
+        map('gl_vat_payable',              subs, '2120', ['vat payable', 'vat account']);
+        map('gl_vat_receivable',           subs, '1510', ['vat receivable', 'input tax']);
+      }
+
       map('gl_opening_equity_account',   subs, '3200', ['retained earnings']);               // Retained Earnings
       map('gl_stock_variance_account',   subs, '6700', ['miscellaneous expense']);           // Miscellaneous Expense
       map('gl_unearned_emi_interest',    subs, '2140', ['unearned', 'interest']);            // 2140 - Unearned EMI Interest (Liability)

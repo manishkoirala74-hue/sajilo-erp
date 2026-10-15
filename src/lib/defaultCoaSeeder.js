@@ -34,7 +34,7 @@ const DEFAULT_COA = [
   // 2111: AP Control — the postable sub-ledger used when no supplier-specific sub-ledger exists.
   // Individual supplier sub-ledgers are auto-created as siblings under 2110 by provisionPartnerLedgers().
   { code: '2111', name: 'Accounts Payable — Control', type: 'Liability', subtype: 'Current Liability', ledger_type: 'Sub Ledger', balance: 'Credit', parent: '2110' },
-  { code: '2120', name: 'VAT Payable', type: 'Liability', subtype: 'Current Liability', ledger_type: 'Sub Ledger', balance: 'Credit', parent: '2100' },
+  { code: '2120', name: 'VAT Account (Payable / Refund Control)', type: 'Liability', subtype: 'Current Liability', ledger_type: 'Sub Ledger', balance: 'Credit', parent: '2100' },
   { code: '2130', name: 'TDS Payable', type: 'Liability', subtype: 'Current Liability', ledger_type: 'Sub Ledger', balance: 'Credit', parent: '2100' },
   { code: '2140', name: 'Unearned EMI Interest', type: 'Liability', subtype: 'Current Liability', ledger_type: 'Sub Ledger', balance: 'Credit', parent: '2100' },
 

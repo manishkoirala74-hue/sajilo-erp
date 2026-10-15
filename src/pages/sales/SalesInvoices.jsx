@@ -751,7 +751,7 @@ export default function SalesInvoices() {
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-4 pb-24">
             {/* LEFT COLUMN */}
-            <div className="lg:col-span-2 space-y-6">
+            <div className="lg:col-span-2 space-y-6 min-w-0">
               <div className="bg-card rounded-2xl border border-stone-200 p-5 shadow-sm">
                 <h3 className="font-semibold text-lg text-foreground mb-4">Customer & invoice context</h3>
                 <FormGrid>
@@ -812,7 +812,7 @@ export default function SalesInvoices() {
                         }}
                         placeholder="Select customer"
                         className="mt-1"
-                        onCreateNew={() => window.open('/sales/customers/new', '_blank')}
+                        onCreateNew={() => window.open('/partners/customers?new=1', '_blank')}
                         createNewText="New Customer"
                       />
                     </div>
@@ -1084,12 +1084,13 @@ export default function SalesInvoices() {
                 <div className="border-t pt-3">
                   <p className="text-sm font-semibold mb-2">Line Items</p>
                   <table className="table-fluid-grid text-xs">
-                    <thead><tr className="border-b text-muted-foreground"><th className="cell-density text-left py-1">Item</th><th className="cell-density text-right py-1">Qty</th><th className="cell-density text-right py-1">Price</th><th className="cell-density text-right py-1">Total</th></tr></thead>
+                    <thead><tr className="border-b text-muted-foreground"><th className="cell-density text-left py-1">Item</th><th className="cell-density text-right py-1">Qty</th><th className="cell-density text-center py-1">Unit</th><th className="cell-density text-right py-1">Price</th><th className="cell-density text-right py-1">Total</th></tr></thead>
                     <tbody>
                       {viewDetail.line_items.map((l, i) => (
                         <tr key={i} className="border-b last:border-0">
                           <td className="cell-density py-1">{l.item_name}</td>
                           <td className="cell-density text-right py-1">{l.quantity}</td>
+                          <td className="cell-density text-center py-1 uppercase text-muted-foreground font-medium">{l.unit_of_measure || '-'}</td>
                           <td className="cell-density text-right py-1">NPR {Number(l.unit_price).toLocaleString()}</td>
                           <td className="cell-density text-right py-1 font-medium">NPR {Number(l.line_total).toLocaleString()}</td>
                         </tr>

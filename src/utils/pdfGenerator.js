@@ -117,18 +117,20 @@ export async function generateVectorPDF(documentData, moduleName, companySetting
   // 3. Line Items Grid (using autoTable)
   if (documentData.line_items && documentData.line_items.length > 0) {
     const isChallan = moduleName === 'DeliveryChallan';
-    const tableColumn = isChallan ? ["Item", "Qty"] : ["Item", "Qty", "Price", "Total"];
+    const tableColumn = isChallan ? ["Item", "Qty", "Unit"] : ["Item", "Qty", "Unit", "Price", "Total"];
     const tableRows = [];
 
     documentData.line_items.forEach(line => {
       const lineData = isChallan 
         ? [
             line.item_name || '',
-            line.quantity || 0
+            line.quantity || 0,
+            (line.unit_of_measure || '').toUpperCase()
           ]
         : [
             line.item_name || '',
             line.quantity || 0,
+            (line.unit_of_measure || '').toUpperCase(),
             Number(line.unit_price || line.rate || 0).toLocaleString(),
             Number(line.line_total || line.subtotal || 0).toLocaleString()
           ];
@@ -151,11 +153,12 @@ export async function generateVectorPDF(documentData, moduleName, companySetting
         cellPadding: 8
       },
       columnStyles: isChallan 
-        ? { 1: { halign: 'right' } }
+        ? { 1: { halign: 'right' }, 2: { halign: 'center' } }
         : {
             1: { halign: 'right' },
-            2: { halign: 'right' },
-            3: { halign: 'right', fontStyle: 'bold' }
+            2: { halign: 'center' },
+            3: { halign: 'right' },
+            4: { halign: 'right', fontStyle: 'bold' }
           },
       willDrawCell: function(data) {
         // Add bottom border to rows

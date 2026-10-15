@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useAuth } from '@/lib/AuthContext';
 import { sajilo } from '@/api/sajiloClient';
 import { toast } from 'sonner';
 import { Plus, Edit2, ArrowRightLeft } from 'lucide-react';
@@ -19,6 +20,7 @@ const empty = {
 };
 
 export default function UnitOfMeasures() {
+  const { activeCompany } = useAuth();
   const [uoms, setUoms] = useState([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
@@ -26,7 +28,7 @@ export default function UnitOfMeasures() {
   const [editing, setEditing] = useState(null);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => { fetchData(); }, [activeCompany?.id]);
 
   const fetchData = async () => {
     setLoading(true);

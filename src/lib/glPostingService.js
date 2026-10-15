@@ -62,6 +62,42 @@ export async function loadSettings(forceRefresh = false) {
   return cachedSettings;
 }
 
+// Enterprise Godown Resolution Fallback (Read-Only Lookup)
+async function resolveDefaultGodownId(companyId) {
+  if (!companyId) return null;
+  
+  // 1. Prioritize existing Main Location
+  const { data: mainGodown } = await supabase
+    .from('Godown')
+    .select('id')
+    .eq('company_id', companyId)
+    .eq('is_main', true)
+    .maybeSingle();
+
+  if (mainGodown?.id) return mainGodown.id;
+
+  // 2. Fallback to any active godown if none is explicitly flagged is_main
+  const { data: anyActiveGodown } = await supabase
+    .from('Godown')
+    .select('id')
+    .eq('company_id', companyId)
+    .eq('status', 'Active')
+    .limit(1)
+    .maybeSingle();
+
+  if (anyActiveGodown?.id) return anyActiveGodown.id;
+
+  // 3. Fallback to any godown regardless of status
+  const { data: fallbackGodown } = await supabase
+    .from('Godown')
+    .select('id')
+    .eq('company_id', companyId)
+    .limit(1)
+    .maybeSingle();
+
+  return fallbackGodown?.id || null;
+}
+
 // ─── SECONDARY HUB RPC POSTINGS ───
 export async function postItemDeletionWriteOff(items, settings) { return null; }
 export async function postSalesReturn(returnsData, itemsMap, settings, isReversal = false) {
@@ -336,11 +372,19 @@ export async function postPOSSale(saleData, itemsMap, settings, isReversal = fal
 // ─── 2. SALES INVOICE ──────────────────────────────────────────────────────────
 export async function checkoutSalesInvoice(invoiceData, itemsMap, settings, idempotencyKey = null) {
   const invoice = { ...invoiceData, company_id: invoiceData.company_id || sajilo.getCompanyId() };
+  const s = settings || await loadSettings();
+
   if (!invoice.godown_id) {
-    throw new Error('ERR_MISSING_GODOWN: A Godown/Branch must be selected for this transaction.');
+    if (s?.enable_godown_management) {
+      throw new Error('ERR_MISSING_GODOWN: A Godown/Branch must be selected for this transaction.');
+    }
+    const defaultGodownId = await resolveDefaultGodownId(invoice.company_id);
+    if (!defaultGodownId) {
+      throw new Error('ERR_MISSING_GODOWN: A Godown/Branch must be selected for this transaction.');
+    }
+    invoice.godown_id = defaultGodownId;
   }
 
-  const s = settings || await loadSettings();
   const lines = [];
 
   let customerArId = invoice.receivable_account_id || invoice.payable_account_id || invoice.customer?.receivable_account_id || invoice.customer?.payable_account_id;
@@ -371,9 +415,29 @@ export async function checkoutSalesInvoice(invoiceData, itemsMap, settings, idem
     });
   }
 
-  if (invoice.total_tax_amount > 0) {
-    if (!s.gl_vat_payable_id) throw new Error('ERR_STRICT_ACCOUNT_MAPPING: Missing VAT Payable Account in Company Settings');
-    lines.push({ account_id: s.gl_vat_payable_id, debit_amount: 0, credit_amount: invoice.total_tax_amount });
+  const taxAmount = Number(invoice.total_tax_amount ?? invoice.vat_amount ?? invoice.tax_total ?? 0);
+  if (taxAmount > 0) {
+    const vatPayableId = s.gl_vat_payable_id || s.gl_vat_receivable_id;
+    if (!vatPayableId) throw new Error('ERR_STRICT_ACCOUNT_MAPPING: Missing VAT Account in Company Settings. Please configure in Settings → GL Account Mappings.');
+    lines.push({ 
+      account_id: vatPayableId, 
+      account_category: 'tax', 
+      debit_amount: 0, 
+      credit_amount: Math.round(taxAmount * 100) / 100,
+      description: `Output VAT (${invoice.invoice_number && invoice.invoice_number !== 'AUTO' ? invoice.invoice_number : 'Sale'})`
+    });
+  }
+
+  const sundryCharges = Number(invoice.sundry_charges_total || invoice.sundry_charges || 0);
+  if (sundryCharges > 0) {
+    const sundryAccId = s.gl_sundry_income_account_id || s.gl_default_sales_account_id;
+    lines.push({
+      account_id: sundryAccId,
+      account_category: 'sales',
+      debit_amount: 0,
+      credit_amount: Math.round(sundryCharges * 100) / 100,
+      description: `Sundry Charges (${invoice.invoice_number && invoice.invoice_number !== 'AUTO' ? invoice.invoice_number : 'Sale'})`
+    });
   }
 
   // EMI Accrual Interest Accounting (IFRS 15 / GAAP Unearned Revenue)
@@ -467,11 +531,25 @@ export async function checkoutSalesInvoice(invoiceData, itemsMap, settings, idem
     }
   }
 
-  // ─── Zero-Trust Double-Entry Journal Balance Verification ───
-  const totalDebit = lines.reduce((sum, l) => sum + Number(l.debit_amount || 0), 0);
-  const totalCredit = lines.reduce((sum, l) => sum + Number(l.credit_amount || 0), 0);
-  if (Math.abs(totalDebit - totalCredit) > 0.01) {
-    throw new Error(`ERR_UNBALANCED_JOURNAL: Generated GL journal is mathematically unbalanced. Debits: ${totalDebit}, Credits: ${totalCredit}.`);
+  // ─── Zero-Trust Double-Entry Journal Balance Verification & Auto-Penny Reconciliation ───
+  let totalDebit = Math.round(lines.reduce((sum, l) => sum + Number(l.debit_amount || 0), 0) * 100) / 100;
+  let totalCredit = Math.round(lines.reduce((sum, l) => sum + Number(l.credit_amount || 0), 0) * 100) / 100;
+  const diff = Math.round((totalDebit - totalCredit) * 100) / 100;
+
+  if (Math.abs(diff) > 0 && Math.abs(diff) <= 0.02) {
+    if (diff > 0) {
+      const creditLine = lines.find(l => Number(l.credit_amount) > 0);
+      if (creditLine) creditLine.credit_amount = Math.round((Number(creditLine.credit_amount) + diff) * 100) / 100;
+    } else {
+      const debitLine = lines.find(l => Number(l.debit_amount) > 0);
+      if (debitLine) debitLine.debit_amount = Math.round((Number(debitLine.debit_amount) + Math.abs(diff)) * 100) / 100;
+    }
+    totalDebit = Math.round(lines.reduce((sum, l) => sum + Number(l.debit_amount || 0), 0) * 100) / 100;
+    totalCredit = Math.round(lines.reduce((sum, l) => sum + Number(l.credit_amount || 0), 0) * 100) / 100;
+  }
+
+  if (Math.abs(totalDebit - totalCredit) > 0.001) {
+    throw new Error(`ERR_UNBALANCED_JOURNAL: Generated GL journal is mathematically unbalanced. Total Debits: NPR ${totalDebit.toFixed(2)}, Total Credits: NPR ${totalCredit.toFixed(2)}. Difference: NPR ${Math.abs(totalDebit - totalCredit).toFixed(2)}.`);
   }
 
   try {
@@ -490,25 +568,64 @@ export async function checkoutSalesInvoice(invoiceData, itemsMap, settings, idem
 // ─── 3. PURCHASE INVOICE ──────────────────────────────────────────────────────────
 export async function checkoutPurchaseInvoice(invoiceData, itemsMap, settings, idempotencyKey = null) {
   const invoice = { ...invoiceData, company_id: invoiceData.company_id || sajilo.getCompanyId() };
+  const s = settings || await loadSettings();
+
   if (!invoice.godown_id) {
-    throw new Error('ERR_MISSING_GODOWN: A Godown/Branch must be selected for this transaction.');
+    if (s?.enable_godown_management) {
+      throw new Error('ERR_MISSING_GODOWN: A Godown/Branch must be selected for this transaction.');
+    }
+    const defaultGodownId = await resolveDefaultGodownId(invoice.company_id);
+    if (!defaultGodownId) {
+      throw new Error('ERR_MISSING_GODOWN: A Godown/Branch must be selected for this transaction.');
+    }
+    invoice.godown_id = defaultGodownId;
   }
 
-  const s = settings || await loadSettings();
   const lines = [];
 
   for (const line of (invoice.line_items || [])) {
+    const invAccId = itemsMap[line.item_id]?.inventory_account_id || s.gl_default_inventory_account_id;
+    if (!invAccId) {
+      throw new Error(`ERR_MISSING_ACCOUNT: No Inventory asset account mapped for item "${line.item_name || 'Item'}". Please configure in Settings → GL Account Mappings or on the Item.`);
+    }
     lines.push({ 
-      account_id: itemsMap[line.item_id]?.inventory_account_id || s.gl_default_inventory_account_id,
+      account_id: invAccId,
       account_category: 'inventory', item_id: line.item_id, 
-      debit_amount: line.line_total, credit_amount: 0, 
-      description: `Purchase: ${line.item_name}` 
+      debit_amount: Math.round(Number(line.line_total || 0) * 100) / 100, credit_amount: 0, 
+      description: `Purchase: ${line.item_name || 'Item'}` 
     });
   }
 
-  if (invoice.total_tax_amount > 0) {
-    if (!s.gl_vat_receivable_id) throw new Error('ERR_STRICT_ACCOUNT_MAPPING: Missing VAT Receivable Account in Company Settings');
-    lines.push({ account_id: s.gl_vat_receivable_id, debit_amount: invoice.total_tax_amount, credit_amount: 0 });
+  // VAT Input Tax
+  const taxAmount = Number(invoice.total_tax_amount ?? invoice.vat_amount ?? invoice.tax_amount ?? 0);
+  if (taxAmount > 0) {
+    const vatReceivableId = s.gl_vat_receivable_id || s.gl_vat_payable_id;
+    if (!vatReceivableId) {
+      throw new Error('ERR_STRICT_ACCOUNT_MAPPING: Missing VAT Account mapping in Company Settings. Please configure in Settings → GL Account Mappings.');
+    }
+    lines.push({ 
+      account_id: vatReceivableId, 
+      account_category: 'tax', 
+      debit_amount: Math.round(taxAmount * 100) / 100, 
+      credit_amount: 0,
+      description: `Input VAT (${invoice.invoice_number && invoice.invoice_number !== 'AUTO' ? invoice.invoice_number : 'Purchase'})`
+    });
+  }
+
+  // Landed Cost (Freight / Customs / Shipping)
+  const landedCost = Number(invoice.landed_cost_total || 0);
+  if (landedCost > 0) {
+    const landedCostAccId = s.gl_landed_cost_account_id || s.gl_stock_variance_account_id || s.gl_default_inventory_account_id;
+    if (!landedCostAccId) {
+      throw new Error('ERR_STRICT_ACCOUNT_MAPPING: Missing Landed Cost / Inventory Account in Company Settings.');
+    }
+    lines.push({
+      account_id: landedCostAccId,
+      account_category: 'inventory',
+      debit_amount: Math.round(landedCost * 100) / 100,
+      credit_amount: 0,
+      description: `Landed Cost: Freight / Customs (${invoice.invoice_number && invoice.invoice_number !== 'AUTO' ? invoice.invoice_number : 'Purchase'})`
+    });
   }
 
   let supplierApId = invoice.payable_account_id || invoice.receivable_account_id || invoice.supplier?.payable_account_id || invoice.supplier?.receivable_account_id || invoice.vendor?.payable_account_id || invoice.vendor?.receivable_account_id;
@@ -522,10 +639,49 @@ export async function checkoutPurchaseInvoice(invoiceData, itemsMap, settings, i
   const cbId = invoice.cash_bank_account_id;
   const billDesc = invoice.notes || (invoice.invoice_number && invoice.invoice_number !== 'AUTO' ? `Purchase Invoice ${invoice.invoice_number}` : 'Purchase Invoice');
   if (cbId) {
-    lines.push({ account_id: cbId, account_category: 'bank', debit_amount: 0, credit_amount: invoice.grand_total, entity_type: 'Supplier', entity_id: partnerId, due_date: invoice.due_date || invoice.invoice_date, description: billDesc });
+    lines.push({ 
+      account_id: cbId, 
+      account_category: 'bank', 
+      debit_amount: 0, 
+      credit_amount: Math.round(Number(invoice.grand_total || 0) * 100) / 100, 
+      entity_type: 'Supplier', 
+      entity_id: partnerId, 
+      due_date: invoice.due_date || invoice.invoice_date, 
+      description: billDesc 
+    });
   } else {
     if (!apId) throw new Error('ERR_STRICT_ACCOUNT_MAPPING: Missing Accounts Payable (AP) Account mapping. Please configure this in Settings.');
-    lines.push({ account_id: apId, account_category: 'accounts payable', debit_amount: 0, credit_amount: invoice.grand_total, entity_type: 'Supplier', entity_id: partnerId, due_date: invoice.due_date || invoice.invoice_date, description: billDesc });
+    lines.push({ 
+      account_id: apId, 
+      account_category: 'accounts payable', 
+      debit_amount: 0, 
+      credit_amount: Math.round(Number(invoice.grand_total || 0) * 100) / 100, 
+      entity_type: 'Supplier', 
+      entity_id: partnerId, 
+      due_date: invoice.due_date || invoice.invoice_date, 
+      description: billDesc 
+    });
+  }
+
+  // ─── Zero-Trust Double-Entry Journal Balance Verification & Auto-Penny Reconciliation ───
+  let totalDebitPI = Math.round(lines.reduce((sum, l) => sum + Number(l.debit_amount || 0), 0) * 100) / 100;
+  let totalCreditPI = Math.round(lines.reduce((sum, l) => sum + Number(l.credit_amount || 0), 0) * 100) / 100;
+  const diffPI = Math.round((totalDebitPI - totalCreditPI) * 100) / 100;
+
+  if (Math.abs(diffPI) > 0 && Math.abs(diffPI) <= 0.02) {
+    if (diffPI > 0) {
+      const creditLine = lines.find(l => Number(l.credit_amount) > 0);
+      if (creditLine) creditLine.credit_amount = Math.round((Number(creditLine.credit_amount) + diffPI) * 100) / 100;
+    } else {
+      const debitLine = lines.find(l => Number(l.debit_amount) > 0);
+      if (debitLine) debitLine.debit_amount = Math.round((Number(debitLine.debit_amount) + Math.abs(diffPI)) * 100) / 100;
+    }
+    totalDebitPI = Math.round(lines.reduce((sum, l) => sum + Number(l.debit_amount || 0), 0) * 100) / 100;
+    totalCreditPI = Math.round(lines.reduce((sum, l) => sum + Number(l.credit_amount || 0), 0) * 100) / 100;
+  }
+
+  if (Math.abs(totalDebitPI - totalCreditPI) > 0.001) {
+    throw new Error(`ERR_UNBALANCED_JOURNAL: Generated GL journal is mathematically unbalanced. Total Debits: NPR ${totalDebitPI.toFixed(2)}, Total Credits: NPR ${totalCreditPI.toFixed(2)}. Difference: NPR ${Math.abs(totalDebitPI - totalCreditPI).toFixed(2)}.`);
   }
 
   try {
