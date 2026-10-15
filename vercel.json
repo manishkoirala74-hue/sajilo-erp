@@ -12,11 +12,5 @@
       "memory": 1024
     }
   },
-  "regions": ["bom1"],
-  "crons": [
-    {
-      "path": "/api/warm-db",
-      "schedule": "*/15 3-13 * * 1-6"
-    }
-  ]
+  "regions": ["bom1"]
 }

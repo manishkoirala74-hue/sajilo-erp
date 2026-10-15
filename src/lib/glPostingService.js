@@ -604,3 +604,18 @@ export async function cancelPurchaseInvoice(invoiceId, reason) {
     throw error;
   }
 }
+
+export async function cancelFinancialVoucher(voucherId, reason) {
+  try {
+    const data = await sajilo.rpc('rpc_cancel_document', {
+      p_doc_id: voucherId,
+      p_doc_type: 'FinancialVoucher',
+      p_reason: reason
+    }, ['FinancialVoucher', 'GeneralLedgerJournal', 'GeneralLedgerLine', 'ChartOfAccount', 'SalesInvoice', 'PurchaseInvoice']);
+    return data;
+  } catch (error) {
+    toast.error('Cancellation Failed: ' + (error.message || 'Unknown error'));
+    throw error;
+  }
+}
+

@@ -6,7 +6,9 @@ import { sajilo } from '@/api/sajiloClient';
 import DualDateDisplay from '@/components/shared/DualDateDisplay';
 import { formatDualDateString } from '@/lib/nepaliDate';
 import { toast } from 'sonner';
-import { Plus, Eye, Trash2, RotateCcw, TriangleAlert, ListChecks, Pencil } from 'lucide-react';
+import { Plus, Eye, Trash2, RotateCcw, TriangleAlert, ListChecks, Pencil, SlidersHorizontal } from 'lucide-react';
+import ContraTransferSection from '@/components/treasury/ContraTransferSection';
+import { useBankAccountsQuery } from '@/hooks/useSajiloQuery';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -26,7 +28,7 @@ import StatusBadge from '@/components/shared/StatusBadge';
 import FormGrid from '@/components/layout/FormGrid';
 import FormRow from '@/components/layout/FormRow';
 import { useSajiloSync } from '@/hooks/useSajiloSync';
-import { postFinancialVoucher } from '@/lib/glPostingService';
+import { postFinancialVoucher, cancelFinancialVoucher } from '@/lib/glPostingService';
 import { generateVectorPDF } from '@/utils/pdfGenerator';
 import VoucherLink from '@/components/shared/VoucherLink';
 import DateInput from '@/components/shared/DateInput';
@@ -87,6 +89,7 @@ export default function FinancialVouchers() {
   const [loadingBills, setLoadingBills] = useState(false);
   const [saving, setSaving] = useState(false);
   const [filter, setFilter] = useState('All');
+  const [contraMode, setContraMode] = useState('simple'); // 'simple' | 'detailed' (fallback)
 
   // Delete / Reverse dialog state
   const [actionDialog, setActionDialog] = useState(null); // null | 'delete' | 'reverse'
@@ -157,6 +160,8 @@ export default function FinancialVouchers() {
   const navigate = useNavigate();
   const { activeCompany, activeFiscalYear, hasAccess, checkPermissionKey, globalSettings } = useAuth();
   const { accounts: masterAccounts } = useMasterData();
+  const { data: bankTreasuryData } = useBankAccountsQuery(activeCompany?.id);
+  const glBalances = bankTreasuryData?.glBalances || {};
 
   useEffect(() => {
     if (masterAccounts?.length > 0) setAllAccounts(masterAccounts);
@@ -228,6 +233,8 @@ export default function FinancialVouchers() {
     a.ledger_type === 'Sub Ledger' &&
     a.account_type === 'Asset' &&
     (
+      a.is_cash_account ||
+      a.is_bank_account ||
       (a.account_subtype || '').toLowerCase().includes('cash') ||
       (a.account_name || '').toLowerCase().includes('cash') ||
       (a.account_name || '').toLowerCase().includes('bank') ||
@@ -335,8 +342,15 @@ export default function FinancialVouchers() {
           };
         });
         
-        if (targetEntries.length === 0) throw new Error("Please add at least one ledger entry.");
+        if (targetEntries.length === 0) throw new Error(form.voucher_type === 'Contra' ? "Please select the 'Deposited To' destination account." : "Please add at least one ledger entry.");
         if (totalAmount <= 0) throw new Error("Total amount must be greater than zero.");
+        
+        if (form.voucher_type === 'Contra') {
+          const sameAcc = targetEntries.some(e => e.account_id === form.source_account_id);
+          if (sameAcc) {
+            throw new Error("Source (Paid From) and Destination (Deposited To) accounts cannot be the same.");
+          }
+        }
         
         const sourceEntry = {
           account_id: form.source_account_id,
@@ -512,120 +526,48 @@ export default function FinancialVouchers() {
     }
   };
 
-  // ── Reverse voucher ───────────────────────────────────────────────────────
+  // ── Reverse voucher (Atomic In-Place Cancellation) ─────────────────────────
   const handleReverse = async () => {
     if (!selected) return;
+    const cleanReason = actionReason.trim();
+    if (!cleanReason) {
+      toast.error('Please enter a cancellation reason.');
+      return;
+    }
+
     setActionProcessing(true);
-    const user = await sajilo.auth.me();
+    try {
+      // 1. Dispatch atomic PostgreSQL RPC
+      await cancelFinancialVoucher(selected.id, cleanReason);
 
-    // Build reversal voucher with flipped debit/credit
-    const reversalEntries = (selected.entries || []).map(e => ({
-      ...e,
-      debit: e.credit || 0,
-      credit: e.debit || 0,
-    }));
+      // 2. Optimistically update local React state (Voucher number stays 100% invariant)
+      setVouchers(prev => prev.map(v => 
+        v.id === selected.id 
+          ? { 
+              ...v, 
+              status: 'Cancelled', 
+              is_reversed: true, 
+              cancellation_reason: cleanReason, 
+              cancelled_at: new Date().toISOString() 
+            } 
+          : v
+      ));
 
-    const revPrefix = { Receipt: 'RV', Payment: 'PV', Journal: 'JV', Contra: 'CV' }[selected.voucher_type] || 'VV';
-    const reversalNumber = `REV-${selected.voucher_number}`;
-    const today = new Date().toISOString().split('T')[0];
-
-    const reversalVoucher = await sajilo.entities.FinancialVoucher.create({
-      voucher_type: selected.voucher_type,
-      voucher_date: today,
-      voucher_number: reversalNumber,
-      contact_name: selected.contact_name || '',
-      payment_mode: selected.payment_mode || 'Cash',
-      reference_no: `REV-${selected.reference_no || selected.voucher_number}`,
-      narration: `Reversal of ${selected.voucher_number}. ${actionReason || ''}`.trim(),
-      total_amount: selected.total_amount || 0,
-      status: 'Posted',
-      entries: reversalEntries,
-    });
-
-    const idempotencyKey = crypto.randomUUID();
-    const linesToPost = reversalEntries.map(e => ({
-      account_id: e.account_id,
-      debit_amount: e.debit || 0,
-      credit_amount: e.credit || 0,
-      description: e.narration || reversalVoucher.narration
-    }));
-    await postFinancialVoucher({ ...reversalVoucher, lines: linesToPost }, false, idempotencyKey);
-
-    // Mark original as Cancelled
-    await sajilo.entities.FinancialVoucher.update(selected.id, { status: 'Cancelled' });
-
-    // Log the reversal
-    await sajilo.entities.FinancialVoucherDeleteLog.create({
-      voucher_id: selected.id,
-      voucher_number: selected.voucher_number,
-      voucher_type: selected.voucher_type,
-      voucher_date: selected.voucher_date,
-      total_amount: selected.total_amount || 0,
-      contact_name: selected.contact_name || '',
-      action_type: 'Reverse',
-      reversal_voucher_number: reversalNumber,
-      performed_by: user?.email || 'unknown',
-      reason: actionReason || 'Manual reversal',
-      voucher_snapshot: selected,
-    });
-
-    toast.success(`Voucher ${selected.voucher_number} reversed. Reversal entry: ${reversalNumber}`);
-    setActionDialog(null);
-    setViewOpen(false);
-    setSelected(null);
-    setActionReason('');
-    setActionProcessing(false);
-    fetchData();
+      toast.success(`Voucher ${selected.voucher_number} has been cancelled & GL reversed.`);
+      setActionDialog(null);
+      setViewOpen(false);
+      setSelected(null);
+      setActionReason('');
+    } catch (error) {
+      console.error('Voucher cancellation error:', error);
+      // Toast is already surfaced by cancelFinancialVoucher
+    } finally {
+      setActionProcessing(false);
+      fetchData();
+    }
   };
 
-  // ── Post reversal GL journal ──────────────────────────────────────────────
-  async function reverseGLLines(voucher, user, actionType) {
-    const lines = (voucher.entries || [])
-      .filter(e => e.account_id)
-      .map(e => ({
-        account_id: e.account_id,
-        account_code: e.account_code || '',
-        account_name: e.account_name || '',
-        account_type: e.account_type || '',
-        debit_amount: e.credit || 0,   // flip
-        credit_amount: e.debit || 0,   // flip
-        description: `${actionType} of voucher ${voucher.voucher_number}`,
-      }));
 
-    if (lines.length === 0) return;
-
-    const today = new Date().toISOString().split('T')[0];
-    const totalDebit = lines.reduce((s, l) => s + (l.debit_amount || 0), 0);
-    const totalCredit = lines.reduce((s, l) => s + (l.credit_amount || 0), 0);
-
-    const journal = await sajilo.entities.GeneralLedgerJournal.create({
-      entry_date: today,
-      description: `${actionType} of Financial Voucher ${voucher.voucher_number}`,
-      reference_module: 'Treasury',
-      source_document_id: voucher.id,
-      source_document_type: 'FinancialVoucher',
-      status: 'Posted',
-      total_debit: totalDebit,
-      total_credit: totalCredit,
-      is_balanced: Math.abs(totalDebit - totalCredit) < 0.01,
-    });
-
-    await sajilo.entities.GeneralLedgerLine.bulkCreate(
-      lines.map(l => ({ ...l, journal_id: journal.id }))
-    );
-
-    // Update ChartOfAccount balances
-    for (const l of lines) {
-      if (!l.account_id) continue;
-      const results = await sajilo.entities.ChartOfAccount.filter({ id: l.account_id }, 'account_code', 1);
-      const acc = results[0];
-      if (!acc) continue;
-      const delta = (l.debit_amount || 0) - (l.credit_amount || 0);
-      const debitNormal = ['Asset', 'COGS', 'Expense', 'OPEX', 'Cost of Goods Sold', 'Other Expense'].includes(acc.account_type);
-      const balanceChange = debitNormal ? delta : -delta;
-      await sajilo.entities.ChartOfAccount.update(acc.id, { current_balance: Math.round(((acc.current_balance || 0) + balanceChange) * 100) / 100 });
-    }
-  }
 
   const filtered = filter === 'All' ? vouchers : vouchers.filter(v => v.voucher_type === filter || v.status === filter);
 
@@ -665,6 +607,9 @@ export default function FinancialVouchers() {
               source_account_code: srcAcc?.account_code,
               source_account_type: srcAcc?.account_type
             });
+            if (row.voucher_type === 'Contra') {
+              setContraMode(targetEntries.length > 1 ? 'detailed' : 'simple');
+            }
             try {
               if (row.bill_allocations && typeof row.bill_allocations === 'string') {
                  setBillAllocations(JSON.parse(row.bill_allocations));
@@ -691,7 +636,13 @@ export default function FinancialVouchers() {
       <PageHeader
         title="Financial Vouchers"
         subtitle="Receipt, Payment, Journal & Contra entries"
-        action={() => { setForm({ ...emptyVoucher, voucher_date: getSafeDefaultDate() }); setBillAllocations([]); setOpen(true); }}
+        action={() => { 
+          const defaultType = filter === 'Contra' ? 'Contra' : (filter !== 'All' && filter !== 'Cancelled' ? filter : '');
+          setForm({ ...emptyVoucher, voucher_type: defaultType, voucher_date: getSafeDefaultDate() }); 
+          setContraMode('simple');
+          setBillAllocations([]); 
+          setOpen(true); 
+        }}
         actionLabel="New Voucher"
         actionIcon={Plus}
         actionDisabled={!activeFiscalYear}
@@ -731,12 +682,18 @@ export default function FinancialVouchers() {
               </div>
               <div>
                 <Label>Voucher Type *</Label>
-                <Select value={form.voucher_type} onValueChange={v => setForm({ ...emptyVoucher, voucher_type: v, voucher_date: form.voucher_date })}>
+                <Select 
+                  value={form.voucher_type} 
+                  onValueChange={v => {
+                    setForm({ ...emptyVoucher, voucher_type: v, voucher_date: form.voucher_date });
+                    if (v === 'Contra') setContraMode('simple');
+                  }}
+                >
                   <SelectTrigger className="mt-1"><SelectValue placeholder="Select Voucher Type" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="Receipt">Receipt (Inflow)</SelectItem>
                     <SelectItem value="Payment">Payment (Outflow)</SelectItem>
-                    <SelectItem value="Contra">Contra (Bank Transfer/Cash Dep)</SelectItem>
+                    <SelectItem value="Contra">Contra (Cash Deposit / Withdrawal / Transfer)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -746,55 +703,98 @@ export default function FinancialVouchers() {
               </div>
             </FormGrid>
 
-            {isPaymentType && (
-              <FormGrid className="bg-muted/30 p-3 rounded-lg border border-border">
-                <div>
-                  <Label>Payment Source / Dest *</Label>
-                  <SearchableSelect
-                    options={paymentSourceAccounts.map(a => ({ value: a.id, label: `${a.account_name} (${a.account_type})` }))}
-                    value={form.source_account_id}
-                    onChange={v => {
-                      const a = allAccounts.find(x => x.id === v);
-                      setForm({
-                        ...form,
-                        source_account_id: v,
-                        source_account_name: a?.account_name,
-                        source_account_code: a?.account_code,
-                        source_account_type: a?.account_type,
-                      });
-                    }}
-                    placeholder="Select Cash/Bank account"
-                    className="mt-1"
-                  />
-                </div>
-                <div>
-                  <Label>Payment Mode</Label>
-                  <Select value={form.payment_mode} onValueChange={v => setForm({ ...form, payment_mode: v })}>
-                    <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Cash">Cash</SelectItem>
-                      <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
-                      <SelectItem value="Cheque">Cheque</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </FormGrid>
-            )}
+            {form.voucher_type === 'Contra' && contraMode === 'simple' ? (
+              <ContraTransferSection
+                form={form}
+                setForm={setForm}
+                cashAccounts={cashAccounts}
+                allAccounts={allAccounts}
+                glBalances={glBalances}
+                contraMode={contraMode}
+                setContraMode={setContraMode}
+              />
+            ) : (
+              <>
+                {form.voucher_type === 'Contra' && contraMode === 'detailed' && (
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs">
+                    <div className="flex items-center gap-2 text-amber-800 dark:text-amber-300">
+                      <SlidersHorizontal className="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                      <span>
+                        <strong>Multi-Row Contra Mode Active:</strong> Use this mode to split funds across multiple destination ledger accounts.
+                      </span>
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setContraMode('simple')}
+                      className="h-7 text-xs shrink-0 border-amber-300 dark:border-amber-700 hover:bg-amber-100 dark:hover:bg-amber-900/30"
+                    >
+                      Switch to Guided Transfer
+                    </Button>
+                  </div>
+                )}
 
-            <FormGrid>
-              <div>
-                <Label>Contact Name</Label>
-                <Input value={form.contact_name} onChange={e => setForm({ ...form, contact_name: e.target.value })} placeholder="Vendor, Customer, or Employee" className="mt-1" />
-              </div>
-              <div>
-                <Label>Reference No / Cheque No</Label>
-                <Input value={form.reference_no} onChange={e => setForm({ ...form, reference_no: e.target.value })} placeholder="Optional" className="mt-1" />
-              </div>
-              <FormRow fullWidth>
-                <Label>Narration / Memo</Label>
-                <Input value={form.narration} onChange={e => setForm({ ...form, narration: e.target.value })} placeholder="Overall voucher description" className="mt-1" />
-              </FormRow>
-            </FormGrid>
+                {isPaymentType && (
+                  <FormGrid className="bg-muted/30 p-3 rounded-lg border border-border">
+                    <div>
+                      <Label>
+                        {form.voucher_type === 'Contra'
+                          ? 'Paid From Account (Outflow / Credit) *'
+                          : 'Payment Source / Dest *'}
+                      </Label>
+                      <SearchableSelect
+                        options={paymentSourceAccounts.map(a => ({ value: a.id, label: `${a.account_name} (${a.account_type})` }))}
+                        value={form.source_account_id}
+                        onChange={v => {
+                          const a = allAccounts.find(x => x.id === v);
+                          setForm({
+                            ...form,
+                            source_account_id: v,
+                            source_account_name: a?.account_name,
+                            source_account_code: a?.account_code,
+                            source_account_type: a?.account_type,
+                          });
+                        }}
+                        placeholder="Select Cash/Bank account"
+                        className="mt-1"
+                      />
+                    </div>
+                    <div>
+                      <Label>Payment Mode</Label>
+                      <Select value={form.payment_mode} onValueChange={v => setForm({ ...form, payment_mode: v })}>
+                        <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Cash">Cash</SelectItem>
+                          <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
+                          <SelectItem value="Cheque">Cheque</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </FormGrid>
+                )}
+
+                <FormGrid>
+                  <div>
+                    <Label>
+                      {form.voucher_type === 'Contra' ? 'Deposited By / Bearer (Optional)' : 'Contact Name'}
+                    </Label>
+                    <Input
+                      value={form.contact_name}
+                      onChange={e => setForm({ ...form, contact_name: e.target.value })}
+                      placeholder={form.voucher_type === 'Contra' ? 'Staff or Bearer name' : 'Vendor, Customer, or Employee'}
+                      className="mt-1"
+                    />
+                  </div>
+                  <div>
+                    <Label>Reference No / Cheque No</Label>
+                    <Input value={form.reference_no} onChange={e => setForm({ ...form, reference_no: e.target.value })} placeholder="Optional" className="mt-1" />
+                  </div>
+                  <FormRow fullWidth>
+                    <Label>Narration / Memo</Label>
+                    <Input value={form.narration} onChange={e => setForm({ ...form, narration: e.target.value })} placeholder="Overall voucher description" className="mt-1" />
+                  </FormRow>
+                </FormGrid>
 
             
 
@@ -802,7 +802,9 @@ export default function FinancialVouchers() {
             {/* Entries table */}
             <div className="space-y-3 mt-4">
               <div className="flex justify-between items-end mb-2">
-                <Label>Ledger Entries *</Label>
+                <Label>
+                  {form.voucher_type === 'Contra' ? 'Deposited To Account(s) (Inflow / Debit) *' : 'Ledger Entries *'}
+                </Label>
                 <Button variant="outline" size="sm" onClick={() => { addEntry(); if (window.innerWidth < 768) openVoucherDrawerAdd(); }} className="print:hidden hidden md:flex"><Plus className="w-4 h-4 mr-1" /> Add Row</Button>
               </div>
               
@@ -936,6 +938,8 @@ export default function FinancialVouchers() {
                 Total Debit: {fmt(form.total_amount)}
               </div>
             </div>
+            </>
+            )}
 
             {/* Mobile Drawer for Entries */}
             <Drawer open={isVoucherDrawerOpen} onOpenChange={setIsVoucherDrawerOpen}>
@@ -1272,6 +1276,22 @@ export default function FinancialVouchers() {
                           const splitNotes = doc.splitTextToSize(selected.notes, pageWidth - margin * 2);
                           doc.text(splitNotes, margin, finalY + 45);
                         }
+
+                        // Diagonal red CANCELLED watermark for cancelled vouchers
+                        if (selected.status === 'Cancelled') {
+                          try {
+                            doc.saveGraphicsState();
+                            doc.setFontSize(52);
+                            doc.setTextColor(220, 38, 38);
+                            if (doc.setGState && doc.GState) {
+                              doc.setGState(new doc.GState({ opacity: 0.18 }));
+                            }
+                            doc.text('CANCELLED', pageWidth / 2, 400, { align: 'center', angle: 45 });
+                            doc.restoreGraphicsState();
+                          } catch (wmErr) {
+                            console.warn('PDF watermark render notice:', wmErr);
+                          }
+                        }
                         
                         doc.save(`Voucher_${selected.voucher_number}.pdf`);
                       });
@@ -1280,29 +1300,41 @@ export default function FinancialVouchers() {
                 >
                   Download PDF
                 </Button>
-                {selected.status !== 'Cancelled' && !selected._isViewMode && (
-                  <div className="flex justify-end gap-2">
-                    {selected.status === 'Posted' && checkPermissionKey('vouchers.approve') && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="gap-1.5 text-amber-600 dark:text-amber-400 border-amber-300 dark:border-amber-500/30 hover:bg-amber-50 dark:bg-amber-500/10 print:hidden"
-                        onClick={() => { setActionReason(''); setActionDialog('reverse'); }}
-                      >
-                        <RotateCcw className="w-3.5 h-3.5" /> Reverse Voucher
-                      </Button>
+                {selected.status === 'Cancelled' ? (
+                  <div className="flex items-center gap-2 text-xs bg-red-50 dark:bg-red-500/10 text-red-700 dark:text-red-400 px-3 py-1.5 rounded-lg border border-red-200 dark:border-red-500/20 font-medium">
+                    <span className="font-semibold uppercase tracking-wider text-red-600 dark:text-red-400">Cancelled</span>
+                    {selected.cancelled_at && (
+                      <span>on {formatDualDateString(selected.cancelled_at, settings?.display_bs_date)}</span>
                     )}
-                    {selected.status === 'Draft' && hasAccess('vouchers', 'delete') && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="gap-1.5 text-red-600 dark:text-red-400 border-red-300 dark:border-red-500/30 hover:bg-red-50 dark:bg-red-500/10 print:hidden"
-                        onClick={() => { setActionReason(''); setActionDialog('delete'); }}
-                      >
-                        <Trash2 className="w-3.5 h-3.5" /> Delete Voucher
-                      </Button>
+                    {selected.cancellation_reason && (
+                      <span className="italic">— {selected.cancellation_reason}</span>
                     )}
                   </div>
+                ) : (
+                  !selected._isViewMode && (
+                    <div className="flex justify-end gap-2">
+                      {selected.status === 'Posted' && !selected.is_reversed && checkPermissionKey('vouchers.approve') && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-1.5 text-amber-600 dark:text-amber-400 border-amber-300 dark:border-amber-500/30 hover:bg-amber-50 dark:bg-amber-500/10 print:hidden"
+                          onClick={() => { setActionReason(''); setActionDialog('reverse'); }}
+                        >
+                          <RotateCcw className="w-3.5 h-3.5" /> Cancel / Reverse Voucher
+                        </Button>
+                      )}
+                      {selected.status === 'Draft' && hasAccess('vouchers', 'delete') && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-1.5 text-red-600 dark:text-red-400 border-red-300 dark:border-red-500/30 hover:bg-red-50 dark:bg-red-500/10 print:hidden"
+                          onClick={() => { setActionReason(''); setActionDialog('delete'); }}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" /> Delete Voucher
+                        </Button>
+                      )}
+                    </div>
+                  )
                 )}
               </div>
             </div>
@@ -1316,7 +1348,7 @@ export default function FinancialVouchers() {
           <DialogHeader>
             <DialogTitle className={`flex items-center gap-2 ${actionDialog === 'delete' ? 'text-red-600 dark:text-red-400' : 'text-amber-600 dark:text-amber-400'}`}>
               {actionDialog === 'delete' ? <Trash2 className="w-4 h-4" /> : <RotateCcw className="w-4 h-4" />}
-              {actionDialog === 'delete' ? 'Delete Voucher' : 'Reverse Voucher'}
+              {actionDialog === 'delete' ? 'Delete Voucher' : 'Cancel / Reverse Voucher'}
             </DialogTitle>
           </DialogHeader>
 
@@ -1330,19 +1362,19 @@ export default function FinancialVouchers() {
                   </p>
                 ) : (
                   <p className="font-medium text-amber-800 dark:text-amber-300">
-                    This will create a <strong>reversal entry</strong> (REV-{selected?.voucher_number}) with opposite debit/credit lines, and mark the original as Cancelled.
+                    This will cancel <strong>{selected?.voucher_number}</strong> and post an atomic reversal (contra entry) in the General Ledger. The voucher number will remain unchanged.
                   </p>
                 )}
               </div>
             </div>
 
             <div>
-              <Label>Reason <span className="text-muted-foreground font-normal">(optional)</span></Label>
+              <Label>Reason {actionDialog === 'reverse' ? <span className="text-red-500 font-semibold">*</span> : <span className="text-muted-foreground font-normal">(optional)</span>}</Label>
               <Input
                 className="mt-1"
                 value={actionReason}
                 onChange={e => setActionReason(e.target.value)}
-                placeholder={actionDialog === 'delete' ? 'Reason for deletion…' : 'Reason for reversal…'}
+                placeholder={actionDialog === 'delete' ? 'Reason for deletion…' : 'Enter cancellation reason (required)…'}
               />
             </div>
 
@@ -1352,11 +1384,11 @@ export default function FinancialVouchers() {
                 variant={actionDialog === 'delete' ? 'destructive' : 'default'}
                 className={actionDialog === 'reverse' ? 'bg-amber-600 hover:bg-amber-700 text-white' : ''}
                 onClick={actionDialog === 'delete' ? handleDelete : handleReverse}
-                disabled={actionProcessing}
+                disabled={actionProcessing || (actionDialog === 'reverse' && !actionReason.trim())}
               >
                 {actionProcessing
-                  ? (actionDialog === 'delete' ? 'Deleting…' : 'Reversing…')
-                  : (actionDialog === 'delete' ? 'Confirm Delete' : 'Confirm Reverse')
+                  ? (actionDialog === 'delete' ? 'Deleting…' : 'Processing…')
+                  : (actionDialog === 'delete' ? 'Confirm Delete' : 'Confirm Cancellation')
                 }
               </Button>
             </div>
