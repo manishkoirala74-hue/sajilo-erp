@@ -39,7 +39,19 @@ const FiscalYearRequired = () => (
 );
 
 export default function ProtectedRoute({ fallback = <DefaultFallback />, unauthenticatedElement }) {
-  const { user, isAuthenticated, isLoadingAuth, authChecked, authError, checkUserAuth, activeFiscalYear, activeCompany } = useAuth();
+  const { 
+    user, 
+    isAuthenticated, 
+    isLoadingAuth, 
+    authChecked, 
+    authError, 
+    checkUserAuth, 
+    activeFiscalYear, 
+    activeCompany,
+    isSwitchingCompany,
+    fyIsLoading,
+    fyIsFetching
+  } = useAuth();
   const { activeRole } = usePermissions();
   const location = useLocation();
 
@@ -81,8 +93,15 @@ export default function ProtectedRoute({ fallback = <DefaultFallback />, unauthe
     '/pos', '/sales/quotations', '/sales/orders', '/sales/invoices', '/sales/returns',
     '/purchase/orders', '/purchase/invoices', '/purchase/returns', '/treasury/vouchers'
   ];
-  if (!activeFiscalYear && transactionRoutes.some(route => location.pathname.startsWith(route))) {
-    return <FiscalYearRequired />;
+  if (transactionRoutes.some(route => location.pathname.startsWith(route))) {
+    // If company switch or fiscal year query is in flight, show fallback loader instead of false error
+    if (isSwitchingCompany || fyIsLoading || fyIsFetching) {
+      return fallback;
+    }
+    // Only display warning once loading is complete and genuinely no active fiscal year exists
+    if (!activeFiscalYear) {
+      return <FiscalYearRequired />;
+    }
   }
 
   return <Outlet />;

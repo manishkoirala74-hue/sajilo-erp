@@ -471,6 +471,7 @@ export const AuthProvider = ({ children }) => {
       fyIsError,
       fyError,
       fyIsLoading,
+      fyIsFetching,
       refreshGlobalSettings
     }}>
       {children}
