@@ -10,6 +10,7 @@ import ReportExportActions from '@/components/reports/ReportExportActions';
 import PartnerStatement from '@/components/reports/PartnerStatement';
 import ProfitLossReport from '@/components/reports/ProfitLossReport';
 import FinancialReportTable from '@/components/reports/FinancialReportTable';
+import VatSummaryReport from '@/components/reports/VatSummaryReport';
 import ReportFilterBar from '@/components/reports/ReportFilterBar';
 import { exportFlatXLSX } from '@/lib/reports/reportExcelExport';
 import { sajilo, supabase } from '@/api/sajiloClient';
@@ -931,15 +932,25 @@ function SimpleReport({ title, reportId, initialData, initialFromDate, initialTo
   const [data,      setData]      = useCachedState(`simple_report_data_${reportId}`, initialData);
   const [loading,   setLoading]   = useState(false);
   const [hasLoaded, setHasLoaded] = useCachedState(`simple_report_hasLoaded_${reportId}`, !!initialData);
+  const currentCompanyId = sajilo.getCompanyId();
 
   const load = useCallback(async () => {
     setHasLoaded(true);
     setLoading(true);
-    const { fetchReportData } = await import('@/lib/reportDataFetcher');
-    const result = await fetchReportData(reportId, filters.fromDate, filters.toDate);
-    setData(result);
-    setLoading(false);
+    try {
+      const { fetchReportData } = await import('@/lib/reportDataFetcher');
+      const result = await fetchReportData(reportId, filters.fromDate, filters.toDate);
+      setData(result);
+    } catch (err) {
+      console.error(`Failed to load ${reportId}:`, err);
+    } finally {
+      setLoading(false);
+    }
   }, [reportId, filters.fromDate, filters.toDate]);
+
+  useEffect(() => {
+    load();
+  }, [currentCompanyId, filters.fromDate, filters.toDate]);
 
   return (
     <div className="space-y-4">
@@ -1630,36 +1641,104 @@ export default function ReportViewer({ reportId, data, fromDate, toDate, columnS
             />
           )} />;
 
-      case 'vat_sales':
       case 'vat_summary':
-        return <SimpleReport title="Sales VAT Register" reportId="vat_sales" initialData={data} initialFromDate={fromDate} initialToDate={toDate}
-          renderFn={(rows, fd, td) => (
-            <ReportTable title="Sales VAT Register" fromDate={fd} toDate={td}
-              headers={['Invoice #','Date','Customer','Subtotal (NPR)','VAT (NPR)','Grand Total (NPR)']}
-              rows={rows.map(r => [
-                <VoucherLink voucherNumber={r.invoice_number}><span className="cursor-pointer text-primary">{r.invoice_number}</span></VoucherLink>, 
-                (r.invoice_date || '').split('T')[0].split('-').reverse().join('-'), 
-                r.customer_name, fmtNPR(r.goods_subtotal), fmtNPR(r.total_tax_amount||r.vat_amount), fmtNPR(r.grand_total)
-              ])}
-              footer={['','','Total VAT','', fmtNPR(rows.reduce((s,r)=>s+(r.total_tax_amount||r.vat_amount||0),0)),'']}
-              onExport={() => downloadCSV('sales_vat.csv',['Invoice','Date','Customer','Subtotal','VAT','Total'],rows.map(r=>[r.invoice_number,(r.invoice_date || '').split('T')[0].split('-').reverse().join('-'),r.customer_name,r.goods_subtotal?.toFixed(2),(r.total_tax_amount||r.vat_amount)?.toFixed(2),r.grand_total?.toFixed(2)]))}
-            />
-          )} />;
+        return <VatSummaryReport initialFromDate={fromDate} initialToDate={toDate} />;
+
+      case 'vat_sales':
+        return <SimpleReport title="Sales VAT Register (Anusuchi 7)" reportId="vat_sales" initialData={data} initialFromDate={fromDate} initialToDate={toDate}
+          renderFn={(rows, fd, td, showBs) => {
+            const totTaxable = rows.reduce((s, r) => s + (r.taxable_amount || 0), 0);
+            const totExempt  = rows.reduce((s, r) => s + (r.exempt_amount || 0), 0);
+            const totVat     = rows.reduce((s, r) => s + (r.vat_amount || 0), 0);
+            const totGrand   = rows.reduce((s, r) => s + (r.grand_total || 0), 0);
+
+            return (
+              <ReportTable title="Sales VAT Register (Anusuchi 7)" fromDate={fd} toDate={td}
+                headers={['Invoice #', 'Date', ...(showBs ? ['Date (BS)'] : []), 'Customer', 'Buyer PAN', 'Taxable (NPR)', 'Exempt (NPR)', 'VAT (13%) (NPR)', 'Grand Total (NPR)']}
+                rows={rows.map(r => {
+                  const dateBs = adToBS(r.invoice_date) ? formatBS(adToBS(r.invoice_date)) : '';
+                  const dateAd = (r.invoice_date || '').split('T')[0].split('-').reverse().join('-');
+                  return [
+                    <VoucherLink voucherNumber={r.invoice_number}><span className="cursor-pointer text-primary font-medium">{r.invoice_number}</span></VoucherLink>,
+                    dateAd,
+                    ...(showBs ? [dateBs] : []),
+                    r.customer_name,
+                    <span className="font-mono text-xs text-muted-foreground">{r.customer_pan || '—'}</span>,
+                    fmtNPR(r.taxable_amount),
+                    fmtNPR(r.exempt_amount),
+                    fmtNPR(r.vat_amount),
+                    fmtNPR(r.grand_total)
+                  ];
+                })}
+                footer={['', '', ...(showBs ? [''] : []), 'TOTAL', '', fmtNPR(totTaxable), fmtNPR(totExempt), fmtNPR(totVat), fmtNPR(totGrand)]}
+                onExport={() => downloadCSV(
+                  `sales_vat_${fd}_to_${td}.xlsx`,
+                  ['Invoice #', 'Date (AD)', ...(showBs ? ['Date (BS)'] : []), 'Customer', 'Buyer PAN', 'Taxable (NPR)', 'Exempt (NPR)', 'VAT 13% (NPR)', 'Grand Total (NPR)'],
+                  rows.map(r => [
+                    r.invoice_number,
+                    (r.invoice_date || '').split('T')[0].split('-').reverse().join('-'),
+                    ...(showBs ? [adToBS(r.invoice_date) ? formatBS(adToBS(r.invoice_date)) : ''] : []),
+                    r.customer_name,
+                    r.customer_pan || '—',
+                    r.taxable_amount?.toFixed(2),
+                    r.exempt_amount?.toFixed(2),
+                    r.vat_amount?.toFixed(2),
+                    r.grand_total?.toFixed(2)
+                  ]),
+                  ['TOTAL', '', ...(showBs ? [''] : []), '', '', totTaxable.toFixed(2), totExempt.toFixed(2), totVat.toFixed(2), totGrand.toFixed(2)]
+                )}
+              />
+            );
+          }} />;
 
       case 'vat_purchases':
-        return <SimpleReport title="Purchase VAT Register" reportId={reportId} initialData={data} initialFromDate={fromDate} initialToDate={toDate}
-          renderFn={(rows, fd, td) => (
-            <ReportTable title="Purchase VAT Register" fromDate={fd} toDate={td}
-              headers={['Invoice #','Date','Supplier','Subtotal (NPR)','VAT (NPR)','Grand Total (NPR)']}
-              rows={rows.map(r => [
-                <VoucherLink voucherNumber={r.invoice_number||r.bill_number}><span className="cursor-pointer text-primary">{r.invoice_number||r.bill_number}</span></VoucherLink>, 
-                (r.invoice_date||r.bill_date || '').split('T')[0].split('-').reverse().join('-'), 
-                r.customer_name||r.vendor_name, fmtNPR(r.goods_subtotal||r.subtotal), fmtNPR(r.vat_amount||r.total_tax_amount), fmtNPR(r.grand_total)
-              ])}
-              footer={['','','Total VAT','', fmtNPR(rows.reduce((s,r)=>s+(r.vat_amount||r.total_tax_amount||0),0)),'']}
-              onExport={() => downloadCSV('purchase_vat.csv',['Invoice','Date','Supplier','Subtotal','VAT','Total'],rows.map(r=>[r.invoice_number||r.bill_number,(r.invoice_date||r.bill_date || '').split('T')[0].split('-').reverse().join('-'),r.customer_name||r.vendor_name,(r.goods_subtotal||r.subtotal)?.toFixed(2),(r.vat_amount||r.total_tax_amount)?.toFixed(2),r.grand_total?.toFixed(2)]))}
-            />
-          )} />;
+        return <SimpleReport title="Purchase VAT Register (Anusuchi 8)" reportId="vat_purchases" initialData={data} initialFromDate={fromDate} initialToDate={toDate}
+          renderFn={(rows, fd, td, showBs) => {
+            const totTaxable = rows.reduce((s, r) => s + (r.taxable_amount || 0), 0);
+            const totExempt  = rows.reduce((s, r) => s + (r.exempt_amount || 0), 0);
+            const totVat     = rows.reduce((s, r) => s + (r.vat_amount || 0), 0);
+            const totGrand   = rows.reduce((s, r) => s + (r.grand_total || 0), 0);
+
+            return (
+              <ReportTable title="Purchase VAT Register (Anusuchi 8)" fromDate={fd} toDate={td}
+                headers={['Bill #', 'Supplier Bill #', 'Date', ...(showBs ? ['Date (BS)'] : []), 'Supplier', 'Supplier PAN', 'Taxable (NPR)', 'Exempt (NPR)', 'VAT (13%) (NPR)', 'Grand Total (NPR)']}
+                rows={rows.map(r => {
+                  const dateBs = adToBS(r.invoice_date) ? formatBS(adToBS(r.invoice_date)) : '';
+                  const dateAd = (r.invoice_date || '').split('T')[0].split('-').reverse().join('-');
+                  return [
+                    <VoucherLink voucherNumber={r.invoice_number}><span className="cursor-pointer text-primary font-medium">{r.invoice_number}</span></VoucherLink>,
+                    <span className="font-mono text-xs">{r.vendor_invoice_no}</span>,
+                    dateAd,
+                    ...(showBs ? [dateBs] : []),
+                    r.vendor_name,
+                    <span className="font-mono text-xs text-muted-foreground">{r.supplier_pan || '—'}</span>,
+                    fmtNPR(r.taxable_amount),
+                    fmtNPR(r.exempt_amount),
+                    fmtNPR(r.vat_amount),
+                    fmtNPR(r.grand_total)
+                  ];
+                })}
+                footer={['', '', '', ...(showBs ? [''] : []), 'TOTAL', '', fmtNPR(totTaxable), fmtNPR(totExempt), fmtNPR(totVat), fmtNPR(totGrand)]}
+                onExport={() => downloadCSV(
+                  `purchase_vat_${fd}_to_${td}.xlsx`,
+                  ['Bill #', 'Supplier Bill #', 'Date (AD)', ...(showBs ? ['Date (BS)'] : []), 'Supplier', 'Supplier PAN', 'Taxable (NPR)', 'Exempt (NPR)', 'VAT 13% (NPR)', 'Grand Total (NPR)'],
+                  rows.map(r => [
+                    r.invoice_number,
+                    r.vendor_invoice_no,
+                    (r.invoice_date || '').split('T')[0].split('-').reverse().join('-'),
+                    ...(showBs ? [adToBS(r.invoice_date) ? formatBS(adToBS(r.invoice_date)) : ''] : []),
+                    r.vendor_name,
+                    r.supplier_pan || '—',
+                    r.taxable_amount?.toFixed(2),
+                    r.exempt_amount?.toFixed(2),
+                    r.vat_amount?.toFixed(2),
+                    r.grand_total?.toFixed(2)
+                  ]),
+                  ['TOTAL', '', '', ...(showBs ? [''] : []), '', '', totTaxable.toFixed(2), totExempt.toFixed(2), totVat.toFixed(2), totGrand.toFixed(2)]
+                )}
+              />
+            );
+          }} />;
 
       case 'sales_return_report':
         return <SimpleReport title="Sales Master Report" reportId={reportId} initialData={data} initialFromDate={fromDate} initialToDate={toDate}
@@ -1693,14 +1772,49 @@ export default function ReportViewer({ reportId, data, fromDate, toDate, columnS
 
       case 'tds_report':
         return <SimpleReport title="TDS Deduction Report" reportId={reportId} initialData={data} initialFromDate={fromDate} initialToDate={toDate}
-          renderFn={(rows, fd, td) => (
-            <ReportTable title="TDS Deduction Report" fromDate={fd} toDate={td}
-              headers={['Employee','Pay Period','Gross Pay (NPR)','TDS Deducted (NPR)','Net Pay (NPR)']}
-              rows={rows.map(r => [r.employee_name, r.pay_period, fmtNPR(r.gross_pay), fmtNPR(r.tds_amount), fmtNPR(r.net_pay)])}
-              footer={['TOTAL','', fmtNPR(rows.reduce((s,r)=>s+(r.gross_pay||0),0)), fmtNPR(rows.reduce((s,r)=>s+(r.tds_amount||0),0)), fmtNPR(rows.reduce((s,r)=>s+(r.net_pay||0),0))]}
-              onExport={() => downloadCSV('tds_report.csv',['Employee','Pay Period','Gross Pay','TDS','Net Pay'],rows.map(r=>[r.employee_name,r.pay_period,r.gross_pay?.toFixed(2),r.tds_amount?.toFixed(2),r.net_pay?.toFixed(2)]))}
-            />
-          )} />;
+          renderFn={(rows, fd, td, showBs) => {
+            const totGross = rows.reduce((s, r) => s + (r.gross_amount || 0), 0);
+            const totTds   = rows.reduce((s, r) => s + (r.tds_amount || 0), 0);
+            const totNet   = rows.reduce((s, r) => s + (r.net_paid || 0), 0);
+
+            return (
+              <ReportTable title="TDS Deduction Report" fromDate={fd} toDate={td}
+                headers={['Date', ...(showBs ? ['Date (BS)'] : []), 'Voucher / Ref', 'Party / Employee', 'PAN', 'TDS Category', 'Gross (NPR)', 'TDS Withheld (NPR)', 'Net Paid (NPR)']}
+                rows={rows.map(r => {
+                  const dateBs = adToBS(r.date) ? formatBS(adToBS(r.date)) : '';
+                  const dateAd = (r.date || '').split('T')[0].split('-').reverse().join('-');
+                  return [
+                    dateAd,
+                    ...(showBs ? [dateBs] : []),
+                    <VoucherLink voucherNumber={r.voucher_no}><span className="cursor-pointer text-primary font-medium">{r.voucher_no}</span></VoucherLink>,
+                    r.party_name,
+                    <span className="font-mono text-xs text-muted-foreground">{r.party_pan || '—'}</span>,
+                    r.tds_type,
+                    r.gross_amount > 0 ? fmtNPR(r.gross_amount) : '—',
+                    fmtNPR(r.tds_amount),
+                    r.net_paid > 0 ? fmtNPR(r.net_paid) : '—'
+                  ];
+                })}
+                footer={['', ...(showBs ? [''] : []), '', 'TOTAL', '', '', fmtNPR(totGross), fmtNPR(totTds), fmtNPR(totNet)]}
+                onExport={() => downloadCSV(
+                  `tds_report_${fd}_to_${td}.xlsx`,
+                  ['Date (AD)', ...(showBs ? ['Date (BS)'] : []), 'Voucher / Ref', 'Party / Employee', 'PAN', 'TDS Category', 'Gross (NPR)', 'TDS Withheld (NPR)', 'Net Paid (NPR)'],
+                  rows.map(r => [
+                    (r.date || '').split('T')[0].split('-').reverse().join('-'),
+                    ...(showBs ? [adToBS(r.date) ? formatBS(adToBS(r.date)) : ''] : []),
+                    r.voucher_no,
+                    r.party_name,
+                    r.party_pan || '—',
+                    r.tds_type,
+                    (r.gross_amount || 0)?.toFixed(2),
+                    (r.tds_amount || 0)?.toFixed(2),
+                    (r.net_paid || 0)?.toFixed(2)
+                  ]),
+                  ['TOTAL', ...(showBs ? [''] : []), '', '', '', '', totGross.toFixed(2), totTds.toFixed(2), totNet.toFixed(2)]
+                )}
+              />
+            );
+          }} />;
 
       case 'category_summary':
         return <SimpleReport title="Category-wise Summary" reportId={reportId} initialData={data} initialFromDate={fromDate} initialToDate={toDate}

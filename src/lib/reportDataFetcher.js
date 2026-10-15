@@ -766,47 +766,301 @@ export async function fetchReportData(reportId, fromDate, toDate, extraParams = 
 
     // ── TAX ───────────────────────────────────────────────────────────────────
 
-    case 'vat_summary':
+    case 'vat_summary': {
+      // 1. Fetch SalesInvoices and PurchaseInvoices
+      const [salesInvoices, purchaseInvoices, allAccounts] = await Promise.all([
+        sajilo.entities.SalesInvoice.list('-invoice_date', 3000).catch(() => []),
+        sajilo.entities.PurchaseInvoice.list('-invoice_date', 3000).catch(() => []),
+        sajilo.entities.ChartOfAccount.filter({ is_active: true }, 'account_code', 2000).catch(() => []),
+      ]);
+
+      const filteredSales = (salesInvoices || []).filter(i => 
+        i.status === 'Posted' && inRange(i.invoice_date, fromDate, toDate)
+      );
+
+      const filteredPurchases = (purchaseInvoices || []).filter(i => 
+        i.status === 'Posted' && inRange(i.invoice_date, fromDate, toDate)
+      );
+
+      let total_sales = 0;
+      let taxable_sales = 0;
+      let exempt_sales = 0;
+      let output_vat = 0;
+
+      filteredSales.forEach(inv => {
+        const vat = Number(inv.total_tax_amount || inv.vat_amount || 0);
+        const gTotal = Number(inv.grand_total || 0);
+        const sub = Number(inv.goods_subtotal || inv.subtotal || 0);
+        
+        output_vat += vat;
+        total_sales += gTotal || (sub + vat);
+
+        if (vat > 0) {
+          const calculatedTaxable = sub > 0 ? sub : (vat / 0.13);
+          taxable_sales += calculatedTaxable;
+          if (gTotal > (calculatedTaxable + vat)) {
+            exempt_sales += (gTotal - (calculatedTaxable + vat));
+          }
+        } else {
+          exempt_sales += (gTotal || sub);
+        }
+      });
+
+      let total_purchases = 0;
+      let taxable_purchases = 0;
+      let exempt_purchases = 0;
+      let input_vat = 0;
+
+      filteredPurchases.forEach(bill => {
+        const vat = Number(bill.vat_amount || bill.total_tax_amount || 0);
+        const gTotal = Number(bill.grand_total || 0);
+        const sub = Number(bill.subtotal || 0);
+
+        input_vat += vat;
+        total_purchases += gTotal || (sub + vat);
+
+        if (vat > 0) {
+          const calculatedTaxable = sub > 0 ? sub : (vat / 0.13);
+          taxable_purchases += calculatedTaxable;
+          if (gTotal > (calculatedTaxable + vat)) {
+            exempt_purchases += (gTotal - (calculatedTaxable + vat));
+          }
+        } else {
+          exempt_purchases += (gTotal || sub);
+        }
+      });
+
+      const net_vat_position = output_vat - input_vat;
+
+      // 2. Fetch Unified VAT Ledger (Account 2120)
+      const vatAccount = (allAccounts || []).find(a => a.account_code === '2120')
+        || (allAccounts || []).find(a => /vat/i.test(a.account_name) && a.account_type === 'Liability');
+
+      let vatLedgerData = {
+        account_id: vatAccount?.id || null,
+        account_code: vatAccount?.account_code || '2120',
+        account_name: vatAccount?.account_name || 'VAT Account (Payable / Refund Control)',
+        opening_balance: 0,
+        total_debit: 0,
+        total_credit: 0,
+        closing_balance: 0,
+        lines: [],
+      };
+
+      if (vatAccount?.id) {
+        const journals = await sajilo.entities.GeneralLedgerJournal.filter({ status: 'Posted' }, 'entry_date', 10000).catch(() => []);
+        const jMap = new Map((journals || []).map(j => [j.id, j]));
+
+        const { data: rawLines } = await supabase.from('GeneralLedgerLine')
+          .select('id, journal_id, account_id, debit_amount, credit_amount, description')
+          .eq('account_id', vatAccount.id);
+
+        let opBal = 0;
+        const periodLines = [];
+
+        (rawLines || []).forEach(line => {
+          const j = jMap.get(line.journal_id);
+          const entryDate = (j?.entry_date || '').substring(0, 10);
+          const dr = Number(line.debit_amount || 0);
+          const cr = Number(line.credit_amount || 0);
+
+          if (entryDate < fromDate) {
+            // Liability account: Credit increases (+), Debit decreases (-)
+            opBal += (cr - dr);
+          } else if (inRange(entryDate, fromDate, toDate)) {
+            const vNum = (j?.voucher_no && j?.voucher_no !== 'AUTO' && j?.voucher_no !== 'REV-AUTO')
+              ? j.voucher_no
+              : (j?.source_document_id || '—');
+
+            periodLines.push({
+              id: line.id,
+              date: entryDate,
+              voucher_no: vNum,
+              module: j?.module || 'GL',
+              description: line.description || j?.description || j?.memo || 'VAT Entry',
+              debit_amount: dr,
+              credit_amount: cr,
+            });
+          }
+        });
+
+        periodLines.sort((a, b) => (a.date || '').localeCompare(b.date || '') || (a.voucher_no || '').localeCompare(b.voucher_no || ''));
+
+        let runningBal = opBal;
+        let totDr = 0;
+        let totCr = 0;
+
+        const computedLines = periodLines.map(l => {
+          runningBal += (l.credit_amount - l.debit_amount);
+          totDr += l.debit_amount;
+          totCr += l.credit_amount;
+          return {
+            ...l,
+            balance: runningBal,
+          };
+        });
+
+        vatLedgerData = {
+          ...vatLedgerData,
+          opening_balance: opBal,
+          total_debit: totDr,
+          total_credit: totCr,
+          closing_balance: runningBal,
+          lines: computedLines,
+        };
+      }
+
+      return {
+        sales_summary: {
+          total_sales,
+          taxable_sales,
+          exempt_sales,
+          output_vat,
+          count: filteredSales.length,
+        },
+        purchase_summary: {
+          total_purchases,
+          taxable_purchases,
+          exempt_purchases,
+          input_vat,
+          count: filteredPurchases.length,
+        },
+        net_vat_position,
+        vat_ledger: vatLedgerData,
+      };
+    }
+
     case 'vat_sales': {
-      const invoices = await sajilo.entities.SalesInvoice.list('-invoice_date', 2000);
+      const [invoices, partners] = await Promise.all([
+        sajilo.entities.SalesInvoice.list('-invoice_date', 3000).catch(() => []),
+        sajilo.entities.BusinessPartner.list('name', 2000).catch(() => []),
+      ]);
+
+      const partnerMap = new Map((partners || []).map(p => [p.id, p]));
+
       return (invoices || [])
-        .filter(i => i.status === 'Posted' && (i.total_tax_amount || 0) > 0 && inRange(i.invoice_date, fromDate, toDate))
-        .map(i => ({
-          invoice_number:  i.invoice_number,
-          invoice_date:    i.invoice_date,
-          customer_name:   i.customer_name,
-          goods_subtotal:  i.subtotal || i.goods_subtotal || 0,
-          total_tax_amount: i.total_tax_amount || i.vat_amount || 0,
-          grand_total:     i.grand_total || 0,
-        }));
+        .filter(i => i.status === 'Posted' && inRange(i.invoice_date, fromDate, toDate))
+        .map(i => {
+          const partner = i.customer_id ? partnerMap.get(i.customer_id) : null;
+          const vat = Number(i.total_tax_amount || i.vat_amount || 0);
+          const gTotal = Number(i.grand_total || 0);
+          const sub = Number(i.goods_subtotal || i.subtotal || 0);
+          const taxable = vat > 0 ? (sub > 0 ? sub : (vat / 0.13)) : 0;
+          const exempt = vat === 0 ? (gTotal || sub) : Math.max(0, gTotal - vat - taxable);
+
+          return {
+            invoice_number:   i.invoice_number,
+            invoice_date:     (i.invoice_date || '').substring(0, 10),
+            customer_name:    i.customer_name || partner?.name || 'Cash Customer',
+            customer_pan:     partner?.tax_id_number || i.customer_pan || '—',
+            taxable_amount:   taxable,
+            exempt_amount:    exempt,
+            vat_amount:       vat,
+            grand_total:      gTotal || (taxable + exempt + vat),
+            status:           i.status,
+          };
+        });
     }
 
     case 'vat_purchases': {
-      const bills = await sajilo.entities.PurchaseInvoice.list('-invoice_date', 2000);
+      const [bills, partners] = await Promise.all([
+        sajilo.entities.PurchaseInvoice.list('-invoice_date', 3000).catch(() => []),
+        sajilo.entities.BusinessPartner.list('name', 2000).catch(() => []),
+      ]);
+
+      const partnerMap = new Map((partners || []).map(p => [p.id, p]));
+
       return (bills || [])
-        .filter(i => i.status === 'Posted' && ((i.vat_amount || 0) + (i.total_tax_amount || 0)) > 0 && inRange(i.invoice_date, fromDate, toDate))
-        .map(i => ({
-          invoice_number: i.invoice_number || i.bill_number,
-          invoice_date:   i.invoice_date   || i.bill_date,
-          customer_name:  i.vendor_name,
-          goods_subtotal: i.subtotal || 0,
-          vat_amount:     i.vat_amount || i.total_tax_amount || 0,
-          grand_total:    i.grand_total || 0,
-        }));
+        .filter(i => i.status === 'Posted' && inRange(i.invoice_date, fromDate, toDate))
+        .map(i => {
+          const partner = i.vendor_id ? partnerMap.get(i.vendor_id) : null;
+          const vat = Number(i.vat_amount || i.total_tax_amount || 0);
+          const gTotal = Number(i.grand_total || 0);
+          const sub = Number(i.subtotal || 0);
+          const taxable = vat > 0 ? (sub > 0 ? sub : (vat / 0.13)) : 0;
+          const exempt = vat === 0 ? (gTotal || sub) : Math.max(0, gTotal - vat - taxable);
+
+          return {
+            invoice_number:    i.invoice_number || i.bill_number,
+            vendor_invoice_no: i.vendor_invoice_no || i.supplier_invoice_number || '—',
+            invoice_date:      (i.invoice_date || i.bill_date || '').substring(0, 10),
+            vendor_name:       i.vendor_name || partner?.name || 'Vendor',
+            supplier_pan:      partner?.tax_id_number || i.supplier_pan || i.vendor_pan || '—',
+            taxable_amount:    taxable,
+            exempt_amount:     exempt,
+            vat_amount:        vat,
+            grand_total:       gTotal || (taxable + exempt + vat),
+            status:            i.status,
+          };
+        });
     }
 
     case 'tds_report': {
-      // Fetch paid payslips with TDS deductions
-      const payslips = await (sajilo.entities.Payslip?.list('-pay_period_end', 2000).catch(() => []) || Promise.resolve([]));
-      return (payslips || [])
+      const [allAccounts, journals, payslips] = await Promise.all([
+        sajilo.entities.ChartOfAccount.filter({ is_active: true }, 'account_code', 2000).catch(() => []),
+        sajilo.entities.GeneralLedgerJournal.filter({ status: 'Posted' }, 'entry_date', 5000).catch(() => []),
+        (sajilo.entities.Payslip?.list('-pay_period_end', 2000).catch(() => []) || Promise.resolve([])),
+      ]);
+
+      const jMap = new Map((journals || []).map(j => [j.id, j]));
+      const tdsAccount = (allAccounts || []).find(a => a.account_code === '2130')
+        || (allAccounts || []).find(a => /tds/i.test(a.account_name) && a.account_type === 'Liability');
+
+      const rows = [];
+
+      // 1. General Ledger TDS entries (Vendor withholding tax on rent, contracts, professional fees, etc.)
+      if (tdsAccount?.id) {
+        const { data: tdsLines } = await supabase.from('GeneralLedgerLine')
+          .select('id, journal_id, account_id, debit_amount, credit_amount, description')
+          .eq('account_id', tdsAccount.id);
+
+        (tdsLines || []).forEach(l => {
+          const j = jMap.get(l.journal_id);
+          const entryDate = (j?.entry_date || '').substring(0, 10);
+          if (inRange(entryDate, fromDate, toDate)) {
+            const cr = Number(l.credit_amount || 0);
+            if (cr > 0) {
+              const vNum = (j?.voucher_no && j?.voucher_no !== 'AUTO' && j?.voucher_no !== 'REV-AUTO')
+                ? j.voucher_no
+                : (j?.source_document_id || '—');
+
+              rows.push({
+                id: l.id,
+                date: entryDate,
+                voucher_no: vNum,
+                party_name: j?.description || l.description || 'Vendor / Contractor',
+                party_pan: '—',
+                tds_type: 'Vendor Withholding Tax',
+                gross_amount: 0,
+                tds_amount: cr,
+                net_paid: 0,
+              });
+            }
+          }
+        });
+      }
+
+      // 2. Payroll TDS from payslips
+      (payslips || [])
         .filter(p => p.status === 'Paid' && inRange(p.pay_period_end || p.pay_period_start, fromDate, toDate))
-        .map(p => ({
-          employee_name: p.employee_name || '—',
-          pay_period:    p.pay_period_end || p.pay_period_start || '—',
-          gross_pay:     p.gross_pay     || 0,
-          tds_amount:    p.tds_amount    || p.income_tax_amount || 0,
-          net_pay:       p.net_pay       || 0,
-        }));
+        .forEach(p => {
+          const tds = Number(p.tds_amount || p.income_tax_amount || 0);
+          if (tds > 0) {
+            rows.push({
+              id: p.id,
+              date: (p.pay_period_end || p.pay_period_start || '').substring(0, 10),
+              voucher_no: p.payslip_number || p.reference || 'PAYSLIP',
+              party_name: p.employee_name || 'Employee',
+              party_pan: p.pan_number || '—',
+              tds_type: 'Payroll Income Tax',
+              gross_amount: Number(p.gross_pay || 0),
+              tds_amount: tds,
+              net_paid: Number(p.net_pay || 0),
+            });
+          }
+        });
+
+      return rows.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
     }
 
     // ── INVENTORY ─────────────────────────────────────────────────────────────
