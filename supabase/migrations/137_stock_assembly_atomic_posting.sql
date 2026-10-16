@@ -11,6 +11,10 @@
 
 BEGIN;
 
+-- Drop existing function first because PostgreSQL prohibits changing return type (from VOID to JSONB) via CREATE OR REPLACE FUNCTION
+DROP FUNCTION IF EXISTS public.complete_stock_assembly(UUID, UUID);
+DROP FUNCTION IF EXISTS public.rpc_complete_stock_assembly(UUID, UUID);
+
 CREATE OR REPLACE FUNCTION public.complete_stock_assembly(
     p_assembly_id UUID,
     p_company_id UUID

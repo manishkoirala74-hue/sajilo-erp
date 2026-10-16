@@ -6,6 +6,7 @@
 BEGIN;
 
 DROP FUNCTION IF EXISTS public.rpc_complete_stock_assembly(UUID, UUID);
+DROP FUNCTION IF EXISTS public.complete_stock_assembly(UUID, UUID);
 
 CREATE OR REPLACE FUNCTION public.complete_stock_assembly(
     p_assembly_id UUID,
