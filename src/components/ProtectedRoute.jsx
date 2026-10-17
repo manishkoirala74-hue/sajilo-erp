@@ -75,6 +75,9 @@ export default function ProtectedRoute({ fallback = <DefaultFallback />, unauthe
     if (authError.type === 'user_not_registered') {
       return <UserNotRegisteredError />;
     }
+    if (authError.type === 'company_access_denied') {
+      return <AccessDenied />;
+    }
     return unauthenticatedElement;
   }
 

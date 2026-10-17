@@ -1,11 +1,13 @@
 -- ============================================================================
 -- 220_stock_assembly_atomic_posting_rollback.sql
 -- Rollback for 220_stock_assembly_atomic_posting.sql
--- Restores complete_stock_assembly to original 073_stock_assembly_rpcs definition.
+-- Restores complete_stock_assembly and create_or_update_stock_assembly to original 073 state.
 -- ============================================================================
 
 BEGIN;
 
+DROP FUNCTION IF EXISTS public.rpc_cancel_stock_assembly(UUID, UUID, TEXT, UUID);
+DROP FUNCTION IF EXISTS public.cancel_stock_assembly(UUID, UUID, TEXT, UUID);
 DROP FUNCTION IF EXISTS public.rpc_complete_stock_assembly(UUID, UUID);
 DROP FUNCTION IF EXISTS public.complete_stock_assembly(UUID, UUID);
 
@@ -21,7 +23,6 @@ DECLARE
     v_assembly RECORD;
     v_item RECORD;
 BEGIN
-    -- 1. Validate assembly
     SELECT * INTO v_assembly 
     FROM public."StockAssembly" 
     WHERE id = p_assembly_id AND company_id = p_company_id
@@ -35,7 +36,6 @@ BEGIN
         RAISE EXCEPTION 'Only Draft assemblies can be completed';
     END IF;
 
-    -- 2. Concurrency Lock: Lock inventory records for consumed/wastage items
     PERFORM 1
     FROM public."CurrentStock"
     WHERE company_id = p_company_id 
@@ -47,14 +47,11 @@ BEGIN
       )
     FOR UPDATE;
 
-    -- 3. Mark as Completed
     UPDATE public."StockAssembly" 
     SET status = 'Completed', updated_at = CURRENT_TIMESTAMP
     WHERE id = p_assembly_id;
 
-    -- 4. Post to Ledger
     PERFORM public.post_stock_assembly_to_ledger(p_assembly_id);
-
 END;
 $$;
 

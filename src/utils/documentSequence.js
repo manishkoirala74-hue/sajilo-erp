@@ -15,6 +15,7 @@ export function getPredictedVoucherNumber(documentType, sequenceConfigs = [], ac
     SalesOrder: 'SO',
     PurchaseOrder: 'PO',
     StockAdjustment: 'SA',
+    StockAssembly: 'ASM',
     SalesReturn: 'SR',
     PurchaseReturn: 'PR',
   };

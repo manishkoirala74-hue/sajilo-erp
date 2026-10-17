@@ -21,6 +21,7 @@ const DEFAULT_DOC_TYPES = [
   { type: 'Journal', label: 'Journal Voucher', prefix: 'JV', padding: 5, include_fy_prefix: true },
   { type: 'Contra', label: 'Contra Voucher', prefix: 'CV', padding: 5, include_fy_prefix: true },
   { type: 'StockAdjustment', label: 'Stock Adjustment', prefix: 'ADJ', padding: 5, include_fy_prefix: true },
+  { type: 'StockAssembly', label: 'Stock Assembly', prefix: 'ASM', padding: 5, include_fy_prefix: true },
 ];
 
 const VoucherSequence = () => {

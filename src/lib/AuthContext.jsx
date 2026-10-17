@@ -147,13 +147,26 @@ export const AuthProvider = ({ children }) => {
       
       if (authUser) {
         const storedCompanyId = sajilo.getCompanyId();
-        const { data: ctx, error } = await sajilo.auth.supabase.rpc('get_user_auth_context', {
+        let { data: ctx, error } = await sajilo.auth.supabase.rpc('get_user_auth_context', {
           p_company_id: storedCompanyId || null
         });
         
         if (error) {
            console.error("Auth RPC failed:", error);
            throw error;
+        }
+
+        // Self-Healing: If access to stored company is denied (e.g. company deleted or membership revoked),
+        // discard the stale localStorage company ID and auto-resolve to the user's default company.
+        if (ctx && ctx.status === 'company_access_denied' && storedCompanyId) {
+          console.warn(`[AuthContext] Access denied for stored company ${storedCompanyId}. Discarding stale ID and resolving default company.`);
+          sajilo.setCompanyId(null);
+          const fallbackRes = await sajilo.auth.supabase.rpc('get_user_auth_context', {
+            p_company_id: null
+          });
+          if (!fallbackRes.error && fallbackRes.data) {
+            ctx = fallbackRes.data;
+          }
         }
 
         switch (ctx.status) {
@@ -175,7 +188,23 @@ export const AuthProvider = ({ children }) => {
             return;
             
           case 'company_access_denied':
+            // If the user has other available secondary companies, auto-switch to the first one!
+            if (ctx.available_companies && ctx.available_companies.length > 0) {
+              const secondary = ctx.available_companies[0];
+              console.warn(`[AuthContext] Requested company access denied. Auto-switching to secondary company: ${secondary.name} (${secondary.id})`);
+              sajilo.setCompanyId(secondary.id);
+              await switchCompany(secondary.id);
+              return;
+            }
             setAuthError({ type: 'company_access_denied' });
+            setUser(authUser);
+            setSession({ user: authUser });
+            setIsAuthenticated(true);
+            setAvailableCompanies(ctx.available_companies || []);
+            setActiveCompany(null);
+            setActiveRole(null);
+            setActiveOverrides([]);
+            sajilo.setCompanyId(null);
             break;
             
           case 'no_company':
@@ -197,6 +226,15 @@ export const AuthProvider = ({ children }) => {
               return;
             }
             
+            // If active_company is missing but available secondary companies exist, auto-select the first one!
+            if (!ctx.active_company && ctx.available_companies && ctx.available_companies.length > 0) {
+              const secondary = ctx.available_companies[0];
+              console.warn(`[AuthContext] Active company not resolved. Auto-switching to secondary company: ${secondary.name} (${secondary.id})`);
+              sajilo.setCompanyId(secondary.id);
+              await switchCompany(secondary.id);
+              return;
+            }
+
             const mergedUser = { ...authUser, ...ctx.user, is_tenant_admin: ctx.is_tenant_admin };
             setUser(mergedUser);
             setSession({ user: mergedUser });
@@ -208,10 +246,14 @@ export const AuthProvider = ({ children }) => {
             setGlobalSettings(ctx.settings || null);
             setActiveGodowns(ctx.godowns || []);
             setMainGodownId((ctx.godowns || []).find(g => g.is_main)?.id || null);
-            sajilo.setCompanyId(ctx.active_company.id);
+            if (ctx.active_company?.id) {
+              sajilo.setCompanyId(ctx.active_company.id);
+            }
             
             // Fire-and-Forget Domain Data
-            sajilo.prefetchDomainData(ctx.active_company.id);
+            if (ctx.active_company?.id) {
+              sajilo.prefetchDomainData(ctx.active_company.id);
+            }
             break;
         }
       } else {

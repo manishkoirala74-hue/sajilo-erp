@@ -13,6 +13,7 @@ import DateInput from '@/components/shared/DateInput';
 import { useQuery } from '@tanstack/react-query';
 import { queryClientInstance } from '@/lib/query-client';
 import { useAmountFormatter } from '@/hooks/useAmountFormatter';
+import { getPredictedVoucherNumber } from '@/utils/documentSequence';
 
 // Discrete units that cannot physically exist in fractions
 const DISCRETE_UOMS = new Set(['PCS', 'NOS', 'BOX', 'SET', 'UNIT', 'BAG', 'PKT', 'PAIR', 'ROLL', 'DOZEN']);
@@ -32,15 +33,23 @@ export default function StockAssemblyForm({ assemblyId, onClose, onSaved }) {
   const [loading, setLoading] = useState(false);
   const [items, setItems] = useState([]);
   const [godowns, setGodowns] = useState([]);
+  const [predictedNumber, setPredictedNumber] = useState('');
   const [showTemplateModal, setShowTemplateModal] = useState(false);
   const [recentAssemblies, setRecentAssemblies] = useState([]);
   const [loadingTemplates, setLoadingTemplates] = useState(false);
+  const [assemblyStatus, setAssemblyStatus] = useState('Draft');
+  const [cancellationReason, setCancellationReason] = useState('');
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancelReasonInput, setCancelReasonInput] = useState('');
+  const [cancelling, setCancelling] = useState(false);
+
+  const isLocked = assemblyStatus === 'Completed' || assemblyStatus === 'Cancelled';
 
   const companyId = activeCompany?.id || user?.company_id;
 
   const { register, control, handleSubmit, reset, watch, setValue } = useForm({
     defaultValues: {
-      assembly_no: `ASM-${Date.now().toString().slice(-6)}`,
+      assembly_no: 'AUTO',
       assembly_date: new Date().toISOString().split('T')[0],
       godown_id: '',
       overhead_cost: 0,
@@ -92,9 +101,12 @@ export default function StockAssemblyForm({ assemblyId, onClose, onSaved }) {
 
   const fetchDependencies = async () => {
     try {
-      const [gList, iList] = await Promise.all([
+      const [gList, iList, seqConfigs, fyList, compSettings] = await Promise.all([
         sajilo.entities.Godown.list(),
-        sajilo.entities.Item.list()
+        sajilo.entities.Item.list(),
+        sajilo.entities.DocumentSequenceConfig.list(),
+        sajilo.entities.FiscalYear.list(),
+        sajilo.entities.CompanySettings.list()
       ]);
       setGodowns(gList || []);
       setItems(iList || []);
@@ -104,6 +116,17 @@ export default function StockAssemblyForm({ assemblyId, onClose, onSaved }) {
         const mainG = gList.find(g => g.is_main) || gList[0];
         setValue('godown_id', mainG.id);
       }
+
+      // Predicted sequence preview for new assemblies
+      if (!assemblyId) {
+        const today = new Date().toISOString().split('T')[0];
+        const currentFy = (fyList || []).find(fy => fy.status === 'OPEN' || (today >= fy.start_date && today <= fy.end_date)) || fyList?.[0];
+        const predicted = getPredictedVoucherNumber('StockAssembly', seqConfigs, currentFy, compSettings?.[0] || {});
+        if (predicted) {
+          setPredictedNumber(predicted);
+        }
+        setValue('assembly_no', 'AUTO');
+      }
     } catch (e) {
       toast.error('Failed to load Godowns and Items');
     }
@@ -112,14 +135,26 @@ export default function StockAssemblyForm({ assemblyId, onClose, onSaved }) {
   const loadAssembly = async (id) => {
     try {
       setLoading(true);
-      const data = await sajilo.entities.StockAssembly.getById(id);
-      const { data: linesData } = await supabase.from('StockAssemblyItem').select('*').eq('assembly_id', id);
+      const data = await sajilo.entities.StockAssembly.get(id);
+      if (!data) {
+        toast.error('Stock assembly not found');
+        return;
+      }
+      const { data: linesData, error: linesErr } = await supabase.from('StockAssemblyItem').select('*').eq('assembly_id', id);
+      if (linesErr) throw linesErr;
       
+      setAssemblyStatus(data.status || 'Draft');
+      setCancellationReason(data.cancellation_reason || '');
+
       reset({
         ...data,
-        lineItems: linesData || []
+        lineItems: (linesData && linesData.length > 0) ? linesData : [
+          { item_id: '', line_type: 'Consumed', quantity: 1, unit_cost: 0 },
+          { item_id: '', line_type: 'Produced', quantity: 1, unit_cost: 0 }
+        ]
       });
     } catch (e) {
+      console.error(e);
       toast.error('Failed to load assembly details');
     } finally {
       setLoading(false);
@@ -233,13 +268,28 @@ export default function StockAssemblyForm({ assemblyId, onClose, onSaved }) {
   const calculatedUnitCost = producedQty > 0 ? (totalProductionCost / producedQty) : 0;
 
   const onSubmit = async (data, isComplete = false) => {
+    if (isLocked) {
+      toast.error('This assembly is completed or cancelled and cannot be edited.');
+      return;
+    }
+
     if (!data.godown_id) {
       toast.error('Please select a Godown');
       return;
     }
 
-    if (producedQty <= 0) {
+    // Filter valid lines
+    const validLines = (data.lineItems || []).filter(l => l.item_id && Number(l.quantity) > 0);
+    const consumedLines = validLines.filter(l => l.line_type === 'Consumed');
+    const producedLines = validLines.filter(l => l.line_type === 'Produced');
+
+    if (producedLines.length === 0) {
       toast.error('Please specify at least one Produced item with a quantity greater than zero');
+      return;
+    }
+
+    if (consumedLines.length === 0) {
+      toast.error('Please specify at least one Consumed raw material with a quantity greater than zero');
       return;
     }
 
@@ -252,20 +302,25 @@ export default function StockAssemblyForm({ assemblyId, onClose, onSaved }) {
 
     setLoading(true);
     try {
-      const status = isComplete ? 'Completed' : 'Draft';
-      
-      // Step 1: Save header and items via create_or_update_stock_assembly
+      // Resolve assembly number: send 'AUTO' if new and unset, 'AUTO', or matches the predicted placeholder
+      const cleanAssemblyNo = (!assemblyId && (
+        !data.assembly_no || 
+        data.assembly_no.trim() === '' || 
+        data.assembly_no.toUpperCase() === 'AUTO' || 
+        data.assembly_no === predictedNumber
+      )) ? 'AUTO' : data.assembly_no.trim();
+
+      // Step 1: Always save header and items with status = 'Draft' first
       const { data: resultId, error: rpcError } = await supabase.rpc('create_or_update_stock_assembly', {
         p_assembly_id: assemblyId || null,
         p_company_id: companyId,
-        p_assembly_no: data.assembly_no,
+        p_assembly_no: cleanAssemblyNo,
         p_godown_id: data.godown_id,
         p_assembly_date: data.assembly_date,
         p_overhead_cost: Number(data.overhead_cost || 0),
-        p_status: status,
-        p_notes: data.notes,
-        p_items: data.lineItems.map(l => ({
-           id: l.id || undefined,
+        p_status: 'Draft',
+        p_notes: data.notes || '',
+        p_items: validLines.map(l => ({
            item_id: l.item_id,
            line_type: l.line_type,
            quantity: Number(l.quantity),
@@ -294,16 +349,20 @@ export default function StockAssemblyForm({ assemblyId, onClose, onSaved }) {
          queryClientInstance.invalidateQueries({ queryKey: ['Item'] });
          queryClientInstance.invalidateQueries({ queryKey: ['StockAssembly'] });
 
-         const syncChannel = new BroadcastChannel('sajilo_sync');
-         syncChannel.postMessage({ type: 'INVALIDATE', tableName: 'CurrentStock' });
-         syncChannel.postMessage({ type: 'INVALIDATE', tableName: 'Item' });
-         syncChannel.close();
+         try {
+           const syncChannel = new BroadcastChannel('sajilo_sync');
+           syncChannel.postMessage({ type: 'INVALIDATE', tableName: 'CurrentStock' });
+           syncChannel.postMessage({ type: 'INVALIDATE', tableName: 'Item' });
+           syncChannel.postMessage({ type: 'INVALIDATE', tableName: 'StockAssembly' });
+           syncChannel.close();
+         } catch (bcErr) {}
 
          window.dispatchEvent(new CustomEvent('sajilo_invalidate', { detail: 'CurrentStock' }));
          window.dispatchEvent(new CustomEvent('sajilo_invalidate', { detail: 'Item' }));
 
          toast.success('Stock Assembly completed, physical inventory updated, and General Ledger balanced!');
       } else {
+         queryClientInstance.invalidateQueries({ queryKey: ['StockAssembly'] });
          toast.success('Stock Assembly Draft saved successfully!');
       }
 
@@ -315,17 +374,67 @@ export default function StockAssemblyForm({ assemblyId, onClose, onSaved }) {
     }
   };
 
+  const handleCancelAssembly = async () => {
+    if (!cancelReasonInput.trim()) {
+      toast.error('Please enter a cancellation reason');
+      return;
+    }
+
+    setCancelling(true);
+    try {
+      const { data: cancelResult, error: cancelError } = await supabase.rpc('cancel_stock_assembly', {
+        p_assembly_id: assemblyId,
+        p_company_id: companyId,
+        p_reason: cancelReasonInput.trim()
+      });
+
+      if (cancelError) throw cancelError;
+
+      queryClientInstance.invalidateQueries({ queryKey: ['CurrentStock'] });
+      queryClientInstance.invalidateQueries({ queryKey: ['Item'] });
+      queryClientInstance.invalidateQueries({ queryKey: ['StockAssembly'] });
+
+      try {
+        const syncChannel = new BroadcastChannel('sajilo_sync');
+        syncChannel.postMessage({ type: 'INVALIDATE', tableName: 'CurrentStock' });
+        syncChannel.postMessage({ type: 'INVALIDATE', tableName: 'Item' });
+        syncChannel.postMessage({ type: 'INVALIDATE', tableName: 'StockAssembly' });
+        syncChannel.close();
+      } catch (bcErr) {}
+
+      window.dispatchEvent(new CustomEvent('sajilo_invalidate', { detail: 'CurrentStock' }));
+      window.dispatchEvent(new CustomEvent('sajilo_invalidate', { detail: 'Item' }));
+
+      toast.success(cancelResult?.message || 'Stock Assembly successfully cancelled and reversed!');
+      setShowCancelModal(false);
+      onSaved();
+    } catch (e) {
+      toast.error(e.message || 'Failed to cancel stock assembly');
+    } finally {
+      setCancelling(false);
+    }
+  };
+
   return (
     <>
       <Dialog open={true} onOpenChange={(open) => !open && onClose()}>
         <DialogContent className="max-w-5xl max-h-[92vh] overflow-y-auto">
           <DialogHeader>
             <div className="flex items-center justify-between pr-6">
-              <DialogTitle className="flex items-center gap-2">
-                <Layers className="w-5 h-5 text-indigo-500" />
-                {assemblyId ? 'Edit Stock Assembly' : 'New Stock Assembly'}
-              </DialogTitle>
-              {!assemblyId && (
+              <div className="flex items-center gap-3">
+                <DialogTitle className="flex items-center gap-2">
+                  <Layers className="w-5 h-5 text-indigo-500" />
+                  {assemblyId ? (isLocked ? 'View Stock Assembly' : 'Edit Stock Assembly') : 'New Stock Assembly'}
+                </DialogTitle>
+                <span className={`text-xs px-2.5 py-0.5 rounded-full border font-medium ${
+                  assemblyStatus === 'Completed' ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-400'
+                  : assemblyStatus === 'Cancelled' ? 'bg-red-50 text-red-700 border-red-200 dark:bg-red-500/10 dark:text-red-400'
+                  : 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-500/10 dark:text-amber-400'
+                }`}>
+                  {assemblyStatus}
+                </span>
+              </div>
+              {!assemblyId && !isLocked && (
                 <Button 
                   type="button" 
                   variant="outline" 
@@ -341,19 +450,62 @@ export default function StockAssemblyForm({ assemblyId, onClose, onSaved }) {
           </DialogHeader>
           
           <div className="space-y-6 py-4">
+            {/* Status Alert Banners */}
+            {assemblyStatus === 'Completed' && (
+              <div className="flex items-center justify-between p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 text-xs text-emerald-800 dark:text-emerald-300">
+                <div className="flex items-center gap-2.5">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                  <span><strong>Completed & Locked:</strong> Physical inventory has been deducted/added and balanced journal entries have been posted to the General Ledger.</span>
+                </div>
+                <Button 
+                  type="button" 
+                  variant="destructive" 
+                  size="sm" 
+                  onClick={() => setShowCancelModal(true)}
+                  className="h-7 text-xs shrink-0 ml-3"
+                >
+                  Reverse / Cancel Assembly
+                </Button>
+              </div>
+            )}
+
+            {assemblyStatus === 'Cancelled' && (
+              <div className="p-3.5 rounded-xl bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-xs text-red-800 dark:text-red-300">
+                <div className="flex items-center gap-2 font-semibold">
+                  <AlertTriangle className="w-4 h-4 text-red-600 shrink-0" />
+                  <span>Assembly Cancelled & Reversed</span>
+                </div>
+                {cancellationReason && (
+                  <p className="mt-1 text-red-700/80 dark:text-red-400 text-[11px]">Reason: {cancellationReason}</p>
+                )}
+              </div>
+            )}
+
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
-                <Label>Assembly No *</Label>
-                <Input {...register('assembly_no')} />
+                <Label className="flex items-center justify-between text-xs">
+                  <span>Assembly No *</span>
+                  {!assemblyId && (
+                    <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded font-mono">
+                      Auto-Numbered
+                    </span>
+                  )}
+                </Label>
+                <Input 
+                  {...register('assembly_no')} 
+                  placeholder={predictedNumber ? `Auto (${predictedNumber})` : 'AUTO'}
+                  disabled={isLocked}
+                  className="font-mono text-xs"
+                />
               </div>
               <div>
                 <Label>Date *</Label>
-                <DateInput value={watch('assembly_date')} onChange={val => setValue('assembly_date', val)} />
+                <DateInput value={watch('assembly_date')} onChange={val => setValue('assembly_date', val)} disabled={isLocked} />
               </div>
               <div>
                 <Label>Godown / Branch *</Label>
-                <Select onValueChange={v => setValue('godown_id', v)} value={watchGodownId}>
-                  <SelectTrigger>
+                <Select onValueChange={v => setValue('godown_id', v)} value={watchGodownId} disabled={isLocked}>
+                  <SelectTrigger disabled={isLocked}>
                     <SelectValue placeholder="Select Godown" />
                   </SelectTrigger>
                   <SelectContent>
@@ -372,14 +524,16 @@ export default function StockAssemblyForm({ assemblyId, onClose, onSaved }) {
                   <h3 className="font-semibold text-sm text-foreground">Assembly Bill of Materials (BOM)</h3>
                   <p className="text-xs text-muted-foreground mt-0.5">Specify consumed raw materials, scrap recovery, and target finished goods</p>
                 </div>
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={() => append({ item_id: '', line_type: 'Consumed', quantity: 1, unit_cost: 0 })}
-                >
-                  <Plus className="w-4 h-4 mr-1.5" /> Add Item
-                </Button>
+                {!isLocked && (
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => append({ item_id: '', line_type: 'Consumed', quantity: 1, unit_cost: 0 })}
+                  >
+                    <Plus className="w-4 h-4 mr-1.5" /> Add Item
+                  </Button>
+                )}
               </div>
 
               <div className="overflow-x-auto">
@@ -412,6 +566,7 @@ export default function StockAssemblyForm({ assemblyId, onClose, onSaved }) {
                           {/* Type Select */}
                           <td className="py-2.5 px-2 w-36">
                             <Select 
+                              disabled={isLocked}
                               onValueChange={v => {
                                 setValue(`lineItems.${index}.line_type`, v);
                                 if (v === 'Produced') {
@@ -423,7 +578,7 @@ export default function StockAssemblyForm({ assemblyId, onClose, onSaved }) {
                               }} 
                               value={currentLine.line_type || 'Consumed'}
                             >
-                              <SelectTrigger className="h-8 text-xs">
+                              <SelectTrigger className="h-8 text-xs" disabled={isLocked}>
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
@@ -437,6 +592,7 @@ export default function StockAssemblyForm({ assemblyId, onClose, onSaved }) {
                           {/* Item Select */}
                           <td className="py-2.5 px-2 min-w-[200px]">
                             <Select 
+                              disabled={isLocked}
                               onValueChange={v => {
                                  setValue(`lineItems.${index}.item_id`, v);
                                  const item = itemsMap.get(v);
@@ -449,7 +605,7 @@ export default function StockAssemblyForm({ assemblyId, onClose, onSaved }) {
                               }} 
                               value={currentLine.item_id}
                             >
-                              <SelectTrigger className="h-8 text-xs">
+                              <SelectTrigger className="h-8 text-xs" disabled={isLocked}>
                                 <SelectValue placeholder="Select Item" />
                               </SelectTrigger>
                               <SelectContent>
@@ -463,7 +619,7 @@ export default function StockAssemblyForm({ assemblyId, onClose, onSaved }) {
                                 })}
                               </SelectContent>
                             </Select>
-                            {stockInfo.isBlocked && (
+                            {!isLocked && stockInfo.isBlocked && (
                               <p className="text-[10px] text-red-500 font-semibold mt-0.5 flex items-center gap-1">
                                 <AlertTriangle className="w-3 h-3 shrink-0" />
                                 {stockInfo.errorMsg}
@@ -507,7 +663,8 @@ export default function StockAssemblyForm({ assemblyId, onClose, onSaved }) {
                               type="number" 
                               step="0.01" 
                               min="0.001"
-                              className={`h-8 text-right font-mono text-xs ${stockInfo.isBlocked ? 'border-red-500 focus-visible:ring-red-400' : ''}`}
+                              disabled={isLocked}
+                              className={`h-8 text-right font-mono text-xs ${!isLocked && stockInfo.isBlocked ? 'border-red-500 focus-visible:ring-red-400' : ''}`}
                               {...register(`lineItems.${index}.quantity`)} 
                             />
                           </td>
@@ -518,7 +675,7 @@ export default function StockAssemblyForm({ assemblyId, onClose, onSaved }) {
                               type="number" 
                               step="0.01" 
                               className="h-8 text-right font-mono text-xs"
-                              disabled={isProduced}
+                              disabled={isLocked || isProduced}
                               title={isProduced ? 'Produced cost is computed automatically' : isWastage ? 'Enter scrap Net Realizable Value' : 'Live WAC cost'}
                               {...register(`lineItems.${index}.unit_cost`)} 
                             />
@@ -544,15 +701,17 @@ export default function StockAssemblyForm({ assemblyId, onClose, onSaved }) {
 
                           {/* Action Button */}
                           <td className="py-2.5 px-2 text-center">
-                            <Button 
-                              type="button" 
-                              variant="ghost" 
-                              size="icon" 
-                              className="h-7 w-7 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-500/10" 
-                              onClick={() => remove(index)}
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </Button>
+                            {!isLocked && (
+                              <Button 
+                                type="button" 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-7 w-7 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-500/10" 
+                                onClick={() => remove(index)}
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </Button>
+                            )}
                           </td>
                         </tr>
                       );
@@ -561,7 +720,7 @@ export default function StockAssemblyForm({ assemblyId, onClose, onSaved }) {
                 </table>
               </div>
 
-              {hasStockDeficit && (
+              {!isLocked && hasStockDeficit && (
                 <div className="mt-4 p-3 rounded-lg bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-xs text-red-700 dark:text-red-400 space-y-1">
                   <div className="flex items-center gap-1.5 font-semibold">
                     <AlertTriangle className="w-4 h-4 shrink-0 text-red-600" />
@@ -586,6 +745,7 @@ export default function StockAssemblyForm({ assemblyId, onClose, onSaved }) {
                   <Input 
                     type="number" 
                     step="0.01" 
+                    disabled={isLocked}
                     className="h-8 text-xs mt-1"
                     placeholder="0.00"
                     {...register('overhead_cost')} 
@@ -595,6 +755,7 @@ export default function StockAssemblyForm({ assemblyId, onClose, onSaved }) {
                 <div>
                   <Label className="text-xs">Notes / Batch Remarks</Label>
                   <Input 
+                    disabled={isLocked}
                     className="h-8 text-xs mt-1"
                     placeholder="Optional assembly notes..."
                     {...register('notes')} 
@@ -632,27 +793,95 @@ export default function StockAssemblyForm({ assemblyId, onClose, onSaved }) {
           </div>
 
           <DialogFooter className="gap-2 sm:gap-0 pt-2 border-t border-border">
-            <Button variant="outline" onClick={onClose} disabled={loading}>Cancel</Button>
-            <div className="flex gap-2">
-              <Button 
-                variant="secondary" 
-                onClick={handleSubmit((data) => onSubmit(data, false))} 
-                disabled={loading}
-              >
-                Save as Draft
-              </Button>
-              <Button 
-                onClick={handleSubmit((data) => onSubmit(data, true))} 
-                disabled={loading || hasStockDeficit}
-                className={hasStockDeficit ? 'opacity-50 cursor-not-allowed bg-slate-400' : 'bg-indigo-600 hover:bg-indigo-700 text-white'}
-                title={hasStockDeficit ? 'Fix stock deficits before completing' : 'Complete and post to General Ledger'}
-              >
-                {hasStockDeficit ? 'Stock Deficit (Blocked)' : 'Complete Assembly'}
-              </Button>
-            </div>
+            {isLocked ? (
+              <div className="flex items-center justify-between w-full">
+                {assemblyStatus === 'Completed' ? (
+                  <Button 
+                    type="button" 
+                    variant="destructive" 
+                    size="sm" 
+                    onClick={() => setShowCancelModal(true)}
+                  >
+                    Reverse / Cancel Assembly
+                  </Button>
+                ) : <div />}
+                <Button variant="outline" onClick={onClose}>Close</Button>
+              </div>
+            ) : (
+              <>
+                <Button variant="outline" onClick={onClose} disabled={loading}>Cancel</Button>
+                <div className="flex gap-2">
+                  <Button 
+                    variant="secondary" 
+                    onClick={handleSubmit((data) => onSubmit(data, false))} 
+                    disabled={loading}
+                  >
+                    Save as Draft
+                  </Button>
+                  <Button 
+                    onClick={handleSubmit((data) => onSubmit(data, true))} 
+                    disabled={loading || hasStockDeficit}
+                    className={hasStockDeficit ? 'opacity-50 cursor-not-allowed bg-slate-400' : 'bg-indigo-600 hover:bg-indigo-700 text-white'}
+                    title={hasStockDeficit ? 'Fix stock deficits before completing' : 'Complete and post to General Ledger'}
+                  >
+                    {hasStockDeficit ? 'Stock Deficit (Blocked)' : 'Complete Assembly'}
+                  </Button>
+                </div>
+              </>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* ── MODAL: REVERSE / CANCEL ASSEMBLY CONFIRMATION ── */}
+      {showCancelModal && (
+        <Dialog open={true} onOpenChange={setShowCancelModal}>
+          <DialogContent className="max-w-md" style={{ zIndex: 10000 }}>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-red-600">
+                <AlertTriangle className="w-5 h-5" />
+                Reverse & Cancel Stock Assembly
+              </DialogTitle>
+            </DialogHeader>
+            <div className="py-3 space-y-3 text-xs">
+              <p className="text-muted-foreground leading-relaxed">
+                Are you sure you want to cancel and reverse this Stock Assembly (<strong>{watch('assembly_no')}</strong>)?
+              </p>
+              <div className="p-3 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-md text-red-700 dark:text-red-400 space-y-1">
+                <p className="font-semibold">Automatic System Actions:</p>
+                <ul className="list-disc pl-4 space-y-0.5 text-[11px]">
+                  <li>Deducts the produced Finished Goods from this Godown</li>
+                  <li>Restocks all consumed Raw Materials back into inventory</li>
+                  <li>Reverses the scrap recovery if recorded</li>
+                  <li>Posts automatic balancing contra-entries in General Ledger</li>
+                </ul>
+              </div>
+              <div className="space-y-1.5 pt-1">
+                <Label className="text-xs font-semibold">Cancellation Reason *</Label>
+                <Input 
+                  value={cancelReasonInput} 
+                  onChange={e => setCancelReasonInput(e.target.value)} 
+                  placeholder="e.g. Wrong raw material quantity entered, defective batch..." 
+                  className="h-8 text-xs" 
+                />
+              </div>
+            </div>
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button variant="outline" size="sm" onClick={() => setShowCancelModal(false)} disabled={cancelling}>
+                Keep Assembly
+              </Button>
+              <Button 
+                variant="destructive" 
+                size="sm" 
+                onClick={handleCancelAssembly} 
+                disabled={cancelling || !cancelReasonInput.trim()}
+              >
+                {cancelling ? 'Reversing...' : 'Confirm Reversal'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
 
       {/* ── MODAL: COPY FROM PREVIOUS ASSEMBLY TEMPLATE ── */}
       {showTemplateModal && (

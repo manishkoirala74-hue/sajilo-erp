@@ -1,14 +1,20 @@
-import { useSearchParams } from 'react-router-dom';
-import { useState, useEffect, useMemo } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { sajilo } from '@/api/sajiloClient';
 import { useMasterData } from '@/hooks/useMasterData';
 import { useAuth } from '@/lib/AuthContext';
 import { loadActiveTaxTypes } from '@/lib/taxService';
-import { Plus, Edit2, Package, AlertTriangle, Upload, X, History, CheckSquare, Square, Minus, Trash2, Ban } from 'lucide-react';
+import { 
+  Plus, Edit2, Package, AlertTriangle, Upload, X, History, 
+  CheckSquare, Square, Minus, Trash2, Ban, TrendingDown, 
+  Layers, FileText, Check, ExternalLink, ArrowRight, ShieldCheck, DollarSign 
+} from 'lucide-react';
 import SearchableSelect from '@/components/shared/SearchableSelect';
 import ItemTransactionHistory from '@/components/inventory/ItemTransactionHistory';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -177,11 +183,35 @@ function BulkActionBar({ selectedIds, onClear, accounts, categories, onBulkUpdat
 export default function Items() {
   
 
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { globalSettings } = useAuth();
+  const companyId = sajilo.getCompanyId();
   const { categories, uoms, accounts, discountSchemes, taxTypes, isLoading: loadingMasterData } = useMasterData();
 
-  const [items, setItems] = useState([]);
-  const [loadingItems, setLoadingItems] = useState(true);
+  // ── TanStack Query for Items (DEVELOPMENT_CHECKLIST.md §2) ────────
+  const { data: items = [], isLoading: loadingItems, refetch: fetchItems } = useQuery({
+    queryKey: ['Company', companyId, 'Item', 'items'],
+    queryFn: async () => {
+      const its = await sajilo.entities.Item.list('-created_date', 3000);
+      return its || [];
+    },
+    enabled: !!companyId,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const invalidateItemCache = useCallback(() => {
+    queryClient.invalidateQueries({
+      predicate: (query) => query.queryKey.includes('Item')
+    });
+    try {
+      const syncChannel = new BroadcastChannel('sajilo_sync');
+      syncChannel.postMessage({ type: 'INVALIDATE', tableName: 'Item' });
+    } catch {
+      // Fallback
+    }
+  }, [queryClient]);
+
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(emptyItem);
@@ -192,6 +222,11 @@ export default function Items() {
   const [historyItem, setHistoryItem] = useState(null);
   const [selectedIds, setSelectedIds] = useState([]);
   const [search, setSearch] = useState('');
+  const [initOpeningStock, setInitOpeningStock] = useState(false);
+  const [priceRevisionPrompt, setPriceRevisionPrompt] = useState(null);
+  const [priceRevisionReason, setPriceRevisionReason] = useState('');
+  const [revisingPrice, setRevisingPrice] = useState(false);
+  const [activeTab, setActiveTab] = useState('general');
 
   const settings = globalSettings || null;
   const imgSettings = useMemo(() => ({
@@ -201,17 +236,53 @@ export default function Items() {
 
   const loading = loadingItems && items.length === 0;
 
-  useEffect(() => {
-    sajilo.entities.Item.list('-created_date')
-      .then(its => {
-        setItems(its || []);
-        setLoadingItems(false);
-      })
-      .catch(err => {
-        console.error('Failed to load items:', err);
-        setLoadingItems(false);
-      });
-  }, []);
+  const defaultVatTax = useMemo(() => {
+    return (taxTypes || []).find(t => t.is_default || t.tax_name?.toLowerCase().includes('vat') || Number(t.tax_rate) === 13) || null;
+  }, [taxTypes]);
+
+  const currentVatMode = useMemo(() => {
+    const ids = form.tax_type_ids || [];
+    if (ids.length === 0) return 'exempt';
+    if (defaultVatTax && ids.length === 1 && ids[0] === defaultVatTax.id) return 'vat_13';
+    return 'custom';
+  }, [form.tax_type_ids, defaultVatTax]);
+
+  const setVatMode = (mode) => {
+    if (mode === 'vat_13') {
+      if (defaultVatTax) {
+        sf('tax_type_ids', [defaultVatTax.id]);
+        sf('is_vat_applicable', true);
+      } else {
+        toast.warning('Default 13% VAT tax type not found in Settings.');
+      }
+    } else if (mode === 'exempt') {
+      sf('tax_type_ids', []);
+      sf('is_vat_applicable', false);
+    }
+  };
+
+  const handleItemTypeSelect = (type) => {
+    setForm(prev => {
+      const next = { ...prev, item_type: type };
+      if (type === 'Service') {
+        next.unit_of_measure = prev.unit_of_measure && ['HRS', 'JOB', 'SRV'].includes(prev.unit_of_measure)
+          ? prev.unit_of_measure 
+          : ((uoms || []).find(u => ['HRS', 'JOB', 'SRV'].includes(u.uom_code))?.uom_code || 'JOB');
+        next.purchase_price = 0;
+        next.quantity_on_hand = 0;
+        next.reorder_level = 0;
+        next.inventory_account_id = '';
+        next.inventory_account_name = '';
+        if (activeTab === 'stock') setActiveTab('general');
+      } else {
+        if (!prev.unit_of_measure || ['HRS', 'JOB', 'SRV'].includes(prev.unit_of_measure)) {
+          next.unit_of_measure = 'PCS';
+        }
+      }
+      return next;
+    });
+  };
+
   const [searchParams, setSearchParams] = useSearchParams();
   useEffect(() => {
     if (searchParams.get('new') === '1') {
@@ -220,12 +291,6 @@ export default function Items() {
       setSearchParams(searchParams, { replace: true });
     }
   }, [searchParams, setSearchParams]);
-
-
-  const fetchItems = async () => {
-    const data = await sajilo.entities.Item.list('-created_date');
-    setItems(data);
-  };
 
   const openNew = () => { 
     // P3: Read defaults from GL Settings, with graceful fallback to hardcoded codes if not configured
@@ -244,17 +309,30 @@ export default function Items() {
       inventory_account_name: defInv?.account_name || '',
     }); 
     setEditing(null); 
+    setInitOpeningStock(false);
+    setPriceRevisionPrompt(null);
+    setPriceRevisionReason('');
+    setActiveTab('general');
     setShowForm(true); 
   };
+
   const openEdit = (item) => {
+    const rawTaxIds = Array.isArray(item.tax_type_ids) 
+      ? item.tax_type_ids 
+      : (item.tax_type_ids ? JSON.parse(item.tax_type_ids) : []);
+
     setForm({
       ...item,
       attributes: item.attributes || { model: '', specifications: '', color: '', size: '', weight: '', custom_metadata: [] },
       image_urls: item.image_urls || (item.image_url ? [item.image_url] : []),
-      tax_type_ids: Array.isArray(item.tax_type_ids) ? item.tax_type_ids : (item.tax_type_ids ? JSON.parse(item.tax_type_ids) : []),
+      tax_type_ids: rawTaxIds,
     });
     setEditing(item);
-    setShowForm(true);
+    setInitOpeningStock(false);
+    setPriceRevisionPrompt(null);
+    setPriceRevisionReason('');
+    setActiveTab('general');
+    setShowForm(true); 
   };
 
   const handleImageUpload = async (e) => {
@@ -295,49 +373,51 @@ export default function Items() {
     if (!form.item_name) { toast.error('Item name is required'); return; }
 
     const isPhysical = form.item_type !== 'Service';
-    const hasOpeningStock = Number(form.quantity_on_hand || 0) > 0;
+    const hasOpeningStock = !editing && initOpeningStock && Number(form.quantity_on_hand || 0) > 0;
     const purchasePrice = Number(form.purchase_price || 0);
 
-    if (isPhysical && hasOpeningStock && purchasePrice <= 0) {
+    // Only validate opening stock purchase cost during initial item creation
+    if (!editing && isPhysical && hasOpeningStock && purchasePrice <= 0) {
       toast.error('Purchase cost/WAC must be strictly greater than zero when initializing opening stock.', { duration: 6000 });
+      return;
+    }
+
+    const { image_urls: _image_urls, total_asset_value: _total_asset_value, ...payload } = form;
+    payload.image_url = form.image_url || (form.image_urls && form.image_urls[0]) || null;
+    const taxIds = Array.isArray(form.tax_type_ids) ? form.tax_type_ids : [];
+    payload.tax_type_ids = taxIds;
+    payload.is_vat_applicable = taxIds.length > 0;
+
+    // Check if selling price changed on edit — trigger in-modal revision audit
+    if (editing && Number(editing.selling_price || 0) !== Number(payload.selling_price || 0)) {
+      setPriceRevisionPrompt({
+        oldPrice: Number(editing.selling_price || 0),
+        newPrice: Number(payload.selling_price || 0),
+        payload
+      });
       return;
     }
 
     setSaving(true);
     try {
-      const { image_urls: _image_urls, total_asset_value: _total_asset_value, ...payload } = form;
-      payload.image_url = form.image_url || (form.image_urls && form.image_urls[0]) || null;
-      const taxIds = Array.isArray(form.tax_type_ids) ? form.tax_type_ids : [];
-      payload.tax_type_ids = taxIds;
-      payload.is_vat_applicable = taxIds.length > 0;
-      
       if (editing) {
-        if (Number(editing.selling_price || 0) !== Number(payload.selling_price || 0)) {
-          const reason = window.prompt("Selling price changed. Please provide a mandatory reason for this change:");
-          if (!reason || !reason.trim()) {
-            toast.error("Price update cancelled. A reason is mandatory.");
-            setSaving(false);
-            return;
-          }
-          await sajilo.auth.supabase.rpc('apply_price_revision_rpc', {
-            p_company_id: sajilo.getCompanyId(),
-            p_category_id: null,
-            p_item_id: editing.id,
-            p_adjustment_type: 'MANUAL_INDIVIDUAL',
-            p_adjustment_value: Number(payload.selling_price || 0),
-            p_remarks: reason.trim(),
-            p_user_id: (await sajilo.auth.supabase.auth.getUser()).data.user.id
-          });
-          delete payload.selling_price; // Handled by RPC
-        }
-
         delete payload.is_physical; // Generated column
+        delete payload.quantity_on_hand; // Maintained strictly via transactions / stock assembly
+        delete payload.weighted_average_cost; // Maintained by stock valuation
+        delete payload.current_unit_cost; // Maintained by stock valuation
+        delete payload.id;
+        delete payload.company_id;
+        delete payload.created_at;
+        delete payload.updated_at;
         await sajilo.entities.Item.update(editing.id, payload);
         toast.success('Item updated');
       } else {
         if (isPhysical) {
           payload.weighted_average_cost = purchasePrice;
           payload.current_unit_cost = purchasePrice;
+        }
+        if (!initOpeningStock) {
+          payload.quantity_on_hand = 0;
         }
         const newItem = await sajilo.entities.Item.create(payload);
         toast.success('Item created');
@@ -365,13 +445,54 @@ export default function Items() {
           }
         }
       }
+      invalidateItemCache();
+      setShowForm(false);
     } catch (err) {
       toast.error(err.message || 'Error occurred while saving');
     } finally {
       setSaving(false);
     }
-    setShowForm(false);
-    fetchItems();
+  };
+
+  const executePriceRevisionSave = async () => {
+    if (!priceRevisionReason || !priceRevisionReason.trim()) {
+      toast.error("Please provide a mandatory reason for this price revision.");
+      return;
+    }
+    setRevisingPrice(true);
+    try {
+      await sajilo.auth.supabase.rpc('apply_price_revision_rpc', {
+        p_company_id: sajilo.getCompanyId(),
+        p_category_id: null,
+        p_item_id: editing.id,
+        p_adjustment_type: 'MANUAL_INDIVIDUAL',
+        p_adjustment_value: Number(priceRevisionPrompt.newPrice || 0),
+        p_remarks: priceRevisionReason.trim(),
+        p_user_id: (await sajilo.auth.supabase.auth.getUser()).data.user.id
+      });
+
+      const payload = { ...priceRevisionPrompt.payload };
+      delete payload.selling_price; // Handled by RPC
+      delete payload.is_physical;
+      delete payload.quantity_on_hand;
+      delete payload.weighted_average_cost;
+      delete payload.current_unit_cost;
+      delete payload.id;
+      delete payload.company_id;
+      delete payload.created_at;
+      delete payload.updated_at;
+
+      await sajilo.entities.Item.update(editing.id, payload);
+      toast.success('Item updated with price revision logged');
+      invalidateItemCache();
+      setShowForm(false);
+      setPriceRevisionPrompt(null);
+      setPriceRevisionReason('');
+    } catch (err) {
+      toast.error(err.message || 'Failed to apply price revision');
+    } finally {
+      setRevisingPrice(false);
+    }
   };
 
   const handleBulkUpdate = async (ids, data) => {
@@ -380,7 +501,7 @@ export default function Items() {
     await Promise.all(ids.map(id => sajilo.entities.Item.update(id, payload)));
     toast.success(`Updated ${ids.length} item(s)`);
     setSelectedIds([]);
-    fetchItems();
+    invalidateItemCache();
   };
 
   const handleResetWac = async (ids) => {
@@ -391,7 +512,7 @@ export default function Items() {
     })));
     toast.success(`Reset WAC to Purchase Price for ${ids.length} item(s)`);
     setSelectedIds([]);
-    fetchItems();
+    invalidateItemCache();
   };
 
   const handleBulkDelete = async (ids) => {
@@ -475,7 +596,7 @@ export default function Items() {
     }
 
     setSelectedIds([]);
-    fetchItems();
+    invalidateItemCache();
   };
 
   // ── Filtering ──────────────────────────────────────────────────
@@ -735,24 +856,84 @@ export default function Items() {
         </div>
       </div>
 
-      {/* Item Form Dialog */}
+      {/* Item Form Dialog — V2 Tabbed Progressive Disclosure */}
       <Dialog open={showForm} onOpenChange={setShowForm}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editing ? 'Edit Item' : 'New Item'}</DialogTitle>
+            <div className="flex items-center justify-between">
+              <div>
+                <DialogTitle>{editing ? `Edit Item: ${editing.item_name}` : 'New Item'}</DialogTitle>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {editing ? 'Update item configuration and master details' : 'Set up a new product, finished good, or service'}
+                </p>
+              </div>
+              <div className="flex items-center gap-2 bg-muted/60 px-3 py-1.5 rounded-lg border border-border">
+                <Switch id="active-item-switch" checked={form.is_active} onCheckedChange={v => sf('is_active', v)} />
+                <Label htmlFor="active-item-switch" className="text-xs font-medium cursor-pointer">
+                  {form.is_active ? 'Active' : 'Inactive'}
+                </Label>
+              </div>
+            </div>
+
+            {/* Archetype Quick Selector — Type-Driven Defaults */}
+            <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-1.5 p-1 bg-muted/60 rounded-lg border border-border">
+              {[
+                { type: 'Product', label: 'Product (Traded)', hint: 'Buy & Sell' },
+                { type: 'Finished Good', label: 'Finished Good', hint: 'Assembled' },
+                { type: 'Raw Material', label: 'Raw Material', hint: 'Components' },
+                { type: 'Service', label: 'Service', hint: 'Non-physical' },
+              ].map(({ type, label, hint }) => {
+                const isSel = form.item_type === type;
+                return (
+                  <button
+                    key={type}
+                    type="button"
+                    onClick={() => handleItemTypeSelect(type)}
+                    className={cn(
+                      'py-1.5 px-2 rounded-md text-center transition-all flex flex-col items-center justify-center',
+                      isSel 
+                        ? 'bg-background text-foreground shadow-sm font-semibold border border-primary/20' 
+                        : 'text-muted-foreground hover:text-foreground hover:bg-background/50'
+                    )}
+                  >
+                    <span className="text-xs">{label}</span>
+                    <span className="text-[10px] text-muted-foreground font-normal">{hint}</span>
+                  </button>
+                );
+              })}
+            </div>
           </DialogHeader>
 
-          <div className="space-y-6 mt-2">
-            <Section title="Basic Information">
+          {/* Radix Tabs for Progressive Disclosure */}
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-2">
+            <TabsList className="grid w-full grid-cols-3 sm:grid-cols-4 h-9 mb-4">
+              <TabsTrigger value="general" className="text-xs">General & Pricing</TabsTrigger>
+              {form.item_type !== 'Service' && (
+                <TabsTrigger value="stock" className="text-xs">Stock & Inventory</TabsTrigger>
+              )}
+              <TabsTrigger value="accounting" className="text-xs">Accounting & GL</TabsTrigger>
+              <TabsTrigger value="specs" className="text-xs">Specs & Media</TabsTrigger>
+            </TabsList>
+
+            {/* TAB 1: GENERAL & PRICING */}
+            <TabsContent value="general" className="space-y-4">
               <FormGrid>
-                <div><Label>Item Code</Label><Input value={form.item_code} onChange={e => sf('item_code', e.target.value)} placeholder="SKU-001" /></div>
-                <div><Label>Item Name *</Label><Input value={form.item_name} onChange={e => sf('item_name', e.target.value)} placeholder="Product name" /></div>
+                <div>
+                  <Label>Item Code / SKU</Label>
+                  <Input value={form.item_code} onChange={e => sf('item_code', e.target.value)} placeholder="SKU-001" />
+                </div>
+                <div>
+                  <Label>Item Name *</Label>
+                  <Input value={form.item_name} onChange={e => sf('item_name', e.target.value)} placeholder="e.g. Mobile Banking Broucher" />
+                </div>
                 <div>
                   <Label>Category</Label>
                   <Select value={form.category_id} onValueChange={v => {
                     const cat = categories.find(c => c.id === v);
                     setForm(prev => ({
-                      ...prev, category_id: v, category_name: cat?.category_name || '',
+                      ...prev, 
+                      category_id: v, 
+                      category_name: cat?.category_name || '',
                       purchase_account_id: prev.purchase_account_id || cat?.purchase_account_id || '',
                       purchase_account_name: prev.purchase_account_name || cat?.purchase_account_name || '',
                       sales_account_id: prev.sales_account_id || cat?.sales_account_id || '',
@@ -764,126 +945,349 @@ export default function Items() {
                   </Select>
                 </div>
                 <div>
-                  <Label>Item Type</Label>
-                  <Select value={form.item_type} onValueChange={v => sf('item_type', v)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {['Product', 'Service', 'Raw Material', 'Semi-Finished Good', 'Finished Good'].map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div><Label>Barcode</Label><Input value={form.barcode || ''} onChange={e => sf('barcode', e.target.value)} placeholder="Barcode / SKU" /></div>
-                <div><Label>HS Code</Label><Input value={form.hs_code || ''} onChange={e => sf('hs_code', e.target.value)} placeholder="e.g. 8471.30" /></div>
-                <FormRow fullWidth><Label>Description</Label><Input value={form.description} onChange={e => sf('description', e.target.value)} placeholder="Optional" /></FormRow>
-              </FormGrid>
-            </Section>
-
-            <Section title="Advanced Specifications / Additional Attributes">
-              <FormGrid>
-                <div><Label>Model</Label><Input value={form.attributes?.model || ''} onChange={e => setForm(p => ({ ...p, attributes: { ...p.attributes, model: e.target.value } }))} placeholder="Model number/name" /></div>
-                <div><Label>Color</Label><Input value={form.attributes?.color || ''} onChange={e => setForm(p => ({ ...p, attributes: { ...p.attributes, color: e.target.value } }))} placeholder="Color variant" /></div>
-                <div><Label>Size</Label><Input value={form.attributes?.size || ''} onChange={e => setForm(p => ({ ...p, attributes: { ...p.attributes, size: e.target.value } }))} placeholder="Size dimensions" /></div>
-                <div><Label>Weight</Label><Input value={form.attributes?.weight || ''} onChange={e => setForm(p => ({ ...p, attributes: { ...p.attributes, weight: e.target.value } }))} placeholder="Weight" /></div>
-                <FormRow fullWidth><Label>Specifications</Label><Input value={form.attributes?.specifications || ''} onChange={e => setForm(p => ({ ...p, attributes: { ...p.attributes, specifications: e.target.value } }))} placeholder="Detailed specs" /></FormRow>
-                <FormRow fullWidth>
-                  <div className="flex items-center justify-between mb-2">
-                    <Label>Custom Metadata</Label>
-                    <Button type="button" variant="outline" size="sm" className="h-7 text-xs" onClick={() => {
-                      const current = Array.isArray(form.attributes?.custom_metadata) ? form.attributes.custom_metadata : [];
-                      setForm(p => ({ ...p, attributes: { ...p.attributes, custom_metadata: [...current, { key: '', value: '' }] } }));
-                    }}>
-                      <Plus className="w-3 h-3 mr-1" /> Add Field
-                    </Button>
-                  </div>
-                  <div className="space-y-2">
-                    {Array.isArray(form.attributes?.custom_metadata) && form.attributes.custom_metadata.map((meta, i) => (
-                      <div key={i} className="flex items-center gap-2">
-                        <Input value={meta.key} onChange={e => {
-                          const newMeta = [...form.attributes.custom_metadata];
-                          newMeta[i].key = e.target.value;
-                          setForm(p => ({ ...p, attributes: { ...p.attributes, custom_metadata: newMeta } }));
-                        }} placeholder="Key (e.g. Warranty)" className="w-1/3" />
-                        <Input value={meta.value} onChange={e => {
-                          const newMeta = [...form.attributes.custom_metadata];
-                          newMeta[i].value = e.target.value;
-                          setForm(p => ({ ...p, attributes: { ...p.attributes, custom_metadata: newMeta } }));
-                        }} placeholder="Value (e.g. 1 Year)" className="flex-1" />
-                        <Button type="button" variant="ghost" size="icon" className="h-9 w-9 text-red-500 shrink-0" onClick={() => {
-                          const newMeta = form.attributes.custom_metadata.filter((_, idx) => idx !== i);
-                          setForm(p => ({ ...p, attributes: { ...p.attributes, custom_metadata: newMeta } }));
-                        }}>
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    ))}
-                    {(!form.attributes?.custom_metadata || form.attributes.custom_metadata.length === 0) && (
-                      <div className="text-sm text-muted-foreground italic bg-muted/30 p-3 rounded-md text-center">
-                        No custom metadata fields added.
-                      </div>
-                    )}
-                  </div>
-                </FormRow>
-              </FormGrid>
-            </Section>
-
-            <Section title="Units of Measure">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <Label>Stock UOM</Label>
+                  <Label>Base Unit of Measure (UOM)</Label>
                   <Select value={form.unit_of_measure} onValueChange={v => sf('unit_of_measure', v)}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>{uomOptions.map(u => <SelectItem key={u.uom_code} value={u.uom_code}>{u.uom_code} — {u.uom_name}</SelectItem>)}</SelectContent>
                   </Select>
-                  <p className="text-xs text-muted-foreground mt-1">Base unit for inventory</p>
                 </div>
-                <div>
-                  <Label>Purchase UOM</Label>
-                  <Select value={form.purchase_uom || form.unit_of_measure} onValueChange={v => sf('purchase_uom', v)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>{uomOptions.map(u => <SelectItem key={u.uom_code} value={u.uom_code}>{u.uom_code} — {u.uom_name}</SelectItem>)}</SelectContent>
-                  </Select>
-                  <p className="text-xs text-muted-foreground mt-1">UOM on purchase docs</p>
-                </div>
-                <div>
-                  <Label>Sales UOM</Label>
-                  <Select value={form.sales_uom || form.unit_of_measure} onValueChange={v => sf('sales_uom', v)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>{uomOptions.map(u => <SelectItem key={u.uom_code} value={u.uom_code}>{u.uom_code} — {u.uom_name}</SelectItem>)}</SelectContent>
-                  </Select>
-                  <p className="text-xs text-muted-foreground mt-1">UOM on sales docs</p>
+              </FormGrid>
+
+              {/* Pricing Section */}
+              <div className="rounded-lg border border-border p-4 bg-muted/20 space-y-3">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Pricing & Valuation</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <Label>Selling Price (NPR)</Label>
+                    <div className="relative mt-1">
+                      <Input 
+                        type="number" 
+                        value={form.selling_price} 
+                        onChange={e => sf('selling_price', Number(e.target.value))} 
+                      />
+                    </div>
+                    {editing && (
+                      <p className="text-[11px] text-muted-foreground mt-1">
+                        Editing price triggers an audited price revision history record.
+                      </p>
+                    )}
+                  </div>
+                  <div>
+                    <Label>
+                      {form.item_type === 'Finished Good' 
+                        ? 'Standard / Target Production Cost (NPR)' 
+                        : form.item_type === 'Service' 
+                          ? 'Direct Service Cost (NPR)' 
+                          : 'Purchase Price (NPR)'}
+                    </Label>
+                    <Input 
+                      type="number" 
+                      value={form.purchase_price} 
+                      onChange={e => sf('purchase_price', Number(e.target.value))} 
+                    />
+                    <p className="text-[11px] text-muted-foreground mt-1">
+                      {form.item_type === 'Finished Good'
+                        ? 'Actual valuation is dynamically calculated from Stock Assembly components (WAC).'
+                        : 'Default unit cost on purchase documents & valuation.'}
+                    </p>
+                  </div>
                 </div>
               </div>
-            </Section>
 
-            <Section title="Pricing & Stock">
-              <FormGrid>
-                <div><Label>Selling Price (NPR)</Label><Input type="number" value={form.selling_price} onChange={e => sf('selling_price', Number(e.target.value))} /></div>
-                <div><Label>Purchase Price (NPR)</Label><Input type="number" value={form.purchase_price} onChange={e => sf('purchase_price', Number(e.target.value))} /></div>
-                <div><Label>Opening Stock Qty</Label><Input type="number" value={form.quantity_on_hand} onChange={e => sf('quantity_on_hand', Number(e.target.value))} /></div>
-                <div><Label>Reorder Level</Label><Input type="number" value={form.reorder_level} onChange={e => sf('reorder_level', Number(e.target.value))} /></div>
-              </FormGrid>
-            </Section>
+              {/* Nepal VAT Quick-Selector */}
+              <div className="rounded-lg border border-border p-4 bg-muted/20 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Tax & VAT (Nepal IRD)</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Select the statutory tax classification for this item</p>
+                  </div>
+                  {currentVatMode === 'vat_13' && (
+                    <span className="text-xs font-semibold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                      13% VAT Active
+                    </span>
+                  )}
+                  {currentVatMode === 'exempt' && (
+                    <span className="text-xs font-semibold px-2 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300">
+                      VAT Exempt (0%)
+                    </span>
+                  )}
+                  {currentVatMode === 'custom' && (
+                    <span className="text-xs font-semibold px-2 py-0.5 rounded bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300">
+                      Custom Multi-Tax
+                    </span>
+                  )}
+                </div>
 
-            <Section title="Account Mapping">
-              <p className="text-xs text-muted-foreground mb-3">Link this item to Chart of Accounts for automatic journal entries.</p>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setVatMode('vat_13')}
+                    className={cn(
+                      'p-2.5 rounded-lg border text-left transition-colors flex items-center justify-between',
+                      currentVatMode === 'vat_13'
+                        ? 'border-primary bg-primary/10 ring-1 ring-primary/30'
+                        : 'border-border bg-card hover:bg-muted/40'
+                    )}
+                  >
+                    <div>
+                      <p className="text-xs font-semibold text-foreground">13% VAT (Taxable)</p>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">Standard Nepal VAT rate</p>
+                    </div>
+                    {currentVatMode === 'vat_13' && <Check className="w-4 h-4 text-primary shrink-0" />}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setVatMode('exempt')}
+                    className={cn(
+                      'p-2.5 rounded-lg border text-left transition-colors flex items-center justify-between',
+                      currentVatMode === 'exempt'
+                        ? 'border-primary bg-primary/10 ring-1 ring-primary/30'
+                        : 'border-border bg-card hover:bg-muted/40'
+                    )}
+                  >
+                    <div>
+                      <p className="text-xs font-semibold text-foreground">VAT Exempt / Non-VAT</p>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">Zero-rated or exempt goods</p>
+                    </div>
+                    {currentVatMode === 'exempt' && <Check className="w-4 h-4 text-primary shrink-0" />}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setVatMode('custom')}
+                    className={cn(
+                      'p-2.5 rounded-lg border text-left transition-colors flex items-center justify-between',
+                      currentVatMode === 'custom'
+                        ? 'border-primary bg-primary/10 ring-1 ring-primary/30'
+                        : 'border-border bg-card hover:bg-muted/40'
+                    )}
+                  >
+                    <div>
+                      <p className="text-xs font-semibold text-foreground">Custom / Multiple Taxes</p>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">Excise, luxury, compound</p>
+                    </div>
+                    {currentVatMode === 'custom' && <Check className="w-4 h-4 text-primary shrink-0" />}
+                  </button>
+                </div>
+
+                {/* Custom Multi-Tax Details (only rendered if custom mode) */}
+                {currentVatMode === 'custom' && (
+                  <div className="pt-2 border-t border-border mt-3 space-y-2">
+                    <p className="text-xs font-medium text-foreground">Select Individual Tax Types:</p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                      {taxTypes.map(tt => {
+                        const selected = (form.tax_type_ids || []).includes(tt.id);
+                        const toggle = () => {
+                          const ids = form.tax_type_ids || [];
+                          sf('tax_type_ids', selected ? ids.filter(x => x !== tt.id) : [...ids, tt.id]);
+                        };
+                        return (
+                          <label key={tt.id} className={cn(
+                            'flex items-start gap-2.5 p-2 rounded-lg border cursor-pointer text-xs',
+                            selected ? 'bg-primary/5 border-primary/40' : 'bg-card border-border'
+                          )}>
+                            <Checkbox checked={selected} onCheckedChange={toggle} className="mt-0.5" />
+                            <div>
+                              <span className="font-medium">{tt.tax_name} ({tt.tax_rate}%)</span>
+                              <p className="text-[10px] text-muted-foreground">{tt.tax_type} · {tt.applies_to}</p>
+                            </div>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Codes & Description */}
               <FormGrid>
                 <div>
-                  <Label>Purchase / COGS Account</Label>
-                  <SearchableSelect 
-                    value={form.purchase_account_id} 
-                    onChange={v => {
-                      const a = accounts.find(a => a.id === v);
-                      setForm(prev => ({ ...prev, purchase_account_id: v, purchase_account_name: a?.account_name || '' }));
-                    }}
-                    options={(cogsAccounts.length > 0 ? cogsAccounts : subAccounts).map(a => ({
-                      value: a.id,
-                      label: a.account_code ? `${a.account_code} — ${a.account_name}` : a.account_name
-                    }))}
-                    placeholder="Select account…"
-                    className="mt-1"
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">Debited on purchase posting</p>
+                  <Label>Barcode</Label>
+                  <Input value={form.barcode || ''} onChange={e => sf('barcode', e.target.value)} placeholder="Barcode / EAN" />
                 </div>
+                <div>
+                  <Label>HS Code</Label>
+                  <Input value={form.hs_code || ''} onChange={e => sf('hs_code', e.target.value)} placeholder="e.g. 4901.99" />
+                </div>
+                <FormRow fullWidth>
+                  <Label>Description</Label>
+                  <Input value={form.description || ''} onChange={e => sf('description', e.target.value)} placeholder="Optional description or item summary" />
+                </FormRow>
+              </FormGrid>
+            </TabsContent>
+
+            {/* TAB 2: STOCK & INVENTORY (Hidden for Service) */}
+            {form.item_type !== 'Service' && (
+              <TabsContent value="stock" className="space-y-4">
+                {editing ? (
+                  /* Edit Mode: Live Stock Audit & Contra-Adjustment Guidance */
+                  <div className="rounded-lg border border-border p-4 bg-muted/20 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <ShieldCheck className="w-4 h-4 text-primary" />
+                        <span className="text-xs font-semibold uppercase tracking-wider text-foreground">Current Inventory Status</span>
+                      </div>
+                      <span className="text-xs font-medium px-2 py-0.5 rounded bg-muted border border-border">
+                        Physical Stock Ledger
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div className="bg-card p-3 rounded-lg border border-border">
+                        <p className="text-xs text-muted-foreground">Quantity on Hand</p>
+                        <p className="text-lg font-bold mt-1 text-foreground">
+                          {Number(form.quantity_on_hand || 0).toLocaleString()} <span className="text-xs font-normal text-muted-foreground">{form.unit_of_measure}</span>
+                        </p>
+                      </div>
+                      <div className="bg-card p-3 rounded-lg border border-border">
+                        <p className="text-xs text-muted-foreground">Weighted Average Cost (WAC)</p>
+                        <p className="text-lg font-bold mt-1 text-foreground font-mono">
+                          NPR {Number(form.weighted_average_cost || form.purchase_price || 0).toLocaleString()}
+                        </p>
+                      </div>
+                      <div className="bg-card p-3 rounded-lg border border-border">
+                        <p className="text-xs text-muted-foreground">Total Stock Valuation</p>
+                        <p className="text-lg font-bold mt-1 text-foreground font-mono">
+                          NPR {Number(Number(form.quantity_on_hand || 0) * Number(form.weighted_average_cost || form.purchase_price || 0)).toLocaleString()}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900 rounded-lg p-3 text-xs text-blue-900 dark:text-blue-300 space-y-2">
+                      <p className="font-semibold flex items-center gap-1.5">
+                        <AlertTriangle className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                        Stock Balance Audit Protection:
+                      </p>
+                      <p className="text-[11px] leading-relaxed">
+                        In accordance with ERP double-entry governance, inventory quantities cannot be manually overwritten on master item edits. 
+                        If you need to correct physical count variances or opening stock typos, post an audited contra-entry in the Stock Adjustment module.
+                      </p>
+                      <div className="flex gap-2 pt-1">
+                        <Button 
+                          type="button" 
+                          variant="outline" 
+                          size="sm" 
+                          className="h-7 text-xs bg-white dark:bg-card border-blue-300 dark:border-blue-800"
+                          onClick={() => {
+                            setShowForm(false);
+                            navigate(`/inventory/adjustments?itemId=${editing.id}&reason=variance`);
+                          }}
+                        >
+                          <TrendingDown className="w-3 h-3 mr-1 text-amber-600" /> Post Stock Adjustment
+                        </Button>
+                        <Button 
+                          type="button" 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-7 text-xs text-blue-800 dark:text-blue-300"
+                          onClick={() => setHistoryItem(editing)}
+                        >
+                          <History className="w-3 h-3 mr-1" /> View Stock History
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="pt-2">
+                      <Label>Reorder Alert Level</Label>
+                      <Input 
+                        type="number" 
+                        value={form.reorder_level} 
+                        onChange={e => sf('reorder_level', Number(e.target.value))} 
+                        placeholder="Minimum stock before reorder warning" 
+                        className="max-w-xs mt-1"
+                      />
+                      <p className="text-[11px] text-muted-foreground mt-1">Triggers low-stock warning when balance drops below this count.</p>
+                    </div>
+                  </div>
+                ) : (
+                  /* Create Mode: Optional Opening Stock Initialization */
+                  <div className="rounded-lg border border-border p-4 bg-muted/20 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-wider text-foreground">Opening Stock Initialization</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">Only enable if you are initializing go-live inventory counts</p>
+                      </div>
+                      <Switch 
+                        checked={initOpeningStock} 
+                        onCheckedChange={setInitOpeningStock} 
+                      />
+                    </div>
+
+                    {initOpeningStock ? (
+                      <div className="space-y-4 pt-2 border-t border-border">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div>
+                            <Label>Initial Opening Quantity</Label>
+                            <Input 
+                              type="number" 
+                              value={form.quantity_on_hand} 
+                              onChange={e => sf('quantity_on_hand', Number(e.target.value))} 
+                              placeholder="0"
+                              min="0"
+                              className="mt-1"
+                            />
+                            <p className="text-[11px] text-muted-foreground mt-1">Starting physical units in stock.</p>
+                          </div>
+                          <div>
+                            <Label>Unit Purchase / Valuation Cost (NPR) *</Label>
+                            <Input 
+                              type="number" 
+                              value={form.purchase_price} 
+                              onChange={e => sf('purchase_price', Number(e.target.value))} 
+                              placeholder="0.00"
+                              min="0.01"
+                              step="0.01"
+                              className="mt-1"
+                            />
+                            <p className="text-[11px] text-muted-foreground mt-1">Cost required to balance opening equity GL journal.</p>
+                          </div>
+                        </div>
+
+                        <div className="bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900 rounded-lg p-3 text-xs text-emerald-900 dark:text-emerald-300">
+                          <p className="font-semibold">Calculated Opening Valuation:</p>
+                          <p className="text-base font-bold font-mono mt-0.5">
+                            NPR {(Number(form.quantity_on_hand || 0) * Number(form.purchase_price || 0)).toLocaleString()}
+                          </p>
+                          <p className="text-[11px] text-emerald-700 dark:text-emerald-400 mt-1">
+                            Will automatically post: Debit <em>Inventory Asset</em>, Credit <em>Opening Stock Equity</em>.
+                          </p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-xs text-muted-foreground p-3 bg-muted/40 rounded-lg">
+                        Opening stock is off. Item will be created with <strong>0 stock</strong>. Stock can be added later via Purchases or Stock Assembly.
+                      </div>
+                    )}
+
+                    <div className="pt-2 border-t border-border">
+                      <Label>Reorder Alert Level</Label>
+                      <Input 
+                        type="number" 
+                        value={form.reorder_level} 
+                        onChange={e => sf('reorder_level', Number(e.target.value))} 
+                        placeholder="0" 
+                        className="max-w-xs mt-1"
+                      />
+                      <p className="text-[11px] text-muted-foreground mt-1">Alerts dashboard when stock falls below this quantity.</p>
+                    </div>
+                  </div>
+                )}
+              </TabsContent>
+            )}
+
+            {/* TAB 3: ACCOUNTING & LEDGER MAPPING */}
+            <TabsContent value="accounting" className="space-y-4">
+              <div className="bg-muted/40 p-3 rounded-lg border border-border flex items-center justify-between text-xs">
+                <span className="text-muted-foreground">
+                  GL Accounts inherited automatically from <strong>{form.category_name || 'Category'}</strong> and Company Settings.
+                </span>
+                <span className="text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
+                  <Check className="w-3.5 h-3.5" /> Auto-Configured
+                </span>
+              </div>
+
+              <FormGrid>
                 <div>
                   <Label>Sales / Revenue Account</Label>
                   <SearchableSelect 
@@ -896,28 +1300,50 @@ export default function Items() {
                       value: a.id,
                       label: a.account_code ? `${a.account_code} — ${a.account_name}` : a.account_name
                     }))}
-                    placeholder="Select account…"
+                    placeholder="Select revenue account…"
                     className="mt-1"
                   />
-                  <p className="text-xs text-muted-foreground mt-1">Credited on sales posting</p>
+                  <p className="text-[11px] text-muted-foreground mt-1">Credited on sales invoices</p>
                 </div>
+
                 <div>
-                  <Label>Inventory Asset Account</Label>
+                  <Label>Purchase / COGS Account</Label>
                   <SearchableSelect 
-                    value={form.inventory_account_id} 
+                    value={form.purchase_account_id} 
                     onChange={v => {
                       const a = accounts.find(a => a.id === v);
-                      setForm(prev => ({ ...prev, inventory_account_id: v, inventory_account_name: a?.account_name || '' }));
+                      setForm(prev => ({ ...prev, purchase_account_id: v, purchase_account_name: a?.account_name || '' }));
                     }}
-                    options={(assetAccounts.length > 0 ? assetAccounts : subAccounts).map(a => ({
+                    options={(cogsAccounts.length > 0 ? cogsAccounts : subAccounts).map(a => ({
                       value: a.id,
                       label: a.account_code ? `${a.account_code} — ${a.account_name}` : a.account_name
                     }))}
-                    placeholder="Select account…"
+                    placeholder="Select COGS account…"
                     className="mt-1"
                   />
-                  <p className="text-xs text-muted-foreground mt-1">Tracks stock value on balance sheet</p>
+                  <p className="text-[11px] text-muted-foreground mt-1">Debited on purchase bills or cost of sales</p>
                 </div>
+
+                {form.item_type !== 'Service' && (
+                  <div>
+                    <Label>Inventory Asset Account</Label>
+                    <SearchableSelect 
+                      value={form.inventory_account_id} 
+                      onChange={v => {
+                        const a = accounts.find(a => a.id === v);
+                        setForm(prev => ({ ...prev, inventory_account_id: v, inventory_account_name: a?.account_name || '' }));
+                      }}
+                      options={(assetAccounts.length > 0 ? assetAccounts : subAccounts).map(a => ({
+                        value: a.id,
+                        label: a.account_code ? `${a.account_code} — ${a.account_name}` : a.account_name
+                      }))}
+                      placeholder="Select asset account…"
+                      className="mt-1"
+                    />
+                    <p className="text-[11px] text-muted-foreground mt-1">Balance sheet inventory asset</p>
+                  </div>
+                )}
+
                 <div>
                   <Label>Discount Scheme</Label>
                   <SearchableSelect 
@@ -933,127 +1359,144 @@ export default function Items() {
                     placeholder="None"
                     className="mt-1"
                   />
-                  <p className="text-xs text-muted-foreground mt-1">Applied automatically on sales</p>
+                  <p className="text-[11px] text-muted-foreground mt-1">Applied automatically on billing</p>
                 </div>
               </FormGrid>
-            </Section>
+            </TabsContent>
 
-            <Section title={`Item Images (max ${imgSettings.max_count} images, ${imgSettings.max_size_mb}MB each)`}>
-              <div className="flex flex-wrap gap-3 items-start">
-                {(form.image_urls || []).map((url, idx) => (
-                  <div key={idx} className="relative w-20 h-20 rounded-lg overflow-hidden border border-border group">
-                    <img src={url} alt="" className="w-full h-full object-cover" />
-                    <button onClick={() => removeImage(idx)} className="absolute top-1 right-1 bg-black/60 text-white rounded-full w-5 h-5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                      <X className="w-3 h-3" />
-                    </button>
-                  </div>
-                ))}
-                {(form.image_urls || []).length < imgSettings.max_count && (
-                  <label className={`w-20 h-20 border-2 border-dashed border-muted-foreground/30 rounded-lg flex flex-col items-center justify-center gap-1 cursor-pointer hover:border-primary transition-colors ${uploading ? 'opacity-50' : ''}`}>
-                    <input type="file" accept="image/*" multiple onChange={handleImageUpload} className="hidden" disabled={uploading} />
-                    {uploading ? <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" /> : <Upload className="w-4 h-4 text-muted-foreground" />}
-                    <span className="text-xs text-muted-foreground">{uploading ? 'Uploading…' : 'Upload'}</span>
-                  </label>
-                )}
-              </div>
-              <p className="text-xs text-muted-foreground mt-2">{(form.image_urls || []).length}/{imgSettings.max_count} images • Max {imgSettings.max_size_mb}MB per image</p>
-            </Section>
+            {/* TAB 4: SPECS & MEDIA */}
+            <TabsContent value="specs" className="space-y-4">
+              <FormGrid>
+                <div><Label>Model</Label><Input value={form.attributes?.model || ''} onChange={e => setForm(p => ({ ...p, attributes: { ...p.attributes, model: e.target.value } }))} placeholder="Model number/name" /></div>
+                <div><Label>Color</Label><Input value={form.attributes?.color || ''} onChange={e => setForm(p => ({ ...p, attributes: { ...p.attributes, color: e.target.value } }))} placeholder="Color variant" /></div>
+                <div><Label>Size / Dimensions</Label><Input value={form.attributes?.size || ''} onChange={e => setForm(p => ({ ...p, attributes: { ...p.attributes, size: e.target.value } }))} placeholder="Size" /></div>
+                <div><Label>Weight / GSM</Label><Input value={form.attributes?.weight || ''} onChange={e => setForm(p => ({ ...p, attributes: { ...p.attributes, weight: e.target.value } }))} placeholder="Weight" /></div>
+                <FormRow fullWidth><Label>Specifications</Label><Input value={form.attributes?.specifications || ''} onChange={e => setForm(p => ({ ...p, attributes: { ...p.attributes, specifications: e.target.value } }))} placeholder="Detailed specs" /></FormRow>
+              </FormGrid>
 
-            {/* Tax Types — Multi-Select */}
-            <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-3">
-              <div>
-                <p className="text-sm font-semibold">Applicable Tax Types</p>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Select one or more taxes for this item. Taxes are applied in Sort Order (lowest first).
-                  Compound taxes are calculated on net + prior taxes.
-                </p>
-              </div>
-
-              {taxTypes.length === 0 ? (
-                <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
-                  <AlertTriangle className="w-3.5 h-3.5" />
-                  No tax types configured. Go to Settings → Tax & VAT to create them.
-                </p>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                  {taxTypes.map(tt => {
-                    const selected = (form.tax_type_ids || []).includes(tt.id);
-                    const toggle = () => {
-                      const ids = form.tax_type_ids || [];
-                      sf('tax_type_ids', selected ? ids.filter(x => x !== tt.id) : [...ids, tt.id]);
-                    };
-                    return (
-                      <label key={tt.id}
-                        className={cn(
-                          'flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors',
-                          selected
-                            ? 'bg-primary/5 border-primary/40 ring-1 ring-primary/20'
-                            : 'bg-card border-border hover:bg-muted/40'
-                        )}
-                      >
-                        <Checkbox checked={selected} onCheckedChange={toggle} className="mt-0.5" />
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-sm font-medium">{tt.tax_name}</span>
-                            <span className="text-xs font-semibold tabular-nums text-primary bg-primary/10 px-1.5 py-0.5 rounded">{tt.tax_rate}%</span>
-                            {tt.is_compound && (
-                              <span className="text-xs text-purple-700 dark:text-purple-400 bg-purple-50 dark:bg-purple-500/10 px-1.5 py-0.5 rounded">Compound</span>
-                            )}
-                            {tt.sort_order != null && (
-                              <span className="text-xs text-muted-foreground">#{tt.sort_order}</span>
-                            )}
-                          </div>
-                          <p className="text-xs text-muted-foreground mt-0.5">
-                            {tt.tax_type} · {tt.applies_to}
-                            {tt.tax_code ? ` · ${tt.tax_code}` : ''}
-                          </p>
-                        </div>
-                      </label>
-                    );
-                  })}
+              {/* Dynamic Metadata */}
+              <div className="pt-2 border-t border-border">
+                <div className="flex items-center justify-between mb-2">
+                  <Label>Custom Metadata Fields</Label>
+                  <Button type="button" variant="outline" size="sm" className="h-7 text-xs" onClick={() => {
+                    const current = Array.isArray(form.attributes?.custom_metadata) ? form.attributes.custom_metadata : [];
+                    setForm(p => ({ ...p, attributes: { ...p.attributes, custom_metadata: [...current, { key: '', value: '' }] } }));
+                  }}>
+                    <Plus className="w-3 h-3 mr-1" /> Add Field
+                  </Button>
                 </div>
-              )}
-
-              {(form.tax_type_ids || []).length > 1 && (() => {
-                // Show cascade preview
-                const sorted = (form.tax_type_ids || [])
-                  .map(id => taxTypes.find(t => t.id === id))
-                  .filter(Boolean)
-                  .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
-                const base = 100;
-                let cum = 0;
-                const steps = sorted.map(tt => {
-                  const taxBase = tt.is_compound ? base + cum : base;
-                  const tax = Math.round(taxBase * Number(tt.tax_rate) / 100 * 100) / 100;
-                  cum += tax;
-                  return { name: tt.tax_name, rate: tt.tax_rate, tax };
-                });
-                return (
-                  <div className="bg-blue-50 dark:bg-blue-500/10 border border-blue-100 rounded px-3 py-2 text-xs">
-                    <p className="font-semibold text-blue-900 mb-1">Cascade Preview on Net=100:</p>
-                    {steps.map((s, i) => (
-                      <p key={i} className="font-mono text-blue-800 dark:text-blue-300">{s.name} ({s.rate}%) = {s.tax}</p>
-                    ))}
-                    <p className="font-mono font-semibold text-blue-900 border-t border-blue-200 dark:border-blue-500/20 mt-1 pt-1">
-                      Total Tax = {steps.reduce((s, x) => s + x.tax, 0).toFixed(2)} → Grand Total = {(100 + steps.reduce((s, x) => s + x.tax, 0)).toFixed(2)}
-                    </p>
-                  </div>
-                );
-              })()}
-            </div>
-
-            <div className="flex items-center gap-6 bg-muted/50 rounded-lg p-4">
-              <div className="flex items-center gap-3">
-                <Switch checked={form.is_active} onCheckedChange={v => sf('is_active', v)} />
-                <Label>Active</Label>
+                <div className="space-y-2">
+                  {Array.isArray(form.attributes?.custom_metadata) && form.attributes.custom_metadata.map((meta, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <Input value={meta.key} onChange={e => {
+                        const newMeta = [...form.attributes.custom_metadata];
+                        newMeta[i].key = e.target.value;
+                        setForm(p => ({ ...p, attributes: { ...p.attributes, custom_metadata: newMeta } }));
+                      }} placeholder="Key (e.g. Paper Finish)" className="w-1/3" />
+                      <Input value={meta.value} onChange={e => {
+                        const newMeta = [...form.attributes.custom_metadata];
+                        newMeta[i].value = e.target.value;
+                        setForm(p => ({ ...p, attributes: { ...p.attributes, custom_metadata: newMeta } }));
+                      }} placeholder="Value (e.g. Glossy)" className="flex-1" />
+                      <Button type="button" variant="ghost" size="icon" className="h-9 w-9 text-red-500 shrink-0" onClick={() => {
+                        const newMeta = form.attributes.custom_metadata.filter((_, idx) => idx !== i);
+                        setForm(p => ({ ...p, attributes: { ...p.attributes, custom_metadata: newMeta } }));
+                      }}>
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ))}
+                  {(!form.attributes?.custom_metadata || form.attributes.custom_metadata.length === 0) && (
+                    <p className="text-xs text-muted-foreground italic bg-muted/20 p-2 rounded text-center">No custom metadata attributes added.</p>
+                  )}
+                </div>
               </div>
-            </div>
-          </div>
 
-          <div className="flex justify-end gap-3 mt-4">
+              {/* Images */}
+              <div className="pt-2 border-t border-border">
+                <p className="text-xs font-semibold mb-2">Item Images (Max {imgSettings.max_count})</p>
+                <div className="flex flex-wrap gap-3 items-start">
+                  {(form.image_urls || []).map((url, idx) => (
+                    <div key={idx} className="relative w-20 h-20 rounded-lg overflow-hidden border border-border group">
+                      <img src={url} alt="" className="w-full h-full object-cover" />
+                      <button onClick={() => removeImage(idx)} className="absolute top-1 right-1 bg-black/60 text-white rounded-full w-5 h-5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ))}
+                  {(form.image_urls || []).length < imgSettings.max_count && (
+                    <label className={`w-20 h-20 border-2 border-dashed border-muted-foreground/30 rounded-lg flex flex-col items-center justify-center gap-1 cursor-pointer hover:border-primary transition-colors ${uploading ? 'opacity-50' : ''}`}>
+                      <input type="file" accept="image/*" multiple onChange={handleImageUpload} className="hidden" disabled={uploading} />
+                      {uploading ? <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" /> : <Upload className="w-4 h-4 text-muted-foreground" />}
+                      <span className="text-xs text-muted-foreground">{uploading ? 'Uploading…' : 'Upload'}</span>
+                    </label>
+                  )}
+                </div>
+              </div>
+            </TabsContent>
+          </Tabs>
+
+          <DialogFooter className="mt-4 pt-3 border-t border-border">
             <Button variant="outline" onClick={() => setShowForm(false)}>Cancel</Button>
-            <Button onClick={handleSave} disabled={saving}>{saving ? 'Saving...' : editing ? 'Update' : 'Create'}</Button>
-          </div>
+            <Button onClick={() => handleSave()} disabled={saving}>
+              {saving ? 'Saving...' : editing ? 'Update Item' : 'Create Item'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Audited Price Revision Modal (Replaces window.prompt) */}
+      <Dialog open={!!priceRevisionPrompt} onOpenChange={(open) => { if (!open) setPriceRevisionPrompt(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <DollarSign className="w-5 h-5 text-amber-500" /> Price Revision Audit
+            </DialogTitle>
+          </DialogHeader>
+
+          {priceRevisionPrompt && (
+            <div className="space-y-4 text-sm mt-2">
+              <p className="text-xs text-muted-foreground">
+                You are updating the selling price for <strong>{priceRevisionPrompt.itemName}</strong>. Statutory audit standards require a mandatory reason for price adjustments.
+              </p>
+
+              <div className="flex items-center justify-around p-3 bg-muted/40 rounded-lg border border-border">
+                <div className="text-center">
+                  <p className="text-xs text-muted-foreground">Current Price</p>
+                  <p className="text-sm font-semibold font-mono text-muted-foreground line-through mt-0.5">
+                    NPR {priceRevisionPrompt.oldPrice?.toLocaleString()}
+                  </p>
+                </div>
+                <ArrowRight className="w-4 h-4 text-muted-foreground" />
+                <div className="text-center">
+                  <p className="text-xs text-muted-foreground">New Price</p>
+                  <p className="text-base font-bold font-mono text-primary mt-0.5">
+                    NPR {priceRevisionPrompt.newPrice?.toLocaleString()}
+                  </p>
+                </div>
+              </div>
+
+              <div>
+                <Label>Mandatory Revision Reason *</Label>
+                <Input 
+                  value={priceRevisionReason} 
+                  onChange={e => setPriceRevisionReason(e.target.value)}
+                  placeholder="e.g. Raw material cost revision, market adjustment" 
+                  className="mt-1"
+                  autoFocus
+                />
+              </div>
+
+              <DialogFooter className="pt-2">
+                <Button variant="outline" onClick={() => setPriceRevisionPrompt(null)} disabled={revisingPrice}>
+                  Cancel
+                </Button>
+                <Button onClick={executePriceRevisionSave} disabled={revisingPrice || !priceRevisionReason.trim()}>
+                  {revisingPrice ? 'Applying…' : 'Confirm Revision & Save'}
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 

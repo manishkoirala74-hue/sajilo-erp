@@ -133,7 +133,8 @@ const buildEntityMethods = (tableName) => {
       // Short-circuit: non-global tables require a company context
       if (!isGlobal && !sajilo.getCompanyId()) return [];
 
-      let query = supabase.from(tableName).select('*').limit(limit);
+      const safeLimit = (typeof limit === 'number' && limit > 0) ? limit : 1000;
+      let query = supabase.from(tableName).select('*').limit(safeLimit);
       query = applyCompanyFilter(query);
       
       if (orderBy) {
@@ -154,8 +155,9 @@ const buildEntityMethods = (tableName) => {
       // Short-circuit: non-global tables require a company context
       if (!isGlobal && !sajilo.getCompanyId()) return [];
 
+      const safeLimit = (typeof limit === 'number' && limit > 0) ? limit : 1000;
       const sanitizedMatch = sanitizePayload(matchObj);
-      let query = supabase.from(tableName).select('*').match(sanitizedMatch).limit(limit);
+      let query = supabase.from(tableName).select('*').match(sanitizedMatch).limit(safeLimit);
       query = applyCompanyFilter(query);
       
       if (orderBy) {
@@ -177,6 +179,15 @@ const buildEntityMethods = (tableName) => {
       
       const { data, error } = await query;
       if (error && error.code !== 'PGRST116') throw error; // Ignore not found error
+      return data;
+    },
+
+    getById: async (id) => {
+      let query = supabase.from(tableName).select('*').eq('id', id).single();
+      query = applyCompanyFilter(query);
+      
+      const { data, error } = await query;
+      if (error && error.code !== 'PGRST116') throw error;
       return data;
     },
     

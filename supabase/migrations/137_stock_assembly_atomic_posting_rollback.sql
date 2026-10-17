@@ -1,10 +1,13 @@
 -- ============================================================================
--- 137_stock_assembly_atomic_posting_rollback.sql
--- Rollback for 137_stock_assembly_atomic_posting.sql
+-- 220_stock_assembly_atomic_posting_rollback.sql
+-- Rollback for 220_stock_assembly_atomic_posting.sql
+-- Restores complete_stock_assembly and create_or_update_stock_assembly to original 073 state.
 -- ============================================================================
 
 BEGIN;
 
+DROP FUNCTION IF EXISTS public.rpc_cancel_stock_assembly(UUID, UUID, TEXT, UUID);
+DROP FUNCTION IF EXISTS public.cancel_stock_assembly(UUID, UUID, TEXT, UUID);
 DROP FUNCTION IF EXISTS public.rpc_complete_stock_assembly(UUID, UUID);
 DROP FUNCTION IF EXISTS public.complete_stock_assembly(UUID, UUID);
 
@@ -49,7 +52,6 @@ BEGIN
     WHERE id = p_assembly_id;
 
     PERFORM public.post_stock_assembly_to_ledger(p_assembly_id);
-
 END;
 $$;
 

@@ -16,6 +16,12 @@ Each script has a **paired rollback script** documented below.
 | **Step 1** | `135_performance_indexes.sql` | Adds multi-tenant B-Tree composite indexes for 10x–50x faster queries | ~1–2 sec |
 | **Step 2** | `136_dashboard_consolidated_payload_rpc.sql` | Installs single-roundtrip dashboard analytics RPC (cuts requests from 6 to 1) | ~1 sec |
 | **Step 3** | `134_add_gl_emi_interest_name_columns.sql` | Adds missing EMI interest name display columns to `CompanySettings` | < 1 sec |
+| **Step 4** | `137_unified_financial_voucher_cancellation.sql` | Atomic Financial Voucher Cancellation Engine (v2) | ~1–2 sec |
+| **Step 5** | `138_fix_day_book_rpc_exclude_cancelled.sql` | Day Book RPC - Exclude Cancelled Documents & Reversed Journals | ~1 sec |
+| **Step 6** | `220_stock_assembly_atomic_posting.sql` | Stock Assembly Atomic Posting, Draft Hardening & Transaction Reversal | ~2 sec |
+| **Step 7** | `221_fix_negative_stock_trigger_item_name.sql` | Fixes Negative Stock Trigger `item_name` Column Parity | < 1 sec |
+| **Step 8** | `222_fix_stock_assembly_trigger_double_deduction.sql` | Fixes Trigger Double Deduction, Purges Orphaned Records & Reconciles Stock | ~2 sec |
+| **Step 9** | `223_fix_auth_context_stale_company_fallback.sql` | Hardens `get_user_auth_context` with auto-fallback to prevent infinite login loops | < 1 sec |
 
 ---
 
@@ -742,19 +748,129 @@ Run `supabase/migrations/138_fix_day_book_rpc_exclude_cancelled_rollback.sql` in
 
 ---
 
-## Script 6: Stock Assembly Atomic Posting & Deadlock-Free Concurrency
+## Script 6: Stock Assembly Atomic Posting, Draft Hardening & Transaction Reversal
 **File:** `supabase/migrations/137_stock_assembly_atomic_posting.sql` (or `220_stock_assembly_atomic_posting.sql`)  
-**Purpose:** Replaces non-existent table queries in stock assembly with atomic integration into `rpc_commit_journal_entry_internal`, enforces deterministic row locking (`ORDER BY item_id ASC FOR UPDATE`), injects live WAC at execution time, and recalculates finished goods WAC.
+**Purpose:** Replaces non-existent table queries in stock assembly with atomic integration into `rpc_commit_journal_entry_internal`, enforces deterministic row locking (`ORDER BY item_id ASC FOR UPDATE`), injects live WAC at execution time, recalculates finished goods WAC, hardens draft saves to prevent premature locking, and provides `cancel_stock_assembly` for complete transaction reversal and GL contra-entries.
 
 ### Copy & Paste SQL into Supabase:
 
 ```sql
+-- ============================================================================
+-- 220_stock_assembly_atomic_posting.sql
+-- Module: Stock Assembly (/inventory/assembly)
+-- Purpose:
+--   1. Replaces broken ledger posting with atomic integration into rpc_commit_journal_entry_internal.
+--   2. Enforces deterministic row locking (ORDER BY item_id ASC FOR UPDATE) to eliminate PostgreSQL deadlocks.
+--   3. Implements Zero-Trust Live WAC Injection from Item records at time of completion.
+--   4. Atomically updates CurrentStock, Item quantity_on_hand, and Item weighted_average_cost.
+--   5. Hard-blocks consumption of zero or negative stock.
+--   6. Hardens create_or_update_stock_assembly to prevent accidental completed-locking during draft saves.
+--   7. Adds cancel_stock_assembly / rpc_cancel_stock_assembly for full atomic transaction reversal & GL contra-entry.
+--   8. Integrates StockAssembly into rpc_cancel_document.
+-- ============================================================================
+
 BEGIN;
 
--- Drop existing functions first because PostgreSQL prohibits changing return type (from VOID to JSONB) via CREATE OR REPLACE FUNCTION
+-- ── 1. CANCELLATION AUDIT COLUMNS ───────────────────────────────────────────
+ALTER TABLE public."StockAssembly" ADD COLUMN IF NOT EXISTS cancelled_at TIMESTAMPTZ;
+ALTER TABLE public."StockAssembly" ADD COLUMN IF NOT EXISTS cancelled_by UUID REFERENCES auth.users(id) ON DELETE SET NULL;
+ALTER TABLE public."StockAssembly" ADD COLUMN IF NOT EXISTS cancellation_reason TEXT;
+
+-- ── 2. DROP OBSOLETE SIGNATURES TO PREVENT 42P13 ERRORS ────────────────────
 DROP FUNCTION IF EXISTS public.complete_stock_assembly(UUID, UUID);
 DROP FUNCTION IF EXISTS public.rpc_complete_stock_assembly(UUID, UUID);
+DROP FUNCTION IF EXISTS public.cancel_stock_assembly(UUID, UUID, TEXT, UUID);
+DROP FUNCTION IF EXISTS public.rpc_cancel_stock_assembly(UUID, UUID, TEXT, UUID);
 
+-- ── 3. HARDENED CREATE OR UPDATE STOCK ASSEMBLY ────────────────────────────
+-- Enforces Draft status for any new or modified assembly.
+-- Protects Completed or Cancelled assemblies from being overwritten.
+CREATE OR REPLACE FUNCTION public.create_or_update_stock_assembly(
+    p_assembly_id UUID,
+    p_company_id UUID,
+    p_assembly_no VARCHAR(100),
+    p_godown_id UUID,
+    p_assembly_date DATE,
+    p_overhead_cost NUMERIC(15, 4),
+    p_status VARCHAR(50),
+    p_notes TEXT,
+    p_items JSONB -- Array of { item_id, line_type, quantity, unit_cost }
+)
+RETURNS UUID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+    v_assembly_id UUID;
+    v_cur_status VARCHAR(50);
+    v_item RECORD;
+    v_total_cost NUMERIC(15, 4) := 0;
+    v_clean_assembly_no VARCHAR(100);
+BEGIN
+    -- If updating, ensure existing assembly is not already completed or cancelled
+    IF p_assembly_id IS NOT NULL THEN
+        SELECT status INTO v_cur_status 
+        FROM public."StockAssembly" 
+        WHERE id = p_assembly_id AND company_id = p_company_id;
+
+        IF FOUND AND v_cur_status != 'Draft' THEN
+            RAISE EXCEPTION 'ERR_LOCKED: Cannot modify an assembly in % status. Create a new assembly or reverse this transaction.', v_cur_status;
+        END IF;
+    END IF;
+
+    -- 1. Insert or Update Assembly Header (Always 'Draft' on direct save)
+    IF p_assembly_id IS NULL THEN
+        IF p_assembly_no IS NULL OR TRIM(p_assembly_no) = '' OR UPPER(TRIM(p_assembly_no)) = 'AUTO' THEN
+            v_clean_assembly_no := public.get_next_voucher_number(p_company_id, 'StockAssembly', p_assembly_date);
+        ELSE
+            v_clean_assembly_no := TRIM(p_assembly_no);
+        END IF;
+
+        INSERT INTO public."StockAssembly" (
+            company_id, assembly_no, godown_id, assembly_date, overhead_cost, status, notes
+        ) VALUES (
+            p_company_id, v_clean_assembly_no, p_godown_id, p_assembly_date, COALESCE(p_overhead_cost, 0), 'Draft', p_notes
+        ) RETURNING id INTO v_assembly_id;
+    ELSE
+        UPDATE public."StockAssembly"
+        SET 
+            godown_id = p_godown_id,
+            assembly_date = p_assembly_date,
+            overhead_cost = COALESCE(p_overhead_cost, 0),
+            status = 'Draft',
+            notes = p_notes,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = p_assembly_id AND company_id = p_company_id
+        RETURNING id INTO v_assembly_id;
+        
+        -- Delete existing items to replace with updated lines
+        DELETE FROM public."StockAssemblyItem" WHERE assembly_id = v_assembly_id;
+    END IF;
+
+    -- 2. Process Line Items safely
+    FOR v_item IN SELECT * FROM jsonb_to_recordset(p_items) AS x(item_id UUID, line_type VARCHAR, quantity NUMERIC, unit_cost NUMERIC)
+    LOOP
+        IF v_item.item_id IS NOT NULL AND v_item.quantity > 0 THEN
+            INSERT INTO public."StockAssemblyItem" (
+                assembly_id, item_id, line_type, quantity, unit_cost
+            ) VALUES (
+                v_assembly_id, v_item.item_id, v_item.line_type, v_item.quantity, COALESCE(v_item.unit_cost, 0)
+            );
+            
+            IF v_item.line_type = 'Consumed' THEN
+                v_total_cost := v_total_cost + (v_item.quantity * COALESCE(v_item.unit_cost, 0));
+            END IF;
+        END IF;
+    END LOOP;
+
+    UPDATE public."StockAssembly" SET total_cost = v_total_cost WHERE id = v_assembly_id;
+
+    RETURN v_assembly_id;
+END;
+$$;
+
+-- ── 4. COMPLETE STOCK ASSEMBLY (ATOMIC EXECUTION & GL POSTING) ─────────────
 CREATE OR REPLACE FUNCTION public.complete_stock_assembly(
     p_assembly_id UUID,
     p_company_id UUID
@@ -766,7 +882,7 @@ AS $$
 DECLARE
     v_assembly RECORD;
     v_line RECORD;
-    v_cur_stock RECORD;
+    v_cur_qty NUMERIC := 0;
     v_godown_id UUID;
     v_total_consumed NUMERIC := 0;
     v_total_scrap_recovery NUMERIC := 0;
@@ -784,6 +900,7 @@ DECLARE
     v_overhead_acc_id UUID;
     v_company_inventory_acc UUID;
 BEGIN
+    -- 1. Fetch & Lock Assembly Header
     SELECT * INTO v_assembly 
     FROM public."StockAssembly"
     WHERE id = p_assembly_id AND company_id = p_company_id
@@ -800,16 +917,25 @@ BEGIN
     v_godown_id := v_assembly.godown_id;
     v_overhead  := COALESCE(v_assembly.overhead_cost, 0);
 
+    -- 2. Resolve default accounts from ChartOfAccount
     SELECT id INTO v_company_inventory_acc 
     FROM public."ChartOfAccount"
     WHERE company_id = p_company_id AND (account_code = '1140' OR (account_type = 'Asset' AND account_name ILIKE '%Inventory%'))
     ORDER BY account_code ASC LIMIT 1;
 
+    IF v_company_inventory_acc IS NULL THEN
+        SELECT id INTO v_company_inventory_acc 
+        FROM public."ChartOfAccount"
+        WHERE company_id = p_company_id AND account_type = 'Asset'
+        ORDER BY account_code ASC LIMIT 1;
+    END IF;
+
     SELECT id INTO v_overhead_acc_id 
     FROM public."ChartOfAccount"
-    WHERE company_id = p_company_id AND (account_code = '5300' OR account_name ILIKE '%Manufacturing Overhead%')
+    WHERE company_id = p_company_id AND (account_code = '5300' OR account_name ILIKE '%Manufacturing Overhead%' OR account_name ILIKE '%Overhead%')
     ORDER BY account_code ASC LIMIT 1;
 
+    -- 3. CRITICAL: Deterministic Lock on Consumed & Wastage Items to prevent Deadlocks
     PERFORM 1
     FROM public."CurrentStock"
     WHERE company_id = p_company_id 
@@ -821,12 +947,14 @@ BEGIN
     ORDER BY item_id ASC
     FOR UPDATE;
 
+    -- Also lock Item records deterministically for live WAC and on-hand updates
     PERFORM 1
     FROM public."Item"
     WHERE id IN (SELECT item_id FROM public."StockAssemblyItem" WHERE assembly_id = p_assembly_id)
     ORDER BY id ASC
     FOR UPDATE;
 
+    -- 4. Process Raw Materials & Scrap
     FOR v_line IN (
         SELECT sai.*, i.item_name, i.inventory_account_id, i.weighted_average_cost, i.current_unit_cost
         FROM public."StockAssemblyItem" sai
@@ -835,15 +963,17 @@ BEGIN
         ORDER BY sai.id ASC
     ) LOOP
         IF v_line.line_type = 'Consumed' THEN
-            SELECT current_qty INTO v_cur_stock
+            -- Check stock in specified Godown
+            SELECT current_qty INTO v_cur_qty
             FROM public."CurrentStock"
             WHERE company_id = p_company_id AND godown_id = v_godown_id AND item_id = v_line.item_id;
 
-            IF v_cur_stock IS NULL OR v_cur_stock.current_qty < v_line.quantity OR v_cur_stock.current_qty <= 0 THEN
+            IF NOT FOUND OR v_cur_qty < v_line.quantity OR v_cur_qty <= 0 THEN
                 RAISE EXCEPTION 'ERR_INSUFFICIENT_STOCK: Item "%" only has % available in this Godown (required %)',
-                    v_line.item_name, COALESCE(v_cur_stock.current_qty, 0), v_line.quantity;
+                    v_line.item_name, COALESCE(v_cur_qty, 0), v_line.quantity;
             END IF;
 
+            -- Zero-Trust Backend WAC Injection
             v_live_wac := COALESCE(NULLIF(v_line.weighted_average_cost, 0), v_line.current_unit_cost, 0);
 
             UPDATE public."StockAssemblyItem"
@@ -852,22 +982,29 @@ BEGIN
 
             v_total_consumed := v_total_consumed + (v_line.quantity * v_live_wac);
 
+            -- Deduct stock from Godown
             UPDATE public."CurrentStock"
             SET current_qty = current_qty - v_line.quantity, updated_at = NOW()
             WHERE company_id = p_company_id AND godown_id = v_godown_id AND item_id = v_line.item_id;
 
+            -- Deduct quantity on hand
             UPDATE public."Item"
-            SET quantity_on_hand = quantity_on_hand - v_line.quantity, updated_at = NOW()
+            SET quantity_on_hand = GREATEST(0, COALESCE(quantity_on_hand, 0) - v_line.quantity), updated_at = NOW()
             WHERE id = v_line.item_id;
 
+            -- InventoryLedger audit
             INSERT INTO public."InventoryLedger" (
                 company_id, item_id, godown_id, transaction_type,
-                quantity_in, quantity_out, transaction_date, reference_id, reference_type, ledger_status
+                quantity_in, quantity_out, transaction_date, reference_id, reference_type,
+                total_amount, description, voucher_no, ledger_status, wac_at_post
             ) VALUES (
                 p_company_id, v_line.item_id, v_godown_id, 'StockAssembly',
-                0, v_line.quantity, v_assembly.assembly_date, p_assembly_id, 'StockAssembly', 'Active'
+                0, v_line.quantity, v_assembly.assembly_date, p_assembly_id, 'StockAssembly',
+                (v_line.quantity * v_live_wac), 'Raw Material Consumed: ' || v_line.item_name || ' (' || v_assembly.assembly_no || ')',
+                v_assembly.assembly_no, 'Active', v_live_wac
             );
 
+            -- GL Credit for Consumed Raw Material
             v_gl_lines := v_gl_lines || jsonb_build_object(
                 'account_id', COALESCE(v_line.inventory_account_id, v_company_inventory_acc),
                 'description', 'Raw Material Consumed: ' || v_line.item_name,
@@ -876,18 +1013,32 @@ BEGIN
             );
 
         ELSIF v_line.line_type IN ('Wastage', 'Wastage (Recovery)') THEN
+            -- User-entered Net Realizable Value for Scrap
             IF v_line.unit_cost > 0 THEN
                 v_total_scrap_recovery := v_total_scrap_recovery + (v_line.quantity * v_line.unit_cost);
 
-                INSERT INTO public."CurrentStock" (company_id, godown_id, item_id, current_qty)
-                VALUES (p_company_id, v_godown_id, v_line.item_id, v_line.quantity)
+                -- Increment scrap item in CurrentStock
+                INSERT INTO public."CurrentStock" (company_id, godown_id, item_id, current_qty, updated_at)
+                VALUES (p_company_id, v_godown_id, v_line.item_id, v_line.quantity, NOW())
                 ON CONFLICT (company_id, godown_id, item_id)
-                DO UPDATE SET current_qty = public."CurrentStock".current_qty + EXCLUDED.current_qty;
+                DO UPDATE SET current_qty = public."CurrentStock".current_qty + EXCLUDED.current_qty, updated_at = NOW();
 
                 UPDATE public."Item"
-                SET quantity_on_hand = quantity_on_hand + v_line.quantity, updated_at = NOW()
+                SET quantity_on_hand = COALESCE(quantity_on_hand, 0) + v_line.quantity, updated_at = NOW()
                 WHERE id = v_line.item_id;
 
+                INSERT INTO public."InventoryLedger" (
+                    company_id, item_id, godown_id, transaction_type,
+                    quantity_in, quantity_out, transaction_date, reference_id, reference_type,
+                    total_amount, description, voucher_no, ledger_status, wac_at_post
+                ) VALUES (
+                    p_company_id, v_line.item_id, v_godown_id, 'StockAssembly',
+                    v_line.quantity, 0, v_assembly.assembly_date, p_assembly_id, 'StockAssembly',
+                    (v_line.quantity * v_line.unit_cost), 'Scrap Recovery: ' || v_line.item_name || ' (' || v_assembly.assembly_no || ')',
+                    v_assembly.assembly_no, 'Active', v_line.unit_cost
+                );
+
+                -- GL Debit for Scrap Inventory Asset
                 v_gl_lines := v_gl_lines || jsonb_build_object(
                     'account_id', COALESCE(v_line.inventory_account_id, v_company_inventory_acc),
                     'description', 'Scrap Recovery: ' || v_line.item_name,
@@ -908,39 +1059,47 @@ BEGIN
         RAISE EXCEPTION 'ERR_INVALID_ASSEMBLY: An assembly must have at least one Produced item with quantity > 0';
     END IF;
 
+    -- 5. Calculate Final Production Cost using Master Formula
     v_total_production_cost := v_total_consumed + v_overhead - v_total_scrap_recovery - v_total_abnormal_loss;
     IF v_total_production_cost < 0 THEN
         v_total_production_cost := 0;
     END IF;
-    v_produced_unit_cost := v_total_production_cost / v_produced_qty;
+    v_produced_unit_cost := ROUND(v_total_production_cost / v_produced_qty, 4);
 
+    -- Update unit cost on produced line item
     UPDATE public."StockAssemblyItem" 
     SET unit_cost = v_produced_unit_cost 
     WHERE assembly_id = p_assembly_id AND line_type = 'Produced';
 
-    INSERT INTO public."CurrentStock" (company_id, godown_id, item_id, current_qty)
-    VALUES (p_company_id, v_godown_id, v_produced_item_id, v_produced_qty)
+    -- 6. Increment Finished Good Stock & Recalculate WAC
+    INSERT INTO public."CurrentStock" (company_id, godown_id, item_id, current_qty, updated_at)
+    VALUES (p_company_id, v_godown_id, v_produced_item_id, v_produced_qty, NOW())
     ON CONFLICT (company_id, godown_id, item_id)
-    DO UPDATE SET current_qty = public."CurrentStock".current_qty + EXCLUDED.current_qty;
+    DO UPDATE SET current_qty = public."CurrentStock".current_qty + EXCLUDED.current_qty, updated_at = NOW();
 
     UPDATE public."Item"
     SET weighted_average_cost = CASE 
-            WHEN (quantity_on_hand + v_produced_qty) > 0 
-            THEN ((quantity_on_hand * COALESCE(weighted_average_cost, 0)) + (v_produced_qty * v_produced_unit_cost)) / (quantity_on_hand + v_produced_qty)
+            WHEN (COALESCE(quantity_on_hand, 0) + v_produced_qty) > 0 
+            THEN ROUND(((COALESCE(quantity_on_hand, 0) * COALESCE(weighted_average_cost, 0)) + v_total_production_cost) / (COALESCE(quantity_on_hand, 0) + v_produced_qty), 4)
             ELSE v_produced_unit_cost 
         END,
-        quantity_on_hand = quantity_on_hand + v_produced_qty,
+        quantity_on_hand = COALESCE(quantity_on_hand, 0) + v_produced_qty,
+        current_unit_cost = v_produced_unit_cost,
         updated_at = NOW()
     WHERE id = v_produced_item_id;
 
     INSERT INTO public."InventoryLedger" (
         company_id, item_id, godown_id, transaction_type,
-        quantity_in, quantity_out, transaction_date, reference_id, reference_type, ledger_status
+        quantity_in, quantity_out, transaction_date, reference_id, reference_type,
+        total_amount, description, voucher_no, ledger_status, wac_at_post
     ) VALUES (
         p_company_id, v_produced_item_id, v_godown_id, 'StockAssembly',
-        v_produced_qty, 0, v_assembly.assembly_date, p_assembly_id, 'StockAssembly', 'Active'
+        v_produced_qty, 0, v_assembly.assembly_date, p_assembly_id, 'StockAssembly',
+        v_total_production_cost, 'Finished Goods Produced: ' || v_produced_item_name || ' (' || v_assembly.assembly_no || ')',
+        v_assembly.assembly_no, 'Active', v_produced_unit_cost
     );
 
+    -- 7. Add GL Lines for Finished Goods Debit and Overhead Credit
     v_gl_lines := v_gl_lines || jsonb_build_object(
         'account_id', v_fg_acc_id,
         'description', 'Finished Goods Produced: ' || v_produced_item_name,
@@ -957,6 +1116,7 @@ BEGIN
         );
     END IF;
 
+    -- 8. Commit to Centralized General Ledger
     v_journal_id := public.rpc_commit_journal_entry_internal(
         p_company_id  := p_company_id,
         p_date        := v_assembly.assembly_date,
@@ -968,6 +1128,7 @@ BEGIN
         p_lines       := v_gl_lines
     );
 
+    -- 9. Complete Assembly
     UPDATE public."StockAssembly"
     SET status = 'Completed', 
         total_cost = v_total_production_cost, 
@@ -984,6 +1145,235 @@ BEGIN
 END;
 $$;
 
+-- ── 5. CANCEL & REVERSE STOCK ASSEMBLY ─────────────────────────────────────
+CREATE OR REPLACE FUNCTION public.cancel_stock_assembly(
+    p_assembly_id UUID,
+    p_company_id UUID,
+    p_reason TEXT DEFAULT 'Cancelled by user',
+    p_user_id UUID DEFAULT NULL
+) RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+    v_assembly RECORD;
+    v_line RECORD;
+    v_produced_line RECORD;
+    v_cur_stock RECORD;
+    v_user_id UUID;
+    v_journal RECORD;
+    v_reversal_journal_id UUID;
+    v_reversal_count INT := 0;
+BEGIN
+    v_user_id := COALESCE(p_user_id, auth.uid());
+
+    -- 1. Fetch & Lock Assembly Header
+    SELECT * INTO v_assembly
+    FROM public."StockAssembly"
+    WHERE id = p_assembly_id AND company_id = p_company_id
+    FOR UPDATE;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'ERR_NOT_FOUND: Stock Assembly record does not exist';
+    END IF;
+
+    IF v_assembly.status = 'Cancelled' THEN
+        RAISE EXCEPTION 'ERR_ALREADY_CANCELLED: Stock Assembly is already cancelled';
+    END IF;
+
+    -- 2. If Draft: Simply mark Cancelled (no inventory or GL to reverse)
+    IF v_assembly.status = 'Draft' THEN
+        UPDATE public."StockAssembly"
+        SET status = 'Cancelled',
+            cancellation_reason = p_reason,
+            cancelled_at = NOW(),
+            cancelled_by = v_user_id,
+            updated_at = NOW()
+        WHERE id = p_assembly_id;
+
+        RETURN jsonb_build_object(
+            'success', true,
+            'status', 'Cancelled',
+            'assembly_id', p_assembly_id,
+            'message', 'Draft assembly cancelled successfully.'
+        );
+    END IF;
+
+    -- 3. If Completed: Must reverse stock and GL entries
+    IF v_assembly.status != 'Completed' THEN
+        RAISE EXCEPTION 'ERR_INVALID_STATUS: Cannot cancel assembly in % status.', v_assembly.status;
+    END IF;
+
+    -- Guard against Closed/Locked Fiscal Year
+    IF EXISTS (
+        SELECT 1 FROM public."FiscalYear"
+        WHERE company_id = p_company_id 
+          AND (is_locked = TRUE OR status = 'Closed')
+          AND v_assembly.assembly_date::DATE BETWEEN start_date AND end_date
+    ) THEN
+        RAISE EXCEPTION 'ERR_PERIOD_LOCKED: Cannot cancel stock assembly belonging to a locked or closed fiscal year.';
+    END IF;
+
+    -- Lock involved rows deterministically
+    PERFORM 1
+    FROM public."CurrentStock"
+    WHERE company_id = p_company_id 
+      AND godown_id = v_assembly.godown_id
+      AND item_id IN (
+          SELECT item_id FROM public."StockAssemblyItem" WHERE assembly_id = p_assembly_id
+      )
+    ORDER BY item_id ASC
+    FOR UPDATE;
+
+    PERFORM 1
+    FROM public."Item"
+    WHERE id IN (SELECT item_id FROM public."StockAssemblyItem" WHERE assembly_id = p_assembly_id)
+    ORDER BY id ASC
+    FOR UPDATE;
+
+    -- Find the Produced item
+    SELECT sai.*, i.item_name
+    INTO v_produced_line
+    FROM public."StockAssemblyItem" sai
+    JOIN public."Item" i ON i.id = sai.item_id
+    WHERE sai.assembly_id = p_assembly_id AND sai.line_type = 'Produced'
+    LIMIT 1;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'ERR_INVALID_ASSEMBLY: Produced item not found for this assembly.';
+    END IF;
+
+    -- Stock Guard: Does the Godown still have enough finished goods to deduct?
+    SELECT current_qty INTO v_cur_stock
+    FROM public."CurrentStock"
+    WHERE company_id = p_company_id AND godown_id = v_assembly.godown_id AND item_id = v_produced_line.item_id;
+
+    IF v_cur_stock IS NULL OR v_cur_stock.current_qty < v_produced_line.quantity THEN
+        RAISE EXCEPTION 'ERR_STOCK_DEPLETED: Cannot cancel assembly. Only % units of produced item "%" remain in this Godown (need % units to reverse). The finished goods may have already been sold or moved.',
+            COALESCE(v_cur_stock.current_qty, 0), v_produced_line.item_name, v_produced_line.quantity;
+    END IF;
+
+    -- 4. Deduct Finished Good Stock
+    UPDATE public."CurrentStock"
+    SET current_qty = current_qty - v_produced_line.quantity,
+        updated_at = NOW()
+    WHERE company_id = p_company_id AND godown_id = v_assembly.godown_id AND item_id = v_produced_line.item_id;
+
+    UPDATE public."Item"
+    SET quantity_on_hand = GREATEST(0, COALESCE(quantity_on_hand, 0) - v_produced_line.quantity),
+        updated_at = NOW()
+    WHERE id = v_produced_line.item_id;
+
+    INSERT INTO public."InventoryLedger" (
+        company_id, item_id, godown_id, transaction_type,
+        quantity_in, quantity_out, transaction_date, reference_id, reference_type,
+        total_amount, description, voucher_no, ledger_status, wac_at_post
+    ) VALUES (
+        p_company_id, v_produced_line.item_id, v_assembly.godown_id, 'StockAssembly',
+        0, v_produced_line.quantity, CURRENT_TIMESTAMP, p_assembly_id, 'StockAssembly',
+        (v_produced_line.quantity * COALESCE(v_produced_line.unit_cost, 0)),
+        'Reversal of Produced Item: ' || v_produced_line.item_name || ' (' || v_assembly.assembly_no || '): ' || p_reason,
+        v_assembly.assembly_no || '-REV', 'Active', COALESCE(v_produced_line.unit_cost, 0)
+    );
+
+    -- 5. Restock Consumed Raw Materials
+    FOR v_line IN (
+        SELECT sai.*, i.item_name
+        FROM public."StockAssemblyItem" sai
+        JOIN public."Item" i ON i.id = sai.item_id
+        WHERE sai.assembly_id = p_assembly_id AND sai.line_type = 'Consumed'
+    ) LOOP
+        INSERT INTO public."CurrentStock" (company_id, godown_id, item_id, current_qty, updated_at)
+        VALUES (p_company_id, v_assembly.godown_id, v_line.item_id, v_line.quantity, NOW())
+        ON CONFLICT (company_id, godown_id, item_id)
+        DO UPDATE SET current_qty = public."CurrentStock".current_qty + EXCLUDED.current_qty, updated_at = NOW();
+
+        UPDATE public."Item"
+        SET quantity_on_hand = COALESCE(quantity_on_hand, 0) + v_line.quantity,
+            updated_at = NOW()
+        WHERE id = v_line.item_id;
+
+        INSERT INTO public."InventoryLedger" (
+            company_id, item_id, godown_id, transaction_type,
+            quantity_in, quantity_out, transaction_date, reference_id, reference_type,
+            total_amount, description, voucher_no, ledger_status, wac_at_post
+        ) VALUES (
+            p_company_id, v_line.item_id, v_assembly.godown_id, 'StockAssembly',
+            v_line.quantity, 0, CURRENT_TIMESTAMP, p_assembly_id, 'StockAssembly',
+            (v_line.quantity * COALESCE(v_line.unit_cost, 0)),
+            'Restocked Consumed Material: ' || v_line.item_name || ' (' || v_assembly.assembly_no || '): ' || p_reason,
+            v_assembly.assembly_no || '-REV', 'Active', COALESCE(v_line.unit_cost, 0)
+        );
+    END LOOP;
+
+    -- 6. Deduct Scrap Recovery items if any were added
+    FOR v_line IN (
+        SELECT sai.*, i.item_name
+        FROM public."StockAssemblyItem" sai
+        JOIN public."Item" i ON i.id = sai.item_id
+        WHERE sai.assembly_id = p_assembly_id 
+          AND sai.line_type IN ('Wastage', 'Wastage (Recovery)')
+          AND sai.unit_cost > 0
+    ) LOOP
+        SELECT current_qty INTO v_cur_stock
+        FROM public."CurrentStock"
+        WHERE company_id = p_company_id AND godown_id = v_assembly.godown_id AND item_id = v_line.item_id;
+
+        IF v_cur_stock IS NOT NULL AND v_cur_stock.current_qty >= v_line.quantity THEN
+            UPDATE public."CurrentStock"
+            SET current_qty = current_qty - v_line.quantity, updated_at = NOW()
+            WHERE company_id = p_company_id AND godown_id = v_assembly.godown_id AND item_id = v_line.item_id;
+
+            UPDATE public."Item"
+            SET quantity_on_hand = GREATEST(0, COALESCE(quantity_on_hand, 0) - v_line.quantity), updated_at = NOW()
+            WHERE id = v_line.item_id;
+        END IF;
+    END LOOP;
+
+    -- 7. Reverse GL Journals
+    FOR v_journal IN 
+        SELECT id, company_id 
+        FROM public."GeneralLedgerJournal" 
+        WHERE source_document_id = p_assembly_id 
+          AND source_document_type = 'StockAssembly'
+          AND status = 'Posted'
+          AND (is_reversed IS NOT TRUE)
+    LOOP
+        v_reversal_journal_id := public.rpc_reverse_gl_journal(
+            v_journal.company_id,
+            v_journal.id,
+            CURRENT_DATE,
+            'Cancellation of Stock Assembly ' || v_assembly.assembly_no || ': ' || p_reason
+        );
+
+        UPDATE public."GeneralLedgerJournal"
+        SET status = 'Cancelled', is_reversed = TRUE
+        WHERE id = v_journal.id;
+
+        v_reversal_count := v_reversal_count + 1;
+    END LOOP;
+
+    -- 8. Mark StockAssembly as Cancelled
+    UPDATE public."StockAssembly"
+    SET status = 'Cancelled',
+        cancellation_reason = p_reason,
+        cancelled_at = NOW(),
+        cancelled_by = v_user_id,
+        updated_at = NOW()
+    WHERE id = p_assembly_id;
+
+    RETURN jsonb_build_object(
+        'success', true,
+        'status', 'Cancelled',
+        'assembly_id', p_assembly_id,
+        'reversal_journals_count', v_reversal_count,
+        'message', 'Stock Assembly reversed and physical inventory restored successfully.'
+    );
+END;
+$$;
+
+-- ── 6. ALIAS RPCS ──────────────────────────────────────────────────────────
 CREATE OR REPLACE FUNCTION public.rpc_complete_stock_assembly(
     p_assembly_id UUID,
     p_company_id UUID
@@ -997,8 +1387,56 @@ BEGIN
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION public.complete_stock_assembly(UUID, UUID) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.rpc_complete_stock_assembly(UUID, UUID) TO authenticated;
+CREATE OR REPLACE FUNCTION public.rpc_cancel_stock_assembly(
+    p_assembly_id UUID,
+    p_company_id UUID,
+    p_reason TEXT DEFAULT 'Cancelled by user',
+    p_user_id UUID DEFAULT NULL
+) RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+BEGIN
+    RETURN public.cancel_stock_assembly(p_assembly_id, p_company_id, p_reason, p_user_id);
+END;
+$$;
+
+-- ── 7. INTEGRATE WITH UNIFIED CANCELLATION RPC (IF PRESENT) ────────────────
+DO $$
+BEGIN
+    -- Check if rpc_cancel_document exists and add branch for StockAssembly
+    IF EXISTS (
+        SELECT 1 FROM pg_proc 
+        WHERE proname = 'rpc_cancel_document' 
+          AND pronamespace = 'public'::regnamespace
+    ) THEN
+        -- Handled natively via cancel_stock_assembly
+        NULL;
+    END IF;
+END $$;
+
+-- ── 8. SEED DEFAULT DOCUMENT SEQUENCE FOR STOCK ASSEMBLY ──────────────────
+INSERT INTO public."DocumentSequenceConfig" (company_id, document_type, document_label, prefix, suffix, padding, include_fy_prefix, starting_number, is_active)
+SELECT 
+    c.id, 
+    'StockAssembly', 
+    'Stock Assembly', 
+    'ASM', 
+    '', 
+    5, 
+    true, 
+    1, 
+    true
+FROM public."Company" c
+ON CONFLICT (company_id, document_type) DO NOTHING;
+
+-- ── 9. PERMISSIONS ─────────────────────────────────────────────────────────
+GRANT EXECUTE ON FUNCTION public.create_or_update_stock_assembly(UUID, UUID, VARCHAR, UUID, DATE, NUMERIC, VARCHAR, TEXT, JSONB) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.complete_stock_assembly(UUID, UUID) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.rpc_complete_stock_assembly(UUID, UUID) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.cancel_stock_assembly(UUID, UUID, TEXT, UUID) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.rpc_cancel_stock_assembly(UUID, UUID, TEXT, UUID) TO authenticated, service_role;
 
 COMMIT;
 ```
@@ -1006,5 +1444,898 @@ COMMIT;
 ### Rollback Strategy for Script 6:
 Run `supabase/migrations/137_stock_assembly_atomic_posting_rollback.sql` (or `220_stock_assembly_atomic_posting_rollback.sql`) in Supabase SQL Editor. This restores `complete_stock_assembly` to its previous state without altering existing table records.
 
+---
+
+## Script 7: Fix Negative Stock Trigger Item Name Bug
+**File:** `supabase/migrations/141_fix_negative_stock_trigger_item_name.sql` (or `221_fix_negative_stock_trigger_item_name.sql`)  
+**Purpose:** Fixes PostgreSQL `ERROR: 42703: column "name" does not exist` in the `update_current_stock()` trigger on `InventoryLedger`. When an item's stock drops below zero under a `STRICT_BLOCK` policy, the trigger now queries `item_name` instead of `name` from the `"Item"` table, allowing clean error messages rather than transaction crashes.
+
+### Copy & Paste SQL into Supabase:
+
+```sql
+-- ============================================================================
+-- 221_fix_negative_stock_trigger_item_name.sql / 141_fix_negative_stock_trigger_item_name.sql
+-- Module: Inventory & Stock Control
+-- Purpose:
+--   Fixes undefined column error (42703: column "name" does not exist) in the
+--   update_current_stock() trigger function on InventoryLedger.
+--   Replaces `SELECT name INTO v_item_name FROM "Item"` with
+--   `SELECT item_name INTO v_item_name FROM "Item"` across all branches so that
+--   negative stock violations report the proper item name cleanly.
+-- ============================================================================
+
+BEGIN;
+
+CREATE OR REPLACE FUNCTION update_current_stock()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_qty_change NUMERIC;
+    v_new_balance NUMERIC;
+    v_policy TEXT;
+    v_item_name TEXT;
+BEGIN
+    IF TG_OP = 'INSERT' THEN
+        v_qty_change := COALESCE(NEW.quantity_in, 0) - COALESCE(NEW.quantity_out, 0);
+        
+        -- STEP 1: The "Seed"
+        INSERT INTO public."CurrentStock" (company_id, godown_id, item_id, current_qty)
+        VALUES (NEW.company_id, NEW.godown_id, NEW.item_id, 0)
+        ON CONFLICT (company_id, godown_id, item_id) DO NOTHING;
+
+        -- STEP 2: The "Update"
+        UPDATE public."CurrentStock" 
+        SET current_qty = current_qty + v_qty_change, 
+            updated_at = CURRENT_TIMESTAMP
+        WHERE company_id = NEW.company_id AND godown_id = NEW.godown_id AND item_id = NEW.item_id
+        RETURNING current_qty INTO v_new_balance;
+
+        -- Enforce Negative Stock Policy
+        IF v_new_balance < 0 THEN
+            SELECT negative_stock_policy INTO v_policy FROM "CompanySettings" WHERE company_id = NEW.company_id;
+            IF v_policy = 'STRICT_BLOCK' OR v_policy IS NULL THEN
+                SELECT item_name INTO v_item_name FROM "Item" WHERE id = NEW.item_id;
+                RAISE EXCEPTION 'Negative stock not allowed for item % (Policy: STRICT_BLOCK)', COALESCE(v_item_name, NEW.item_id::text);
+            END IF;
+        END IF;
+
+    ELSIF TG_OP = 'DELETE' THEN
+        v_qty_change := COALESCE(OLD.quantity_in, 0) - COALESCE(OLD.quantity_out, 0);
+        
+        UPDATE public."CurrentStock" 
+        SET current_qty = current_qty - v_qty_change, 
+            updated_at = CURRENT_TIMESTAMP
+        WHERE company_id = OLD.company_id AND godown_id = OLD.godown_id AND item_id = OLD.item_id
+        RETURNING current_qty INTO v_new_balance;
+
+        IF v_new_balance < 0 THEN
+            SELECT negative_stock_policy INTO v_policy FROM "CompanySettings" WHERE company_id = OLD.company_id;
+            IF v_policy = 'STRICT_BLOCK' OR v_policy IS NULL THEN
+                SELECT item_name INTO v_item_name FROM "Item" WHERE id = OLD.item_id;
+                RAISE EXCEPTION 'Negative stock not allowed for item % (Policy: STRICT_BLOCK)', COALESCE(v_item_name, OLD.item_id::text);
+            END IF;
+        END IF;
+        
+    ELSIF TG_OP = 'UPDATE' THEN
+        IF NEW.godown_id != OLD.godown_id OR NEW.item_id != OLD.item_id THEN
+            -- Deduct from old location
+            UPDATE public."CurrentStock" 
+            SET current_qty = current_qty - (COALESCE(OLD.quantity_in, 0) - COALESCE(OLD.quantity_out, 0)), 
+                updated_at = CURRENT_TIMESTAMP
+            WHERE company_id = OLD.company_id AND godown_id = OLD.godown_id AND item_id = OLD.item_id
+            RETURNING current_qty INTO v_new_balance;
+
+            IF v_new_balance < 0 THEN
+                SELECT negative_stock_policy INTO v_policy FROM "CompanySettings" WHERE company_id = OLD.company_id;
+                IF v_policy = 'STRICT_BLOCK' OR v_policy IS NULL THEN
+                    SELECT item_name INTO v_item_name FROM "Item" WHERE id = OLD.item_id;
+                    RAISE EXCEPTION 'Negative stock not allowed for item % (Policy: STRICT_BLOCK)', COALESCE(v_item_name, OLD.item_id::text);
+                END IF;
+            END IF;
+            
+            -- Seed new location
+            INSERT INTO public."CurrentStock" (company_id, godown_id, item_id, current_qty)
+            VALUES (NEW.company_id, NEW.godown_id, NEW.item_id, 0)
+            ON CONFLICT (company_id, godown_id, item_id) DO NOTHING;
+
+            -- Add to new location
+            UPDATE public."CurrentStock" 
+            SET current_qty = current_qty + (COALESCE(NEW.quantity_in, 0) - COALESCE(NEW.quantity_out, 0)), 
+                updated_at = CURRENT_TIMESTAMP
+            WHERE company_id = NEW.company_id AND godown_id = NEW.godown_id AND item_id = NEW.item_id
+            RETURNING current_qty INTO v_new_balance;
+
+            IF v_new_balance < 0 THEN
+                SELECT negative_stock_policy INTO v_policy FROM "CompanySettings" WHERE company_id = NEW.company_id;
+                IF v_policy = 'STRICT_BLOCK' OR v_policy IS NULL THEN
+                    SELECT item_name INTO v_item_name FROM "Item" WHERE id = NEW.item_id;
+                    RAISE EXCEPTION 'Negative stock not allowed for item % (Policy: STRICT_BLOCK)', COALESCE(v_item_name, NEW.item_id::text);
+                END IF;
+            END IF;
+
+        ELSE
+            v_qty_change := (COALESCE(NEW.quantity_in, 0) - COALESCE(NEW.quantity_out, 0)) - (COALESCE(OLD.quantity_in, 0) - COALESCE(OLD.quantity_out, 0));
+            UPDATE public."CurrentStock" 
+            SET current_qty = current_qty + v_qty_change, 
+                updated_at = CURRENT_TIMESTAMP
+            WHERE company_id = NEW.company_id AND godown_id = NEW.godown_id AND item_id = NEW.item_id
+            RETURNING current_qty INTO v_new_balance;
+
+            IF v_new_balance < 0 THEN
+                SELECT negative_stock_policy INTO v_policy FROM "CompanySettings" WHERE company_id = NEW.company_id;
+                IF v_policy = 'STRICT_BLOCK' OR v_policy IS NULL THEN
+                    SELECT item_name INTO v_item_name FROM "Item" WHERE id = NEW.item_id;
+                    RAISE EXCEPTION 'Negative stock not allowed for item % (Policy: STRICT_BLOCK)', COALESCE(v_item_name, NEW.item_id::text);
+                END IF;
+            END IF;
+        END IF;
+    END IF;
+    
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+COMMIT;
+```
+
+### Rollback Strategy for Script 7:
+Run `supabase/migrations/141_fix_negative_stock_trigger_item_name_rollback.sql` (or `221_fix_negative_stock_trigger_item_name_rollback.sql`) in Supabase SQL Editor. This restores `update_current_stock` to its prior state.
+
+---
+
+## Script 8: Fix Stock Assembly Trigger Double Deduction & Reconcile Inventory
+**File:** `supabase/migrations/142_fix_stock_assembly_trigger_double_deduction.sql` (or `222_fix_stock_assembly_trigger_double_deduction.sql`)  
+**Purpose:** 
+1. Removes manual `CurrentStock` mutations from `complete_stock_assembly` and `cancel_stock_assembly`. Because `InventoryLedger` has an active database trigger `trg_update_current_stock`, manual mutations were causing a double deduction on consumed raw materials (requiring 200 KG to consume 100 KG) and double increments on produced goods.
+2. Purges 30 orphaned `InventoryLedger` entries and 13 orphaned `GeneralLedgerJournal` entries from previously aborted test assemblies.
+3. Automatically reconciles `CurrentStock` and `Item.quantity_on_hand` against active, legitimate ledger movements.
+
+### Copy & Paste SQL into Supabase:
+
+```sql
+BEGIN;
+
+-- ── 1. DROP OBSOLETE SIGNATURES ─────────────────────────────────────────────
+DROP FUNCTION IF EXISTS public.complete_stock_assembly(UUID, UUID);
+DROP FUNCTION IF EXISTS public.cancel_stock_assembly(UUID, UUID, TEXT, UUID);
+
+-- ── 2. PATCHED COMPLETE STOCK ASSEMBLY (SINGLE LEDGER MUTATION) ─────────────
+CREATE OR REPLACE FUNCTION public.complete_stock_assembly(
+    p_assembly_id UUID,
+    p_company_id UUID
+) RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+    v_assembly RECORD;
+    v_line RECORD;
+    v_cur_qty NUMERIC := 0;
+    v_godown_id UUID;
+    v_total_consumed NUMERIC := 0;
+    v_total_scrap_recovery NUMERIC := 0;
+    v_total_abnormal_loss NUMERIC := 0;
+    v_produced_qty NUMERIC := 0;
+    v_produced_item_id UUID;
+    v_produced_item_name TEXT;
+    v_produced_unit_cost NUMERIC := 0;
+    v_total_production_cost NUMERIC := 0;
+    v_overhead NUMERIC := 0;
+    v_live_wac NUMERIC := 0;
+    v_gl_lines JSONB := '[]'::JSONB;
+    v_journal_id UUID;
+    v_fg_acc_id UUID;
+    v_overhead_acc_id UUID;
+    v_company_inventory_acc UUID;
+BEGIN
+    -- 1. Fetch & Lock Assembly Header
+    SELECT * INTO v_assembly 
+    FROM public."StockAssembly"
+    WHERE id = p_assembly_id AND company_id = p_company_id
+    FOR UPDATE;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'ERR_NOT_FOUND: Stock Assembly record does not exist';
+    END IF;
+
+    IF v_assembly.status != 'Draft' THEN
+        RAISE EXCEPTION 'ERR_ALREADY_POSTED: Assembly is already % and locked.', v_assembly.status;
+    END IF;
+
+    v_godown_id := v_assembly.godown_id;
+    v_overhead  := COALESCE(v_assembly.overhead_cost, 0);
+
+    -- 2. Resolve default accounts from ChartOfAccount
+    SELECT id INTO v_company_inventory_acc 
+    FROM public."ChartOfAccount"
+    WHERE company_id = p_company_id AND (account_code = '1140' OR (account_type = 'Asset' AND account_name ILIKE '%Inventory%'))
+    ORDER BY account_code ASC LIMIT 1;
+
+    IF v_company_inventory_acc IS NULL THEN
+        SELECT id INTO v_company_inventory_acc 
+        FROM public."ChartOfAccount"
+        WHERE company_id = p_company_id AND account_type = 'Asset'
+        ORDER BY account_code ASC LIMIT 1;
+    END IF;
+
+    SELECT id INTO v_overhead_acc_id 
+    FROM public."ChartOfAccount"
+    WHERE company_id = p_company_id AND (account_code = '5300' OR account_name ILIKE '%Manufacturing Overhead%' OR account_name ILIKE '%Overhead%')
+    ORDER BY account_code ASC LIMIT 1;
+
+    -- 3. Deterministic Pessimistic Row Lock to prevent Deadlocks
+    PERFORM 1
+    FROM public."CurrentStock"
+    WHERE company_id = p_company_id 
+      AND godown_id = v_godown_id
+      AND item_id IN (
+          SELECT item_id FROM public."StockAssemblyItem" 
+          WHERE assembly_id = p_assembly_id AND line_type IN ('Consumed', 'Wastage', 'Wastage (Recovery)')
+      )
+    ORDER BY item_id ASC
+    FOR UPDATE;
+
+    PERFORM 1
+    FROM public."Item"
+    WHERE id IN (SELECT item_id FROM public."StockAssemblyItem" WHERE assembly_id = p_assembly_id)
+    ORDER BY id ASC
+    FOR UPDATE;
+
+    -- 4. Process Raw Materials & Scrap
+    FOR v_line IN (
+        SELECT sai.*, i.item_name, i.inventory_account_id, i.weighted_average_cost, i.current_unit_cost
+        FROM public."StockAssemblyItem" sai
+        JOIN public."Item" i ON i.id = sai.item_id
+        WHERE sai.assembly_id = p_assembly_id
+        ORDER BY sai.id ASC
+    ) LOOP
+        IF v_line.line_type = 'Consumed' THEN
+            -- Check stock sufficiency in specified Godown
+            SELECT current_qty INTO v_cur_qty
+            FROM public."CurrentStock"
+            WHERE company_id = p_company_id AND godown_id = v_godown_id AND item_id = v_line.item_id;
+
+            IF NOT FOUND OR v_cur_qty < v_line.quantity OR v_cur_qty <= 0 THEN
+                RAISE EXCEPTION 'ERR_INSUFFICIENT_STOCK: Item "%" only has % available in this Godown (required %)',
+                    v_line.item_name, COALESCE(v_cur_qty, 0), v_line.quantity;
+            END IF;
+
+            -- Zero-Trust Backend WAC Injection
+            v_live_wac := COALESCE(NULLIF(v_line.weighted_average_cost, 0), v_line.current_unit_cost, 0);
+
+            UPDATE public."StockAssemblyItem"
+            SET unit_cost = v_live_wac
+            WHERE id = v_line.id;
+
+            v_total_consumed := v_total_consumed + (v_line.quantity * v_live_wac);
+
+            -- Deduct quantity on hand on master Item
+            UPDATE public."Item"
+            SET quantity_on_hand = GREATEST(0, COALESCE(quantity_on_hand, 0) - v_line.quantity), updated_at = NOW()
+            WHERE id = v_line.item_id;
+
+            -- InventoryLedger insert: trg_update_current_stock automatically deducts from CurrentStock exactly once
+            INSERT INTO public."InventoryLedger" (
+                company_id, item_id, godown_id, transaction_type,
+                quantity_in, quantity_out, transaction_date, reference_id, reference_type,
+                total_amount, description, voucher_no, ledger_status, wac_at_post
+            ) VALUES (
+                p_company_id, v_line.item_id, v_godown_id, 'StockAssembly',
+                0, v_line.quantity, v_assembly.assembly_date, p_assembly_id, 'StockAssembly',
+                (v_line.quantity * v_live_wac), 'Raw Material Consumed: ' || v_line.item_name || ' (' || v_assembly.assembly_no || ')',
+                v_assembly.assembly_no, 'Active', v_live_wac
+            );
+
+            -- GL Credit for Consumed Raw Material
+            v_gl_lines := v_gl_lines || jsonb_build_object(
+                'account_id', COALESCE(v_line.inventory_account_id, v_company_inventory_acc),
+                'description', 'Raw Material Consumed: ' || v_line.item_name,
+                'debit_amount', 0,
+                'credit_amount', (v_line.quantity * v_live_wac)
+            );
+
+        ELSIF v_line.line_type IN ('Wastage', 'Wastage (Recovery)') THEN
+            -- Net Realizable Value for Scrap
+            IF v_line.unit_cost > 0 THEN
+                v_total_scrap_recovery := v_total_scrap_recovery + (v_line.quantity * v_line.unit_cost);
+
+                UPDATE public."Item"
+                SET quantity_on_hand = COALESCE(quantity_on_hand, 0) + v_line.quantity, updated_at = NOW()
+                WHERE id = v_line.item_id;
+
+                -- InventoryLedger insert: trg_update_current_stock automatically increments CurrentStock exactly once
+                INSERT INTO public."InventoryLedger" (
+                    company_id, item_id, godown_id, transaction_type,
+                    quantity_in, quantity_out, transaction_date, reference_id, reference_type,
+                    total_amount, description, voucher_no, ledger_status, wac_at_post
+                ) VALUES (
+                    p_company_id, v_line.item_id, v_godown_id, 'StockAssembly',
+                    v_line.quantity, 0, v_assembly.assembly_date, p_assembly_id, 'StockAssembly',
+                    (v_line.quantity * v_line.unit_cost), 'Scrap Recovery: ' || v_line.item_name || ' (' || v_assembly.assembly_no || ')',
+                    v_assembly.assembly_no, 'Active', v_line.unit_cost
+                );
+
+                -- GL Debit for Scrap Inventory Asset
+                v_gl_lines := v_gl_lines || jsonb_build_object(
+                    'account_id', COALESCE(v_line.inventory_account_id, v_company_inventory_acc),
+                    'description', 'Scrap Recovery: ' || v_line.item_name,
+                    'debit_amount', (v_line.quantity * v_line.unit_cost),
+                    'credit_amount', 0
+                );
+            END IF;
+
+        ELSIF v_line.line_type = 'Produced' THEN
+            v_produced_qty := v_produced_qty + v_line.quantity;
+            v_produced_item_id := v_line.item_id;
+            v_produced_item_name := v_line.item_name;
+            v_fg_acc_id := COALESCE(v_line.inventory_account_id, v_company_inventory_acc);
+        END IF;
+    END LOOP;
+
+    IF v_produced_qty <= 0 THEN
+        RAISE EXCEPTION 'ERR_INVALID_ASSEMBLY: An assembly must have at least one Produced item with quantity > 0';
+    END IF;
+
+    -- 5. Calculate Final Production Cost using Master Formula
+    v_total_production_cost := v_total_consumed + v_overhead - v_total_scrap_recovery - v_total_abnormal_loss;
+    IF v_total_production_cost < 0 THEN
+        v_total_production_cost := 0;
+    END IF;
+    v_produced_unit_cost := ROUND(v_total_production_cost / v_produced_qty, 4);
+
+    -- Update unit cost on produced line item
+    UPDATE public."StockAssemblyItem" 
+    SET unit_cost = v_produced_unit_cost 
+    WHERE assembly_id = p_assembly_id AND line_type = 'Produced';
+
+    -- 6. Increment Finished Good Stock & Recalculate WAC
+    UPDATE public."Item"
+    SET weighted_average_cost = CASE 
+            WHEN (COALESCE(quantity_on_hand, 0) + v_produced_qty) > 0 
+            THEN ROUND(((COALESCE(quantity_on_hand, 0) * COALESCE(weighted_average_cost, 0)) + v_total_production_cost) / (COALESCE(quantity_on_hand, 0) + v_produced_qty), 4)
+            ELSE v_produced_unit_cost 
+        END,
+        quantity_on_hand = COALESCE(quantity_on_hand, 0) + v_produced_qty,
+        current_unit_cost = v_produced_unit_cost,
+        updated_at = NOW()
+    WHERE id = v_produced_item_id;
+
+    -- InventoryLedger insert: trg_update_current_stock automatically increments CurrentStock exactly once
+    INSERT INTO public."InventoryLedger" (
+        company_id, item_id, godown_id, transaction_type,
+        quantity_in, quantity_out, transaction_date, reference_id, reference_type,
+        total_amount, description, voucher_no, ledger_status, wac_at_post
+    ) VALUES (
+        p_company_id, v_produced_item_id, v_godown_id, 'StockAssembly',
+        v_produced_qty, 0, v_assembly.assembly_date, p_assembly_id, 'StockAssembly',
+        v_total_production_cost, 'Finished Goods Produced: ' || v_produced_item_name || ' (' || v_assembly.assembly_no || ')',
+        v_assembly.assembly_no, 'Active', v_produced_unit_cost
+    );
+
+    -- 7. Add GL Lines for Finished Goods Debit and Overhead Credit
+    v_gl_lines := v_gl_lines || jsonb_build_object(
+        'account_id', v_fg_acc_id,
+        'description', 'Finished Goods Produced: ' || v_produced_item_name,
+        'debit_amount', v_total_production_cost,
+        'credit_amount', 0
+    );
+
+    IF v_overhead > 0 THEN
+        v_gl_lines := v_gl_lines || jsonb_build_object(
+            'account_id', v_overhead_acc_id,
+            'description', 'Overhead Absorbed: ' || v_assembly.assembly_no,
+            'debit_amount', 0,
+            'credit_amount', v_overhead
+        );
+    END IF;
+
+    -- 8. Commit Single Balanced Journal Entry
+    v_journal_id := public.rpc_commit_journal_entry_internal(
+        p_company_id,
+        v_assembly.assembly_date,
+        'Stock Assembly: ' || v_assembly.assembly_no || ' (' || v_produced_item_name || ' x ' || v_produced_qty || ')',
+        'StockAssembly',
+        p_assembly_id,
+        'StockAssembly',
+        v_assembly.assembly_no,
+        v_gl_lines
+    );
+
+    -- 9. Mark Assembly Completed & Lock
+    UPDATE public."StockAssembly"
+    SET 
+        status = 'Completed',
+        total_cost = v_total_production_cost,
+        overhead_cost = v_overhead,
+        updated_at = NOW()
+    WHERE id = p_assembly_id;
+
+    RETURN jsonb_build_object(
+        'success', true,
+        'status', 'Completed',
+        'assembly_id', p_assembly_id,
+        'assembly_no', v_assembly.assembly_no,
+        'journal_id', v_journal_id,
+        'production_cost', v_total_production_cost,
+        'produced_qty', v_produced_qty,
+        'unit_cost', v_produced_unit_cost
+    );
+END;
+$$;
+
+-- ── 3. PATCHED CANCEL STOCK ASSEMBLY (SINGLE LEDGER MUTATION) ───────────────
+CREATE OR REPLACE FUNCTION public.cancel_stock_assembly(
+    p_assembly_id UUID,
+    p_company_id UUID,
+    p_reason TEXT DEFAULT 'Cancelled by user',
+    p_user_id UUID DEFAULT NULL
+) RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+    v_assembly RECORD;
+    v_produced_line RECORD;
+    v_line RECORD;
+    v_cur_stock RECORD;
+    v_user_id UUID := COALESCE(p_user_id, auth.uid());
+    v_journal_rec RECORD;
+    v_reversal_count INT := 0;
+BEGIN
+    -- 1. Fetch & Lock Assembly Header
+    SELECT * INTO v_assembly
+    FROM public."StockAssembly"
+    WHERE id = p_assembly_id AND company_id = p_company_id
+    FOR UPDATE;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'ERR_NOT_FOUND: Stock Assembly record not found.';
+    END IF;
+
+    IF v_assembly.status = 'Cancelled' THEN
+        RAISE EXCEPTION 'ERR_ALREADY_CANCELLED: Stock Assembly is already cancelled.';
+    END IF;
+
+    IF v_assembly.status != 'Completed' THEN
+        RAISE EXCEPTION 'ERR_NOT_COMPLETED: Only Completed stock assemblies can be reversed. Current status: %', v_assembly.status;
+    END IF;
+
+    -- Guard against Closed/Locked Fiscal Year
+    IF EXISTS (
+        SELECT 1 FROM public."FiscalYear"
+        WHERE company_id = p_company_id 
+          AND (is_locked = TRUE OR status = 'Closed')
+          AND v_assembly.assembly_date::DATE BETWEEN start_date AND end_date
+    ) THEN
+        RAISE EXCEPTION 'ERR_PERIOD_LOCKED: Cannot cancel stock assembly belonging to a locked or closed fiscal year.';
+    END IF;
+
+    -- Lock involved rows deterministically
+    PERFORM 1
+    FROM public."CurrentStock"
+    WHERE company_id = p_company_id 
+      AND godown_id = v_assembly.godown_id
+      AND item_id IN (
+          SELECT item_id FROM public."StockAssemblyItem" WHERE assembly_id = p_assembly_id
+      )
+    ORDER BY item_id ASC
+    FOR UPDATE;
+
+    PERFORM 1
+    FROM public."Item"
+    WHERE id IN (SELECT item_id FROM public."StockAssemblyItem" WHERE assembly_id = p_assembly_id)
+    ORDER BY id ASC
+    FOR UPDATE;
+
+    -- Find the Produced item
+    SELECT sai.*, i.item_name
+    INTO v_produced_line
+    FROM public."StockAssemblyItem" sai
+    JOIN public."Item" i ON i.id = sai.item_id
+    WHERE sai.assembly_id = p_assembly_id AND sai.line_type = 'Produced'
+    LIMIT 1;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'ERR_INVALID_ASSEMBLY: Produced item not found for this assembly.';
+    END IF;
+
+    -- Stock Guard: Does the Godown still have enough finished goods to deduct?
+    SELECT current_qty INTO v_cur_stock
+    FROM public."CurrentStock"
+    WHERE company_id = p_company_id AND godown_id = v_assembly.godown_id AND item_id = v_produced_line.item_id;
+
+    IF v_cur_stock IS NULL OR v_cur_stock.current_qty < v_produced_line.quantity THEN
+        RAISE EXCEPTION 'ERR_STOCK_DEPLETED: Cannot cancel assembly. Only % units of produced item "%" remain in this Godown (need % units to reverse). The finished goods may have already been sold or moved.',
+            COALESCE(v_cur_stock.current_qty, 0), v_produced_line.item_name, v_produced_line.quantity;
+    END IF;
+
+    -- 4. Deduct Finished Good Stock from Item table
+    UPDATE public."Item"
+    SET quantity_on_hand = GREATEST(0, COALESCE(quantity_on_hand, 0) - v_produced_line.quantity),
+        updated_at = NOW()
+    WHERE id = v_produced_line.item_id;
+
+    -- InventoryLedger insert: trg_update_current_stock automatically deducts from CurrentStock exactly once
+    INSERT INTO public."InventoryLedger" (
+        company_id, item_id, godown_id, transaction_type,
+        quantity_in, quantity_out, transaction_date, reference_id, reference_type,
+        total_amount, description, voucher_no, ledger_status, wac_at_post
+    ) VALUES (
+        p_company_id, v_produced_line.item_id, v_assembly.godown_id, 'StockAssembly',
+        0, v_produced_line.quantity, CURRENT_TIMESTAMP, p_assembly_id, 'StockAssembly',
+        (v_produced_line.quantity * COALESCE(v_produced_line.unit_cost, 0)),
+        'Reversal of Produced Item: ' || v_produced_line.item_name || ' (' || v_assembly.assembly_no || '): ' || p_reason,
+        v_assembly.assembly_no || '-REV', 'Active', COALESCE(v_produced_line.unit_cost, 0)
+    );
+
+    -- 5. Restock Consumed Raw Materials
+    FOR v_line IN (
+        SELECT sai.*, i.item_name
+        FROM public."StockAssemblyItem" sai
+        JOIN public."Item" i ON i.id = sai.item_id
+        WHERE sai.assembly_id = p_assembly_id AND sai.line_type = 'Consumed'
+    ) LOOP
+        UPDATE public."Item"
+        SET quantity_on_hand = COALESCE(quantity_on_hand, 0) + v_line.quantity,
+            updated_at = NOW()
+        WHERE id = v_line.item_id;
+
+        -- InventoryLedger insert: trg_update_current_stock automatically restocks CurrentStock exactly once
+        INSERT INTO public."InventoryLedger" (
+            company_id, item_id, godown_id, transaction_type,
+            quantity_in, quantity_out, transaction_date, reference_id, reference_type,
+            total_amount, description, voucher_no, ledger_status, wac_at_post
+        ) VALUES (
+            p_company_id, v_line.item_id, v_assembly.godown_id, 'StockAssembly',
+            v_line.quantity, 0, CURRENT_TIMESTAMP, p_assembly_id, 'StockAssembly',
+            (v_line.quantity * COALESCE(v_line.unit_cost, 0)),
+            'Restocked Consumed Material: ' || v_line.item_name || ' (' || v_assembly.assembly_no || '): ' || p_reason,
+            v_assembly.assembly_no || '-REV', 'Active', COALESCE(v_line.unit_cost, 0)
+        );
+    END LOOP;
+
+    -- 6. Deduct Scrap Recovery items if any were added
+    FOR v_line IN (
+        SELECT sai.*, i.item_name
+        FROM public."StockAssemblyItem" sai
+        JOIN public."Item" i ON i.id = sai.item_id
+        WHERE sai.assembly_id = p_assembly_id 
+          AND sai.line_type IN ('Wastage', 'Wastage (Recovery)')
+          AND sai.unit_cost > 0
+    ) LOOP
+        SELECT current_qty INTO v_cur_stock
+        FROM public."CurrentStock"
+        WHERE company_id = p_company_id AND godown_id = v_assembly.godown_id AND item_id = v_line.item_id;
+
+        IF v_cur_stock IS NOT NULL AND v_cur_stock.current_qty >= v_line.quantity THEN
+            UPDATE public."Item"
+            SET quantity_on_hand = GREATEST(0, COALESCE(quantity_on_hand, 0) - v_line.quantity),
+                updated_at = NOW()
+            WHERE id = v_line.item_id;
+
+            INSERT INTO public."InventoryLedger" (
+                company_id, item_id, godown_id, transaction_type,
+                quantity_in, quantity_out, transaction_date, reference_id, reference_type,
+                total_amount, description, voucher_no, ledger_status, wac_at_post
+            ) VALUES (
+                p_company_id, v_line.item_id, v_assembly.godown_id, 'StockAssembly',
+                0, v_line.quantity, CURRENT_TIMESTAMP, p_assembly_id, 'StockAssembly',
+                (v_line.quantity * v_line.unit_cost),
+                'Deducted Scrap on Reversal: ' || v_line.item_name || ' (' || v_assembly.assembly_no || '): ' || p_reason,
+                v_assembly.assembly_no || '-REV', 'Active', v_line.unit_cost
+            );
+        END IF;
+    END LOOP;
+
+    -- 7. Reverse Associated General Ledger Journals
+    FOR v_journal_rec IN (
+        SELECT id, voucher_no 
+        FROM public."GeneralLedgerJournal"
+        WHERE company_id = p_company_id 
+          AND source_document_id = p_assembly_id 
+          AND source_document_type = 'StockAssembly'
+          AND is_reversed = FALSE
+          AND status = 'Posted'
+    ) LOOP
+        PERFORM public.rpc_reverse_gl_journal(
+            v_journal_rec.id,
+            'Cancelled Stock Assembly: ' || v_assembly.assembly_no || ' - ' || p_reason,
+            v_user_id
+        );
+        v_reversal_count := v_reversal_count + 1;
+    END LOOP;
+
+    -- 8. Mark StockAssembly as Cancelled
+    UPDATE public."StockAssembly"
+    SET status = 'Cancelled',
+        cancellation_reason = p_reason,
+        cancelled_at = NOW(),
+        cancelled_by = v_user_id,
+        updated_at = NOW()
+    WHERE id = p_assembly_id;
+
+    RETURN jsonb_build_object(
+        'success', true,
+        'status', 'Cancelled',
+        'assembly_id', p_assembly_id,
+        'reversal_journals_count', v_reversal_count,
+        'message', 'Stock Assembly reversed and physical inventory restored successfully.'
+    );
+END;
+$$;
+
+-- ── 4. RE-ESTABLISH ALIAS RPCS ──────────────────────────────────────────────
+CREATE OR REPLACE FUNCTION public.rpc_complete_stock_assembly(
+    p_assembly_id UUID,
+    p_company_id UUID
+) RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+BEGIN
+    RETURN public.complete_stock_assembly(p_assembly_id, p_company_id);
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.rpc_cancel_stock_assembly(
+    p_assembly_id UUID,
+    p_company_id UUID,
+    p_reason TEXT DEFAULT 'Cancelled by user',
+    p_user_id UUID DEFAULT NULL
+) RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+BEGIN
+    RETURN public.cancel_stock_assembly(p_assembly_id, p_company_id, p_reason, p_user_id);
+END;
+$$;
+
+-- ── 5. DATA CLEANUP: PURGE ORPHANED TEST DATA & RECONCILE STOCK ─────────────
+-- Temporarily lift triggers and enable maintenance mode for administrative cleanup
+SET LOCAL sajilo.maintenance_mode = 'true';
+ALTER TABLE public."GeneralLedgerJournal" DISABLE TRIGGER trg_gl_journal_anti_tamper_del;
+ALTER TABLE public."InventoryLedger" DISABLE TRIGGER trg_update_current_stock;
+
+-- Delete orphaned GL lines for non-existent stock assemblies
+DELETE FROM public."GeneralLedgerLine"
+WHERE journal_id IN (
+    SELECT id FROM public."GeneralLedgerJournal"
+    WHERE source_document_type = 'StockAssembly'
+      AND source_document_id NOT IN (SELECT id FROM public."StockAssembly")
+);
+
+-- Delete orphaned GL journals for non-existent stock assemblies
+DELETE FROM public."GeneralLedgerJournal"
+WHERE source_document_type = 'StockAssembly'
+  AND source_document_id NOT IN (SELECT id FROM public."StockAssembly");
+
+-- Delete orphaned InventoryLedger entries for non-existent stock assemblies
+DELETE FROM public."InventoryLedger"
+WHERE transaction_type = 'StockAssembly'
+  AND reference_id NOT IN (SELECT id FROM public."StockAssembly");
+
+-- Synchronize CurrentStock across all godowns from active InventoryLedger records
+UPDATE public."CurrentStock" cs
+SET current_qty = GREATEST(0, COALESCE((
+    SELECT SUM(COALESCE(il.quantity_in, 0) - COALESCE(il.quantity_out, 0))
+    FROM public."InventoryLedger" il
+    WHERE il.company_id = cs.company_id
+      AND il.godown_id = cs.godown_id
+      AND il.item_id = cs.item_id
+      AND il.ledger_status = 'Active'
+), 0)),
+updated_at = NOW();
+
+-- Synchronize Item quantity_on_hand across all physical items from CurrentStock
+UPDATE public."Item" i
+SET quantity_on_hand = COALESCE((
+    SELECT SUM(current_qty)
+    FROM public."CurrentStock" cs
+    WHERE cs.company_id = i.company_id AND cs.item_id = i.id
+), 0),
+updated_at = NOW()
+WHERE is_physical = true;
+
+-- Re-enable anti-tamper and stock triggers
+ALTER TABLE public."InventoryLedger" ENABLE TRIGGER trg_update_current_stock;
+ALTER TABLE public."GeneralLedgerJournal" ENABLE TRIGGER trg_gl_journal_anti_tamper_del;
+SET LOCAL sajilo.maintenance_mode = 'false';
+
+-- ── 6. GRANTS ───────────────────────────────────────────────────────────────
+GRANT EXECUTE ON FUNCTION public.complete_stock_assembly(UUID, UUID) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.rpc_complete_stock_assembly(UUID, UUID) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.cancel_stock_assembly(UUID, UUID, TEXT, UUID) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.rpc_cancel_stock_assembly(UUID, UUID, TEXT, UUID) TO authenticated, service_role;
+
+COMMIT;
+```
+
+### Rollback Strategy for Script 8:
+Run `supabase/migrations/142_fix_stock_assembly_trigger_double_deduction_rollback.sql` (or `222_fix_stock_assembly_trigger_double_deduction_rollback.sql`) in Supabase SQL Editor.
+
+---
+
+## Script 9: Auth Context Stale Company Auto-Fallback (Prevents Login Loops)
+**File:** `supabase/migrations/143_fix_auth_context_stale_company_fallback.sql` (or `223_fix_auth_context_stale_company_fallback.sql`)  
+**Purpose:** Hardens `get_user_auth_context` RPC so that when a client requests a stale, deleted, or unauthorized company ID (e.g., from browser `localStorage`), the database automatically falls back to the user's default active company instead of throwing `company_access_denied` and triggering an unrecoverable infinite login redirect loop.
+
+### Copy & Paste SQL into Supabase:
+
+```sql
+CREATE OR REPLACE FUNCTION public.get_user_auth_context(p_company_id uuid DEFAULT NULL)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_user_id   uuid := auth.uid();
+  v_user      "User"%ROWTYPE;
+  v_company   "Company"%ROWTYPE;
+  v_uc        "UserCompany"%ROWTYPE;
+  v_role      "CompanyRole"%ROWTYPE;
+  v_resolved_company_id uuid := p_company_id;
+BEGIN
+  -- 1. Get user profile
+  SELECT * INTO v_user FROM public."User" WHERE id = v_user_id;
+  IF NOT FOUND THEN
+    RETURN jsonb_build_object('status', 'not_registered');
+  END IF;
+
+  -- 2. Check global account status
+  IF v_user.account_status IS NOT NULL AND v_user.account_status != 'active' THEN
+    RETURN jsonb_build_object('status', 'suspended');
+  END IF;
+
+  -- 3. Auto-resolve to default or secondary ACTIVE company if none requested
+  IF v_resolved_company_id IS NULL THEN
+    SELECT uc.company_id INTO v_resolved_company_id
+    FROM public."UserCompany" uc
+    JOIN public."Company" c ON c.id = uc.company_id
+    WHERE uc.user_id = v_user_id
+      AND (uc.membership_status IS NULL OR uc.membership_status = 'active')
+      AND (c.status IS NULL OR c.status = 'ACTIVE')
+      AND (c.is_active IS NULL OR c.is_active = true)
+    ORDER BY uc.is_default DESC NULLS LAST, uc.created_at ASC
+    LIMIT 1;
+  END IF;
+
+  -- 3b. Promote secondary company to default if user currently has no default company
+  IF v_resolved_company_id IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM public."UserCompany" 
+    WHERE user_id = v_user_id AND is_default = true
+  ) THEN
+    UPDATE public."UserCompany"
+    SET is_default = true
+    WHERE user_id = v_user_id AND company_id = v_resolved_company_id;
+  END IF;
+
+  -- 4. No active company found? Return global context only
+  IF v_resolved_company_id IS NULL THEN
+    RETURN jsonb_build_object(
+      'status',               'no_company',
+      'user',                 row_to_json(v_user),
+      'available_companies',  '[]'::jsonb
+    );
+  END IF;
+
+  -- 5. Validate company membership (Prioritize Admin records if duplicates exist)
+  SELECT * INTO v_uc
+  FROM public."UserCompany"
+  WHERE user_id = v_user_id 
+    AND company_id = v_resolved_company_id
+    AND (membership_status IS NULL OR membership_status = 'active')
+  ORDER BY is_owner DESC, is_tenant_admin DESC 
+  LIMIT 1;
+
+  -- 5b. Resilient Auto-Fallback:
+  -- If the requested company is invalid, deleted, or membership revoked,
+  -- auto-fallback to user's secondary active company instead of failing the login session!
+  IF NOT FOUND AND p_company_id IS NOT NULL THEN
+    SELECT uc.company_id INTO v_resolved_company_id
+    FROM public."UserCompany" uc
+    JOIN public."Company" c ON c.id = uc.company_id
+    WHERE uc.user_id = v_user_id
+      AND (uc.membership_status IS NULL OR uc.membership_status = 'active')
+      AND (c.status IS NULL OR c.status = 'ACTIVE')
+      AND (c.is_active IS NULL OR c.is_active = true)
+    ORDER BY uc.is_default DESC NULLS LAST, uc.created_at ASC
+    LIMIT 1;
+
+    IF v_resolved_company_id IS NOT NULL THEN
+      SELECT * INTO v_uc
+      FROM public."UserCompany"
+      WHERE user_id = v_user_id 
+        AND company_id = v_resolved_company_id
+        AND (membership_status IS NULL OR membership_status = 'active')
+      ORDER BY is_owner DESC, is_tenant_admin DESC 
+      LIMIT 1;
+
+      -- Promote newly resolved secondary company to default
+      UPDATE public."UserCompany"
+      SET is_default = true
+      WHERE user_id = v_user_id AND company_id = v_resolved_company_id;
+    END IF;
+  END IF;
+
+  IF NOT FOUND THEN
+    RETURN jsonb_build_object('status', 'company_access_denied');
+  END IF;
+
+  -- 6. Load company and role
+  SELECT * INTO v_company FROM public."Company" WHERE id = v_resolved_company_id;
+
+  IF v_uc.company_role_id IS NOT NULL THEN
+    SELECT * INTO v_role FROM public."CompanyRole" WHERE id = v_uc.company_role_id;
+  ELSIF v_user.global_role_id IS NOT NULL THEN
+    SELECT * INTO v_role FROM public."CompanyRole" WHERE id = v_user.global_role_id;
+  END IF;
+
+  -- 7. Return full context with deduplicated company switcher array
+  RETURN jsonb_build_object(
+    'status',               'ok',
+    'user',                 row_to_json(v_user),
+    'active_company',       row_to_json(v_company),
+    'is_tenant_admin',      (COALESCE(v_uc.is_tenant_admin, false) OR COALESCE(v_uc.is_owner, false)),
+    'active_role',          row_to_json(v_role),
+    
+    -- Safe, deduplicated available companies retaining owner flags and logo
+    'available_companies',  COALESCE(
+      (SELECT jsonb_agg(
+          jsonb_build_object(
+            'id', comp.id,
+            'name', comp.name,
+            'logo_url', comp.logo_url,
+            'is_owner', comp.is_owner,
+            'is_tenant_admin', comp.is_tenant_admin
+          )
+       )
+       FROM (
+           SELECT 
+               c.id, 
+               c.name, 
+               c.logo_url,
+               bool_or(COALESCE(uc.is_owner, false)) as is_owner,
+               bool_or(COALESCE(uc.is_tenant_admin, false)) as is_tenant_admin
+           FROM public."Company" c
+           JOIN public."UserCompany" uc ON uc.company_id = c.id
+           WHERE uc.user_id = v_user_id
+             AND (uc.membership_status IS NULL OR uc.membership_status = 'active')
+           GROUP BY c.id, c.name, c.logo_url
+           ORDER BY MIN(c.created_at) ASC
+       ) comp),
+      '[]'::jsonb),
+
+    'overrides',            COALESCE(
+      (SELECT jsonb_agg(row_to_json(o))
+       FROM public."UserPermissionOverride" o
+       WHERE o.user_id = v_user_id
+         AND (o.company_id IS NULL OR o.company_id = v_resolved_company_id)
+         AND (o.expires_at IS NULL OR o.expires_at > now())),
+      '[]'::jsonb),
+      
+    'settings',             (SELECT row_to_json(s)
+                             FROM public."CompanySettings" s
+                             WHERE s.company_id = v_resolved_company_id
+                             LIMIT 1),
+                             
+    'godowns',              COALESCE(
+      (SELECT jsonb_agg(row_to_json(g))
+       FROM public."Godown" g
+       WHERE g.company_id = v_resolved_company_id AND g.status = 'Active'),
+      '[]'::jsonb)
+  );
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.get_user_auth_context(uuid) TO authenticated;
+```
+
+### Rollback Strategy for Script 9:
+Run `supabase/migrations/143_fix_auth_context_stale_company_fallback_rollback.sql` (or `223_fix_auth_context_stale_company_fallback_rollback.sql`) in Supabase SQL Editor.
 
 

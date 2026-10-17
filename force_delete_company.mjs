@@ -95,16 +95,120 @@ async function run() {
         // Enable maintenance mode for custom trigger conditions
         await client.query("SELECT set_config('sajilo.maintenance_mode', 'true', true);");
 
-        // Explicitly clear UserCompany just in case it uses TEXT mapping or lacks cascade
-        await client.query(`DELETE FROM "UserCompany" WHERE company_id::text = $1`, [companyId]);
+        // Phase 2a: Auto-Promote Secondary Company for Affected Users
+        console.log(` - Auto-promoting secondary company for affected default users...`);
+        await client.query(`
+            CREATE TEMP TABLE tmp_affected_users AS
+            SELECT DISTINCT user_id 
+            FROM public."UserCompany" 
+            WHERE company_id = $1::uuid AND is_default = true;
+        `, [companyId]);
+
+        await client.query(`DELETE FROM public."UserCompany" WHERE company_id = $1::uuid`, [companyId]);
+
+        const promoRes = await client.query(`
+            WITH candidate_defaults AS (
+                SELECT uc.id,
+                       ROW_NUMBER() OVER (PARTITION BY uc.user_id ORDER BY uc.created_at ASC) as rn
+                FROM public."UserCompany" uc
+                JOIN public."Company" c ON c.id = uc.company_id
+                WHERE uc.user_id IN (SELECT user_id FROM tmp_affected_users)
+                  AND (uc.membership_status IS NULL OR uc.membership_status = 'active')
+                  AND (c.status IS NULL OR c.status = 'ACTIVE')
+                  AND (c.is_active IS NULL OR c.is_active = true)
+            )
+            UPDATE public."UserCompany"
+            SET is_default = true
+            WHERE id IN (SELECT id FROM candidate_defaults WHERE rn = 1);
+        `);
+        console.log(` ✅ Auto-promoted secondary company to default for ${promoRes.rowCount} user(s).`);
+        await client.query(`DROP TABLE IF EXISTS tmp_affected_users;`);
+
+        // Phase 2b: Dynamic Discovery & Purge of Child Tables (without direct company_id)
+        console.log(` - Dynamically discovering and purging child/line tables...`);
+        const { rows: childTables } = await client.query(`
+            SELECT 
+                c.conname AS fk_name,
+                src_ns.nspname AS child_schema,
+                src_tbl.relname AS child_table,
+                src_col.attname AS child_column,
+                ref_ns.nspname AS parent_schema,
+                ref_tbl.relname AS parent_table,
+                ref_col.attname AS parent_column
+            FROM pg_constraint c
+            JOIN pg_class src_tbl ON src_tbl.oid = c.conrelid
+            JOIN pg_namespace src_ns ON src_ns.oid = src_tbl.relnamespace
+            JOIN pg_attribute src_col ON src_col.attrelid = src_tbl.oid AND src_col.attnum = ANY(c.conkey)
+            JOIN pg_class ref_tbl ON ref_tbl.oid = c.confrelid
+            JOIN pg_namespace ref_ns ON ref_ns.oid = ref_tbl.relnamespace
+            JOIN pg_attribute ref_col ON ref_col.attrelid = ref_tbl.oid AND ref_col.attnum = ANY(c.confkey)
+            WHERE c.contype = 'f' 
+              AND src_ns.nspname = 'public'
+              AND ref_ns.nspname = 'public'
+              AND src_tbl.relname NOT LIKE 'pg_%'
+              AND src_tbl.relname NOT LIKE 'sql_%'
+              AND NOT EXISTS (
+                  SELECT 1 FROM information_schema.columns col 
+                  WHERE col.table_schema = src_ns.nspname 
+                    AND col.table_name = src_tbl.relname 
+                    AND col.column_name = 'company_id'
+              )
+              AND EXISTS (
+                  SELECT 1 FROM information_schema.columns col 
+                  WHERE col.table_schema = ref_ns.nspname 
+                    AND col.table_name = ref_tbl.relname 
+                    AND col.column_name = 'company_id'
+              )
+        `);
+
+        for (const ct of childTables) {
+            try {
+                const delRes = await client.query(`
+                    DELETE FROM "${ct.child_schema}"."${ct.child_table}"
+                    WHERE "${ct.child_column}" IN (
+                        SELECT "${ct.parent_column}" FROM "${ct.parent_schema}"."${ct.parent_table}" WHERE company_id = $1::uuid
+                    )
+                `, [companyId]);
+                if (delRes.rowCount > 0) {
+                    console.log(`   - ${ct.child_table}: deleted ${delRes.rowCount} child row(s)`);
+                }
+            } catch (err) {
+                // Ignore gracefully if table structure differs
+            }
+        }
+
+        // Phase 2c: Dynamic Discovery & Purge of All Tables with company_id
+        console.log(` - Dynamically discovering and purging all tables with company_id...`);
+        const { rows: companyTables } = await client.query(`
+            SELECT table_schema, table_name 
+            FROM information_schema.columns 
+            WHERE table_schema = 'public' 
+              AND column_name = 'company_id'
+              AND table_name NOT IN ('Company', 'UserCompany')
+              AND table_name NOT LIKE 'pg_%'
+              AND table_name NOT LIKE 'sql_%'
+            GROUP BY table_schema, table_name
+            ORDER BY table_name ASC
+        `);
+
+        for (const tbl of companyTables) {
+            try {
+                const delRes = await client.query(`DELETE FROM "${tbl.table_schema}"."${tbl.table_name}" WHERE company_id = $1::uuid`, [companyId]);
+                if (delRes.rowCount > 0) {
+                    console.log(`   - ${tbl.table_name}: deleted ${delRes.rowCount} row(s)`);
+                }
+            } catch (err) {
+                console.warn(`   ⚠️ Skipping ${tbl.table_name}: ${err.message}`);
+            }
+        }
         
-        // Execute the single hard delete, letting V6 ON DELETE CASCADE handle the rest
+        // Execute the hard delete for Company
         const compRes = await client.query(`DELETE FROM "Company" WHERE id = $1::uuid`, [companyId]);
         
         if (compRes.rowCount === 0) {
             console.warn(` ⚠️ Company record not found in database (may have been deleted already).`);
         } else {
-            console.log(` ✅ Triggered native cascade delete for Company.`);
+            console.log(` ✅ Completed multi-table clean delete for Company.`);
         }
 
         // Restore trigger enforcement

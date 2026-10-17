@@ -20,11 +20,15 @@ export default function ItemTransactionHistory({ item }) {
   const fetchHistory = async () => {
     setLoading(true);
     try {
-      // Fetch purchase invoices, sales invoices, and stock adjustments in parallel
-      const [purchaseInvoices, salesInvoices, stockAdj] = await Promise.all([
+      // Fetch purchase invoices, sales invoices, stock adjustments, and stock assemblies in parallel
+      const [purchaseInvoices, salesInvoices, stockAdj, { data: assemblyItems }] = await Promise.all([
         sajilo.entities.PurchaseInvoice.list('-created_date', 200),
         sajilo.entities.SalesInvoice.list('-created_date', 200),
         sajilo.entities.StockAdjustment.list('-created_date', 200),
+        sajilo.client
+          .from('StockAssemblyItem')
+          .select('id, assembly_id, line_type, quantity, unit_cost, StockAssembly!inner(id, assembly_no, assembly_date, status, company_id)')
+          .eq('item_id', item.id)
       ]);
 
       const txns = [];
@@ -89,6 +93,28 @@ export default function ItemTransactionHistory({ item }) {
         });
       });
 
+      // Extract lines from completed stock assemblies that match this item
+      (assemblyItems || []).forEach(line => {
+        const asm = line.StockAssembly;
+        if (asm && asm.status === 'Completed') {
+          const isProduced = line.line_type === 'Produced';
+          const isScrap = line.line_type === 'Wastage' || line.line_type === 'Wastage (Recovery)';
+          const direction = isProduced ? 'in' : (isScrap && Number(line.unit_cost || 0) > 0 ? 'in' : 'out');
+          txns.push({
+            id: `asm-${asm.id}-${line.id}`,
+            date: asm.assembly_date,
+            type: 'Assembly',
+            direction,
+            document: asm.assembly_no || 'Stock Assembly',
+            partner: isProduced ? 'Production Build (FG)' : (isScrap ? 'Scrap Recovery' : 'Production Consumption'),
+            quantity: Number(line.quantity || 0),
+            unit_price: Number(line.unit_cost || 0),
+            line_total: Number(line.quantity || 0) * Number(line.unit_cost || 0),
+            status: asm.status,
+          });
+        }
+      });
+
       // Sort by date desc
       txns.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
       setTransactions(txns);
@@ -124,8 +150,8 @@ export default function ItemTransactionHistory({ item }) {
 
       {/* Tabs */}
       <div className="flex items-center justify-between">
-        <div className="flex gap-1.5">
-          {['all', 'purchase', 'sale', 'adjustment'].map(tab => (
+        <div className="flex gap-1.5 flex-wrap">
+          {['all', 'purchase', 'sale', 'adjustment', 'assembly'].map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -134,7 +160,11 @@ export default function ItemTransactionHistory({ item }) {
                 activeTab === tab ? 'bg-primary text-white' : 'bg-muted text-muted-foreground hover:bg-muted/80'
               )}
             >
-              {tab === 'all' ? `All (${transactions.length})` : tab === 'purchase' ? `Purchases (${transactions.filter(t => t.type === 'Purchase').length})` : tab === 'sale' ? `Sales (${transactions.filter(t => t.type === 'Sale').length})` : `Adjustments (${transactions.filter(t => t.type === 'Adjustment').length})`}
+              {tab === 'all' ? `All (${transactions.length})` 
+                : tab === 'purchase' ? `Purchases (${transactions.filter(t => t.type === 'Purchase').length})` 
+                : tab === 'sale' ? `Sales (${transactions.filter(t => t.type === 'Sale').length})` 
+                : tab === 'adjustment' ? `Adjustments (${transactions.filter(t => t.type === 'Adjustment').length})`
+                : `Assemblies (${transactions.filter(t => t.type === 'Assembly').length})`}
             </button>
           ))}
         </div>
@@ -182,6 +212,7 @@ export default function ItemTransactionHistory({ item }) {
                     'inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full',
                     t.type === 'Purchase' ? 'bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400' :
                     t.type === 'Sale' ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400' :
+                    t.type === 'Assembly' ? 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400' :
                     'bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400'
                   )}>
                     {t.direction === 'in'

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '@/lib/AuthContext';
 import { useTheme } from '@/lib/ThemeContext';
 import { useDateFormat } from '@/lib/DateFormatContext';
@@ -30,11 +30,19 @@ import {
 } from '@/lib/nepaliDate';
 
 export default function Dashboard() {
-  const { availableCompanies, isLoadingAuth, activeCompany } = useAuth();
+  const { availableCompanies, isLoadingAuth, activeCompany, switchCompany } = useAuth();
   const { formatAmountShort } = useAmountFormatter();
   const { dateFormat } = useDateFormat();
   const isBS = dateFormat === 'BS';
   const activeCompanyId = activeCompany?.id || null;
+
+  // Auto-select secondary company if activeCompany is null but available companies exist
+  useEffect(() => {
+    if (!isLoadingAuth && !activeCompany && availableCompanies && availableCompanies.length > 0) {
+      console.log(`[Dashboard] Auto-selecting secondary company: ${availableCompanies[0].name} (${availableCompanies[0].id})`);
+      switchCompany(availableCompanies[0].id);
+    }
+  }, [isLoadingAuth, activeCompany, availableCompanies, switchCompany]);
   
   // --- Decoupled Date Ranges (V4 Architecture) ---
   // 1. 6-Month Rolling Boundary for Area & Bar Charts
